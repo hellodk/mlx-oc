@@ -54,6 +54,12 @@ MODEL_DEFAULT = "mlx-community/Qwen3-1.7B-4bit"
 _OTEL = None  # set by _setup_otel(); None == OTel disabled
 
 
+def _sig_url(endpoint, sig):
+    """Return the full OTLP URL for a signal path, e.g. <endpoint>/v1/metrics."""
+    url = endpoint.rstrip("/")
+    return url if url.endswith(f"/v1/{sig}") else f"{url}/v1/{sig}"
+
+
 def _setup_otel(endpoint, node_name, service_name="mlx-metrics-proxy"):
     """Best-effort OTel init. Returns an OTel helper or None on failure."""
     if not endpoint:
@@ -94,14 +100,17 @@ def _setup_otel(endpoint, node_name, service_name="mlx-metrics-proxy"):
 
         # -- traces ------------------------------------------------------
         tp = TracerProvider(resource=resource)
-        tp.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
+        tp.add_span_processor(
+            BatchSpanProcessor(OTLPSpanExporter(endpoint=_sig_url(endpoint, "traces")))
+        )
         trace.set_tracer_provider(tp)
 
         # -- metrics -----------------------------------------------------
         mp = MeterProvider(
             metric_readers=[
                 PeriodicExportingMetricReader(
-                    OTLPMetricExporter(endpoint=endpoint), export_interval_millis=15000
+                    OTLPMetricExporter(endpoint=_sig_url(endpoint, "metrics")),
+                    export_interval_millis=15000,
                 )
             ],
             resource=resource,
@@ -111,7 +120,9 @@ def _setup_otel(endpoint, node_name, service_name="mlx-metrics-proxy"):
         # -- logs --------------------------------------------------------
         lp = LoggerProvider(resource=resource)
         lp.add_log_record_processor(
-            BatchLogRecordProcessor(OTLPLogExporter(endpoint=endpoint))
+            BatchLogRecordProcessor(
+                OTLPLogExporter(endpoint=_sig_url(endpoint, "logs"))
+            )
         )
         _logs.set_logger_provider(lp)
         logging_handler = LoggingHandler(
@@ -249,6 +260,16 @@ H_UNGROUNDED = Gauge(
 UPSTREAM_UP = Gauge(
     "mlx_up",
     "1 if the upstream mlx_lm server is reachable",
+)
+IN_FLIGHT = Gauge(
+    "mlx_in_flight",
+    "Chat completion requests currently being processed (queue depth)",
+    ["model"],
+)
+ERRORS = Counter(
+    "mlx_error_total",
+    "Requests by HTTP status class (4xx/5xx)",
+    ["model", "status"],
 )
 
 # --------------------------------------------------------------------------
@@ -407,6 +428,7 @@ class Proxy(BaseHTTPRequestHandler):
         streaming = False
         temperature = self.default_temp
         tools_provided = False
+        messages = []
         if self.command == "POST" and req_path.endswith("/v1/chat/completions"):
             try:
                 req = json.loads(body or b"{}")
@@ -414,6 +436,7 @@ class Proxy(BaseHTTPRequestHandler):
                 streaming = bool(req.get("stream", False))
                 temperature = req.get("temperature", self.default_temp)
                 tools_provided = bool(req.get("tools"))
+                messages = req.get("messages") or []
             except json.JSONDecodeError:
                 pass
 
@@ -444,12 +467,15 @@ class Proxy(BaseHTTPRequestHandler):
                 },
             )
             span.set_attribute("mlx.tools_provided", tools_provided)
+        IN_FLIGHT.labels(model).inc()
         try:
             conn.request(self.command, req_path, body=body, headers=headers)
             resp = conn.getresponse()
             UPSTREAM_UP.set(1)
 
             status = resp.status
+            if status >= 400:
+                ERRORS.labels(model, f"{status // 100}xx").inc()
             resp_headers = []
             for k, v in resp.getheaders():
                 if k.lower() in ("transfer-encoding", "connection", "keep-alive"):
@@ -470,7 +496,10 @@ class Proxy(BaseHTTPRequestHandler):
             content_bytes = []
 
             while True:
-                chunk = resp.read(65536)
+                # read1(): return available bytes instead of blocking until
+                # the full buffer size is read. read(65536) would buffer the
+                # entire SSE response and destroy streaming / TTFT accuracy.
+                chunk = resp.read1(65536)
                 if not chunk:
                     break
                 if is_sse:
@@ -503,10 +532,16 @@ class Proxy(BaseHTTPRequestHandler):
                     pass
 
             if usage:
-                TOKENS_PROMPT.labels(model).inc(int(usage.get("prompt_tokens", 0)))
+                prompt_tokens = int(usage.get("prompt_tokens", 0))
                 comp_tokens = int(usage.get("completion_tokens", 0))
             else:
+                # upstream mlx_lm.server does not return a `usage` object;
+                # fall back to a word-count estimate for prompt tokens.
+                prompt_tokens = sum(
+                    len(str(m.get("content", "")).split()) for m in messages
+                )
                 comp_tokens = len(content.split())
+            TOKENS_PROMPT.labels(model).inc(prompt_tokens)
             TOKENS_COMPLETION.labels(model).inc(comp_tokens)
 
             gen_time = t_done - t_send
@@ -535,8 +570,7 @@ class Proxy(BaseHTTPRequestHandler):
                     (t_first_token - t_send) if t_first_token is not None else gen_time,
                 )
                 span.set_attribute("mlx.gen_seconds", gen_time)
-                span.set_attribute("mlx.tokens_prompt",
-                                   int(usage.get("prompt_tokens", 0)) if usage else 0)
+                span.set_attribute("mlx.tokens_prompt", prompt_tokens)
                 span.set_attribute("mlx.tokens_completion", comp_tokens)
                 span.set_attribute("mlx.tool_calls", tool_calls)
                 span.set_attribute("mlx.hallucination_risk", risk)
@@ -554,6 +588,7 @@ class Proxy(BaseHTTPRequestHandler):
 
         except (socket.error, http.client.HTTPException, ConnectionRefusedError) as exc:
             UPSTREAM_UP.set(0)
+            ERRORS.labels(model, "5xx").inc()
             if span is not None:
                 span.set_attribute("error.type", type(exc).__name__)
                 span.set_attribute("http.response.status_code", 503)
@@ -569,6 +604,7 @@ class Proxy(BaseHTTPRequestHandler):
             except Exception:
                 pass
         finally:
+            IN_FLIGHT.labels(model).dec()
             if span is not None:
                 try:
                     span.end()

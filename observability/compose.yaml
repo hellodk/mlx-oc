@@ -1,0 +1,56 @@
+services:
+  victoria-metrics:
+    image: docker.io/victoriametrics/victoria-metrics:latest
+    container_name: victoria-metrics
+    restart: unless-stopped
+    ports:
+      - "8428:8428"        # Prometheus-compatible API + /vmui query UI
+    command:
+      - -promscrape.config=/etc/vm-scrape.yml
+      - -retentionPeriod=30d
+      - -storageDataPath=/victoria-metrics-data
+    environment:
+      - MLX_IP=${MLX_IP:-192.168.1.64}
+    volumes:
+      - vm-data:/victoria-metrics-data
+      - ./vm-scrape.yml:/etc/vm-scrape.yml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8428/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Optional: OTLP gateway so the MLX proxy / hw agents can push
+  # traces, metrics and logs (--otlp-endpoint http://192.168.1.64:4318).
+  # Metrics are remote-written into VictoriaMetrics; traces/logs go to stdout.
+  otel-collector:
+    image: docker.io/otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    restart: unless-stopped
+    ports:
+      - "4317:4317"        # OTLP gRPC
+      - "4318:4318"        # OTLP HTTP
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otelcol-config.yaml:/etc/otelcol/config.yaml:ro
+
+  grafana:
+    image: docker.io/grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_USERS_DEFAULT_THEME=light
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+volumes:
+  vm-data:
+  grafana-data:

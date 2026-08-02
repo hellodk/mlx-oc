@@ -1,4 +1,6 @@
 .venv/
 __pycache__/
 *.pyc
-dist/*.log
+cluster/logs/
+observability/data/
+observability/vm-scrape.yml

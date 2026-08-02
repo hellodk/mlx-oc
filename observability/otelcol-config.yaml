@@ -1,0 +1,39 @@
+# OpenTelemetry Collector config for the temporary podman observability stack.
+# Receives OTLP from the MLX proxy / hw agents and:
+#   - metrics -> VictoriaMetrics via Prometheus remote write
+#   - traces / logs -> debug (stdout), so they are visible in `podman logs`
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+
+exporters:
+  prometheus_remote_write:
+    endpoint: http://victoria-metrics:8428/api/v1/write
+    resource_to_telemetry_conversion:
+      enabled: true
+  debug:
+    verbosity: basic
+    sampling_initial: 2
+    sampling_thereafter: 0
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus_remote_write, debug]
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]

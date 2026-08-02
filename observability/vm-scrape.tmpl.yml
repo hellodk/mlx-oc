@@ -1,0 +1,30 @@
+# VictoriaMetrics single-node scrape config.
+# Generated from vm-scrape.tmpl.yml by ./setup.sh (substitutes __MLX_IP__ /
+# __RANK1_IP__ with your Mac LAN addresses). Targets:
+#   - proxy      <MLX_IP>:8080/metrics   (inference + hallucination metrics)
+#   - hw agents  <MLX_IP>:9102 (rank0) and <RANK1_IP>:9102 (rank1)
+global:
+  scrape_interval: 10s
+
+scrape_configs:
+  - job_name: mlx-proxy
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["__MLX_IP__:8080"]
+        labels:
+          service: mlx-proxy
+          node: rank0
+
+  - job_name: mlx-hw
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "__MLX_IP__:9102"
+        labels:
+          service: mlx-hw
+          node: rank0
+      - targets:
+          - "__RANK1_IP__:9102"
+        labels:
+          service: mlx-hw
+          node: rank1

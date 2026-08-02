@@ -256,7 +256,7 @@
     <tr><td>mlx_lm</td><td>0.31.3</td><td>Includes the OpenAI-compatible <code>server.py</code></td></tr>
     <tr><td>Python</td><td>3.14.6</td><td>Homebrew, identical on both hosts</td></tr>
     <tr><td>Model</td><td><code>mlx-community/Qwen3-1.7B-4bit</code></td><td>Cached on both nodes (sharded load)</td></tr>
-    <tr><td>Interconnect</td><td>10.0.0.1 &harr; 10.0.0.2</td><td>Ring hostfile at <code>dist/hosts.json</code></td></tr>
+    <tr><td>Interconnect</td><td>10.0.0.1 &harr; 10.0.0.2</td><td>Ring hostfile at <code>cluster/hosts.json</code></td></tr>
   </table>
 
   <div class="callout warn"><span class="ic">!</span>
@@ -340,7 +340,7 @@ else:
     <div class="tl">
       <div class="when">Step 2 &middot; Provision</div>
       <div class="what">Identical venvs on both nodes</div>
-      <p>Installed MLX 0.32.0 + mlx_lm 0.31.3 into <code>/Users/dk/mlx-oc/dist/.venv</code> on both Macs and cached <code>Qwen3-1.7B-4bit</code> on both. Same path, same bits — sharded loading assumes it.</p>
+      <p>Installed MLX 0.32.0 + mlx_lm 0.31.3 into <code>.venv/</code> (now at the repo root) on both Macs and cached <code>Qwen3-1.7B-4bit</code> on both. Same path, same bits — sharded loading assumes it.</p>
     </div>
     <div class="tl">
       <div class="when">Step 3 &middot; Smoke test</div>
@@ -374,8 +374,8 @@ else:
     </div>
     <div class="tl">
       <div class="when">Step 9 &middot; Observability</div>
-      <div class="what">Metrics into the existing cluster</div>
-      <p>Explored the k0s cluster's Prometheus + Grafana to answer: "can I see model stats over Grafana?" (see <a href="#grafana">section 9</a>).</p>
+      <div class="what">Metrics into Grafana &mdash; locally</div>
+      <p>Explored the k0s cluster's Prometheus + Grafana, then stood up a self-contained <b>VictoriaMetrics + otel-collector + Grafana</b> stack on podman (see <a href="#grafana">section 11</a>) so the Macs don't depend on the cluster at all.</p>
     </div>
   </div>
 </section>
@@ -421,6 +421,24 @@ else:
     <tr><td>2 nodes &middot; direct Ethernet ring</td><td>3.5s</td><td>the sweet spot &mdash; shards the work</td></tr>
     <tr><td>2 nodes &middot; WiFi ring</td><td>34s</td><td>demonstrates why the cable exists</td></tr>
   </table>
+
+  <h3>Benchmarked with <code>bench.py</code></h3>
+  <p>Re-measured through the proxy with real SSE streaming (<code>tools/bench.py</code>, temp 0.0, 3 iters). At 1.7B parameters the ring collectives dominate, so two Macs are roughly <b>3&times; slower</b> than one &mdash; distribution pays off when the model outgrows a single machine.</p>
+  <table>
+    <tr><th>Scenario</th><th>Single node</th><th>2-node ring</th><th>Ratio</th></tr>
+    <tr><td>TTFT (first token)</td><td><span class="pill ok">0.1&ndash;0.2s</span></td><td><span class="pill warn">~0.2s</span></td><td>1&ndash;2&times;</td></tr>
+    <tr><td>Short prompt (~40 tokens out)</td><td><span class="pill ok">0.8s &middot; ~65 tok/s</span></td><td><span class="pill warn">2.4s &middot; ~18 tok/s</span></td><td>~3&times;</td></tr>
+    <tr><td>Medium prompt (~70 tokens out)</td><td><span class="pill ok">2.0&ndash;3.4s &middot; ~32 tok/s</span></td><td><span class="pill warn">6.9s &middot; ~10 tok/s</span></td><td>~3&times;</td></tr>
+    <tr><td>Long prompt (~90 tokens out)</td><td><span class="pill ok">2.1&ndash;3.9s &middot; ~44 tok/s</span></td><td><span class="pill warn">7.0s &middot; ~12 tok/s</span></td><td>~3&times;</td></tr>
+    <tr><td>256-token cap (medium / long)</td><td><span class="pill ok">3.4&ndash;3.9s &middot; ~36&ndash;44 tok/s</span></td><td><span class="pill warn">13.9&ndash;14s &middot; ~11 tok/s</span></td><td>~3.5&times;</td></tr>
+  </table>
+
+  <h3>Concurrency burst (4 clients, 12 requests)</h3>
+  <table>
+    <tr><th>Configuration</th><th>Wall time</th><th>Mean / request</th><th>Aggregate throughput</th></tr>
+    <tr><td>Single node</td><td><span class="pill ok">26.8s</span></td><td>8.9s</td><td><span class="pill ok">~51.5 tok/s</span></td></tr>
+    <tr><td>2-node ring</td><td><span class="pill warn">61.6s</span></td><td>20.5s</td><td><span class="pill warn">~23.6 tok/s</span></td></tr>
+  </table>
 </section>
 
 <section id="agent">
@@ -462,9 +480,9 @@ else:
   </div>
 
   <pre><code># Distributed agent run (identical output to single-node):
-mlx.launch --hostfile dist/hosts.json --backend ring \
-  --cwd /Users/dk/mlx-oc/dist \
-  -- /Users/dk/mlx-oc/dist/.venv/bin/python agent.py
+mlx.launch --hostfile cluster/hosts.json --backend ring \
+  --cwd /Users/dk/mlx-oc/cluster \
+  -- /Users/dk/mlx-oc/.venv/bin/python tools/agent.py
 
 # server.py verified live:
 #   POST /v1/chat/completions
@@ -638,19 +656,31 @@ mlx.launch --hostfile dist/hosts.json --backend ring \
       <line x1="490" y1="136" x2="585" y2="136" stroke="#c7cbe8" stroke-width="2" marker-end="url(#h1)"/>
       <defs><marker id="h1" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#5b6072"/></marker></defs>
     </svg>
-    <div class="figcap">Fig 6. Two sources, one pipeline. The llama.cpp path is already wired; the MLX path needs a small exporter.</div>
+    <div class="figcap">Fig 6. Two sources, one pipeline. The llama.cpp path ships metrics via ServiceMonitor; the MLX Macs now push/scrape into the local VictoriaMetrics stack.</div>
   </div>
 
   <h3>Path A &mdash; llama.cpp model (already instrumented)</h3>
   <p>The <code>llama</code> namespace runs a llama.cpp <code>coder.gguf</code> server with <code>--metrics</code> and a ServiceMonitor scraping it every 15s. Rich llama metrics (<code>llama_requests_total</code>, <code>llama_tokens_prompt_total</code>, <code>llama_tokens_predicted_total</code>, tokens/sec, etc.) should already be flowing into Prometheus. Next step: verify the target is healthy, then import a community dashboard (e.g. <i>llama.cpp Server Metrics</i> #19237) into Grafana.</p>
 
-  <h3>Path B &mdash; MLX Qwen3 on the Macs (needs a bridge)</h3>
-  <p>The two Mac minis sit <b>outside</b> the cluster, and <code>mlx_lm.server</code> has <b>no <code>/metrics</code> endpoint</b>. To chart the opencode-facing model in Grafana you'd:</p>
-  <ol>
-    <li>Run a tiny <code>prometheus_client</code> exporter on rank 0 that tracks requests/tokens &mdash; e.g. a reverse proxy in front of <code>:8080</code>, or by tailing server logs / opencode's usage DB.</li>
-    <li>Expose it on <code>192.168.1.64</code> and add it to Prometheus via <code>additionalScrapeConfigs</code> (node-exporter can't reach non-cluster hosts).</li>
-    <li>Dashboard it the same way as Path A.</li>
-  </ol>
+  <h3>Path B &mdash; MLX Qwen3 on the Macs (working)</h3>
+  <p>The two Mac minis sit <b>outside</b> the cluster, and <code>mlx_lm.server</code> has no <code>/metrics</code> endpoint &mdash; so we built the bridge ourselves. A local podman stack on rank 0 (<code>observability/compose.yaml</code>) runs <b>VictoriaMetrics</b>, an <b>otel-collector</b>, and <b>Grafana</b>:</p>
+  <table>
+    <tr><th>Container</th><th>Port</th><th>Role</th></tr>
+    <tr><td><code>victoria-metrics</code></td><td>:8428</td><td>TSDB + scraping; Prometheus-compatible API &amp; <code>/vmui</code> query UI</td></tr>
+    <tr><td><code>otel-collector</code></td><td>:4317 / :4318</td><td>OTLP receiver &rarr; <code>prometheus_remote_write</code> &rarr; VM</td></tr>
+    <tr><td><code>grafana</code></td><td>:3000</td><td>auto-provisioned datasource + <b>MLX Cluster</b> dashboard</td></tr>
+  </table>
+  <p>Two paths feed the TSDB: the proxy and both hw agents expose <code>/metrics</code> that VM scrapes every 15s, and they also <b>push OTLP</b> (traces + metrics + logs) to the collector, which remote-writes them into VM. Everything is reachable from the LAN, so node B (rank 1) pushes its hardware metrics over WiFi to <code>192.168.1.64:4318</code>.</p>
+  <pre><code>cd observability
+./setup.sh                      # generates vm-scrape.yml from your machine IPs
+podman compose up -d            # victoria-metrics + otel-collector + grafana
+open http://localhost:8428/vmui # query: mlx_requests_total
+open http://localhost:3000      # Grafana (admin/admin) → "MLX Cluster" dashboard</code></pre>
+  <p>The dashboard charts requests/min, TTFT p50/p95, tokens/min, token rate, hallucination-risk heuristics, tool calls, and per-node hardware (load, memory pressure, worker RSS, CPU temp) &mdash; with a single panel showing whether all three exporters (<code>mlx-proxy</code>, <code>mlx-hw</code> rank0, rank1) are up.</p>
+
+  <div class="callout warn"><span class="ic">!</span>
+    <div><b>One OTLP gotcha:</b> the exporter needs the full signal path &mdash; base endpoint <code>http://192.168.1.64:4318</code> must be expanded to <code>/v1/metrics</code> (and <code>/v1/traces</code>, <code>/v1/logs</code>) or the collector returns 404 and silently drops everything. The proxy now does this itself via <code>_sig_url()</code>.</div>
+  </div>
 </section>
 
 <section id="learnings">
@@ -663,6 +693,7 @@ mlx.launch --hostfile dist/hosts.json --backend ring \
         <li>mlx_lm's OpenAI-compatible server makes opencode integration a pure config change.</li>
         <li>Rank-0-only HTTP makes the external surface tiny and predictable.</li>
         <li>Identical venvs + pinned versions = reproducible sharded loads.</li>
+        <li>Full observability pipeline (scrape + OTLP &rarr; VictoriaMetrics &rarr; Grafana) runs on podman &mdash; no cluster needed.</li>
       </ul>
     </div>
     <div class="card">
@@ -683,28 +714,39 @@ mlx.launch --hostfile dist/hosts.json --backend ring \
   <h2><span class="num">13</span> Appendix &mdash; File Inventory &amp; Commands</h2>
   <table>
     <tr><th>Path</th><th>Purpose</th></tr>
-    <tr><td><code>dist/hosts.json</code></td><td>Ring hostfile: rank0 (10.0.0.1), rank1 (10.0.0.2)</td></tr>
-    <tr><td><code>dist/smoke.py</code></td><td>Distributed <code>all_sum</code> connectivity test</td></tr>
-    <tr><td><code>dist/agent.py</code></td><td>Qwen3 tool-loop demo (weather + calculate)</td></tr>
-    <tr><td><code>dist/start_server.sh</code></td><td>Launch distributed server (0.0.0.0:8080)</td></tr>
-    <tr><td><code>dist/stop_server.sh</code></td><td>Stop it on both nodes via SSH</td></tr>
+    <tr><td><code>cluster/hosts.json</code></td><td>Ring hostfile: rank0 (10.0.0.1), rank1 (10.0.0.2)</td></tr>
+    <tr><td><code>cluster/mlx_metrics_proxy.py</code></td><td>Metrics + OTel proxy in front of <code>mlx_lm.server</code></td></tr>
+    <tr><td><code>cluster/mlx_hw_telemetry.py</code></td><td>Per-node hardware telemetry (Prometheus + OTLP)</td></tr>
+    <tr><td><code>cluster/start_server.sh</code></td><td>Launch distributed server + proxy + hw agents</td></tr>
+    <tr><td><code>cluster/stop_server.sh</code></td><td>Stop them on both nodes via SSH</td></tr>
+    <tr><td><code>tools/smoke.py</code></td><td>Distributed <code>all_sum</code> connectivity test</td></tr>
+    <tr><td><code>tools/agent.py</code></td><td>Qwen3 tool-loop demo (weather + calculate)</td></tr>
+    <tr><td><code>tools/bench.py</code></td><td>Streaming TTFT / token-rate / concurrency benchmark</td></tr>
+    <tr><td><code>observability/compose.yaml</code></td><td>VictoriaMetrics + otel-collector + Grafana (podman)</td></tr>
+    <tr><td><code>observability/setup.sh</code></td><td>Generate <code>vm-scrape.yml</code> from your machine IPs</td></tr>
+    <tr><td><code>observability/grafana/</code></td><td>Auto-provisioned datasource + MLX Cluster dashboard</td></tr>
     <tr><td><code>opencode.json</code></td><td>Project provider config (<code>mlx-dist</code>)</td></tr>
     <tr><td><code>~/opencode.json</code></td><td>Remote-laptop variant (baseURL = WiFi IP)</td></tr>
   </table>
 
   <h3>Every command that mattered</h3>
   <pre><code># distributed smoke / agent
-mlx.launch --hostfile dist/hosts.json --backend ring --cwd /Users/dk/mlx-oc/dist \
-  -- /Users/dk/mlx-oc/dist/.venv/bin/python smoke.py
-mlx.launch --hostfile dist/hosts.json --backend ring --cwd /Users/dk/mlx-oc/dist \
-  -- /Users/dk/mlx-oc/dist/.venv/bin/python agent.py
+mlx.launch --hostfile cluster/hosts.json --backend ring --cwd /Users/dk/mlx-oc/cluster \
+  -- /Users/dk/mlx-oc/cluster/.venv/bin/python tools/smoke.py
+mlx.launch --hostfile cluster/hosts.json --backend ring --cwd /Users/dk/mlx-oc/cluster \
+  -- /Users/dk/mlx-oc/cluster/.venv/bin/python tools/agent.py
 
 # distributed OpenAI-compatible server
-dist/start_server.sh
+cluster/start_server.sh
+
+# benchmark + observability
+.venv/bin/python tools/bench.py --label "2-node ring"
+cd observability && ./setup.sh && podman compose up -d
 
 # verify
 curl -s http://127.0.0.1:8080/v1/models
 curl -s http://192.168.1.64:8080/v1/models            # over WiFi
+curl -s "http://localhost:8428/api/v1/query?query=mlx_requests_total"
 
 # opencode
 opencode models          # confirm mlx-dist/mlx-community/Qwen3-1.7B-4bit
@@ -714,7 +756,7 @@ opencode stats --models  # per-model token usage</code></pre>
 </main>
 
 <footer class="wrap">
-  <p>Field notes from the two-Mac-mini MLX cluster &mdash; distributed Qwen3, agentic tool calling, opencode integration, LAN serving, and the road to Grafana. Build the cable, pin the versions, and the rest follows.</p>
+  <p>Field notes from the two-Mac-mini MLX cluster &mdash; distributed Qwen3, agentic tool calling, opencode integration, LAN serving, and the VictoriaMetrics &rarr; Grafana dashboards that watch it all. Build the cable, pin the versions, and the rest follows.</p>
 </footer>
 
 </body>
