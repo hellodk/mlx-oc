@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Distributed MLX Inference — 2× Mac mini — Plan</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2333; --border:#2d333b;
+    --text:#e6edf3; --muted:#8b949e; --accent:#6e9bff; --green:#3fb950;
+    --amber:#d29922; --red:#f85149; --purple:#bc8cff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.55}
+  .wrap{max-width:960px;margin:0 auto;padding:32px 20px 80px}
+  header{border-bottom:1px solid var(--border);padding-bottom:18px;margin-bottom:24px}
+  h1{font-size:26px;margin:0 0 6px}
+  h1 .accent{color:var(--accent)}
+  .sub{color:var(--muted);font-size:14px}
+  h2{font-size:18px;margin:34px 0 12px;color:var(--accent);display:flex;align-items:center;gap:8px}
+  h2 .n{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);font-size:12px;color:var(--accent)}
+  p{color:var(--text);font-size:14.5px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin:12px 0}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}}
+  .node{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+  .node h3{margin:0 0 8px;font-size:15px}
+  .node .ip{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--green);font-size:13px}
+  .node .tag{display:inline-block;font-size:11px;padding:1px 8px;border-radius:20px;margin-right:6px}
+  .tag.a{background:rgba(188,140,255,.15);color:var(--purple);border:1px solid rgba(188,140,255,.4)}
+  .tag.b{background:rgba(110,155,255,.15);color:var(--accent);border:1px solid rgba(110,155,255,.4)}
+  .tag.c{background:rgba(63,185,80,.12);color:var(--green);border:1px solid rgba(63,185,80,.4)}
+  ul{margin:8px 0;padding-left:20px}
+  li{font-size:14px;margin:4px 0}
+  li::marker{color:var(--accent)}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .code{background:#0a0e14;border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;overflow-x:auto;white-space:pre;line-height:1.5}
+  .ok{color:var(--green)} .warn{color:var(--amber)} .bad{color:var(--red)}
+  .status li{list-style:none;margin:6px 0}
+  .status li::before{content:"";margin-right:0}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:8px;vertical-align:middle}
+  .steps{counter-reset:step}
+  .step{display:flex;gap:14px;margin:0;padding:14px 0;border-bottom:1px solid var(--border)}
+  .step:last-child{border-bottom:none}
+  .step .num{flex:0 0 30px;height:30px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;color:var(--accent)}
+  .step .body h4{margin:0 0 4px;font-size:14.5px}
+  .step .body p{margin:0;font-size:13.5px;color:var(--muted)}
+  .diagram{display:flex;align-items:stretch;justify-content:center;gap:0;padding:8px 0}
+  .machine{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;text-align:center;min-width:170px}
+  .machine .name{font-weight:600;font-size:13px}
+  .machine .role{font-size:11px;color:var(--muted);margin-top:2px}
+  .machine ul{list-style:none;padding:0;margin:10px 0 0;text-align:left;font-size:11.5px;color:var(--muted)}
+  .machine ul li{padding:1px 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .link{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 14px;color:var(--muted);font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-align:center}
+  .link .line{width:2px;flex:1;background:linear-gradient(180deg,var(--accent),var(--green));margin:4px 0}
+  .pill{display:inline-block;font-size:11.5px;padding:2px 10px;border-radius:20px;border:1px solid var(--border);background:var(--panel2);margin:3px 4px 3px 0}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:8px 0}
+  th,td{border:1px solid var(--border);padding:7px 10px;text-align:left}
+  th{background:var(--panel2);color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  .foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);color:var(--muted);font-size:12.5px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Distributed MLX Inference <span class="accent">— 2 × Mac mini</span></h1>
+  <div class="sub">Shard one small tool-calling model across two Macs with Apple MLX, then drive it through an agent loop with real tool calls. Plan v1.0</div>
+</header>
+
+<h2><span class="n">1</span> Goal</h2>
+<p>Run <b>distributed inference</b> of a <b>small MLX model that understands tool calls</b> across the two Mac minis. One model instance, its weights <b>sharded across both machines</b> (tensor parallelism). The agent demo asks the model a question that requires calling tools; the model emits a tool call, the script executes it, and the model produces the final answer — all with the compute shared over the LAN.</p>
+
+<h2><span class="n">2</span> Cluster status <span style="font-size:12px;color:var(--muted);font-weight:400">(verified before planning)</span></h2>
+<div class="grid">
+  <div class="node">
+    <h3><span class="tag a">NODE A · rank 0</span>Current Mac mini</h3>
+    <div class="ip">192.168.1.64</div>
+    <ul>
+      <li>Apple Silicon (arm64) · macOS 26.5.1</li>
+      <li>8 GB RAM · 8 cores · 26 GB free</li>
+      <li>Python 3.14 (Homebrew)</li>
+      <li>MLX 0.32.0 present (Homebrew build)</li>
+    </ul>
+  </div>
+  <div class="node">
+    <h3><span class="tag b">NODE B · rank 1</span>Abhisheks-Mac-mini</h3>
+    <div class="ip">192.168.1.5</div>
+    <ul>
+      <li>Apple Silicon (arm64) · macOS 26.5.1</li>
+      <li>16 GB RAM · 10 cores · 94 GB free</li>
+      <li>Homebrew Pythons 3.12 / 3.13 / 3.14</li>
+      <li>Old user-site MLX 0.29 + mlx_lm 0.29 (will not reuse)</li>
+    </ul>
+  </div>
+</div>
+<ul class="status">
+  <li><span class="dot"></span>Passwordless SSH both directions (64 → 5 and 5 → 64) <span class="ok">✓</span></li>
+  <li><span class="dot"></span>Bidirectional TCP on the LAN (ring backend requirement) <span class="ok">✓</span></li>
+  <li><span class="dot"></span>Same username (<span class="mono">dk</span>) on both → identical venv path on both nodes</li>
+  <li><span class="dot"></span>MLX installs are messy (namespace-package Homebrew / old user-site) → clean isolated venv <span class="warn">⚠ fixed in step 3</span></li>
+</ul>
+
+<h2><span class="n">3</span> Approach</h2>
+<div class="card">
+  <h4 style="margin:0 0 8px">How the pieces fit</h4>
+  <div class="diagram">
+    <div class="machine">
+      <div class="name">Node A · rank 0</div>
+      <div class="role">192.168.1.64</div>
+      <ul>
+        <li>agent loop (tools)</li>
+        <li>model shard ½</li>
+        <li>output printing</li>
+      </ul>
+    </div>
+    <div class="link">
+      <span>TCP</span>
+      <div class="line"></div>
+      <span>ring / all-gather</span>
+    </div>
+    <div class="machine">
+      <div class="name">Node B · rank 1</div>
+      <div class="role">192.168.1.5</div>
+      <ul>
+        <li>model shard ½</li>
+        <li>participates in every</li>
+        <li>forward pass</li>
+      </ul>
+    </div>
+  </div>
+  <table>
+    <tr><th>Decision</th><th>Choice</th><th>Why</th></tr>
+    <tr><td>Comms backend</td><td class="mono">ring</td><td>Built into MLX, pure TCP sockets, no third-party comms lib (MPI/JACCL not needed over Ethernet)</td></tr>
+    <tr><td>Orchestrator</td><td class="mono">mlx.launch</td><td>Ships with MLX 0.32; ssh's to each node, sets <span class="mono">MLX_RANK</span> + <span class="mono">MLX_HOSTFILE</span>, runs the script on every rank</td></tr>
+    <tr><td>Parallelism</td><td>Tensor parallel</td><td><span class="mono">mlx_lm sharded_load()</span> → <span class="mono">model.shard(group)</span> splits weights by width; both Macs compute every token, activations all-reduced each step</td></tr>
+    <tr><td>Model</td><td class="mono">mlx-community/Qwen3-1.7B-4bit</td><td>Small (~1.1 GB), Qwen3 is tool-call trained, and its arch has TP <span class="mono">shard()</span> in mlx_lm. Fallback: <span class="mono">Qwen3-4B-4bit</span></td></tr>
+    <tr><td>Versions</td><td class="mono">mlx==0.32.0 · mlx_lm==0.31.3</td><td>Pinned identical on both nodes (distributed protocol must match); satisfies mlx_lm's <span class="mono">mlx&gt;=0.31.2</span></td></tr>
+    <tr><td>Env layout</td><td class="mono">/Users/dk/mlx-oc/dist/.venv</td><td>Same path on both hosts → <span class="mono">mlx.launch --python</span> works on both</td></tr>
+  </table>
+</div>
+
+<h2><span class="n">4</span> Implementation steps</h2>
+<div class="steps">
+  <div class="step"><div class="num">1</div><div class="body"><h4>Workspace on both nodes</h4><p>Create <span class="mono">/Users/dk/mlx-oc/dist</span> on both (via ssh to .5).</p></div></div>
+  <div class="step"><div class="num">2</div><div class="body"><h4>Hostfile</h4><p><span class="mono">hosts.json</span>: rank 0 = localhost (127.0.0.1) on IP 192.168.1.64, rank 1 = 192.168.1.5. Ring listens on 192.168.1.64/5:32323.</p></div></div>
+  <div class="step"><div class="num">3</div><div class="body"><h4>Venvs + pinned deps</h4><p>Python 3.14 venv on both; install <span class="mono">mlx==0.32.0 mlx_lm==0.31.3</span> (pulls transformers 5.x, sentencepiece, protobuf, jinja2). ~2–3 min each.</p></div></div>
+  <div class="step"><div class="num">4</div><div class="body"><h4>Model on both nodes</h4><p>Each node downloads <span class="mono">mlx-community/Qwen3-1.7B-4bit</span> into its HF cache (~1.1 GB each). Each rank needs the full weights to load &amp; shard its local slice.</p></div></div>
+  <div class="step"><div class="num">5</div><div class="body"><h4>Scripts</h4><p><span class="mono">agent.py</span> — distributed agent loop; <span class="mono">smoke.py</span> — tiny all-gather ping test; copied to both nodes.</p></div></div>
+  <div class="step"><div class="num">6</div><div class="body"><h4>Smoke test</h4><p>Run <span class="mono">mlx.launch</span> on the ping script — proves both ranks connect over the ring before loading any model.</p></div></div>
+  <div class="step"><div class="num">7</div><div class="body"><h4>Distributed agent run</h4><p>Launch <span class="mono">agent.py</span> across both Macs; model sharded, tool loop runs on rank 0.</p></div></div>
+  <div class="step"><div class="num">8</div><div class="body"><h4>Baseline comparison</h4><p>Run the same agent on a single node for a correctness + tokens/sec reference, and to quantify the TP-over-Ethernet trade-off.</p></div></div>
+</div>
+
+<h2><span class="n">5</span> The demo — tool-call agent</h2>
+<div class="card">
+  <p><b>Two tools registered:</b></p>
+  <span class="pill mono">get_weather(city) → "24°C, partly cloudy"</span>
+  <span class="pill mono">calculate(expression) → arithmetic result</span>
+  <p style="margin-top:10px"><b>Conversation:</b></p>
+  <div class="code">[user]  What is the weather in Tokyo, and what is 23 × 17?
+[rank0] <i>model emits tool_calls → get_weather("Tokyo"), calculate("23*17")</i>
+[rank0] <i>agent executes both, appends results as tool messages</i>
+[rank0] "The weather in Tokyo is 24°C, partly cloudy, and 23 × 17 = 391."</div>
+  <p style="color:var(--muted)">Tool calling is done the same way mlx_lm's OpenAI-compatible server does it: <span class="mono">tokenizer.apply_chat_template(..., tools=tools)</span> then parse <span class="mono">&lt;tool_call&gt;</span> blocks from the Qwen3 output.</p>
+</div>
+
+<h2><span class="n">6</span> Honest performance note</h2>
+<div class="card">
+  <p>Tensor parallelism over <b>1&nbsp;GbE Ethernet</b> is latency-bound: every generated token requires an all-gather of hidden states between the Macs. For a tiny 1.7B model the network sync <b>outweighs</b> the compute gain, so the distributed run will likely be <span class="warn">slower than a single node</span> (expect single-node ≈ 40–80 tok/s; distributed may drop to a few tok/s).</p>
+  <p>That is expected and correct for this setup. The value here is <b>demonstrating the sharding machinery works end-to-end with tool calls</b>, plus an honest baseline to quantify the trade-off. If you later want speed, that's what Thunderbolt-5 RDMA + JACCL is for (the newer MLX 0.32 path) — not available on this 1GbE rig.</p>
+</div>
+
+<h2><span class="n">7</span> Risks &amp; fallbacks</h2>
+<ul>
+  <li><b>Version mismatch</b> between nodes → versions pinned byte-for-byte; distributed init fails loudly, never silently.</li>
+  <li><b>Quantized weights + TP</b>: Qwen3 <span class="mono">shard()</span> handles QuantizedLinear in mlx_lm (verified in source). If it still trips, fall back to the 8-bit/bf16 Qwen3-1.7B build.</li>
+  <li><b>Port 32323 blocked</b> → pick another with <span class="mono">--starting-port</span>.</li>
+  <li><b>Model download time</b> (~1.1 GB/node) → only on first run, cached after.</li>
+  <li><b>transformers 5.x install</b> is heavy → isolated venv, no effect on system Python.</li>
+  <li><b>Old broken MLX installs</b> are ignored entirely (fresh venv shadows them).</li>
+</ul>
+
+<div class="foot">Plan · 2 × Apple Silicon Mac mini · MLX 0.32.0 ring backend · mlx_lm 0.31.3 tensor parallel · Qwen3-1.7B-4bit</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Riding Two Mac minis — A Distributed Qwen3 Agent Server for opencode</title>
+<style>
+  :root{
+    --bg:#f7f7fa;
+    --card:#ffffff;
+    --ink:#1d1f2b;
+    --muted:#5b6072;
+    --line:#e5e7f0;
+    --accent:#4f46e5;
+    --accent-soft:#eef0ff;
+    --teal:#0f766e;
+    --teal-soft:#e6f6f4;
+    --amber:#b45309;
+    --amber-soft:#fef3d7;
+    --red:#b91c1c;
+    --code-bg:#f4f4f8;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;
+    line-height:1.65;
+    font-size:16px;
+  }
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+
+  /* Nav */
+  nav{
+    position:sticky;top:0;z-index:10;
+    background:rgba(247,247,250,.92);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+  }
+  nav .wrap{display:flex;gap:18px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+
+  /* Hero */
+  header.hero{
+    padding:64px 0 40px;
+    background:
+      radial-gradient(1200px 420px at 80% -10%, rgba(79,70,229,.12), transparent 60%),
+      radial-gradient(900px 380px at 10% -20%, rgba(15,118,110,.10), transparent 55%);
+    border-bottom:1px solid var(--line);
+  }
+  .kicker{
+    display:inline-block;
+    font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;
+    color:var(--accent);
+    background:var(--accent-soft);
+    border:1px solid #dfe1ff;
+    padding:5px 12px;border-radius:999px;
+  }
+  h1{font-size:clamp(28px,5vw,44px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:18px;color:var(--muted);max-width:660px}
+  .meta{margin-top:18px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+
+  main{padding:48px 0 80px}
+  section{padding:28px 0}
+  h2{
+    font-size:26px;letter-spacing:-.01em;margin:8px 0 6px;
+    display:flex;align-items:baseline;gap:12px;
+  }
+  h2 .num{
+    font-size:14px;font-weight:800;color:#fff;background:var(--accent);
+    width:26px;height:26px;border-radius:8px;flex:0 0 auto;
+    display:inline-flex;align-items:center;justify-content:center;
+    transform:translateY(-2px);
+  }
+  h3{font-size:19px;margin:26px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{
+    background:var(--code-bg);border:1px solid var(--line);
+    padding:1px 6px;border-radius:6px;font-size:.86em;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  pre{
+    background:var(--code-bg);border:1px solid var(--line);
+    border-radius:var(--radius);padding:16px 18px;overflow-x:auto;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    font-size:13px;line-height:1.6;margin:14px 0;
+  }
+  pre code{background:none;border:none;padding:0}
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:22px 24px;margin:18px 0;
+  }
+  .figure{text-align:center;margin:26px 0}
+  .figure svg{max-width:100%;height:auto}
+  .figcap{font-size:13px;color:var(--muted);margin-top:10px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+  .stat{
+    text-align:center;padding:22px 16px;
+  }
+  .stat .big{font-size:34px;font-weight:800;letter-spacing:-.02em;color:var(--accent)}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  .pill{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;margin-right:6px}
+  .pill.ok{background:var(--teal-soft);color:var(--teal)}
+  .pill.warn{background:var(--amber-soft);color:var(--amber)}
+  .pill.err{background:#fde8e8;color:var(--red)}
+  .pill.info{background:var(--accent-soft);color:var(--accent)}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  blockquote{
+    margin:16px 0;padding:12px 18px;border-left:4px solid var(--accent);
+    background:var(--accent-soft);border-radius:0 10px 10px 0;color:#3a3d57;
+  }
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout .ic{font-weight:800;line-height:1.4}
+  footer{
+    border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px;
+  }
+  .timeline{position:relative;margin:20px 0 8px;padding-left:28px}
+  .timeline::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:var(--line)}
+  .tl{position:relative;margin-bottom:20px}
+  .tl::before{
+    content:"";position:absolute;left:-25px;top:6px;width:12px;height:12px;border-radius:50%;
+    background:var(--accent);border:3px solid var(--accent-soft);
+  }
+  .tl .when{font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em}
+  .tl .what{font-weight:700;margin:2px 0 4px}
+  .tl p{margin:4px 0;color:#3f4358;font-size:14.5px}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a href="#mission">Mission</a>
+    <a href="#hardware">Hardware</a>
+    <a href="#stack">Stack</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#journey">Journey</a>
+    <a href="#performance">Performance</a>
+    <a href="#agent">Agent Loop</a>
+    <a href="#opencode">opencode</a>
+    <a href="#remote">Remote</a>
+    <a href="#network">Network</a>
+    <a href="#grafana">Grafana</a>
+    <a href="#learnings">Learnings</a>
+    <a href="#appendix">Appendix</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Distributed ML on Apple Silicon &middot; Field Notes</span>
+    <h1>Riding Two Mac minis:<br>A Distributed Qwen3 Agent Server for opencode</h1>
+    <p class="sub">We turned two Mac minis connected by a single Ethernet cable into one sharded, tool-calling LLM inference server — and pointed opencode at it so an AI agent can drive it end to end.</p>
+    <div class="meta">
+      <span><b>Nodes</b> 2 &times; Mac mini (M2 Pro 8GB + M4 16GB)</span>
+      <span><b>Model</b> Qwen3-1.7B-4bit (MLX)</span>
+      <span><b>Interconnect</b> 1000baseT ring</span>
+      <span><b>Turn time</b> 3.5s wired / 34s WiFi / 1.4s single</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="mission">
+  <h2><span class="num">1</span> The Mission</h2>
+  <p>We had two Mac minis sitting in the same room and a hunch: a direct Gigabit Ethernet cable between them could fuse their Apple Silicon into a single distributed MLX compute pool. The goal was not just to shard a model and generate text — it was to build something <b>usable as an agent</b>:</p>
+  <ul>
+    <li>Tensor-parallel inference across both machines (each holds a slice of the weights).</li>
+    <li>A real <b>tool-calling</b> loop (the model issues <code>tool_calls</code>, executes them, and answers).</li>
+    <li>Exposed as an <b>OpenAI-compatible HTTP API</b> so <code>opencode</code> — an agentic coding CLI — can treat it as its own model provider.</li>
+    <li>Reachable from <b>any laptop on WiFi</b>, while the two Macs keep talking to each other over Ethernet.</li>
+  </ul>
+  <p>The result: a private, on-prem "model server" that opencode uses for real agentic work, with dashboards a keystroke away.</p>
+</section>
+
+<section id="hardware">
+  <h2><span class="num">2</span> The Hardware</h2>
+  <p>Two distinct networks carry different traffic. The <b>control/API plane</b> lives on WiFi (<code>192.168.1.x</code>); the <b>data plane</b> — the sharded-compute chatter between the two Macs — lives on a direct Ethernet cable (<code>10.0.0.x</code>).</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Network topology: two Mac minis over Ethernet ring, opencode client over WiFi">
+      <!-- WiFi cloud -->
+      <g>
+        <path d="M380 22 c-8 -10 -24 -10 -32 0 c-8 -10 -24 -10 -32 0 c-8 -10 -24 -10 -32 0 c-8 -10 -24 -10 -32 0" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+        <path d="M380 42 c-8 -10 -24 -10 -32 0 c-8 -10 -24 -10 -32 0 c-8 -10 -24 -10 -32 0" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+        <path d="M380 62 c-8 -10 -24 -10 -32 0 c-8 -10 -24 -10 -32 0 c-8 -10 -24 -10 -32 0" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+        <text x="380" y="88" text-anchor="middle" font-size="13" fill="#4f46e5" font-weight="700">WiFi &mdash; control &amp; API plane 192.168.1.x</text>
+      </g>
+
+      <!-- Mac A -->
+      <g transform="translate(30,150)">
+        <rect width="240" height="120" rx="14" fill="#ffffff" stroke="#c7cbe8" stroke-width="1.5"/>
+        <rect x="0" y="0" width="240" height="34" rx="14" fill="#4f46e5"/>
+        <rect x="0" y="20" width="240" height="14" fill="#4f46e5"/>
+        <text x="120" y="22" text-anchor="middle" font-size="14" font-weight="800" fill="#fff">Mac mini A &mdash; rank 0</text>
+        <text x="120" y="58" text-anchor="middle" font-size="12.5" fill="#5b6072">M2 Pro &middot; 8GB</text>
+        <text x="120" y="78" text-anchor="middle" font-size="12.5" fill="#0f766e">WiFi 192.168.1.64</text>
+        <text x="120" y="98" text-anchor="middle" font-size="12.5" fill="#b45309">Eth 10.0.0.1</text>
+      </g>
+
+      <!-- Mac B -->
+      <g transform="translate(490,150)">
+        <rect width="240" height="120" rx="14" fill="#ffffff" stroke="#c7cbe8" stroke-width="1.5"/>
+        <rect x="0" y="0" width="240" height="34" rx="14" fill="#0f766e"/>
+        <rect x="0" y="20" width="240" height="14" fill="#0f766e"/>
+        <text x="120" y="22" text-anchor="middle" font-size="14" font-weight="800" fill="#fff">Mac mini B &mdash; rank 1</text>
+        <text x="120" y="58" text-anchor="middle" font-size="12.5" fill="#5b6072">M4 &middot; 16GB</text>
+        <text x="120" y="78" text-anchor="middle" font-size="12.5" fill="#0f766e">WiFi 192.168.1.5</text>
+        <text x="120" y="98" text-anchor="middle" font-size="12.5" fill="#b45309">Eth 10.0.0.2</text>
+      </g>
+
+      <!-- Ethernet link -->
+      <line x1="270" y1="210" x2="490" y2="210" stroke="#b45309" stroke-width="6" stroke-linecap="round"/>
+      <line x1="270" y1="210" x2="490" y2="210" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6 6" stroke-linecap="round"/>
+      <text x="380" y="240" text-anchor="middle" font-size="13" fill="#b45309" font-weight="700">Direct Ethernet ring &mdash; 1000baseT &middot; sub-ms RTT</text>
+
+      <!-- WiFi links from macs -->
+      <line x1="150" y1="150" x2="250" y2="95" stroke="#4f46e5" stroke-width="1.5" stroke-dasharray="4 4" opacity=".6"/>
+      <line x1="610" y1="150" x2="510" y2="95" stroke="#4f46e5" stroke-width="1.5" stroke-dasharray="4 4" opacity=".6"/>
+
+      <!-- Client -->
+      <g transform="translate(580,20)">
+        <rect width="130" height="44" rx="10" fill="#ffffff" stroke="#c7cbe8" stroke-width="1.5"/>
+        <text x="65" y="20" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1d1f2b">opencode client</text>
+        <text x="65" y="36" text-anchor="middle" font-size="10.5" fill="#5b6072">any laptop on WiFi</text>
+      </g>
+      <line x1="580" y1="42" x2="440" y2="60" stroke="#4f46e5" stroke-width="1.5" stroke-dasharray="4 4" opacity=".6"/>
+      <text x="560" y="30" text-anchor="end" font-size="10.5" fill="#4f46e5">API &#8594; 192.168.1.64:8080</text>
+      <text x="270" y="66" text-anchor="middle" font-size="10.5" fill="#4f46e5">launch &amp; SSH :22</text>
+    </svg>
+    <div class="figcap">Fig 1. Three planes: SSH control &amp; the HTTP API over WiFi (192.168.1.x), sharded compute over the Ethernet ring (10.0.0.x).</div>
+  </div>
+</section>
+
+<section id="stack">
+  <h2><span class="num">3</span> The Software Stack</h2>
+  <p>Both nodes were provisioned identically — same venv path, same versions, same cached weights. Reproducibility was the whole game.</p>
+  <table>
+    <tr><th>Component</th><th>Version</th><th>Notes</th></tr>
+    <tr><td>macOS</td><td>26.5.1</td><td>Both nodes arm64</td></tr>
+    <tr><td>MLX</td><td>0.32.0</td><td>Apple's array framework; <code>mx.distributed</code> + ring backend</td></tr>
+    <tr><td>mlx_lm</td><td>0.31.3</td><td>Includes the OpenAI-compatible <code>server.py</code></td></tr>
+    <tr><td>Python</td><td>3.14.6</td><td>Homebrew, identical on both hosts</td></tr>
+    <tr><td>Model</td><td><code>mlx-community/Qwen3-1.7B-4bit</code></td><td>Cached on both nodes (sharded load)</td></tr>
+    <tr><td>Interconnect</td><td>10.0.0.1 &harr; 10.0.0.2</td><td>Ring hostfile at <code>dist/hosts.json</code></td></tr>
+  </table>
+
+  <div class="callout warn"><span class="ic">!</span>
+    <div><b>Version pins matter.</b> <code>mlx.launch --python</code> is silently <b>ignored</b> in 0.32.0 — the interpreter must be part of the command. And <code>generate_step</code> takes a <code>sampler</code>, not a <code>temperature</code> kwarg. Pin everything or rediscover these the hard way.</div>
+  </div>
+</section>
+
+<section id="architecture">
+  <h2><span class="num">4</span> Distributed Architecture</h2>
+  <p><code>mlx.launch</code> reads <code>hosts.json</code>, opens an SSH session per rank, and runs the <i>same</i> command on every host. Each rank initializes the distributed group (<code>mx.distributed.init()</code>) and cooperates through <code>all_sum</code>-style collectives over the ring — that's how tensor parallelism stays in sync without a central aggregator.</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Distributed inference architecture diagram">
+      <!-- launcher -->
+      <g transform="translate(220,8)">
+        <rect width="320" height="40" rx="10" fill="#4f46e5"/>
+        <text x="160" y="25" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">mlx.launch &mdash; hostfile hosts.json &middot; backend ring</text>
+      </g>
+      <line x1="220" y1="48" x2="120" y2="80" stroke="#c7cbe8" stroke-width="2"/>
+      <line x1="540" y1="48" x2="640" y2="80" stroke="#c7cbe8" stroke-width="2"/>
+
+      <!-- rank 0 -->
+      <g transform="translate(20,80)">
+        <rect width="240" height="200" rx="14" fill="#ffffff" stroke="#c7cbe8" stroke-width="1.5"/>
+        <rect x="0" y="0" width="240" height="30" rx="14" fill="#4f46e5"/><rect x="0" y="16" width="240" height="14" fill="#4f46e5"/>
+        <text x="120" y="20" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">rank 0 &middot; Mac A</text>
+        <text x="120" y="58" text-anchor="middle" font-size="12" fill="#5b6072">sharded weights slice W0</text>
+        <rect x="30" y="70" width="180" height="26" rx="8" fill="#eef0ff" stroke="#c7cbe8"/>
+        <text x="120" y="87" text-anchor="middle" font-size="11.5" fill="#4f46e5">tensor-parallel layers</text>
+        <rect x="30" y="106" width="180" height="26" rx="8" fill="#eef0ff" stroke="#c7cbe8"/>
+        <text x="120" y="123" text-anchor="middle" font-size="11.5" fill="#4f46e5">ring collectives</text>
+        <rect x="30" y="142" width="180" height="40" rx="8" fill="#e6f6f4" stroke="#0f766e"/>
+        <text x="120" y="158" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0f766e">HTTP API :8080</text>
+        <text x="120" y="174" text-anchor="middle" font-size="10.5" fill="#0f766e">(rank 0 only)</text>
+      </g>
+
+      <!-- ring link -->
+      <line x1="260" y1="180" x2="500" y2="180" stroke="#b45309" stroke-width="5" stroke-linecap="round"/>
+      <path d="M 260 180 L 500 180" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5 5" marker-end="url(#a1)"/>
+      <path d="M 500 180 L 260 180" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5 5" marker-end="url(#a2)"/>
+      <defs>
+        <marker id="a1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#b45309"/></marker>
+        <marker id="a2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#b45309"/></marker>
+      </defs>
+      <text x="380" y="205" text-anchor="middle" font-size="11.5" fill="#b45309" font-weight="700">ring &middot; all_sum sync &middot; 10.0.0.x</text>
+
+      <!-- rank 1 -->
+      <g transform="translate(500,80)">
+        <rect width="240" height="200" rx="14" fill="#ffffff" stroke="#c7cbe8" stroke-width="1.5"/>
+        <rect x="0" y="0" width="240" height="30" rx="14" fill="#0f766e"/><rect x="0" y="16" width="240" height="14" fill="#0f766e"/>
+        <text x="120" y="20" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">rank 1 &middot; Mac B</text>
+        <text x="120" y="58" text-anchor="middle" font-size="12" fill="#5b6072">sharded weights slice W1</text>
+        <rect x="30" y="70" width="180" height="26" rx="8" fill="#e6f6f4" stroke="#0f766e"/>
+        <text x="120" y="87" text-anchor="middle" font-size="11.5" fill="#0f766e">tensor-parallel layers</text>
+        <rect x="30" y="106" width="180" height="26" rx="8" fill="#e6f6f4" stroke="#0f766e"/>
+        <text x="120" y="123" text-anchor="middle" font-size="11.5" fill="#0f766e">ring collectives</text>
+        <rect x="30" y="142" width="180" height="40" rx="8" fill="#f4f4f8" stroke="#c7cbe8"/>
+        <text x="120" y="158" text-anchor="middle" font-size="11.5" fill="#5b6072">compute worker</text>
+        <text x="120" y="174" text-anchor="middle" font-size="10.5" fill="#9a9fb5">no HTTP listener</text>
+      </g>
+    </svg>
+    <div class="figcap">Fig 2. One model, two machines. Every token is computed cooperatively; only rank 0 exposes the API.</div>
+  </div>
+
+  <p>A surprising and important detail lives at <code>mlx_lm/server.py:1745</code>:</p>
+  <pre><code>if group.rank() == 0:
+    _run_http_server(host, port, response_generator)   # rank 0 serves the API
+else:
+    response_generator.join()                           # everyone else just computes</code></pre>
+  <p>So even though both ranks load the sharded model and co-compute every forward pass, <b>only rank 0 listens on the network</b>. External clients always talk to rank 0; rank 1 is a silent worker. This becomes the single most confusing fact when you try to reach the "other" Mac's IP (more in <a href="#remote">section 9</a>).</p>
+</section>
+
+<section id="journey">
+  <h2><span class="num">5</span> The Journey</h2>
+  <div class="timeline">
+    <div class="tl">
+      <div class="when">Step 1 &middot; Recon</div>
+      <div class="what">Both Macs mapped</div>
+      <p>Verified: both arm64 on macOS 26.5.1; passwordless SSH in both directions; bidirectional TCP over the cable confirmed. Note the dead end we dodged: <b>no Thunderbolt cable was available</b> (only USB-A &rarr; USB-C), so IP-over-Thunderbolt was off the table — a plain Gigabit Ethernet cable became the ring.</p>
+    </div>
+    <div class="tl">
+      <div class="when">Step 2 &middot; Provision</div>
+      <div class="what">Identical venvs on both nodes</div>
+      <p>Installed MLX 0.32.0 + mlx_lm 0.31.3 into <code>/Users/dk/mlx-oc/dist/.venv</code> on both Macs and cached <code>Qwen3-1.7B-4bit</code> on both. Same path, same bits — sharded loading assumes it.</p>
+    </div>
+    <div class="tl">
+      <div class="when">Step 3 &middot; Smoke test</div>
+      <div class="what">Prove the ring actually works</div>
+      <p><code>smoke.py</code> ran an <code>all_sum</code> across ranks. Rank 0 got the summed value — proof the two machines were one collective. <code>--python</code> flag ignored by <code>mlx.launch</code> in 0.32.0 cost us a code-127 detour first.</p>
+    </div>
+    <div class="tl">
+      <div class="when">Step 4 &middot; Agent demo</div>
+      <div class="what">Tool calling, distributed</div>
+      <p><code>agent.py</code> ran the Qwen3 tool-loop (<code>get_weather</code> + <code>calculate</code>) sharded over both machines: parse <code>&lt;tool_call&gt;</code> JSON, execute, feed results back. Output was <b>identical</b> to single-node — but the ring was still on WiFi.</p>
+    </div>
+    <div class="tl">
+      <div class="when">Step 5 &middot; WiFi &rarr; Ethernet</div>
+      <div class="what">The 10&times; speedup</div>
+      <p>Re-pointed the ring from WiFi to the direct cable (<code>10.0.0.1 &harr; 10.0.0.2</code>). Turn time collapsed from <b>34s to 3.5s</b> with byte-identical output.</p>
+    </div>
+    <div class="tl">
+      <div class="when">Step 6 &middot; Serve it</div>
+      <div class="what">Distributed OpenAI-compatible API</div>
+      <p>Launched <code>mlx_lm.server</code> through <code>mlx.launch</code>. It self-detects distribution via <code>mx.distributed.init().size() &gt; 1</code>. Verified <code>/v1/models</code>, tool calls, and SSE streaming.</p>
+    </div>
+    <div class="tl">
+      <div class="when">Step 7 &middot; Agent-ify opencode</div>
+      <div class="what">Custom provider config</div>
+      <p>Registered <code>mlx-dist</code> (an <code>@ai-sdk/openai-compatible</code> provider) pointing at rank 0, model with <code>tool_call: true</code>. Restarted opencode &mdash; and agentic work now runs on the cluster.</p>
+    </div>
+    <div class="tl">
+      <div class="when">Step 8 &middot; Go wireless</div>
+      <div class="what">Any laptop on the LAN</div>
+      <p>Rebound the server to <code>0.0.0.0</code>, verified inference over the WiFi IP, and shipped a remote config that points at <code>http://192.168.1.64:8080/v1</code>.</p>
+    </div>
+    <div class="tl">
+      <div class="when">Step 9 &middot; Observability</div>
+      <div class="what">Metrics into the existing cluster</div>
+      <p>Explored the k0s cluster's Prometheus + Grafana to answer: "can I see model stats over Grafana?" (see <a href="#grafana">section 9</a>).</p>
+    </div>
+  </div>
+</section>
+
+<section id="performance">
+  <h2><span class="num">6</span> Performance</h2>
+  <p>The headline number: on a direct Gigabit link, the two-machine cluster runs <b>&asymp;2.4&times;</b> slower than a single node but <b>&asymp;10&times;</b> faster than the same setup on WiFi. The ring is what makes distribution worth it.</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bar chart of per-turn latency">
+      <line x1="80" y1="30" x2="80" y2="260" stroke="#c7cbe8" stroke-width="2"/>
+      <line x1="80" y1="260" x2="740" y2="260" stroke="#c7cbe8" stroke-width="2"/>
+      <text x="70" y="34" text-anchor="end" font-size="11" fill="#5b6072">40s</text>
+      <text x="70" y="84" text-anchor="end" font-size="11" fill="#5b6072">30s</text>
+      <text x="70" y="134" text-anchor="end" font-size="11" fill="#5b6072">20s</text>
+      <text x="70" y="184" text-anchor="end" font-size="11" fill="#5b6072">10s</text>
+      <text x="70" y="260" text-anchor="end" font-size="11" fill="#5b6072">0</text>
+      <line x1="80" y1="85" x2="740" y2="85" stroke="#eef0f7" stroke-width="1" stroke-dasharray="4 4"/>
+      <line x1="80" y1="135" x2="740" y2="135" stroke="#eef0f7" stroke-width="1" stroke-dasharray="4 4"/>
+      <line x1="80" y1="185" x2="740" y2="185" stroke="#eef0f7" stroke-width="1" stroke-dasharray="4 4"/>
+
+      <!-- Single node 1.4s -->
+      <rect x="120" y="249" width="120" height="11" rx="4" fill="#0f766e"/>
+      <text x="180" y="245" text-anchor="middle" font-size="14" font-weight="800" fill="#0f766e">1.4s</text>
+      <text x="180" y="285" text-anchor="middle" font-size="12" fill="#5b6072">single node</text>
+
+      <!-- Wired 3.5s -->
+      <rect x="320" y="239" width="120" height="21" rx="4" fill="#4f46e5"/>
+      <text x="380" y="235" text-anchor="middle" font-size="14" font-weight="800" fill="#4f46e5">3.5s</text>
+      <text x="380" y="285" text-anchor="middle" font-size="12" fill="#5b6072">2-node &middot; wired ring</text>
+
+      <!-- WiFi 34s -->
+      <rect x="520" y="88" width="120" height="172" rx="4" fill="#b45309"/>
+      <text x="580" y="84" text-anchor="middle" font-size="14" font-weight="800" fill="#b45309">34s</text>
+      <text x="580" y="285" text-anchor="middle" font-size="12" fill="#5b6072">2-node &middot; WiFi ring</text>
+    </svg>
+    <div class="figcap">Fig 3. Per-turn latency, lower is better. Same code, same model, same output.</div>
+  </div>
+
+  <table>
+    <tr><th>Configuration</th><th>Turn time</th><th>Verdict</th></tr>
+    <tr><td>Single node (baseline)</td><td>1.4s</td><td>fastest &mdash; but runs out of headroom</td></tr>
+    <tr><td>2 nodes &middot; direct Ethernet ring</td><td>3.5s</td><td>the sweet spot &mdash; shards the work</td></tr>
+    <tr><td>2 nodes &middot; WiFi ring</td><td>34s</td><td>demonstrates why the cable exists</td></tr>
+  </table>
+</section>
+
+<section id="agent">
+  <h2><span class="num">7</span> The Agentic Tool Loop</h2>
+  <p>The whole point was <i>agentic</i> work, not autocomplete. The demo loop in <code>agent.py</code> is the canonical ReAct-ish pattern — and it runs sharded across both Macs:</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tool calling loop diagram">
+      <!-- user -->
+      <rect x="30" y="130" width="140" height="52" rx="12" fill="#eef0ff" stroke="#4f46e5"/>
+      <text x="100" y="153" text-anchor="middle" font-size="12.5" font-weight="700" fill="#4f46e5">User prompt</text>
+      <text x="100" y="171" text-anchor="middle" font-size="11" fill="#5b6072">"weather + 23&times;17"</text>
+
+      <!-- model -->
+      <rect x="300" y="130" width="160" height="52" rx="12" fill="#4f46e5"/>
+      <text x="380" y="153" text-anchor="middle" font-size="12.5" font-weight="800" fill="#fff">Distributed Qwen3</text>
+      <text x="380" y="171" text-anchor="middle" font-size="11" fill="#dfe1ff">tool_calls JSON</text>
+
+      <!-- tools -->
+      <rect x="590" y="70" width="140" height="40" rx="10" fill="#e6f6f4" stroke="#0f766e"/>
+      <text x="660" y="94" text-anchor="middle" font-size="12" font-weight="700" fill="#0f766e">get_weather</text>
+      <rect x="590" y="200" width="140" height="40" rx="10" fill="#e6f6f4" stroke="#0f766e"/>
+      <text x="660" y="224" text-anchor="middle" font-size="12" font-weight="700" fill="#0f766e">calculate</text>
+
+      <!-- arrows -->
+      <line x1="170" y1="156" x2="295" y2="156" stroke="#4f46e5" stroke-width="2" marker-end="url(#f1)"/>
+      <path d="M 460 156 L 585 92" stroke="#b45309" stroke-width="2" fill="none" marker-end="url(#f1)"/>
+      <path d="M 460 156 L 585 218" stroke="#b45309" stroke-width="2" fill="none" marker-end="url(#f1)"/>
+      <path d="M 660 70 L 660 62 L 380 62 L 380 128" stroke="#0f766e" stroke-width="2" fill="none" marker-end="url(#f1)"/>
+      <path d="M 660 240 L 660 252 L 380 252 L 380 186" stroke="#0f766e" stroke-width="2" fill="none" marker-end="url(#f1)"/>
+      <defs><marker id="f1" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#4f46e5"/></marker></defs>
+
+      <!-- final answer -->
+      <rect x="300" y="262" width="160" height="40" rx="12" fill="#0f766e"/>
+      <text x="380" y="286" text-anchor="middle" font-size="12.5" font-weight="800" fill="#fff">Final answer</text>
+      <line x1="380" y1="252" x2="380" y2="258" stroke="#0f766e" stroke-width="2"/>
+    </svg>
+    <div class="figcap">Fig 4. The model emits tool_calls, tools execute, results re-enter context, model answers.</div>
+  </div>
+
+  <pre><code># Distributed agent run (identical output to single-node):
+mlx.launch --hostfile dist/hosts.json --backend ring \
+  --cwd /Users/dk/mlx-oc/dist \
+  -- /Users/dk/mlx-oc/dist/.venv/bin/python agent.py
+
+# server.py verified live:
+#   POST /v1/chat/completions
+#   {"finish_reason": "tool_calls",
+#    "message.tool_calls": [
+#      {"function": {"name": "get_weather", "arguments": "{\"city\": \"Tokyo\"}"}},
+#      {"function": {"name": "calculate",   "arguments": "{\"expression\": \"23 * 17\"}"}}]}</code></pre>
+</section>
+
+<section id="opencode">
+  <h2><span class="num">8</span> Wiring It Into opencode</h2>
+  <p><code>mlx_lm.server</code> speaks OpenAI-compatible HTTP, and it auto-detects distributed mode (<code>mx.distributed.init().size() &gt; 1</code>) — so serving the sharded model is literally the same command you run for one Mac. We launched it through <code>mlx.launch</code> and pointed opencode at it as a custom provider.</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 760 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="opencode to distributed model stack">
+      <rect x="40" y="30" width="160" height="52" rx="12" fill="#1d1f2b"/>
+      <text x="120" y="52" text-anchor="middle" font-size="12.5" font-weight="800" fill="#fff">opencode TUI</text>
+      <text x="120" y="70" text-anchor="middle" font-size="11" fill="#b9bccf">agent: build</text>
+
+      <rect x="300" y="30" width="160" height="52" rx="12" fill="#eef0ff" stroke="#4f46e5"/>
+      <text x="380" y="52" text-anchor="middle" font-size="12.5" font-weight="700" fill="#4f46e5">provider mlx-dist</text>
+      <text x="380" y="70" text-anchor="middle" font-size="11" fill="#5b6072">@ai-sdk/openai-compatible</text>
+
+      <rect x="560" y="30" width="160" height="52" rx="12" fill="#e6f6f4" stroke="#0f766e"/>
+      <text x="640" y="52" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0f766e">rank 0 HTTP</text>
+      <text x="640" y="70" text-anchor="middle" font-size="11" fill="#0f766e">:8080 /v1</text>
+
+      <line x1="200" y1="56" x2="295" y2="56" stroke="#c7cbe8" stroke-width="2" marker-end="url(#g1)"/>
+      <line x1="460" y1="56" x2="555" y2="56" stroke="#c7cbe8" stroke-width="2" marker-end="url(#g1)"/>
+      <defs><marker id="g1" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#5b6072"/></marker></defs>
+
+      <rect x="560" y="140" width="160" height="52" rx="12" fill="#f4f4f8" stroke="#c7cbe8"/>
+      <text x="640" y="162" text-anchor="middle" font-size="12" font-weight="700" fill="#1d1f2b">ResponseGenerator</text>
+      <text x="640" y="180" text-anchor="middle" font-size="11" fill="#5b6072">distributed generate</text>
+      <line x1="640" y1="82" x2="640" y2="136" stroke="#c7cbe8" stroke-width="2" marker-end="url(#g1)"/>
+
+      <text x="380" y="140" text-anchor="middle" font-size="12.5" font-weight="700" fill="#b45309">rank 0 + rank 1</text>
+      <text x="380" y="160" text-anchor="middle" font-size="11" fill="#5b6072">ring collectives &mdash; both Macs compute every token</text>
+    </svg>
+    <div class="figcap">Fig 5. opencode &rarr; custom provider &rarr; rank 0 API &rarr; distributed generation.</div>
+  </div>
+
+  <h3>opencode.json</h3>
+  <pre><code>{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "mlx-dist": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "MLX Distributed (2x Mac mini, Qwen3-1.7B-4bit)",
+      "options": { "baseURL": "http://127.0.0.1:8080/v1", "apiKey": "no-key" },
+      "models": {
+        "mlx-community/Qwen3-1.7B-4bit": { "name": "Qwen3 1.7B (distributed)", "tool_call": true }
+      }
+    }
+  },
+  "model": "mlx-dist/mlx-community/Qwen3-1.7B-4bit"
+}</code></pre>
+
+  <h3>Verification before trusting it</h3>
+  <ul>
+    <li><code>opencode models</code> &rarr; lists <code>mlx-dist/mlx-community/Qwen3-1.7B-4bit</code>.</li>
+    <li>One-shot <code>/v1/chat/completions</code> with <code>tools</code> &rarr; <code>finish_reason: "tool_calls"</code> with correct JSON args.</li>
+    <li>Streaming check &rarr; SSE chunks flow (opencode depends on streaming).</li>
+  </ul>
+
+  <div class="callout warn"><span class="ic">!</span>
+    <div><b>opencode does not hot-reload config.</b> Config is read once at launch, and every tab in a session shares that frozen config. After writing <code>opencode.json</code>, <b>quit opencode completely and reopen it from the project directory</b> — otherwise your "new tab" searches in vain for <code>mlx-dist</code> while <code>opencode models</code> proves it exists.</div>
+  </div>
+</section>
+
+<section id="remote">
+  <h2><span class="num">9</span> Using It From Any Machine</h2>
+  <p>Rank 0 was bound to <code>127.0.0.1</code> initially — invisible to the network. Rebinding to <code>0.0.0.0</code> and restarting made the API reachable at the Mac's WiFi address. Inference then verified over <code>http://192.168.1.64:8080</code>.</p>
+
+  <div class="callout ok"><span class="ic">&#10003;</span>
+    <div><b>Internal &harr; external split is real:</b> the two Macs keep sharding over the Ethernet ring (<code>10.0.0.x</code>) while opencode on any laptop talks to rank 0 over WiFi (<code>192.168.1.64:8080</code>). Firewall disabled on the Macs, so nothing blocks the inbound connection.</div>
+  </div>
+
+  <div class="callout warn"><span class="ic">!</span>
+    <div><b>Only rank 0 speaks HTTP.</b> Because of <code>server.py:1745</code>, rank 1 (Mac B, <code>192.168.1.5</code>) runs no listener at all — <code>curl 192.168.1.5:8080</code> returns connection refused. You cannot use the second WiFi IP as the endpoint unless you flip the rank order in <code>hosts.json</code>.</div>
+  </div>
+
+  <h3>Config for a remote laptop</h3>
+  <pre><code>{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "mlx-dist": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "MLX Distributed (2x Mac mini, Qwen3-1.7B-4bit)",
+      "options": { "baseURL": "http://192.168.1.64:8080/v1", "apiKey": "no-key" },
+      "models": {
+        "mlx-community/Qwen3-1.7B-4bit": { "name": "Qwen3 1.7B (distributed)", "tool_call": true }
+      }
+    }
+  },
+  "model": "mlx-dist/mlx-community/Qwen3-1.7B-4bit"
+}</code></pre>
+  <p>Drop it on the client as the project or global config (<code>~/.config/opencode/opencode.json</code>), restart, pick the model. Token usage per model is visible with <code>opencode stats --models</code>. One caveat: every token round-trips over WiFi from a wireless client, so expect the ~34s-class latency there — the 3.5s wired number only applies when the client sits on the wire too.</p>
+</section>
+
+<section id="network">
+  <h2><span class="num">10</span> Network Traffic Map</h2>
+  <p>Everything that moved over the wire during this project, one table. The same <code>hosts.json</code> entry carries two different destinations: the <code>ssh</code> field (control plane, WiFi) and the <code>ips</code> field (data plane, Ethernet ring).</p>
+  <table>
+    <tr><th>Plane</th><th>Path</th><th>Protocol / port</th><th>Purpose &amp; observations</th></tr>
+    <tr>
+      <td><b>SSH control</b></td>
+      <td><code>192.168.1.64</code> &harr; <code>192.168.1.5</code></td>
+      <td>SSH :22 (WiFi)</td>
+      <td><code>mlx.launch</code> opens a session to rank 1 to start the worker; manual ssh for recon, ifconfig, and stop. Passwordless both ways.</td>
+    </tr>
+    <tr>
+      <td><b>Ethernet ring</b></td>
+      <td><code>10.0.0.1</code> &harr; <code>10.0.0.2</code></td>
+      <td>TCP, ephemeral (&asymp;32323/32324) &middot; 1000baseT</td>
+      <td>Every distributed collective: <code>all_sum</code> init test, weight/KV sync, and per-token coordination. Verified bidirectional TCP, sub-ms RTT.</td>
+    </tr>
+    <tr>
+      <td><b>HTTP API</b></td>
+      <td>clients &#8594; <code>192.168.1.64:8080</code></td>
+      <td>HTTP/1.1 + SSE (WiFi)</td>
+      <td>OpenAI-compatible <code>/v1/models</code>, <code>/v1/chat/completions</code> (streaming + tool calls). Bound to <code>0.0.0.0</code>; initially <code>127.0.0.1</code>.</td>
+    </tr>
+    <tr>
+      <td><b>Node-B probe</b></td>
+      <td>&rarr; <code>192.168.1.5:8080</code></td>
+      <td>TCP</td>
+      <td>Connection refused &mdash; rank 1 runs no HTTP listener (<code>server.py:1745</code>), only rank 0 serves.</td>
+    </tr>
+    <tr>
+      <td><b>Firewall</b></td>
+      <td>&mdash;</td>
+      <td>macOS App Firewall</td>
+      <td>Verified disabled via <code>socketfilterfw</code> &rarr; no inbound blocking on either Mac.</td>
+    </tr>
+    <tr>
+      <td><b>Cluster access</b></td>
+      <td>&rarr; <code>192.168.1.10</code>, k0s nodes <code>.52</code>/<code>.118</code></td>
+      <td>kubectl port-forward + traefik :80/:443</td>
+      <td>Reached Prometheus (prefix <code>/prometheus</code>) and Grafana (<code>thecylon.local</code>) for the monitoring story.</td>
+    </tr>
+  </table>
+  <blockquote>Mental model: <b>rank 0 is the front door</b>. SSH + API come in over WiFi; the moment a request lands, every token is computed in a coordinated dance over the Ethernet ring — and only rank 0 ever answers the door.</blockquote>
+</section>
+
+<section id="grafana">
+  <h2><span class="num">11</span> Observability &mdash; Grafana</h2>
+  <p>There's already a k0s cluster on the same LAN (<code>192.168.1.10</code> / cylon) running a full kube-prometheus-stack: <b>Prometheus 3.4.1</b> (route prefix <code>/prometheus</code>) and <b>Grafana</b> behind a traefik ingress at <code>thecylon.local</code>. We explored two distinct "model stats" stories:</p>
+
+  <div class="figure">
+    <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Monitoring flow: sources to prometheus to grafana">
+      <rect x="30" y="80" width="190" height="86" rx="12" fill="#ffffff" stroke="#c7cbe8"/>
+      <text x="125" y="105" text-anchor="middle" font-size="12" font-weight="700" fill="#1d1f2b">llama.cpp server</text>
+      <text x="125" y="123" text-anchor="middle" font-size="10.5" fill="#5b6072">k8s &middot; llama ns</text>
+      <text x="125" y="140" text-anchor="middle" font-size="10.5" fill="#0f766e">/metrics &middot; ServiceMonitor</text>
+
+      <rect x="30" y="190" width="190" height="46" rx="12" fill="#ffffff" stroke="#c7cbe8"/>
+      <text x="125" y="208" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1d1f2b">MLX Qwen3 (Macs)</text>
+      <text x="125" y="225" text-anchor="middle" font-size="10.5" fill="#b45309">needs an exporter &middot; future</text>
+
+      <rect x="320" y="110" width="170" height="52" rx="12" fill="#4f46e5"/>
+      <text x="405" y="132" text-anchor="middle" font-size="12.5" font-weight="800" fill="#fff">Prometheus</text>
+      <text x="405" y="150" text-anchor="middle" font-size="11" fill="#dfe1ff">monitoring ns &middot; 3.4.1</text>
+
+      <rect x="590" y="110" width="150" height="52" rx="12" fill="#0f766e"/>
+      <text x="665" y="132" text-anchor="middle" font-size="12.5" font-weight="800" fill="#fff">Grafana</text>
+      <text x="665" y="150" text-anchor="middle" font-size="11" fill="#cfeef0">thecylon.local</text>
+
+      <line x1="220" y1="123" x2="315" y2="136" stroke="#c7cbe8" stroke-width="2" marker-end="url(#h1)"/>
+      <line x1="220" y1="213" x2="315" y2="150" stroke="#c7cbe8" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#h1)"/>
+      <line x1="490" y1="136" x2="585" y2="136" stroke="#c7cbe8" stroke-width="2" marker-end="url(#h1)"/>
+      <defs><marker id="h1" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#5b6072"/></marker></defs>
+    </svg>
+    <div class="figcap">Fig 6. Two sources, one pipeline. The llama.cpp path is already wired; the MLX path needs a small exporter.</div>
+  </div>
+
+  <h3>Path A &mdash; llama.cpp model (already instrumented)</h3>
+  <p>The <code>llama</code> namespace runs a llama.cpp <code>coder.gguf</code> server with <code>--metrics</code> and a ServiceMonitor scraping it every 15s. Rich llama metrics (<code>llama_requests_total</code>, <code>llama_tokens_prompt_total</code>, <code>llama_tokens_predicted_total</code>, tokens/sec, etc.) should already be flowing into Prometheus. Next step: verify the target is healthy, then import a community dashboard (e.g. <i>llama.cpp Server Metrics</i> #19237) into Grafana.</p>
+
+  <h3>Path B &mdash; MLX Qwen3 on the Macs (needs a bridge)</h3>
+  <p>The two Mac minis sit <b>outside</b> the cluster, and <code>mlx_lm.server</code> has <b>no <code>/metrics</code> endpoint</b>. To chart the opencode-facing model in Grafana you'd:</p>
+  <ol>
+    <li>Run a tiny <code>prometheus_client</code> exporter on rank 0 that tracks requests/tokens &mdash; e.g. a reverse proxy in front of <code>:8080</code>, or by tailing server logs / opencode's usage DB.</li>
+    <li>Expose it on <code>192.168.1.64</code> and add it to Prometheus via <code>additionalScrapeConfigs</code> (node-exporter can't reach non-cluster hosts).</li>
+    <li>Dashboard it the same way as Path A.</li>
+  </ol>
+</section>
+
+<section id="learnings">
+  <h2><span class="num">12</span> Key Takeaways &amp; Gotchas</h2>
+  <div class="grid2">
+    <div class="card">
+      <span class="pill ok">wins</span>
+      <ul style="margin-top:12px">
+        <li>Direct Ethernet between Macs gives near-single-node speed (<b>3.5s vs 1.4s</b>) &mdash; distribution is affordable on Apple Silicon.</li>
+        <li>mlx_lm's OpenAI-compatible server makes opencode integration a pure config change.</li>
+        <li>Rank-0-only HTTP makes the external surface tiny and predictable.</li>
+        <li>Identical venvs + pinned versions = reproducible sharded loads.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="pill err">gotchas</span>
+      <ul style="margin-top:12px">
+        <li><code>mlx.launch --python</code> is <b>ignored</b> in 0.32.0 &mdash; put the interpreter in the command.</li>
+        <li>No <code>temperature</code> kwarg on <code>generate_step</code> &mdash; use <code>sampler</code>.</li>
+        <li>opencode config is <b>not hot-reloaded</b> &mdash; full restart required; tabs share frozen config.</li>
+        <li>Default server bind is <code>127.0.0.1</code> &mdash; rebind to <code>0.0.0.0</code> for LAN access.</li>
+        <li>Node B (<code>192.168.1.5</code>) is compute-only; don't point clients at it.</li>
+        <li>No Thunderbolt cable meant no IP-over-TB &mdash; the gigabit cable was the practical ring.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="appendix">
+  <h2><span class="num">13</span> Appendix &mdash; File Inventory &amp; Commands</h2>
+  <table>
+    <tr><th>Path</th><th>Purpose</th></tr>
+    <tr><td><code>dist/hosts.json</code></td><td>Ring hostfile: rank0 (10.0.0.1), rank1 (10.0.0.2)</td></tr>
+    <tr><td><code>dist/smoke.py</code></td><td>Distributed <code>all_sum</code> connectivity test</td></tr>
+    <tr><td><code>dist/agent.py</code></td><td>Qwen3 tool-loop demo (weather + calculate)</td></tr>
+    <tr><td><code>dist/start_server.sh</code></td><td>Launch distributed server (0.0.0.0:8080)</td></tr>
+    <tr><td><code>dist/stop_server.sh</code></td><td>Stop it on both nodes via SSH</td></tr>
+    <tr><td><code>opencode.json</code></td><td>Project provider config (<code>mlx-dist</code>)</td></tr>
+    <tr><td><code>~/opencode.json</code></td><td>Remote-laptop variant (baseURL = WiFi IP)</td></tr>
+  </table>
+
+  <h3>Every command that mattered</h3>
+  <pre><code># distributed smoke / agent
+mlx.launch --hostfile dist/hosts.json --backend ring --cwd /Users/dk/mlx-oc/dist \
+  -- /Users/dk/mlx-oc/dist/.venv/bin/python smoke.py
+mlx.launch --hostfile dist/hosts.json --backend ring --cwd /Users/dk/mlx-oc/dist \
+  -- /Users/dk/mlx-oc/dist/.venv/bin/python agent.py
+
+# distributed OpenAI-compatible server
+dist/start_server.sh
+
+# verify
+curl -s http://127.0.0.1:8080/v1/models
+curl -s http://192.168.1.64:8080/v1/models            # over WiFi
+
+# opencode
+opencode models          # confirm mlx-dist/mlx-community/Qwen3-1.7B-4bit
+opencode stats --models  # per-model token usage</code></pre>
+</section>
+
+</main>
+
+<footer class="wrap">
+  <p>Field notes from the two-Mac-mini MLX cluster &mdash; distributed Qwen3, agentic tool calling, opencode integration, LAN serving, and the road to Grafana. Build the cable, pin the versions, and the rest follows.</p>
+</footer>
+
+</body>
+</html>
