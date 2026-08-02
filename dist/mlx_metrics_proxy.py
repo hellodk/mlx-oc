@@ -17,12 +17,19 @@ and records, per request:
 
 Metrics are served in Prometheus text format on /metrics.
 
+Optional OpenTelemetry (--otlp-endpoint): each request becomes a trace span,
+a log record, and OTLP metric points exported to an OTLP HTTP/gRPC gateway
+(e.g. the in-cluster otel-gateway). Disabled unless --otlp-endpoint is set.
+
 Usage:
   mlx_metrics_proxy.py --listen 0.0.0.0:8080 --upstream 127.0.0.1:8081
+  mlx_metrics_proxy.py --otlp-endpoint http://192.168.1.10:30318 --node-name rank0
 """
 
 import argparse
 import json
+import logging
+import os
 import re
 import socket
 import sys
@@ -40,6 +47,135 @@ from prometheus_client import (
 )
 
 MODEL_DEFAULT = "mlx-community/Qwen3-1.7B-4bit"
+
+# --------------------------------------------------------------------------
+# OpenTelemetry (optional)
+# --------------------------------------------------------------------------
+_OTEL = None  # set by _setup_otel(); None == OTel disabled
+
+
+def _setup_otel(endpoint, node_name, service_name="mlx-metrics-proxy"):
+    """Best-effort OTel init. Returns an OTel helper or None on failure."""
+    if not endpoint:
+        return None
+    try:
+        from opentelemetry import trace, metrics, _logs
+        from opentelemetry.sdk.resources import (
+            Resource,
+            SERVICE_NAME,
+            HOST_NAME,
+            SERVICE_INSTANCE_ID,
+        )
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+            OTLPSpanExporter,
+        )
+        from opentelemetry.sdk.metrics import MeterProvider
+        from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+        from opentelemetry.exporter.otlp.proto.http.metric_exporter import (
+            OTLPMetricExporter,
+        )
+        from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+        from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+        from opentelemetry.exporter.otlp.proto.http._log_exporter import (
+            OTLPLogExporter,
+        )
+
+        host = socket.gethostname()
+        resource = Resource.create(
+            {
+                SERVICE_NAME: service_name,
+                HOST_NAME: host,
+                SERVICE_INSTANCE_ID: f"{node_name or host}:proxy",
+                "mlx.node.name": node_name or host,
+            }
+        )
+
+        # -- traces ------------------------------------------------------
+        tp = TracerProvider(resource=resource)
+        tp.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
+        trace.set_tracer_provider(tp)
+
+        # -- metrics -----------------------------------------------------
+        mp = MeterProvider(
+            metric_readers=[
+                PeriodicExportingMetricReader(
+                    OTLPMetricExporter(endpoint=endpoint), export_interval_millis=15000
+                )
+            ],
+            resource=resource,
+        )
+        metrics.set_meter_provider(mp)
+
+        # -- logs --------------------------------------------------------
+        lp = LoggerProvider(resource=resource)
+        lp.add_log_record_processor(
+            BatchLogRecordProcessor(OTLPLogExporter(endpoint=endpoint))
+        )
+        _logs.set_logger_provider(lp)
+        logging_handler = LoggingHandler(
+            level=logging.INFO, logger_provider=lp
+        )
+        root = logging.getLogger()
+        root.setLevel(logging.INFO)
+        root.addHandler(logging_handler)
+
+        class Otel:
+            tracer = tp.get_tracer("mlx.proxy")
+            meter = mp.get_meter("mlx.proxy")
+
+            req_counter = meter.create_counter(
+                "mlx.requests", unit="1", description="requests served"
+            )
+            token_counter = meter.create_counter(
+                "mlx.tokens.completion", unit="1", description="completion tokens"
+            )
+            tool_counter = meter.create_counter(
+                "mlx.tool_calls", unit="1", description="tool calls"
+            )
+            ttft_hist = meter.create_histogram(
+                "mlx.ttft.seconds", unit="s", description="time to first token"
+            )
+            rate_hist = meter.create_histogram(
+                "mlx.token_rate.tps", unit="1", description="tokens per second"
+            )
+            risk_hist = meter.create_histogram(
+                "mlx.hallucination.risk", unit="1", description="heuristic risk"
+            )
+            temp_gauge = meter.create_up_down_counter(
+                "mlx.temperature", unit="1", description="sampling temperature"
+            )
+            risk_gauge = meter.create_up_down_counter(
+                "mlx.hallucination.risk.last", unit="1", description="last risk"
+            )
+
+            @staticmethod
+            def record(model, streaming, ttft, gen_time, comp_tokens, rate,
+                       temperature, risk, tool_calls, status, flagged):
+                attrs = {"model": model}
+                Otel.req_counter.add(1, {**attrs, "streaming": str(streaming).lower()})
+                Otel.token_counter.add(comp_tokens, attrs)
+                Otel.tool_counter.add(tool_calls, attrs)
+                if ttft is not None:
+                    Otel.ttft_hist.record(ttft, attrs)
+                if rate is not None:
+                    Otel.rate_hist.record(rate, attrs)
+                Otel.risk_hist.record(risk, attrs)
+                Otel.temp_gauge.add(0, {**attrs, "value": str(temperature)})
+                Otel.risk_gauge.add(0, {**attrs, "value": str(risk)})
+
+            @staticmethod
+            def span(name, **attrs):
+                return Otel.tracer.start_as_current_span(name, attributes=attrs)
+
+        return Otel
+    except Exception as exc:  # keep the proxy alive without OTel
+        print(
+            f"[proxy] OTel setup failed ({exc!r}); continuing without OTel",
+            flush=True,
+        )
+        return None
 
 # --------------------------------------------------------------------------
 # Metrics
@@ -247,7 +383,9 @@ class Proxy(BaseHTTPRequestHandler):
 
     # -- helpers -----------------------------------------------------------
     def log_message(self, fmt, *args):
-        sys.stderr.write("[proxy] %s - %s\n" % (self.address_string(), fmt % args))
+        line = "%s - %s" % (self.address_string(), fmt % args)
+        sys.stderr.write("[proxy] %s\n" % line)
+        logging.getLogger("mlx.proxy.http").info("request: %s", line)
 
     def _forward(self):
         """Forward the current request to upstream and stream the reply."""
@@ -293,6 +431,19 @@ class Proxy(BaseHTTPRequestHandler):
             headers[k] = v
         t_send = time.monotonic()
         t_first_token = None
+        span = None
+        if _OTEL is not None:
+            span = _OTEL.tracer.start_span(
+                "mlx.chat.completions",
+                attributes={
+                    "http.request.method": self.command,
+                    "url.path": req_path,
+                    "mlx.model": model,
+                    "mlx.streaming": streaming,
+                    "mlx.temperature": temperature,
+                },
+            )
+            span.set_attribute("mlx.tools_provided", tools_provided)
         try:
             conn.request(self.command, req_path, body=body, headers=headers)
             resp = conn.getresponse()
@@ -378,8 +529,36 @@ class Proxy(BaseHTTPRequestHandler):
             if flagged:
                 FLAGS.labels(model).inc()
 
-        except (socket.error, http.client.HTTPException, ConnectionRefusedError):
+            if span is not None:
+                span.set_attribute(
+                    "mlx.ttft_seconds",
+                    (t_first_token - t_send) if t_first_token is not None else gen_time,
+                )
+                span.set_attribute("mlx.gen_seconds", gen_time)
+                span.set_attribute("mlx.tokens_prompt",
+                                   int(usage.get("prompt_tokens", 0)) if usage else 0)
+                span.set_attribute("mlx.tokens_completion", comp_tokens)
+                span.set_attribute("mlx.tool_calls", tool_calls)
+                span.set_attribute("mlx.hallucination_risk", risk)
+                span.set_attribute("mlx.hallucination_flagged", flagged)
+                span.set_attribute("http.response.status_code", status)
+                span.set_status("OK")
+                _OTEL.record(
+                    model, streaming,
+                    t_first_token - t_send if t_first_token else None,
+                    gen_time, comp_tokens,
+                    comp_tokens / gen_time if comp_tokens > 0 and gen_time > 0 else None,
+                    temperature, risk, tool_calls, status, flagged,
+                )
+                span.end()
+
+        except (socket.error, http.client.HTTPException, ConnectionRefusedError) as exc:
             UPSTREAM_UP.set(0)
+            if span is not None:
+                span.set_attribute("error.type", type(exc).__name__)
+                span.set_attribute("http.response.status_code", 503)
+                span.set_status("ERROR", str(exc))
+                span.end()
             try:
                 self.send_response(503)
                 self.send_header("Content-Type", "text/plain")
@@ -390,6 +569,11 @@ class Proxy(BaseHTTPRequestHandler):
             except Exception:
                 pass
         finally:
+            if span is not None:
+                try:
+                    span.end()
+                except Exception:
+                    pass
             conn.close()
 
     # -- handler hooks -----------------------------------------------------
@@ -429,6 +613,17 @@ def main():
     ap.add_argument("--upstream", default="127.0.0.1:8081", help="mlx_lm server")
     ap.add_argument("--default-temp", type=float, default=0.0)
     ap.add_argument("--metrics-path", default="/metrics")
+    ap.add_argument(
+        "--otlp-endpoint",
+        default=os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
+        help="OTLP HTTP endpoint (e.g. http://192.168.1.10:30318). "
+        "Enables traces/metrics/logs export via OpenTelemetry.",
+    )
+    ap.add_argument(
+        "--node-name",
+        default=os.environ.get("MLX_NODE_NAME", ""),
+        help="node/rank label attached to OTel resources (e.g. rank0)",
+    )
     args = ap.parse_args()
 
     host, _, port = args.listen.rpartition(":")
@@ -436,6 +631,9 @@ def main():
     Proxy.upstream = (up_host or "127.0.0.1", int(up_port or 8081))
     Proxy.default_temp = args.default_temp
     Proxy.metrics_path = args.metrics_path
+
+    global _OTEL
+    _OTEL = _setup_otel(args.otlp_endpoint, args.node_name)
 
     threading.Thread(
         target=_health_watch, args=(Proxy.upstream,), daemon=True
