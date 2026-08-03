@@ -136,8 +136,9 @@ curl -s http://localhost:8428/api/v1/query?query=mlx_requests_total
 Two paths feed the TSDB:
 
 1. **Prometheus scraping** — VM scrapes `mlx-proxy` (:8080), both `mlx-hw`
-   agents (:9102 on rank0 + rank1), and the stack itself (`vmalert` :8880,
-   `alertmanager` :9093, `victoria-metrics` self-scrape) every 15s.
+   agents (:9102 on rank0 + rank1), the `mlx-kv` cache agent (:9104), and the
+   stack itself (`vmalert` :8880, `alertmanager` :9093, `victoria-metrics`
+   self-scrape) every 15s.
 2. **OTLP push (traces + logs only)** — the proxy exports request traces and
    logs to `http://<rank0-ip>:4318`; hardware and inference metrics are
    scrape-only so there is no `job="mlx-metrics-proxy"` duplication.
@@ -163,7 +164,7 @@ alerts. Every alert is visible in Grafana via the `Alerts` annotation and the
 
 ### Dashboards
 
-Grafana auto-provisions three dashboards from `observability/grafana/dashboards/`:
+Grafana auto-provisions four dashboards from `observability/grafana/dashboards/`:
 
 * **MLX Cluster** — cluster-wide inference + hardware rows: GPU utilization
   heatmap (RdYlGn, per-node y-buckets), GPU memory used/allocated, CPU / ANE /
@@ -172,8 +173,12 @@ Grafana auto-provisions three dashboards from `observability/grafana/dashboards/
   gauges, CPU/ANE/power panels, thermal pressure and a node-scoped heatmap.
 * **MLX GPU & Power** — the GPU/power deep-dive: utilization heatmap,
   frequency, GPU/ANE/package power, GPU memory.
+* **MLX Performance** — the cache/context layer: KV cache size by type and
+  utilization (`mlx_kv_cache_agent` :9104), per-request context length and
+  utilization (proxy gauges), requests and tokens/min, TTFT and generation
+  p50/p95 quantiles, and the hallucination-risk row.
 
-All three are file-provisioned (no UI drift), readable anonymously for kiosk
+All four are file-provisioned (no UI drift), readable anonymously for kiosk
 display, and carry the `ALERTS{firing}` annotation.
 
 ![MLX Cluster dashboard](docs/screenshots/mlx-cluster.png)
@@ -181,6 +186,23 @@ display, and carry the `ALERTS{firing}` annotation.
 ![MLX Node dashboard](docs/screenshots/mlx-node.png)
 
 ![MLX GPU & Power dashboard](docs/screenshots/mlx-gpu-power.png)
+
+![MLX Performance dashboard](docs/screenshots/mlx-performance.png)
+
+### KV cache & context length
+
+mlx_lm.server has no cache-stats HTTP endpoint, but it logs a `Prompt Cache:`
+summary whenever a generation starts. `cluster/mlx_kv_cache_agent.py` tails
+`cluster/logs/server.log` and exports gauges on `:9104/metrics`:
+`mlx_kv_cache_sequences{type=...}`, `mlx_kv_cache_bytes{type=...}`,
+`mlx_kv_cache_utilization` (cached bytes ÷ LRU-depth × full-context KV), plus
+`mlx_kv_bytes_per_token` and `mlx_kv_est_bytes_max_context`. The proxy adds
+per-request context gauges (`mlx_context_used_tokens`,
+`mlx_context_utilization`, `mlx_context_length_max_tokens`). Both read the
+model's `config.json` through the shared `cluster/mlx_model_info.py` helper:
+Qwen3-1.7B-4bit is 40,960 tokens and 114,688 KV bytes/token (fp16), so one
+full-length sequence is 4.70 GB and the 10-sequence LRU cache ceilings at
+~47 GB.
 
 ## OpenTelemetry
 
@@ -312,6 +334,7 @@ Per-section field notes on the observability layer, with animated pastel SVGs
 4. [What an External Observability Audit Found](blog/4-observability-audit.html)
 5. [Self-Hosted LLM Tracing: the MLX Proxy Talks to Opik](blog/5-opik-llm-tracing.html)
 6. [The Feedback Loop: Every Chat Completion Gets Scored](blog/6-opik-feedback-loop.html)
+7. [The Performance Dashboard: KV Cache and Context, Finally Visible](blog/7-mlx-inference-performance.html)
 
 ## Known platform quirks
 
@@ -336,6 +359,8 @@ Per-section field notes on the observability layer, with animated pastel SVGs
 ```
 cluster/mlx_metrics_proxy.py    metrics + OTel proxy in front of mlx_lm.server
 cluster/mlx_hw_telemetry.py     per-node hardware telemetry exporter
+cluster/mlx_kv_cache_agent.py   KV-cache / context-length exporter (:9104, tails server.log)
+cluster/mlx_model_info.py       shared model context + KV-cache math (config.json)
 cluster/start_server.sh         launch ring server, proxy, hw agents (both nodes)
 cluster/stop_server.sh          stop the above
 cluster/hosts.json              ring hostfile (rank 0 side)
@@ -346,7 +371,8 @@ tools/agent.py, smoke.py        distributed tool-loop demo, ring connectivity te
 observability/compose.yaml      victoria-metrics + otel-collector + grafana + vmalert + alertmanager (podman)
 observability/setup.sh          generate vm-scrape.yml (scrape targets from your IPs)
 observability/otelcol-config.yaml   OTLP traces/logs receiver (metrics are scrape-only)
-observability/vm-scrape.yml     scrape config: mlx-proxy, mlx-hw (x2), stack self-scrape
+observability/vm-scrape.yml     scrape config: mlx-proxy, mlx-hw (x2), mlx-kv, stack self-scrape
+observability/grafana/dashboards/   four provisioned dashboards (incl. mlx-performance.json)
 observability/vmalert/rules.yml 28 alert rules (hardware / inference / quality / stack down)
 observability/alertmanager/alertmanager.yml   receivers + inhibit_rules
 observability/grafana/          auto-provisioned datasource + 3 dashboards (MLX Cluster / MLX Node / MLX GPU & Power)

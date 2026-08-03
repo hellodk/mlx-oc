@@ -84,7 +84,18 @@ nohup "$VENV/bin/python" "$DIR/mlx_metrics_proxy.py" \
 disown
 echo "metrics proxy launching (pid $!) -> $LOG/proxy.log"
 
+# KV-cache / context-length agent (tails $LOG/server.log for the "Prompt Cache:"
+# summary mlx_lm prints whenever a generation starts; exports gauges on :9104).
+nohup "$VENV/bin/python" "$DIR/mlx_kv_cache_agent.py" \
+  --log-file "$LOG/server.log" \
+  --model "$MODEL" \
+  --listen 0.0.0.0:9104 \
+  > "$LOG/kvagent.log" 2>&1 &
+disown
+echo "kv cache agent launching (pid $!) -> $LOG/kvagent.log"
+
 echo "poll: curl -s http://127.0.0.1:8080/v1/models"
 echo "metrics: curl -s http://192.168.1.64:8080/metrics"
 echo "hw rank0: curl -s http://127.0.0.1:9102/metrics | head"
 echo "hw rank1: curl -s http://192.168.1.5:9102/metrics | head"
+echo "kv cache: curl -s http://127.0.0.1:9104/metrics | grep mlx_kv_cache"

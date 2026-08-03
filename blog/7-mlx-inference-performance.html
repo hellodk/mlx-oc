@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7 — The Performance Dashboard: KV Cache and Context, Finally Visible</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#0e7490;--accent-soft:#e6fbff;--teal:#0e7490;--teal-soft:#e6fbff;
+    --amber:#b45309;--amber-soft:#fef3d7;--red:#b91c1c;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(14,116,144,.14), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(79,70,229,.08), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #b6e8f7;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  .figure{text-align:center;margin:24px 0}
+  .figure svg{max-width:100%;height:auto}
+  .figure img{max-width:100%;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .figcap{font-size:13px;color:var(--muted);margin-top:10px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+  .stat{text-align:center;padding:20px 14px}
+  .stat .big{font-size:32px;font-weight:800;letter-spacing:-.02em;color:var(--accent)}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  .pill{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;margin-right:6px}
+  .pill.ok{background:var(--teal-soft);color:var(--teal)}
+  .pill.warn{background:var(--amber-soft);color:var(--amber)}
+  .pill.err{background:#fde8e8;color:var(--red)}
+  .pill.info{background:#eef0ff;color:#4f46e5}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  blockquote{margin:16px 0;padding:12px 18px;border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 10px 10px 0;color:#134e63}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #b6e8f7}
+  .callout.err{background:#fde8e8;border:1px solid #f7c6c6}
+  .callout .ic{font-weight:800;line-height:1.4}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+  <a href="5-opik-llm-tracing.html">Opik</a>
+  <a href="6-opik-feedback-loop.html">Feedback</a>
+  <a href="7-mlx-inference-performance.html">Performance</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Post 7 of 7 &middot; Context &amp; KV cache</span>
+    <h1>The Performance Dashboard: KV Cache and Context, Finally Visible</h1>
+    <p class="sub">The cluster already exported hardware, request and quality metrics. The one thing nobody could see was the thing that decides how much of a 40,960-token window a request actually uses &mdash; the prompt (KV) cache and the context length. This week a log-tailing agent on :9104 plus a handful of proxy gauges put both in VictoriaMetrics, and a fourth Grafana dashboard renders them.</p>
+    <div class="meta">
+      <span><b>Agent</b> mlx_kv_cache_agent :9104</span>
+      <span><b>Source</b> mlx_lm.server's own log</span>
+      <span><b>Dashboard</b> mlx-performance &middot; 17 panels</span>
+      <span><b>Context</b> 40,960 tokens &middot; 114,688 B/tok</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="figure">
+    <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Data flow: mlx_lm.server logs the prompt cache, the KV agent tails the log and exports gauges, the proxy exports context gauges, VictoriaMetrics scrapes both, Grafana renders">
+      <defs>
+        <linearGradient id="c1" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#e6fbff"/><stop offset="1" stop-color="#b6e8f7"/>
+        </linearGradient>
+        <linearGradient id="c2" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#eef0ff"/><stop offset="1" stop-color="#ddd0f7"/>
+        </linearGradient>
+        <linearGradient id="c3" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#fde8f1"/><stop offset="1" stop-color="#fbcfe8"/>
+        </linearGradient>
+      </defs>
+
+      <!-- mlx_lm.server -->
+      <g transform="translate(20,10)">
+        <rect x="0" y="20" width="150" height="90" rx="12" fill="url(#c3)" opacity=".75"/>
+        <text x="75" y="46" text-anchor="middle" font-size="11" font-weight="800" fill="#be185d">mlx_lm.server</text>
+        <text x="75" y="66" text-anchor="middle" font-size="9" font-weight="700" fill="#be185d">ring backend :8081</text>
+        <text x="75" y="84" text-anchor="middle" font-size="9" font-weight="700" fill="#be185d">logs "Prompt Cache:"</text>
+        <text x="75" y="100" text-anchor="middle" font-size="9" font-weight="700" fill="#be185d">on every generation</text>
+      </g>
+
+      <!-- kv agent -->
+      <g transform="translate(215,0)">
+        <rect x="0" y="15" width="180" height="115" rx="12" fill="url(#c1)" opacity=".8"/>
+        <text x="90" y="38" text-anchor="middle" font-size="11" font-weight="800" fill="#0e7490">mlx_kv_cache_agent</text>
+        <text x="90" y="58" text-anchor="middle" font-size="9" font-weight="600" fill="#0e7490">tails server.log</text>
+        <text x="90" y="76" text-anchor="middle" font-size="9" font-weight="600" fill="#0e7490">:9104/metrics</text>
+        <rect x="10" y="88" width="160" height="26" rx="8" fill="#fff" opacity=".9"/>
+        <text x="90" y="105" text-anchor="middle" font-size="9" font-weight="800" fill="#0e7490">sequences / bytes / util</text>
+      </g>
+
+      <!-- proxy -->
+      <g transform="translate(215,190)">
+        <rect x="0" y="0" width="180" height="115" rx="12" fill="url(#c2)" opacity=".7"/>
+        <text x="90" y="24" text-anchor="middle" font-size="11" font-weight="800" fill="#6d28d9">mlx_metrics_proxy</text>
+        <text x="90" y="44" text-anchor="middle" font-size="9" font-weight="600" fill="#6d28d9">:8080 &rarr; mlx_lm.server</text>
+        <rect x="10" y="56" width="160" height="26" rx="8" fill="#fff" opacity=".9"/>
+        <text x="90" y="73" text-anchor="middle" font-size="9" font-weight="800" fill="#6d28d9">context used / max / util</text>
+        <rect x="10" y="88" width="160" height="26" rx="8" fill="#fff" opacity=".9"/>
+        <text x="90" y="105" text-anchor="middle" font-size="9" font-weight="800" fill="#6d28d9">kv bytes/token (model_info)</text>
+      </g>
+
+      <!-- vm -->
+      <g transform="translate(470,30)">
+        <rect x="0" y="30" width="200" height="90" rx="12" fill="url(#c1)" opacity=".8"/>
+        <text x="100" y="58" text-anchor="middle" font-size="11" font-weight="800" fill="#0e7490">VictoriaMetrics</text>
+        <text x="100" y="80" text-anchor="middle" font-size="9" font-weight="600" fill="#0e7490">:8428 &middot; job mlx-kv :9104</text>
+        <text x="100" y="96" text-anchor="middle" font-size="9" font-weight="600" fill="#0e7490">job mlx-proxy :8080</text>
+      </g>
+
+      <!-- grafana -->
+      <g transform="translate(470,190)">
+        <rect x="0" y="0" width="200" height="115" rx="12" fill="url(#c2)" opacity=".75"/>
+        <text x="100" y="26" text-anchor="middle" font-size="11" font-weight="800" fill="#6d28d9">Grafana :3000</text>
+        <text x="100" y="48" text-anchor="middle" font-size="9" font-weight="600" fill="#6d28d9">MLX Performance</text>
+        <rect x="10" y="60" width="180" height="24" rx="8" fill="#fff" opacity=".9"/>
+        <text x="100" y="76" text-anchor="middle" font-size="9" font-weight="800" fill="#6d28d9">KV cache &middot; context &middot; latency</text>
+        <rect x="10" y="88" width="180" height="24" rx="8" fill="#fff" opacity=".9"/>
+        <text x="100" y="104" text-anchor="middle" font-size="9" font-weight="800" fill="#6d28d9">throughput &middot; quality</text>
+      </g>
+
+      <!-- arrows -->
+      <line x1="178" y1="86" x2="209" y2="86" stroke="#0e7490" stroke-width="2" stroke-dasharray="5 5">
+        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <line x1="178" y1="220" x2="209" y2="220" stroke="#6d28d9" stroke-width="2" stroke-dasharray="5 5">
+        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <line x1="401" y1="86" x2="464" y2="86" stroke="#0e7490" stroke-width="2" stroke-dasharray="5 5">
+        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <line x1="401" y1="220" x2="464" y2="220" stroke="#6d28d9" stroke-width="2" stroke-dasharray="5 5">
+        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <line x1="570" y1="126" x2="570" y2="184" stroke="#0e7490" stroke-width="2" stroke-dasharray="5 5">
+        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <text x="560" y="160" text-anchor="middle" font-size="9" font-weight="700" fill="#0e7490">scrape 10s</text>
+      <line x1="305" y1="132" x2="305" y2="184" stroke="#b45309" stroke-width="2" stroke-dasharray="5 5">
+        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <text x="315" y="160" text-anchor="middle" font-size="9" font-weight="700" fill="#b45309">same upstream</text>
+    </svg>
+    <div class="figcap">Fig 1. Two writers, one time series. The KV agent reads what mlx_lm.server prints &mdash; the prompt cache summary that appears whenever a generation starts &mdash; and exports gauges on :9104. The proxy exports per-request context length and the KV math it already knows. VictoriaMetrics scrapes both; the MLX Performance dashboard renders all of it.</div>
+  </div>
+
+  <h2><span class="num">1</span> The invisible bottleneck</h2>
+  <p>After five weeks the cluster can answer <i>how fast, how hot, how broken, how good</i>. But the single number that shapes every one of those answers was invisible: <b>how much of the context window a request actually consumes</b>. Qwen3-1.7B-4bit accepts 40,960 tokens, and KV-cache memory grows linearly with them &mdash; but the metrics stack had no idea what fraction of that window the cluster was really working inside, nor how much of it was being reused across requests.</p>
+  <p>The reuse part matters more than it sounds. The mlx_lm server keeps an <b>LRU prompt cache</b> (10 sequences by default): when a request arrives whose prefix matches a cached one, the model skips the prefill and starts decoding immediately. That cache is the difference between a 2&ndash;3&nbsp;s first token and a sub-second one. It is also the only source of truth for "how long are the contexts people actually send".</p>
+
+  <h2><span class="num">2</span> mlx_lm has no stats endpoint &mdash; so tail its log</h2>
+  <p>mlx_lm.server (0.31.3) exposes no HTTP route for cache internals. What it <i>does</i> do, on every generation start, is print a summary to its log &mdash; we see it because the server already logs to <code>cluster/logs/server.log</code>:</p>
+  <pre><code>Prompt Cache: 10 sequences, 0.18 GB
+- assistant: 10 sequences, 0.18 GB
+- user: 0 sequences, 0.00 GB
+- system: 0 sequences, 0.00 GB</code></pre>
+  <p>That log line is a perfectly good metric source &mdash; it just isn't one. So <code>cluster/mlx_kv_cache_agent.py</code> is a 180-line Prometheus exporter that tails the same file (byte-offset seek, so it survives rotation), regexes those lines, and serves gauges on <code>:9104/metrics</code>. One scrape job in <code>observability/vm-scrape.yml</code> (<code>mlx-kv</code> &rarr; <code>192.168.1.64:9104</code>) is all the wiring that needed.</p>
+  <div class="card">
+    <table>
+      <tr><th>Metric</th><th>Meaning</th></tr>
+      <tr><td><code>mlx_kv_cache_sequences{type=...}</code></td><td>Sequences in the LRU cache, per role + total</td></tr>
+      <tr><td><code>mlx_kv_cache_bytes{type=...}</code></td><td>KV bytes cached, per role + total</td></tr>
+      <tr><td><code>mlx_kv_cache_max_sequences</code></td><td>LRU depth (mlx_lm default 10)</td></tr>
+      <tr><td><code>mlx_kv_cache_utilization</code></td><td>Cached bytes &divide; theoretical full-cache capacity</td></tr>
+      <tr><td><code>mlx_kv_bytes_per_token</code></td><td>fp16 KV bytes per token from model dims</td></tr>
+      <tr><td><code>mlx_context_length_max_tokens</code></td><td>Model max context (40,960)</td></tr>
+      <tr><td><code>mlx_kv_est_bytes_max_context</code></td><td>KV for one full-length sequence (4.7&nbsp;GB)</td></tr>
+    </table>
+    <p class="figcap">The agent recomputes the KV numbers itself every poll from the model config, so the log's approximate "0.18 GB" becomes an exact bytes/token figure.</p>
+  </div>
+
+  <h2><span class="num">3</span> Context math from config.json</h2>
+  <p>The bytes-per-token figure doesn't come from the log &mdash; it comes from <code>cluster/mlx_model_info.py</code>, a tiny shared helper that loads the model's <code>config.json</code> from the Hugging Face cache and computes the KV footprint from the transformer's actual dimensions. For Qwen3-1.7B-4bit: <code>max_position_embeddings=40960</code>, 28 layers, 8 KV heads, 128 head_dim &rarr;</p>
+  <pre><code>kv_bytes_per_token = 2 * layers * kv_heads * head_dim * 2 bytes
+                  = 2 * 28 * 8 * 128 * 2
+                  = 114,688 B/tok        (~112 KiB)
+
+max_context_kv = 40960 * 114,688      = 4.70 GB per sequence
+cache_capacity = 10 * 4.70 GB         = 46.97 GB theoretical</code></pre>
+  <p>Both the proxy and the KV agent import the same helper, so the number is derived once and shared &mdash; no hand-maintained constants to drift. (The <code>2&times;</code> is fp16: mlx stores the cache half-precision.)</p>
+
+  <h2><span class="num">4</span> The proxy's per-request context gauges</h2>
+  <p>The cache tells us what's <i>sitting in memory</i>. The proxy tells us what each request <i>uses</i>. It already sums prompt + completion tokens per request for the token counters, so three gauges were nearly free: <code>mlx_context_used_tokens</code> (the last request's total context length), <code>mlx_context_utilization</code> (that over 40,960), and <code>mlx_context_length_max_tokens</code> &mdash; all label-exported per model, sharing the same <code>model_info</code> import.</p>
+  <pre><code>context_used = prompt_tokens + comp_tokens
+CONTEXT_USED.labels(model=model).set(context_used)
+CONTEXT_UTIL.labels(model=model).set(
+    min(1.0, context_used / float(_CTX_MAX_TOKENS)))</code></pre>
+  <p>The existing <code>mlx_ttft_seconds</code> and <code>mlx_generation_seconds</code> histograms from post 4 stay as they are &mdash; the dashboard just finally shows them side by side with the cache that makes them interesting.</p>
+
+  <h2><span class="num">5</span> The dashboard</h2>
+  <p><code>observability/grafana/dashboards/mlx-performance.json</code> (uid <code>mlx-performance</code>, folder "MLX Cluster") lands in the same provisioning directory as the other three, so Grafana picks it up without a restart. Seventeen panels in four rows: <b>KV cache</b> (size by type, cached sequences, utilization gauge), <b>Context length</b> (used tokens, utilization, max-context stat), <b>Throughput &amp; latency</b> (requests/min, prompt vs completion tokens/min, TTFT and generation p50/p95), and <b>Model quality</b> (hallucination risk + p95, flags, current-risk gauge).</p>
+
+  <div class="figure">
+    <img src="../docs/screenshots/mlx-performance.png" alt="MLX Performance dashboard in Grafana: KV cache size by type, cached sequences, cache utilization, context length used and utilization, requests and tokens per minute, TTFT and generation quantiles, hallucination risk">
+    <div class="figcap">Fig 2. The MLX Performance dashboard after a live 18-request burst. KV cache holds ~190&nbsp;MB across 10 sequences &mdash; utilization 0.34% of the theoretical 47&nbsp;GB &mdash; while the context panels show real requests landing at ~0.35% of the 40,960-token window. Bottom row: TTFT p50 0.38&nbsp;s / p95 0.91&nbsp;s against a generation time of ~5.8&nbsp;s, and the proxy's current hallucination risk at 2.17%.</div>
+  </div>
+
+  <h2><span class="num">6</span> Reading the numbers</h2>
+  <p>That screenshot is the whole story in one glance:</p>
+  <div class="grid2">
+    <div class="card stat"><div class="big">190&nbsp;MB</div><div class="lbl">KV cache after 18 requests &mdash; 10 cached sequences, ~19&nbsp;MB each</div></div>
+    <div class="card stat"><div class="big">0.34%</div><div class="lbl">cache utilization &mdash; 190&nbsp;MB of a 47&nbsp;GB theoretical ceiling</div></div>
+    <div class="card stat"><div class="big">0.38&nbsp;s</div><div class="lbl">TTFT p50 &mdash; cache-hit requests start decoding almost instantly</div></div>
+    <div class="card stat"><div class="big">8.8</div><div class="lbl">decode tokens/s on the two-node ring &mdash; the generation-time partner to TTFT</div></div>
+  </div>
+  <p>The TTFT panel is the one that makes the cache panels earn their place. Cold requests &mdash; first time a prompt is seen &mdash; pay a 2&ndash;3&nbsp;s prefill; the same prompt re-sent lands at sub-second TTFT because the LRU cache served the prefix. The <i>KV cache size</i> step and the <i>TTFT</i> drop are the same event seen from two sides. And the context gauges put a hard number on a question the trace data could only gesture at: real workloads are using ~0.35% of the window. There is an enormous amount of headroom &mdash; or, put more honestly, the cluster is comfortably far from its KV ceiling even under burst traffic.</p>
+  <blockquote>Prefill cost is invisible until you can watch the cache fill. The moment you can, the TTFT spikes and the cache steps line up &mdash; and the "why is it slow" question gets an answer in one row.</blockquote>
+
+  <h2><span class="num">7</span> What bit us along the way</h2>
+  <ul>
+    <li><b><code>rate()</code> with no samples is garbage.</b> <code>histogram_quantile(0.5, rate(bucket[5m]))</code> interpolates into whichever bucket is nonzero &mdash; after traffic stopped, TTFT "p50" read 32&nbsp;ms, then 17&nbsp;s on the next scrape. The fix was widening the rate window to <code>[30m]</code> so the whole displayed span always has samples; the quantile stays stable instead of glitching on idle.</li>
+    <li><b>Stacking the <code>total</code> series doubles the chart.</b> The cache lines report per-type <i>and</i> a total, so the first draft of the stacked "KV cache size" panel plotted the total on top of its own parts. Filtering to <code>{type!="total"}</code> fixed it; total stays available for queries.</li>
+    <li><b>Deleting series from VM isn't enough while the process holds the label.</b> After a malformed test request, the proxy kept exporting a stale <code>model="qwen3:1.7b"</code> series (prometheus_client retains label sets in memory), and every 10&nbsp;s scrape re-created the "deleted" data. The series only really disappeared after a proxy restart that reset the registry.</li>
+    <li><b>Gauges with zero flags render as "No data".</b> A counter that never fired has no series at all. Wrapping the flags query in <code>or on() vector(0)</code> gives the panel a real 0 instead of an empty plot.</li>
+  </ul>
+
+  <div class="callout ok"><span class="ic">&#10003;</span><div><b>Seven posts, four dashboards.</b> The observability stack now spans hardware, alerts, quality and &mdash; finally &mdash; the cache and context layer that gates every request. The KV agent and the context gauges are two more Prometheus-format surfaces scraped by the same VictoriaMetrics, shown by the same Grafana.</div></div>
+
+</main>
+
+<footer class="wrap">
+  <a href="index.html">&larr; Back to all posts</a>
+</footer>
+</body>
+</html>

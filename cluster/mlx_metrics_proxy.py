@@ -63,6 +63,14 @@ from prometheus_client import (
 )
 
 MODEL_DEFAULT = "mlx-community/Qwen3-1.7B-4bit"
+_CTX_MAX_TOKENS = 0  # model max context, set at startup from config
+
+# Model context/KV metrics (best-effort; falls back to defaults if the model
+# config cannot be located).
+try:
+    from mlx_model_info import model_info as _model_info
+except Exception:  # pragma: no cover - import guard
+    _model_info = None
 
 # --------------------------------------------------------------------------
 # OpenTelemetry (optional)
@@ -251,6 +259,26 @@ ERRORS = Counter(
     "mlx_error_total",
     "Requests by HTTP status class (4xx/5xx)",
     ["model", "status"],
+)
+CONTEXT_MAX = Gauge(
+    "mlx_context_length_max_tokens",
+    "Model maximum context length (max_position_embeddings)",
+    ["model"],
+)
+CONTEXT_USED = Gauge(
+    "mlx_context_used_tokens",
+    "Tokens in the context of the most recent request (prompt + completion)",
+    ["model"],
+)
+CONTEXT_UTIL = Gauge(
+    "mlx_context_utilization",
+    "Context used divided by the model maximum context (0..1)",
+    ["model"],
+)
+KV_BYTES_PER_TOKEN = Gauge(
+    "mlx_kv_bytes_per_token",
+    "Approximate KV cache bytes per token (fp16, from model dims)",
+    ["model"],
 )
 
 # --------------------------------------------------------------------------
@@ -592,6 +620,13 @@ class Proxy(BaseHTTPRequestHandler):
             TOKENS_PROMPT.labels(model).inc(prompt_tokens)
             TOKENS_COMPLETION.labels(model).inc(comp_tokens)
 
+            context_used = prompt_tokens + comp_tokens
+            CONTEXT_USED.labels(model=model).set(context_used)
+            if _CTX_MAX_TOKENS > 0:
+                CONTEXT_UTIL.labels(model=model).set(
+                    min(1.0, context_used / float(_CTX_MAX_TOKENS))
+                )
+
             gen_time = t_done - t_send
             GEN_TIME.labels(model).observe(gen_time)
             if t_first_token is not None:
@@ -857,7 +892,7 @@ def main():
     Proxy.default_temp = args.default_temp
     Proxy.metrics_path = args.metrics_path
 
-    global _OTEL, _OPIK, _OPIK_OTLP, _NODE_NAME
+    global _OTEL, _OPIK, _OPIK_OTLP, _NODE_NAME, _CTX_MAX_TOKENS
     _NODE_NAME = args.node_name
     _OTEL = _setup_otel(
         args.otlp_endpoint, args.node_name, opik_otlp_endpoint=args.opik_otlp_endpoint
@@ -883,6 +918,20 @@ def main():
             f"[proxy] opik OTLP -> {args.opik_otlp_endpoint} (project=mlx)",
             flush=True,
         )
+
+    # Model context/KV gauges (static once known).
+    try:
+        info = _model_info(MODEL_DEFAULT) if _model_info else None
+        if info:
+            _CTX_MAX_TOKENS = info.max_context_tokens
+            CONTEXT_MAX.labels(model=MODEL_DEFAULT).set(info.max_context_tokens)
+            KV_BYTES_PER_TOKEN.labels(model=MODEL_DEFAULT).set(info.kv_bytes_per_token)
+            print(
+                f"[proxy] model ctx={info.max_context_tokens} kv={info.kv_bytes_per_token} B/tok",
+                flush=True,
+            )
+    except Exception as exc:
+        print(f"[proxy] model info failed ({exc!r})", flush=True)
 
     threading.Thread(
         target=_health_watch, args=(Proxy.upstream,), daemon=True

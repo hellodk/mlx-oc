@@ -31,6 +31,7 @@
   .n4{background:linear-gradient(135deg,#b45309,#f59e0b)}
   .n5{background:linear-gradient(135deg,#7c3aed,#a78bfa)}
   .n6{background:linear-gradient(135deg,#0f766e,#d97706)}
+  .n7{background:linear-gradient(135deg,#0e7490,#22d3ee)}
   .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
   .post p{margin:0;color:var(--muted);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
@@ -42,11 +43,11 @@
   <div class="wrap">
     <span class="kicker">MLX Observability &middot; Field Notes</span>
     <h1>Making Two Mac minis<br>Actually Observable</h1>
-    <p class="sub">Six deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 28 rules, three Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, and a feedback loop that scores every chat completion.</p>
+    <p class="sub">Seven deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 28 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, and a performance dashboard that finally shows the KV cache and context window.</p>
     <div class="meta">
       <span><b>Stack</b> VictoriaMetrics + vmalert + Alertmanager + Grafana</span>
-      <span><b>Agents</b> mlx_metrics_proxy :8080 &middot; mlx_hw_telemetry :9102</span>
-      <span><b>Rules</b> 28 &middot; <b>Dashboards</b> 3</span>
+      <span><b>Agents</b> mlx_metrics_proxy :8080 &middot; mlx_hw_telemetry :9102 &middot; mlx_kv_cache_agent :9104</span>
+      <span><b>Rules</b> 28 &middot; <b>Dashboards</b> 4</span>
     </div>
   </div>
 </header>
@@ -97,6 +98,14 @@
       <h2>The Feedback Loop: Every Chat Completion Gets Scored</h2>
       <p>Heuristic scores logged in-band by the proxy plus an LLM-as-judge that uses the cluster itself to rate answers &mdash; five feedback scores per trace. Includes the self-tracing judge bug and the PUT-not-POST gotcha.</p>
       <span class="tag">Opik</span><span class="tag">feedback scores</span><span class="tag">LLM-as-judge</span>
+    </div>
+  </a>
+  <a class="post" href="7-mlx-inference-performance.html">
+    <div class="num n7">7</div>
+    <div>
+      <h2>The Performance Dashboard: KV Cache and Context, Finally Visible</h2>
+      <p>A log-tailing agent on :9104 plus new proxy gauges put the prompt (KV) cache and per-request context length into VictoriaMetrics &mdash; and a fourth dashboard shows cached bytes, utilization, TTFT/generation quantiles and throughput together. Includes the rate()-without-samples trap.</p>
+      <span class="tag">KV cache</span><span class="tag">context length</span><span class="tag">mlx_kv_cache_agent</span><span class="tag">dashboard</span>
     </div>
   </a>
 </main>
