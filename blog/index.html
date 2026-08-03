@@ -30,6 +30,7 @@
   .n3{background:linear-gradient(135deg,#db2777,#f472b6)}
   .n4{background:linear-gradient(135deg,#b45309,#f59e0b)}
   .n5{background:linear-gradient(135deg,#7c3aed,#a78bfa)}
+  .n6{background:linear-gradient(135deg,#0f766e,#d97706)}
   .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
   .post p{margin:0;color:var(--muted);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
@@ -41,7 +42,7 @@
   <div class="wrap">
     <span class="kicker">MLX Observability &middot; Field Notes</span>
     <h1>Making Two Mac minis<br>Actually Observable</h1>
-    <p class="sub">Five deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 28 rules, three Grafana dashboards, what an external audit found, and self-hosted LLM tracing with Opik.</p>
+    <p class="sub">Six deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 28 rules, three Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, and a feedback loop that scores every chat completion.</p>
     <div class="meta">
       <span><b>Stack</b> VictoriaMetrics + vmalert + Alertmanager + Grafana</span>
       <span><b>Agents</b> mlx_metrics_proxy :8080 &middot; mlx_hw_telemetry :9102</span>
@@ -88,6 +89,14 @@
       <h2>Self-Hosted LLM Tracing: the MLX Proxy Talks to Opik</h2>
       <p>Opik via helm on k0s, and every chat completion logged twice &mdash; over the opik SDK and over OTLP with OpenInference attributes. Includes the write-ordering race that silently stripped names from traces.</p>
       <span class="tag">Opik</span><span class="tag">LLM tracing</span><span class="tag">OpenInference</span><span class="tag">helm</span>
+    </div>
+  </a>
+  <a class="post" href="6-opik-feedback-loop.html">
+    <div class="num n6">6</div>
+    <div>
+      <h2>The Feedback Loop: Every Chat Completion Gets Scored</h2>
+      <p>Heuristic scores logged in-band by the proxy plus an LLM-as-judge that uses the cluster itself to rate answers &mdash; five feedback scores per trace. Includes the self-tracing judge bug and the PUT-not-POST gotcha.</p>
+      <span class="tag">Opik</span><span class="tag">feedback scores</span><span class="tag">LLM-as-judge</span>
     </div>
   </a>
 </main>

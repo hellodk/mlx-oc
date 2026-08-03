@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>6 — The Feedback Loop: Every Chat Completion Gets Scored</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#0f766e;--accent-soft:#e6f6f4;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--red:#b91c1c;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(15,118,110,.14), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(124,58,237,.08), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #c7e9e4;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  .figure{text-align:center;margin:24px 0}
+  .figure svg{max-width:100%;height:auto}
+  .figure img{max-width:100%;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .figcap{font-size:13px;color:var(--muted);margin-top:10px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+  .stat{text-align:center;padding:20px 14px}
+  .stat .big{font-size:32px;font-weight:800;letter-spacing:-.02em;color:var(--accent)}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  .pill{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;margin-right:6px}
+  .pill.ok{background:var(--teal-soft);color:var(--teal)}
+  .pill.warn{background:var(--amber-soft);color:var(--amber)}
+  .pill.err{background:#fde8e8;color:var(--red)}
+  .pill.info{background:#eef0ff;color:#4f46e5}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  blockquote{margin:16px 0;padding:12px 18px;border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 10px 10px 0;color:#1d4a45}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.err{background:#fde8e8;border:1px solid #f7c6c6}
+  .callout .ic{font-weight:800;line-height:1.4}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+  <a href="5-opik-llm-tracing.html">Opik</a>
+  <a href="6-opik-feedback-loop.html">Feedback</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Post 6 of 6 &middot; Online evaluation</span>
+    <h1>The Feedback Loop: Every Chat Completion Gets Scored</h1>
+    <p class="sub">Traces are just records until someone says whether the answer was any good. This week the proxy logs heuristic scores in-band for every completion, and a small judge process uses the MLX cluster itself &mdash; via the same proxy &mdash; to rate the answers. Five scores per trace, visible in the Opik UI.</p>
+    <div class="meta">
+      <span><b>Scores</b> 2 heuristic (proxy) + 3 judge (MLX)</span>
+      <span><b>Writer</b> PUT /api/v1/private/traces/feedback-scores</span>
+      <span><b>Judge</b> opik_evaluator.py &middot; Qwen3-1.7B</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="figure">
+    <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Feedback loop: proxy logs heuristic scores, evaluator judges via the cluster and writes scores back">
+      <defs>
+        <linearGradient id="c1" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#e6f6f4"/><stop offset="1" stop-color="#c7e9e4"/>
+        </linearGradient>
+        <linearGradient id="c2" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#f1e9fe"/><stop offset="1" stop-color="#ddd0f7"/>
+        </linearGradient>
+        <linearGradient id="c3" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#fde8f1"/><stop offset="1" stop-color="#fbcfe8"/>
+        </linearGradient>
+      </defs>
+
+      <!-- client -->
+      <g transform="translate(30,10)">
+        <rect x="0" y="20" width="140" height="74" rx="12" fill="url(#c3)" opacity=".75"/>
+        <text x="70" y="50" text-anchor="middle" font-size="11" font-weight="800" fill="#be185d">curl / opencode</text>
+        <text x="70" y="70" text-anchor="middle" font-size="9.5" font-weight="700" fill="#be185d">/v1/chat/completions</text>
+      </g>
+
+      <!-- proxy -->
+      <g transform="translate(210,10)">
+        <rect x="0" y="0" width="170" height="120" rx="12" fill="url(#c2)" opacity=".7"/>
+        <text x="85" y="22" text-anchor="middle" font-size="11" font-weight="800" fill="#6d28d9">mlx_metrics_proxy</text>
+        <text x="85" y="44" text-anchor="middle" font-size="9" font-weight="600" fill="#6d28d9">:8080 &rarr; mlx_lm.server</text>
+        <rect x="10" y="56" width="150" height="26" rx="8" fill="#fff" opacity=".9"/>
+        <text x="85" y="73" text-anchor="middle" font-size="9" font-weight="800" fill="#6d28d9">log heuristic scores</text>
+        <rect x="10" y="88" width="150" height="26" rx="8" fill="#fff" opacity=".9"/>
+        <text x="85" y="105" text-anchor="middle" font-size="9" font-weight="800" fill="#6d28d9">X-Mlx-Trace: 0 honored</text>
+      </g>
+
+      <!-- opik -->
+      <g transform="translate(470,0)">
+        <rect x="0" y="10" width="250" height="130" rx="12" fill="url(#c1)" opacity=".8"/>
+        <text x="125" y="36" text-anchor="middle" font-size="11" font-weight="800" fill="#0f766e">Opik (self-hosted)</text>
+        <text x="125" y="56" text-anchor="middle" font-size="9" font-weight="600" fill="#0f766e">traces + feedback scores</text>
+        <text x="125" y="76" text-anchor="middle" font-size="9" font-weight="600" fill="#0f766e">:32173 NodePort &middot; project "mlx"</text>
+        <rect x="20" y="90" width="210" height="26" rx="8" fill="#fff" opacity=".9"/>
+        <text x="125" y="107" text-anchor="middle" font-size="9" font-weight="800" fill="#0f766e">PUT /traces/feedback-scores</text>
+      </g>
+
+      <!-- evaluator -->
+      <g transform="translate(100,240)">
+        <rect x="0" y="0" width="190" height="92" rx="12" fill="url(#c2)" opacity=".6"/>
+        <text x="95" y="24" text-anchor="middle" font-size="11" font-weight="800" fill="#6d28d9">opik_evaluator.py</text>
+        <text x="95" y="46" text-anchor="middle" font-size="9" font-weight="600" fill="#6d28d9">polls traces &middot; builds judge prompt</text>
+        <text x="95" y="66" text-anchor="middle" font-size="9" font-weight="600" fill="#6d28d9">parses {"correctness": ...}</text>
+        <text x="95" y="84" text-anchor="middle" font-size="9" font-weight="600" fill="#6d28d9">temp 0.0 &middot; X-Mlx-Trace: 0</text>
+      </g>
+
+      <!-- arrows -->
+      <line x1="178" y1="72" x2="204" y2="72" stroke="#7c3aed" stroke-width="2" stroke-dasharray="5 5">
+        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <line x1="386" y1="72" x2="464" y2="72" stroke="#0f766e" stroke-width="2" stroke-dasharray="5 5">
+        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <text x="425" y="60" text-anchor="middle" font-size="9" font-weight="700" fill="#0f766e">scores in-band</text>
+      <line x1="595" y1="140" x2="220" y2="235" stroke="#6d28d9" stroke-width="2" stroke-dasharray="5 5">
+        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <text x="470" y="205" text-anchor="middle" font-size="9" font-weight="700" fill="#6d28d9">GET traces (pending)</text>
+      <line x1="185" y1="245" x2="260" y2="140" stroke="#0f766e" stroke-width="2" stroke-dasharray="5 5">
+        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <text x="205" y="178" text-anchor="middle" font-size="9" font-weight="700" fill="#0f766e">judge via proxy</text>
+      <line x1="295" y1="66" x2="465" y2="66" stroke="#b45309" stroke-width="2" stroke-dasharray="5 5">
+        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <text x="380" y="52" text-anchor="middle" font-size="9" font-weight="700" fill="#b45309">PUT scores</text>
+    </svg>
+    <div class="figcap">Fig 1. Two score writers, one Opik. The proxy logs heuristic scores in-band as every request finishes; the evaluator reads traces, asks the cluster to rate the answer, and writes judge scores back. Both flows land on the same trace.</div>
+  </div>
+
+  <h2><span class="num">1</span> Why traces need scores</h2>
+  <p>Post 5 gave every chat completion a trace: input, output, tokens, TTFT, hallucination risk. That tells you <i>what happened</i>. It does not tell you <i>whether it was any good</i> &mdash; and a 1.7B model on a Mac mini can be confidently wrong. The K2 question is the running example: asked "What is the tallest mountain on Earth?", Qwen3-1.7B answers <b>K2</b>, complete with confident, contradictory details (it calls K2 both the "highest" and "second highest", and names Everest's height as K2's). A trace with no score lets that slip past; a trace with a <code>correctness: 0.9</code> badge and a <code>hallucination_flagged</code> warning makes it visible in one glance.</p>
+  <p>Opik's model for this is <b>feedback scores</b>: named, 0&ndash;1 values attached to a trace (or span) with a category and a reason. They render as chips on the trace detail page, as extra columns in the log table, and aggregate to averages. The only question is who writes them.</p>
+
+  <h2><span class="num">2</span> Writer 1: heuristic scores, in-band from the proxy</h2>
+  <p>The proxy already computes a hallucination <code>risk</code> and a <code>flagged</code> boolean for every response (repetition, refusal and hedging/ungrounded-signal heuristics, alert-rule quality inherited from the audit). Posting those as feedback scores is three lines, in the same success handler that ends the trace:</p>
+  <pre><code>opik_trace.log_feedback_score(
+    name="hallucination_quality",
+    value=round(1.0 - risk, 3),
+    category_name="quality",
+    reason="proxy heuristic (repetition/refusal/hedging/"
+           "ungrounded signals), higher is better",
+)
+opik_trace.log_feedback_score(
+    name="hallucination_flagged",
+    value=0.0 if flagged else 1.0,
+    category_name="safety",
+    reason="1.0 == proxy heuristics did NOT flag the output "
+           "for hallucination risk",
+)</code></pre>
+  <p>Note the polarity flip: feedback scores mean "higher is better", so we store <code>1 - risk</code> and invert <code>flagged</code>. These two land for every completion &mdash; even tool-call replies with no text &mdash; because they are computed from the proxy's own signal, not from the model output.</p>
+
+  <h2><span class="num">3</span> Writer 2: an LLM-as-judge that runs on the cluster itself</h2>
+  <p>Heuristics catch shape, not substance. For substance we let the cluster grade its own homework. <code>cluster/opik_evaluator.py</code> runs on the Mac and, every pass:</p>
+  <ol>
+    <li><code>GET /api/v1/private/traces?project_name=mlx</code> to list recent traces;</li>
+    <li>skips traces that already carry all three judge scores (<code>correctness</code>, <code>helpfulness</code>, <code>hallucination_free</code>);</li>
+    <li>builds a prompt with the user's question and the assistant's answer, and calls the live proxy (<code>/v1/chat/completions</code>, model Qwen3-1.7B-4bit, temperature 0.0);</li>
+    <li>parses the reply's JSON and writes the three scores with one batched <code>PUT /api/v1/private/traces/feedback-scores</code>.</li>
+  </ol>
+  <div class="card">
+    <b>The judge prompt.</b> Ask a 1.7B model for a verdict, and you get prose. We pin it to a strict contract and give it a worked example:
+    <pre><code>You are an evaluator. Score the assistant's answer to the user's
+question using three numbers between 0 and 1.
+
+Question: {question}
+
+Assistant answer: {answer}
+
+Return ONLY a JSON object with exactly these keys:
+- "correctness": how factually correct and complete the answer is
+- "helpfulness": how well the answer addresses the request
+- "hallucination_free": 1.0 if the answer is fully grounded in the
+  question and invents nothing, 0.0 if it fabricates
+Example: {"correctness": 0.9, "helpfulness": 0.8, "hallucination_free": 1.0}</code></pre>
+    <p class="figcap">The evaluator extracts the <code>{"..."}</code> object from the reply (regex from first <code>{</code> to last <code>}</code>), clamps each value to [0,1], and writes it.</p>
+  </div>
+  <p>Real run, against the K2 trace and a fresh haiku:</p>
+  <pre><code>$ .venv/bin/python cluster/opik_evaluator.py --once --limit 20
+[evaluator] 18 traces, 1 pending judge scores
+[evaluator] scored 019fc8f0-d92 -> {"correctness": 0.9, "helpfulness": 0.8, "hallucination_free": 1.0}
+[evaluator] wrote 3 feedback scores</code></pre>
+  <p>The loop is fully self-contained: no external API, no GPU cloud &mdash; the judge is the same Qwen3-1.7B-4bit the cluster serves, reaching it through the same proxy that traced it.</p>
+
+  <h2><span class="num">4</span> The judge must not trace itself</h2>
+  <p>First run, and every pass kept finding new pending traces. Cause: each judge call is a <code>POST /v1/chat/completions</code> through the proxy &mdash; so the proxy traced the judge, then the evaluator rated its own rating prompt, then the rating got traced too, forever. A feedback loop with no exit.</p>
+  <p>The fix is an opt-out: the proxy honors an <code>X-Mlx-Trace: 0</code> header and skips Opik tracing for that request, and the evaluator sends it on every judge call. After that, a judge pass creates zero traces and the pending count converges to 0.</p>
+  <pre><code># proxy: don't start a trace when the caller opts out
+if _OPIK is not None and self.headers.get("X-Mlx-Trace", "1") != "0":
+    opik_trace = _OPIK.trace(name="mlx.chat.completions", input={...})
+
+# evaluator: mark judge calls as untraceable
+headers = {"Content-Type": "application/json", "X-Mlx-Trace": "0"}</code></pre>
+
+  <h2><span class="num">5</span> Scores on the wire</h2>
+  <p>Six requests through the live proxy &mdash; a fact, a capital, a streaming count, the K2 question, a haiku, and a tool-call &mdash; then one evaluator pass. Every text-bearing trace carries all five scores:</p>
+  <div class="card">
+    <table>
+      <tr><th>Question</th><th>correctness</th><th>helpfulness</th><th>hallucination_free</th><th>hallucination_quality</th><th>hallucination_flagged</th></tr>
+      <tr><td>Who wrote Moby-Dick?</td><td><code>1.0</code></td><td><code>1.0</code></td><td><code>1.0</code></td><td><code>0.99</code></td><td><code>1.0</code></td></tr>
+      <tr><td>Capital of Japan</td><td><code>1.0</code></td><td><code>1.0</code></td><td><code>1.0</code></td><td><code>1.0</code></td><td><code>1.0</code></td></tr>
+      <tr><td>Count 1&ndash;10 (stream)</td><td><code>1.0</code></td><td><code>1.0</code></td><td><code>1.0</code></td><td><code>0.97</code></td><td><code>1.0</code></td></tr>
+      <tr><td>Tallest mountain on Earth?</td><td><code>0.9</code></td><td><code>0.9</code></td><td><code>1.0</code></td><td><code>0.99</code></td><td><code>1.0</code></td></tr>
+      <tr><td>Haiku about the ocean</td><td><code>0.9</code></td><td><code>0.8</code></td><td><code>1.0</code></td><td><code>1.0</code></td><td><code>1.0</code></td></tr>
+      <tr><td>Weather in Paris (tool call)</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td><code>1.0</code></td><td><code>1.0</code></td></tr>
+    </table>
+  </div>
+  <p>Worth calling out: the model answered K2 with full confidence, so the proxy's <i>shape</i> heuristics gave it a near-perfect <code>hallucination_quality</code> &mdash; the flags catch repetition/refusal, not wrong-but-confident facts. The judge is the layer that caught it, docking correctness to 0.9. The two score sources are deliberately complementary, and the tool-call trace is the boundary case: no text, nothing to judge, heuristic scores only.</p>
+
+  <div class="figure">
+    <img src="../docs/screenshots/opik-trace-feedback.png" alt="Opik trace detail, Feedback scores tab, showing five scores with reasons">
+    <div class="figcap">Fig 2. The Feedback scores tab on the K2 trace: <code>correctness</code> and <code>helpfulness</code> judge 0.9, <code>hallucination_free</code> judge 1.0, plus the proxy's <code>hallucination_quality</code> (quality 0.99) and <code>hallucination_flagged</code> (safety 1.0), each with its reason.</div>
+  </div>
+  <div class="figure">
+    <img src="../docs/screenshots/opik-traces-scores.png" alt="Opik log table with one column per feedback score and per-trace score chips">
+    <div class="figcap">Fig 3. The project log view: every feedback score is a column (<code>correctness avg 0.96</code>, <code>hallucination_quality avg 0.99</code>, &hellip;) and every row carries its chips &mdash; <code>judge (1)</code>, <code>safety (1)</code>, <code>quality (0.99)</code>.</div>
+  </div>
+
+  <h2><span class="num">6</span> What bit us along the way</h2>
+  <ul>
+    <li><b>Self-tracing judge.</b> The evaluator's judge calls were being traced and then judged by themselves. Fixed with the <code>X-Mlx-Trace: 0</code> opt-out.</li>
+    <li><b>Eventual consistency on the read side.</b> The traces list is served by a search index, not the live DB. The first evaluator pass often saw a just-finished trace with an empty output (the index hadn't caught up) and skipped it as unjudgeable. One more pass later and it scores fine.</li>
+    <li><b>PUT, not POST.</b> <code>POST /traces/feedback-scores</code> is a 405; the writer is <code>PUT</code> with a <code>{"scores": [...]}</code> wrapper, and the span variant additionally demands a <code>source</code> field. The SDK's <code>log_traces_feedback_scores</code> does the same thing under the hood.</li>
+    <li><b>Tool calls have no content.</b> Nothing to judge, so no judge scores &mdash; the right behavior, and the reason the heuristic scores exist at all.</li>
+  </ul>
+
+  <div class="callout ok"><span class="ic">&#10003;</span><div><b>Score types on one trace.</b> The Feedback scores tab on Fig 2 shows exactly what the UI does with a mixed-source trace: <code>judge</code>, <code>quality</code> and <code>safety</code> categories each render as a chip with its reason, and the log table aggregates them into averages &mdash; correctness 0.96 across the project in Fig 3.</div></div>
+  <blockquote>The pattern that repeated all day: close the loop and it immediately starts feeding on itself. The judge needed its own escape hatch before it could grade anyone else's answers.</blockquote>
+
+</main>
+
+<footer class="wrap">
+  <a href="index.html">&larr; Back to all posts</a>
+</footer>
+</body>
+</html>

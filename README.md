@@ -257,6 +257,50 @@ Gotchas worth knowing (see [blog post 5](blog/5-opik-llm-tracing.html)):
 
 ![Opik project traces](docs/screenshots/opik-projects.png)
 
+![Opik feedback scores](docs/screenshots/opik-trace-feedback.png)
+
+![Opik trace list with score columns](docs/screenshots/opik-traces-scores.png)
+
+### Feedback scores (online evaluation)
+
+Every chat completion gets five named 0–1 **feedback scores** written to its
+trace (see [blog post 6](blog/6-opik-feedback-loop.html)):
+
+| writer | name | category | source |
+|---|---|---|---|
+| proxy (in-band) | `hallucination_quality` | quality | `1 - hallucination_risk` |
+| proxy (in-band) | `hallucination_flagged` | safety | `1.0` if not flagged |
+| `opik_evaluator.py` | `correctness` | judge | LLM-as-judge (Qwen3-1.7B, temp 0) |
+| `opik_evaluator.py` | `helpfulness` | judge | LLM-as-judge |
+| `opik_evaluator.py` | `hallucination_free` | judge | LLM-as-judge |
+
+The proxy logs its two heuristics at the end of each request:
+
+```python
+opik_trace.log_feedback_score(name="hallucination_quality",
+    value=round(1.0 - risk, 3), category_name="quality", reason="...")
+opik_trace.log_feedback_score(name="hallucination_flagged",
+    value=0.0 if flagged else 1.0, category_name="safety", reason="...")
+```
+
+`cluster/opik_evaluator.py` is the LLM-as-judge: it polls recent traces, and for
+any trace without judge scores builds a prompt from the question + answer, asks
+the live cluster to rate it (`/v1/chat/completions`, temperature 0), parses the
+JSON reply and writes scores with a batched
+`PUT /api/v1/private/traces/feedback-scores`:
+
+```bash
+cluster/opik_evaluator.py --once                 # single pass
+cluster/opik_evaluator.py --interval 15          # background loop
+OPIK_BASE=... JUDGE_URL=http://127.0.0.1:8080/v1 cluster/opik_evaluator.py
+```
+
+Gotchas: judge calls send `X-Mlx-Trace: 0` so the proxy does **not** trace the
+judge (otherwise it rates its own rating prompts forever); the write endpoint is
+`PUT` (POST is 405) with a `{"scores": [...]}` wrapper; the traces list is
+search-index backed, so just-finished traces can briefly appear with empty
+outputs and are skipped until the index catches up.
+
 ## Blog
 
 Per-section field notes on the observability layer, with animated pastel SVGs
@@ -267,6 +311,7 @@ Per-section field notes on the observability layer, with animated pastel SVGs
 3. [Three Dashboards, a GPU Heatmap, and Anonymous Kiosk Rendering](blog/3-dashboards.html)
 4. [What an External Observability Audit Found](blog/4-observability-audit.html)
 5. [Self-Hosted LLM Tracing: the MLX Proxy Talks to Opik](blog/5-opik-llm-tracing.html)
+6. [The Feedback Loop: Every Chat Completion Gets Scored](blog/6-opik-feedback-loop.html)
 
 ## Known platform quirks
 

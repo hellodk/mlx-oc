@@ -423,7 +423,7 @@ class Proxy(BaseHTTPRequestHandler):
                 messages = req.get("messages") or []
             except json.JSONDecodeError:
                 pass
-            if _OPIK is not None:
+            if _OPIK is not None and self.headers.get("X-Mlx-Trace", "1") != "0":
                 try:
                     opik_trace = _OPIK.trace(
                         name="mlx.chat.completions",
@@ -707,6 +707,34 @@ class Proxy(BaseHTTPRequestHandler):
                     opik_trace.end()
                 except Exception as exc:
                     print(f"[proxy] opik trace end failed ({exc!r})", flush=True)
+                # In-band feedback: the proxy's heuristics become Opik feedback
+                # scores (higher is better). These go through the same streamer
+                # and are flushed with the final _OPIK.flush() below.
+                if opik_trace is not None:
+                    try:
+                        opik_trace.log_feedback_score(
+                            name="hallucination_quality",
+                            value=round(1.0 - risk, 3),
+                            category_name="quality",
+                            reason=(
+                                "proxy heuristic (repetition/refusal/hedging/"
+                                "ungrounded signals), higher is better"
+                            ),
+                        )
+                        opik_trace.log_feedback_score(
+                            name="hallucination_flagged",
+                            value=0.0 if flagged else 1.0,
+                            category_name="safety",
+                            reason=(
+                                "1.0 == proxy heuristics did NOT flag the "
+                                "output for hallucination risk"
+                            ),
+                        )
+                    except Exception as exc:
+                        print(
+                            f"[proxy] opik feedback scores failed ({exc!r})",
+                            flush=True,
+                        )
 
         except (socket.error, http.client.HTTPException, ConnectionRefusedError) as exc:
             UPSTREAM_UP.set(0)
