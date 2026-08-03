@@ -29,6 +29,12 @@ mkdir -p "$LOG"
 # Leave empty to disable OTel (Prometheus /metrics is always on).
 OTLP="${MLX_OTLP_ENDPOINT:-http://192.168.1.64:4318}"
 
+# Optional Opik tracing (both paths; set empty to disable either).
+#   --opik-endpoint      opik SDK base URL (frontend NodePort; proxy appends /api)
+#   --opik-otlp-endpoint OTLP HTTP ingestion of the same instance
+OPIK_ENDPOINT="${OPIK_ENDPOINT:-http://192.168.1.10:32173}"
+OPIK_OTLP="${OPIK_OTLP_ENDPOINT:-http://192.168.1.10:32173/api/v1/private/otel}"
+
 nohup "$MLX_VENV/bin/mlx.launch" \
   --hostfile "$DIR/hosts.json" \
   --backend ring \
@@ -63,12 +69,17 @@ nohup ssh -o ConnectTimeout=5 192.168.1.5 \
 disown
 echo "hw telemetry rank1 launching over ssh (pid $!)"
 
+PROXY_OPIK_ARGS=()
+if [[ -n "$OPIK_ENDPOINT" ]]; then PROXY_OPIK_ARGS+=(--opik-endpoint "$OPIK_ENDPOINT"); fi
+if [[ -n "$OPIK_OTLP" ]]; then PROXY_OPIK_ARGS+=(--opik-otlp-endpoint "$OPIK_OTLP"); fi
+
 nohup "$VENV/bin/python" "$DIR/mlx_metrics_proxy.py" \
   --listen 0.0.0.0:8080 \
   --upstream 127.0.0.1:8081 \
   --default-temp 0.0 \
   --node-name rank0 \
   --otlp-endpoint "$OTLP" \
+  "${PROXY_OPIK_ARGS[@]}" \
   > "$LOG/proxy.log" 2>&1 &
 disown
 echo "metrics proxy launching (pid $!) -> $LOG/proxy.log"

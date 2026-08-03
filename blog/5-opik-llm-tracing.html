@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5 — Self-Hosted LLM Tracing with Opik</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#7c3aed;--accent-soft:#f1e9fe;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--red:#b91c1c;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(124,58,237,.13), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(15,118,110,.09), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #ddd0f7;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  .figure{text-align:center;margin:24px 0}
+  .figure svg{max-width:100%;height:auto}
+  .figure img{max-width:100%;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .figcap{font-size:13px;color:var(--muted);margin-top:10px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+  .stat{text-align:center;padding:20px 14px}
+  .stat .big{font-size:32px;font-weight:800;letter-spacing:-.02em;color:var(--accent)}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  .pill{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;margin-right:6px}
+  .pill.ok{background:var(--teal-soft);color:var(--teal)}
+  .pill.warn{background:var(--amber-soft);color:var(--amber)}
+  .pill.err{background:#fde8e8;color:var(--red)}
+  .pill.info{background:#eef0ff;color:#4f46e5}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  blockquote{margin:16px 0;padding:12px 18px;border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 10px 10px 0;color:#4c2a86}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.err{background:#fde8e8;border:1px solid #f7c6c6}
+  .callout .ic{font-weight:800;line-height:1.4}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+  <a href="5-opik-llm-tracing.html">Opik</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Post 5 of 5 &middot; Self-hosted LLM tracing</span>
+    <h1>Self-Hosted LLM Tracing: the MLX Proxy Talks to Opik</h1>
+    <p class="sub">The inference proxy now logs every chat completion to a self-hosted Opik on the k0s cluster &mdash; over the opik SDK and over OTLP with OpenInference attributes, with token usage, TTFT and hallucination metadata in every span.</p>
+    <div class="meta">
+      <span><b>Paths</b> opik SDK + OTLP</span>
+      <span><b>Deploy</b> helm on k0s &middot; NodePort 32173</span>
+      <span><b>Spans</b> type=llm &middot; model &middot; usage &middot; metadata</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="figure">
+    <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two ingestion paths from the proxy into Opik">
+      <defs>
+        <linearGradient id="c1" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#f1e9fe"/><stop offset="1" stop-color="#ddd0f7"/>
+        </linearGradient>
+        <linearGradient id="c2" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#d9f3ec"/><stop offset="1" stop-color="#b2ece0"/>
+        </linearGradient>
+        <linearGradient id="c3" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#fde8f1"/><stop offset="1" stop-color="#fbcfe8"/>
+        </linearGradient>
+      </defs>
+
+      <!-- client -->
+      <g transform="translate(30,24)">
+        <rect x="0" y="20" width="150" height="74" rx="12" fill="url(#c3)" opacity=".75"/>
+        <text x="75" y="50" text-anchor="middle" font-size="11" font-weight="800" fill="#be185d">opencode / curl</text>
+        <text x="75" y="70" text-anchor="middle" font-size="9.5" font-weight="700" fill="#be185d">/v1/chat/completions</text>
+      </g>
+
+      <!-- proxy -->
+      <g transform="translate(220,24)">
+        <rect x="0" y="0" width="180" height="120" rx="12" fill="url(#c1)" opacity=".7"/>
+        <text x="90" y="22" text-anchor="middle" font-size="11" font-weight="800" fill="#6d28d9">mlx_metrics_proxy</text>
+        <text x="90" y="44" text-anchor="middle" font-size="9" font-weight="600" fill="#6d28d9">:8080 &rarr; mlx_lm.server</text>
+        <rect x="14" y="56" width="152" height="26" rx="8" fill="#fff" opacity=".9"/>
+        <text x="90" y="73" text-anchor="middle" font-size="9.5" font-weight="800" fill="#6d28d9">opik SDK trace+span</text>
+        <rect x="14" y="88" width="152" height="26" rx="8" fill="#fff" opacity=".9"/>
+        <text x="90" y="105" text-anchor="middle" font-size="9.5" font-weight="800" fill="#6d28d9">OTLP + OpenInference</text>
+      </g>
+
+      <!-- opik -->
+      <g transform="translate(500,24)">
+        <rect x="0" y="10" width="230" height="100" rx="12" fill="url(#c2)" opacity=".75"/>
+        <text x="115" y="36" text-anchor="middle" font-size="11" font-weight="800" fill="#0f766e">Opik (self-hosted)</text>
+        <text x="115" y="56" text-anchor="middle" font-size="9" font-weight="600" fill="#0f766e">ClickHouse &middot; MySQL &middot; MinIO &middot; Redis</text>
+        <text x="115" y="76" text-anchor="middle" font-size="9" font-weight="600" fill="#0f766e">:32173 NodePort</text>
+        <text x="115" y="96" text-anchor="middle" font-size="9" font-weight="700" fill="#0f766e">project = "mlx"</text>
+      </g>
+
+      <line x1="188" y1="72" x2="214" y2="72" stroke="#7c3aed" stroke-width="2" stroke-dasharray="5 5">
+        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <line x1="406" y1="80" x2="494" y2="72" stroke="#0f766e" stroke-width="2" stroke-dasharray="5 5">
+        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <text x="310" y="62" text-anchor="middle" font-size="9" font-weight="700" fill="#7c3aed">POST /api/v1/private/traces</text>
+      <text x="450" y="112" text-anchor="middle" font-size="9" font-weight="700" fill="#0f766e">POST /api/v1/private/otel/v1/traces</text>
+    </svg>
+    <div class="figcap">Fig 1. Every chat completion crosses the proxy twice into Opik: once as a native SDK trace + LLM span, once as an OTel span stamped with OpenInference attributes. Both land in the same "mlx" project.</div>
+  </div>
+
+  <h2><span class="num">1</span> Why a second observability plane</h2>
+  <p>The Prometheus + Grafana layer answers <i>how fast, how hot, how broken</i>. It does not answer <i>what the model was asked, what it replied, and how many tokens that cost</i>. LLM tracing needs the request payloads &mdash; prompts, completions, tool calls, token counts &mdash; so this week we stood up <a href="https://comet.com/docs/opik">Opik</a> (Comet's open-source LLM observability platform) on the k0s cluster and pointed the proxy at it.</p>
+  <div class="grid2">
+    <div class="card"><b>Deploy.</b> The official <code>opik/opik</code> helm chart (2.2.13) on cylon: ClickHouse via the altinity operator, MySQL, MinIO, Redis, a Java backend, a python backend and the React frontend &mdash; nine pods, one release, exposed on NodePort <code>32173</code>.</div>
+    <div class="card"><b>Why not hosted?</b> This is a self-hosted, RFC1918-only stack. The whole observability story lives in-cluster, so the LLM trace store should too. And the proxy is already OTel-native, so the Opik OTLP ingestion was the natural second path.</div>
+  </div>
+
+  <h2><span class="num">2</span> The two ingestion paths</h2>
+  <p>In <code>mlx_metrics_proxy.py</code> the request handler now wraps each <code>POST /v1/chat/completions</code> twice:</p>
+  <div class="card">
+    <b>Path A &mdash; opik SDK.</b> A native <code>trace(name="mlx.chat.completions")</code> with one LLM <code>span(type="llm", model, provider="mlx")</code>. Input is the request (model, stream, temperature, tools, messages); output and <code>usage</code> come back from the response; metadata carries <code>node</code>, <code>ttft_seconds</code>, <code>generation_seconds</code>, <code>hallucination_risk</code> and <code>hallucination_flagged</code>.
+  </div>
+  <div class="card">
+    <b>Path B &mdash; OTLP + OpenInference.</b> The proxy's OTel span gets the OpenInference semantic-convention attributes (<code>openinference.span.kind="LLM"</code>, <code>input.value</code>, <code>output.value</code>, <code>llm.model_name</code>, <code>llm.token_count.*</code>, <code>metadata</code>) and is exported over OTLP HTTP to <code>/api/v1/private/otel/v1/traces</code> with the <code>projectName: mlx</code> header.
+  </div>
+  <p>Two paths means two traces per request (one per route) &mdash; deliberate redundancy, and a good way to cross-check that both the SDK and the OTLP pipe produce identical numbers.</p>
+
+  <h2><span class="num">3</span> The three bugs that cost a morning</h2>
+  <h3>3a. The SDK's update overtook its own create</h3>
+  <p>Traces appeared in the UI with <code>name: None</code>, <code>start_time: 1970-01-01</code> and empty input. Packet capture showed the SDK's <code>PATCH /traces/&lt;id&gt;</code> was hitting the backend <i>before</i> the <code>POST /traces</code> that created it. The backend's create is idempotent &mdash; it does not backfill fields once the trace exists &mdash; so the create silently lost the name/input/start_time. The fix is one line: <code>_OPIK.flush()</code> immediately after creating the trace and span, forcing the create POSTs out before any update is queued.</p>
+  <pre><code>opik_trace = _OPIK.trace(name="mlx.chat.completions", input={...})
+opik_span  = opik_trace.span(type="llm", model=model, provider="mlx", input={...})
+_OPIK.flush()          # create FIRST, or the backend never backfills name/input</code></pre>
+  <h3>3b. The host needs a trailing /api</h3>
+  <p>The frontend nginx only proxies <code>/api/v1/private/...</code>; the SDK posts to <code>&lt;host&gt;/v1/private/...</code>. Without the suffix every call is a 405. The proxy now appends <code>/api</code> to <code>--opik-endpoint</code> automatically.</p>
+  <h3>3c. OpenInference's prefixed vs unprefixed attributes</h3>
+  <p><code>openinference.span.kind</code> is prefixed, but the content attributes are not. Our first OTLP spans used <code>openinference.input.value</code> &mdash; the backend stored them as opaque attributes and classified the span <code>general</code>. With the modern conventions (<code>input.value</code>, <code>output.value</code>, <code>llm.model_name</code>, <code>llm.token_count.prompt</code>) the same span renders as <code>type: llm</code> with model, prompt, completion and usage all extracted.</p>
+
+  <h2><span class="num">4</span> Proof on the wire</h2>
+  <p>Three real requests through the live proxy against the distributed Qwen3 model produced traces in the <code>mlx</code> project within a second:</p>
+  <div class="card">
+    <table>
+      <tr><th>Request</th><th>Reply</th><th>tokens in/out</th><th>metadata</th></tr>
+      <tr><td>capital of France</td><td><code>Paris</code></td><td>24 / 2</td><td>risk 0.0 &middot; not flagged</td></tr>
+      <tr><td>count 1 to 5 (stream)</td><td><code>1 2 3 4 5</code></td><td>8 / 5</td><td>TTFT 0.89s &middot; gen 1.46s</td></tr>
+      <tr><td>weather in Paris (tools)</td><td>tool call <code>get_weather(city="Paris")</code></td><td>&mdash;</td><td>gen 3.5s</td></tr>
+    </table>
+  </div>
+  <div class="figure">
+    <img src="../docs/screenshots/opik-trace.png" alt="Opik trace detail for the tool-calling request">
+    <div class="figcap">Fig 2. The trace detail page: <code>mlx.chat.completions</code> &rarr; <code>chat.completions</code> LLM span, model Qwen3-1.7B-4bit, 3.5s duration, with the prompt "What is the weather in Paris?" and the full trace table on the right.</div>
+  </div>
+  <div class="figure">
+    <img src="../docs/screenshots/opik-projects.png" alt="Opik project traces table">
+    <div class="figcap">Fig 3. The <code>mlx</code> project log view &mdash; 14 traces, one per chat completion per ingestion path, searchable by content.</div>
+  </div>
+
+  <h2><span class="num">5</span> What the spans actually contain</h2>
+  <p>Fetching the SDK span for the tool-calling request:</p>
+  <pre><code>{
+  "name": "chat.completions", "type": "llm",
+  "model": "mlx-community/Qwen3-1.7B-4bit", "provider": "mlx",
+  "input":  {"model": ..., "temperature": 0.1, "tools_provided": true,
+             "messages": [{"role": "user", "content": "What is the weather in Paris?"}]},
+  "output": {"content": "", "tool_calls": 1, "usage": {...}},
+  "usage":  {"prompt_tokens": 5, "completion_tokens": 3, "total_tokens": 8},
+  "metadata": {"node": "rank0", "ttft_seconds": 0.89, "generation_seconds": 1.46,
+               "hallucination_risk": 0.0, "hallucination_flagged": false}
+}</code></pre>
+  <p>The OTLP-ingested sibling span carries the same numbers under OpenInference keys (<code>llm.token_count.prompt</code> &rarr; the <code>usage</code> object), which cross-validates both paths.</p>
+
+  <div class="callout ok"><span class="ic">&#10003;</span><div><b>Notable:</b> the MySQL-on-NFS failure from last session is why Opik's database lives on local storage. Chart's official <code>mysql:8.4.2</code> image with Bitnami paths took ~3.5 min to init on NFS and kept getting killed by the liveness probe &mdash; a static local PV fixed it permanently.</div></div>
+  <blockquote>The lesson that kept repeating: "it works, but the fields are gone" is usually a write-ordering bug, not a parse bug. Capture the wire order before blaming the schema.</blockquote>
+
+</main>
+
+<footer class="wrap">
+  <a href="index.html">&larr; Back to all posts</a>
+</footer>
+</body>
+</html>

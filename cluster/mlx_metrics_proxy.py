@@ -23,9 +23,23 @@ Optional OpenTelemetry (--otlp-endpoint): each request becomes a trace span
 and a log record exported to an OTLP HTTP gateway (e.g. the in-cluster
 otel-collector). Disabled unless --otlp-endpoint is set.
 
+Optional Opik tracing (two independent paths, both optional):
+
+  * --opik-endpoint      base URL of a self-hosted Opik (e.g.
+                         http://192.168.1.10:32173). Uses the opik SDK to log
+                         each chat completion as a trace with an LLM span
+                         (input/output/usage/metadata) into the "mlx" project.
+  * --opik-otlp-endpoint OTLP HTTP endpoint of Opik's ingestion (e.g.
+                         http://192.168.1.10:32173/api/v1/private/otel). Adds a
+                         second trace exporter and stamps spans with
+                         OpenInference attributes (input.value, llm.model_name,
+                         token counts, ...) so the Opik collector renders them.
+
 Usage:
   mlx_metrics_proxy.py --listen 0.0.0.0:8080 --upstream 127.0.0.1:8081
   mlx_metrics_proxy.py --otlp-endpoint http://192.168.1.10:30318 --node-name rank0
+  mlx_metrics_proxy.py --opik-endpoint http://192.168.1.10:32173 --node-name rank0
+  mlx_metrics_proxy.py --opik-otlp-endpoint http://192.168.1.10:32173/api/v1/private/otel
 """
 
 import argparse
@@ -55,6 +69,11 @@ MODEL_DEFAULT = "mlx-community/Qwen3-1.7B-4bit"
 # --------------------------------------------------------------------------
 _OTEL = None  # set by _setup_otel(); None == OTel disabled
 
+# Opik integration (optional, independent of _OTEL)
+_OPIK = None       # opik.Opik SDK client, or None
+_OPIK_OTLP = False  # stamp OpenInference attrs for Opik's OTLP ingestion
+_NODE_NAME = ""     # node/rank label attached to traces
+
 
 def _sig_url(endpoint, sig):
     """Return the full OTLP URL for a signal path, e.g. <endpoint>/v1/metrics."""
@@ -62,9 +81,15 @@ def _sig_url(endpoint, sig):
     return url if url.endswith(f"/v1/{sig}") else f"{url}/v1/{sig}"
 
 
-def _setup_otel(endpoint, node_name, service_name="mlx-metrics-proxy"):
-    """Best-effort OTel init. Returns an OTel helper or None on failure."""
-    if not endpoint:
+def _setup_otel(endpoint, node_name, service_name="mlx-metrics-proxy", opik_otlp_endpoint=""):
+    """Best-effort OTel init. Returns an OTel helper or None on failure.
+
+    `endpoint` is the primary OTLP HTTP gateway (otel-collector); when set,
+    traces + logs are exported there. `opik_otlp_endpoint` (e.g.
+    http://host/api/v1/private/otel) adds a second trace processor that sends
+    the same spans to Opik's OTLP ingestion, tagged to the "mlx" project.
+    """
+    if not endpoint and not opik_otlp_endpoint:
         return None
     try:
         from opentelemetry import trace, metrics, _logs
@@ -97,25 +122,36 @@ def _setup_otel(endpoint, node_name, service_name="mlx-metrics-proxy"):
 
         # -- traces ------------------------------------------------------
         tp = TracerProvider(resource=resource)
-        tp.add_span_processor(
-            BatchSpanProcessor(OTLPSpanExporter(endpoint=_sig_url(endpoint, "traces")))
-        )
+        if endpoint:
+            tp.add_span_processor(
+                BatchSpanProcessor(OTLPSpanExporter(endpoint=_sig_url(endpoint, "traces")))
+            )
+        if opik_otlp_endpoint:
+            tp.add_span_processor(
+                BatchSpanProcessor(
+                    OTLPSpanExporter(
+                        endpoint=_sig_url(opik_otlp_endpoint, "traces"),
+                        headers={"projectName": "mlx"},
+                    )
+                )
+            )
         trace.set_tracer_provider(tp)
 
-        # -- logs --------------------------------------------------------
-        lp = LoggerProvider(resource=resource)
-        lp.add_log_record_processor(
-            BatchLogRecordProcessor(
-                OTLPLogExporter(endpoint=_sig_url(endpoint, "logs"))
+        # -- logs (primary gateway only) ---------------------------------
+        if endpoint:
+            lp = LoggerProvider(resource=resource)
+            lp.add_log_record_processor(
+                BatchLogRecordProcessor(
+                    OTLPLogExporter(endpoint=_sig_url(endpoint, "logs"))
+                )
             )
-        )
-        _logs.set_logger_provider(lp)
-        logging_handler = LoggingHandler(
-            level=logging.INFO, logger_provider=lp
-        )
-        root = logging.getLogger()
-        root.setLevel(logging.INFO)
-        root.addHandler(logging_handler)
+            _logs.set_logger_provider(lp)
+            logging_handler = LoggingHandler(
+                level=logging.INFO, logger_provider=lp
+            )
+            root = logging.getLogger()
+            root.setLevel(logging.INFO)
+            root.addHandler(logging_handler)
 
         class Otel:
             tracer = tp.get_tracer("mlx.proxy")
@@ -375,6 +411,8 @@ class Proxy(BaseHTTPRequestHandler):
         temperature = self.default_temp
         tools_provided = False
         messages = []
+        opik_trace = None
+        opik_span = None
         if self.command == "POST" and req_path.endswith("/v1/chat/completions"):
             try:
                 req = json.loads(body or b"{}")
@@ -385,6 +423,41 @@ class Proxy(BaseHTTPRequestHandler):
                 messages = req.get("messages") or []
             except json.JSONDecodeError:
                 pass
+            if _OPIK is not None:
+                try:
+                    opik_trace = _OPIK.trace(
+                        name="mlx.chat.completions",
+                        input={
+                            "model": model,
+                            "stream": streaming,
+                            "temperature": temperature,
+                            "tools_provided": tools_provided,
+                            "messages": messages,
+                        },
+                    )
+                    opik_span = opik_trace.span(
+                        name="chat.completions",
+                        type="llm",
+                        model=model,
+                        provider="mlx",
+                        input={
+                            "model": model,
+                            "stream": streaming,
+                            "temperature": temperature,
+                            "tools_provided": tools_provided,
+                            "messages": messages,
+                        },
+                    )
+                    # Force the create POSTs out before any update: the SDK
+                    # streamer can otherwise send PATCH updates ahead of the
+                    # batched create, and the backend's create is idempotent so
+                    # it never backfills name/input/start_time once the trace
+                    # exists. A flush here keeps the create first.
+                    _OPIK.flush()
+                except Exception as exc:
+                    print(f"[proxy] opik trace start failed ({exc!r})", flush=True)
+                    opik_trace = None
+                    opik_span = None
 
         # -- forward -------------------------------------------------------
         conn = http.client.HTTPConnection(
@@ -413,6 +486,35 @@ class Proxy(BaseHTTPRequestHandler):
                 },
             )
             span.set_attribute("mlx.tools_provided", tools_provided)
+            if _OPIK_OTLP:
+                # OpenInference attributes so Opik's OTLP ingestion can render
+                # prompt/completion content and LLM metadata.
+                span.set_attribute("openinference.span.kind", "LLM")
+                span.set_attribute("llm.provider", "mlx")
+                span.set_attribute(
+                    "input.value",
+                    json.dumps(
+                        {
+                            "model": model,
+                            "stream": streaming,
+                            "temperature": temperature,
+                            "tools_provided": tools_provided,
+                            "messages": messages,
+                        }
+                    ),
+                )
+                span.set_attribute("input.mime_type", "application/json")
+                span.set_attribute("llm.model_name", model)
+                span.set_attribute(
+                    "llm.invocation_parameters",
+                    json.dumps(
+                        {
+                            "temperature": temperature,
+                            "stream": streaming,
+                            "tools_provided": tools_provided,
+                        }
+                    ),
+                )
         IN_FLIGHT.labels(model).inc()
         try:
             conn.request(self.command, req_path, body=body, headers=headers)
@@ -522,8 +624,89 @@ class Proxy(BaseHTTPRequestHandler):
                 span.set_attribute("mlx.hallucination_risk", risk)
                 span.set_attribute("mlx.hallucination_flagged", flagged)
                 span.set_attribute("http.response.status_code", status)
+                if _OPIK_OTLP:
+                    span.set_attribute(
+                        "output.value",
+                        json.dumps({"content": content, "tool_calls": tool_calls}),
+                    )
+                    span.set_attribute("output.mime_type", "application/json")
+                    span.set_attribute("llm.token_count.prompt", prompt_tokens)
+                    span.set_attribute(
+                        "llm.token_count.completion", comp_tokens
+                    )
+                    span.set_attribute(
+                        "llm.token_count.total", prompt_tokens + comp_tokens
+                    )
+                    span.set_attribute(
+                        "metadata",
+                        json.dumps(
+                            {
+                                "node": _NODE_NAME,
+                                "ttft_seconds": round(
+                                    (t_first_token - t_send)
+                                    if t_first_token is not None
+                                    else gen_time,
+                                    4,
+                                ),
+                                "generation_seconds": round(gen_time, 4),
+                                "hallucination_risk": risk,
+                                "hallucination_flagged": flagged,
+                            }
+                        ),
+                    )
                 span.set_status("OK")
                 span.end()
+
+            if opik_span is not None:
+                try:
+                    opik_span.update(
+                        output={
+                            "content": content,
+                            "tool_calls": tool_calls,
+                            "usage": {
+                                "prompt_tokens": prompt_tokens,
+                                "completion_tokens": comp_tokens,
+                                "total_tokens": prompt_tokens + comp_tokens,
+                            },
+                        },
+                        usage={
+                            "prompt_tokens": prompt_tokens,
+                            "completion_tokens": comp_tokens,
+                            "total_tokens": prompt_tokens + comp_tokens,
+                        },
+                        metadata={
+                            "node": _NODE_NAME,
+                            "ttft_seconds": round(
+                                (t_first_token - t_send)
+                                if t_first_token is not None
+                                else gen_time,
+                                4,
+                            ),
+                            "generation_seconds": round(gen_time, 4),
+                            "hallucination_risk": risk,
+                            "hallucination_flagged": flagged,
+                        },
+                    )
+                    opik_span.end()
+                except Exception as exc:
+                    print(f"[proxy] opik span end failed ({exc!r})", flush=True)
+
+            if opik_trace is not None:
+                try:
+                    opik_trace.update(
+                        output={
+                            "content": content,
+                            "tool_calls": tool_calls,
+                            "usage": {
+                                "prompt_tokens": prompt_tokens,
+                                "completion_tokens": comp_tokens,
+                                "total_tokens": prompt_tokens + comp_tokens,
+                            },
+                        }
+                    )
+                    opik_trace.end()
+                except Exception as exc:
+                    print(f"[proxy] opik trace end failed ({exc!r})", flush=True)
 
         except (socket.error, http.client.HTTPException, ConnectionRefusedError) as exc:
             UPSTREAM_UP.set(0)
@@ -533,6 +716,26 @@ class Proxy(BaseHTTPRequestHandler):
                 span.set_attribute("http.response.status_code", 503)
                 span.set_status("ERROR", str(exc))
                 span.end()
+            if opik_span is not None:
+                try:
+                    opik_span.end(
+                        error_info={
+                            "exception_type": type(exc).__name__,
+                            "exception_message": str(exc),
+                        }
+                    )
+                except Exception:
+                    pass
+            if opik_trace is not None:
+                try:
+                    opik_trace.end(
+                        error_info={
+                            "exception_type": type(exc).__name__,
+                            "exception_message": str(exc),
+                        }
+                    )
+                except Exception:
+                    pass
             try:
                 self.send_response(503)
                 self.send_header("Content-Type", "text/plain")
@@ -547,6 +750,11 @@ class Proxy(BaseHTTPRequestHandler):
             if span is not None:
                 try:
                     span.end()
+                except Exception:
+                    pass
+            if _OPIK is not None and (opik_trace is not None or opik_span is not None):
+                try:
+                    _OPIK.flush()
                 except Exception:
                     pass
             conn.close()
@@ -599,6 +807,20 @@ def main():
         default=os.environ.get("MLX_NODE_NAME", ""),
         help="node/rank label attached to OTel resources (e.g. rank0)",
     )
+    ap.add_argument(
+        "--opik-endpoint",
+        default=os.environ.get("OPIK_ENDPOINT", ""),
+        help="Opik self-hosted base URL (e.g. http://192.168.1.10:32173). "
+        "Enables opik-SDK tracing of chat completions into the 'mlx' project. "
+        "A trailing '/api' is appended automatically when missing.",
+    )
+    ap.add_argument(
+        "--opik-otlp-endpoint",
+        default=os.environ.get("OPIK_OTLP_ENDPOINT", ""),
+        help="Opik OTLP HTTP endpoint (e.g. "
+        "http://192.168.1.10:32173/api/v1/private/otel). Adds OpenInference "
+        "spans exported to Opik's OTLP ingestion.",
+    )
     args = ap.parse_args()
 
     host, _, port = args.listen.rpartition(":")
@@ -607,8 +829,32 @@ def main():
     Proxy.default_temp = args.default_temp
     Proxy.metrics_path = args.metrics_path
 
-    global _OTEL
-    _OTEL = _setup_otel(args.otlp_endpoint, args.node_name)
+    global _OTEL, _OPIK, _OPIK_OTLP, _NODE_NAME
+    _NODE_NAME = args.node_name
+    _OTEL = _setup_otel(
+        args.otlp_endpoint, args.node_name, opik_otlp_endpoint=args.opik_otlp_endpoint
+    )
+    if args.opik_endpoint:
+        try:
+            from opik import Opik
+
+            opik_host = args.opik_endpoint
+            if not opik_host.rstrip("/").endswith("/api"):
+                opik_host = opik_host.rstrip("/") + "/api"
+            _OPIK = Opik(host=opik_host, project_name="mlx")
+            print(
+                f"[proxy] opik SDK -> {opik_host} (project=mlx)",
+                flush=True,
+            )
+        except Exception as exc:
+            print(f"[proxy] opik SDK init failed ({exc!r})", flush=True)
+            _OPIK = None
+    if args.opik_otlp_endpoint:
+        _OPIK_OTLP = True
+        print(
+            f"[proxy] opik OTLP -> {args.opik_otlp_endpoint} (project=mlx)",
+            flush=True,
+        )
 
     threading.Thread(
         target=_health_watch, args=(Proxy.upstream,), daemon=True

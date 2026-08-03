@@ -11,6 +11,7 @@ clients (opencode / curl)
 mlx_metrics_proxy.py :8080 ──► mlx_lm.server :8081 (ring: rank0 + rank1)
         │   /metrics (Prometheus text)
         │   OTLP traces+logs ──► otel-collector ──► VictoriaMetrics
+        │   opik SDK + OTLP (OpenInference) ──► Opik :32173 (self-hosted on k0s)
         ▼
 mlx_hw_telemetry.py :9102  per-node CPU / RAM / disk / GPU / power (both nodes)
         │   scraped every 15s
@@ -199,6 +200,63 @@ Each request becomes a `mlx.chat.completions` span carrying
 `mlx.ttft_seconds`, `mlx.gen_seconds`, token counts, tool calls,
 hallucination risk and HTTP status.
 
+## LLM tracing (Opik)
+
+Self-hosted [Opik](https://comet.com/docs/opik) (Comet's LLM observability
+platform) runs on the k0s cluster as the `opik` helm release
+(`opik/opik` 2.2.13), exposed on NodePort **32173**. The proxy logs every
+`/v1/chat/completions` into the `mlx` project over **two independent paths**:
+
+1. **opik SDK** — a native `trace("mlx.chat.completions")` with one LLM span
+   (`model`, `provider="mlx"`), carrying input/output, token `usage` and
+   metadata (`node`, `ttft_seconds`, `generation_seconds`,
+   `hallucination_risk`, `hallucination_flagged`).
+2. **OTLP + OpenInference** — the proxy's OTel span is stamped with
+   OpenInference semantic-convention attributes (`openinference.span.kind`,
+   `input.value`, `output.value`, `llm.model_name`, `llm.token_count.*`,
+   `metadata`) and exported over OTLP HTTP to
+   `/api/v1/private/otel/v1/traces` with the `projectName: mlx` header.
+
+Each request therefore produces two traces (one per path) so the numbers can
+be cross-checked. Enable via env (`OPIK_ENDPOINT`, `OPIK_OTLP_ENDPOINT`) or
+flags:
+
+```bash
+OPIK_ENDPOINT=http://192.168.1.10:32173 \
+OPIK_OTLP_ENDPOINT=http://192.168.1.10:32173/api/v1/private/otel \
+cluster/start_server.sh
+```
+
+Or run the proxy directly:
+
+```bash
+cluster/mlx_metrics_proxy.py \
+  --listen 0.0.0.0:8080 --upstream 127.0.0.1:8081 --node-name rank0 \
+  --otlp-endpoint http://192.168.1.64:4318 \
+  --opik-endpoint http://192.168.1.10:32173 \
+  --opik-otlp-endpoint http://192.168.1.10:32173/api/v1/private/otel
+```
+
+Gotchas worth knowing (see [blog post 5](blog/5-opik-llm-tracing.html)):
+
+* **Write ordering**: the SDK can send PATCH updates before the create POST;
+  the backend's create is idempotent so `name`/`input`/`start_time` silently
+  come back empty. The proxy calls `_OPIK.flush()` right after creating the
+  trace and span to force the create out first.
+* **URL suffix**: the SDK posts to `<host>/v1/private/...`; the frontend nginx
+  only proxies `/api/v1/private/...`. `--opik-endpoint` is normalized to end
+  in `/api` automatically.
+* **OpenInference attrs**: `openinference.span.kind` is prefixed, but content
+  attributes (`input.value`, `llm.model_name`, `llm.token_count.*`) are not —
+  with the prefixed form the span is stored as `general` instead of `llm`.
+* **MySQL**: Opik's database lives on a static local PV on typhoon. The chart's
+  official `mysql:8.4.2` image with Bitnami paths fails to init on NFS within
+  the liveness window and enters CrashLoopBackOff; local storage fixes it.
+
+![Opik trace detail](docs/screenshots/opik-trace.png)
+
+![Opik project traces](docs/screenshots/opik-projects.png)
+
 ## Blog
 
 Per-section field notes on the observability layer, with animated pastel SVGs
@@ -208,6 +266,7 @@ Per-section field notes on the observability layer, with animated pastel SVGs
 2. [28 Alert Rules and the Full Loop to Alertmanager](blog/2-alerting.html)
 3. [Three Dashboards, a GPU Heatmap, and Anonymous Kiosk Rendering](blog/3-dashboards.html)
 4. [What an External Observability Audit Found](blog/4-observability-audit.html)
+5. [Self-Hosted LLM Tracing: the MLX Proxy Talks to Opik](blog/5-opik-llm-tracing.html)
 
 ## Known platform quirks
 
