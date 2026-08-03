@@ -1,6 +1,23 @@
 {
   "annotations": {
-    "list": []
+    "list": [
+      {
+        "name": "Alerts",
+        "type": "prometheus",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "VictoriaMetrics"
+        },
+        "expr": "ALERTS{alertstate=\"firing\", node=\"$node\"}",
+        "step": "60s",
+        "iconColor": "#e24d42",
+        "enable": true,
+        "hide": false,
+        "showIn": 0,
+        "titleFormat": "ALERT: {{alertname}}",
+        "textFormat": "{{labels.severity}}"
+      }
+    ]
   },
   "editable": true,
   "panels": [
@@ -405,12 +422,256 @@
       "type": "gauge"
     },
     {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "#e24d42",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 12
+      },
+      "id": 26,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "expr": "mlx_hw_gpu_mem_used_bytes{node=\"$node\"} / mlx_hw_gpu_mem_total_bytes{node=\"$node\"} * 100",
+          "legendFormat": "GPU memory used %",
+          "refId": "A"
+        }
+      ],
+      "title": "GPU memory used %",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decibytes",
+          "min": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 12
+      },
+      "id": 27,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "expr": "mlx_hw_gpu_mem_used_bytes{node=\"$node\"} / 1073741824",
+          "legendFormat": "GPU memory used (GiB)",
+          "refId": "A"
+        }
+      ],
+      "title": "GPU memory used (GiB)",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "min": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 12
+      },
+      "id": 28,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "expr": "mlx_hw_cpu_power_milliwatts{node=\"$node\"} / 1000",
+          "legendFormat": "CPU power",
+          "refId": "A"
+        }
+      ],
+      "title": "CPU power",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "min": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 12
+      },
+      "id": 29,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "expr": "mlx_hw_ane_power_milliwatts{node=\"$node\"} / 1000",
+          "legendFormat": "ANE power",
+          "refId": "A"
+        }
+      ],
+      "title": "ANE power",
+      "type": "gauge"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 17
       },
       "id": 6,
       "title": "Over time",
@@ -431,7 +692,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 13
+        "y": 18
       },
       "id": 7,
       "targets": [
@@ -470,7 +731,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 13
+        "y": 18
       },
       "id": 8,
       "targets": [
@@ -504,7 +765,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 13
+        "y": 18
       },
       "id": 9,
       "targets": [
@@ -532,7 +793,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 19
+        "y": 24
       },
       "id": 10,
       "targets": [
@@ -567,7 +828,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 19
+        "y": 24
       },
       "id": 11,
       "targets": [
@@ -596,7 +857,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 19
+        "y": 24
       },
       "id": 12,
       "targets": [
@@ -610,12 +871,189 @@
       "type": "timeseries"
     },
     {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
+      "id": 30,
+      "options": {
+        "calculate": true,
+        "cellGap": 1,
+        "cellValues": {
+          "unit": "short"
+        },
+        "color": {
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "mode": "scheme",
+          "reverse": false,
+          "scale": "exponential",
+          "scheme": "RdYlGn",
+          "steps": 64
+        },
+        "exemplars": {
+          "color": "rgba(255,0,255,0.7)"
+        },
+        "legend": {
+          "show": true
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "tooltip": {
+          "show": true,
+          "yHistogram": false
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "reverse": false
+        },
+        "yBucketBoundAuto": true,
+        "yBucketNumber": 24
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "expr": "mlx_hw_gpu_utilization_percent{node=\"$node\"}",
+          "format": "time_series",
+          "legendFormat": "GPU util",
+          "refId": "A"
+        }
+      ],
+      "title": "GPU utilization heatmap",
+      "type": "heatmap"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decibytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 36
+      },
+      "id": 31,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "expr": "mlx_hw_gpu_mem_used_bytes{node=\"$node\"} / 1073741824",
+          "legendFormat": "used",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "expr": "mlx_hw_gpu_mem_alloc_bytes{node=\"$node\"} / 1073741824",
+          "legendFormat": "alloc",
+          "refId": "B"
+        }
+      ],
+      "title": "GPU memory used / alloc",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 36
+      },
+      "id": 32,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "expr": "mlx_hw_cpu_power_milliwatts{node=\"$node\"} / 1000",
+          "legendFormat": "CPU",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "expr": "mlx_hw_ane_power_milliwatts{node=\"$node\"} / 1000",
+          "legendFormat": "ANE",
+          "refId": "B"
+        }
+      ],
+      "title": "CPU & ANE power",
+      "type": "timeseries"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 25
+        "y": 42
       },
       "id": 13,
       "title": "LLM on this node",
@@ -637,7 +1075,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 26
+        "y": 43
       },
       "id": 14,
       "targets": [
@@ -666,7 +1104,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 26
+        "y": 43
       },
       "id": 15,
       "targets": [
@@ -700,7 +1138,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 26
+        "y": 43
       },
       "id": 16,
       "targets": [
@@ -745,7 +1183,7 @@
         "h": 4,
         "w": 8,
         "x": 0,
-        "y": 32
+        "y": 49
       },
       "id": 24,
       "targets": [
@@ -776,7 +1214,7 @@
         "h": 4,
         "w": 16,
         "x": 8,
-        "y": 32
+        "y": 49
       },
       "id": 25,
       "targets": [
@@ -804,7 +1242,7 @@
         "h": 4,
         "w": 8,
         "x": 0,
-        "y": 36
+        "y": 53
       },
       "id": 17,
       "targets": [
@@ -857,7 +1295,7 @@
         "h": 4,
         "w": 16,
         "x": 8,
-        "y": 36
+        "y": 53
       },
       "id": 18,
       "targets": [
@@ -873,6 +1311,68 @@
         }
       ],
       "title": "Telemetry up",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "#e24d42",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 57
+      },
+      "id": 33,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "expr": "count(ALERTS{alertstate=\"firing\", node=\"$node\"})",
+          "legendFormat": "firing",
+          "refId": "A"
+        }
+      ],
+      "title": "Active alerts",
       "type": "stat"
     }
   ],

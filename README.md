@@ -10,9 +10,13 @@ clients (opencode / curl)
         ▼
 mlx_metrics_proxy.py :8080 ──► mlx_lm.server :8081 (ring: rank0 + rank1)
         │   /metrics (Prometheus text)
-        │   OTLP traces+metrics+logs ──► otel-collector ──► VictoriaMetrics ──► Grafana
+        │   OTLP traces+logs ──► otel-collector ──► VictoriaMetrics
         ▼
-mlx_hw_telemetry.py :9102  per-node CPU / RAM / disk / temp (both nodes)
+mlx_hw_telemetry.py :9102  per-node CPU / RAM / disk / GPU / power (both nodes)
+        │   scraped every 15s
+        ▼
+      VictoriaMetrics ──► vmalert :8880 (28 rules) ──► Alertmanager :9093
+                     └──► Grafana :3000 (3 dashboards)
 ```
 
 ## Stack
@@ -23,7 +27,7 @@ mlx_hw_telemetry.py :9102  per-node CPU / RAM / disk / temp (both nodes)
 | `cluster/mlx_metrics_proxy.py` | rank 0 | 0.0.0.0:8080 | OpenAI-compatible front door; records TTFT, token rate, temperature, tool calls, hallucination-risk heuristics |
 | `cluster/mlx_hw_telemetry.py` | both nodes | 0.0.0.0:9102 | hardware telemetry (load, memory pressure, disk, worker CPU/RSS, CPU temp, GPU util/power, package power, thermal pressure) |
 | `cluster/start_server.sh` / `stop_server.sh` | rank 0 | – | launch / tear down the whole stack |
-| `observability/compose.yaml` | podman (rank 0) | 8428 / 4317 / 4318 / 3000 | VictoriaMetrics + otel-collector + Grafana |
+| `observability/compose.yaml` | podman (rank 0) | 8428 / 4317 / 4318 / 3000 / 8880 / 9093 | VictoriaMetrics + otel-collector + Grafana + vmalert + Alertmanager |
 
 Model: `mlx-community/Qwen3-1.7B-4bit` (change `MODEL` in `start_server.sh`).
 
@@ -90,7 +94,8 @@ Hardware agent `/metrics` (each node, `--node-name`):
 * `mlx_hw_mem_total_bytes`, `mlx_hw_mem_used_bytes`, `mlx_hw_mem_pressure`
 * `mlx_hw_disk_total_bytes`, `mlx_hw_disk_used_bytes`
 * `mlx_hw_gpu_utilization_percent`, `mlx_hw_gpu_frequency_mhz`, `mlx_hw_gpu_power_milliwatts` (powermetrics, ~15 s cadence; `NaN` when sudo/powermetrics unavailable)
-* `mlx_hw_package_power_milliwatts` (combined CPU + GPU + ANE)
+* `mlx_hw_gpu_mem_total_bytes`, `mlx_hw_gpu_mem_used_bytes`, `mlx_hw_gpu_mem_alloc_bytes` (from `ioreg -c IOAccelerator`; no sudo needed)
+* `mlx_hw_package_power_milliwatts` (combined CPU + GPU + ANE), `mlx_hw_cpu_power_milliwatts`, `mlx_hw_ane_power_milliwatts`
 * `mlx_hw_thermal_pressure` (0..1 from `pmset -g therm`; no sudo needed)
 * `mlx_worker_cpu_percent`, `mlx_worker_rss_bytes` (matches `mlx_lm.server`)
 
@@ -101,13 +106,15 @@ Proxy `/metrics` runtime gauges:
 
 ## Observability (VictoriaMetrics on podman)
 
-`observability/compose.yaml` runs three containers on rank 0 with podman:
+`observability/compose.yaml` runs five containers on rank 0 with podman:
 
 | Container | Port | Role |
 |---|---|---|
 | `victoria-metrics` | :8428 | TSDB + scraping; Prometheus-compatible API (`/vmui`) |
-| `otel-collector` | :4317 gRPC / :4318 HTTP | OTLP receiver → `prometheus_remote_write` → VM |
+| `otel-collector` | :4317 gRPC / :4318 HTTP | OTLP receiver (traces/logs) → debug output |
 | `grafana` | :3000 | dashboards, auto-provisioned (login `admin` / `admin`) |
+| `vmalert` | :8880 | evaluates the 28 alert rules in `observability/vmalert/rules.yml` |
+| `alertmanager` | :9093 | dedupes/inhibits alerts, routes to `oncall` + `default` webhooks |
 
 Start it (once — generates `vm-scrape.yml` from the template with your IPs):
 
@@ -127,46 +134,80 @@ curl -s http://localhost:8428/api/v1/query?query=mlx_requests_total
 
 Two paths feed the TSDB:
 
-1. **Prometheus scraping** — VM scrapes `mlx-proxy` (:8080) and both
-   `mlx-hw` agents (:9102 on rank0 + rank1) every 15s.
-2. **OTLP push** — the proxy and hw agents export traces/metrics/logs to
-   `http://<rank0-ip>:4318`; the collector converts and remote-writes to VM.
+1. **Prometheus scraping** — VM scrapes `mlx-proxy` (:8080), both `mlx-hw`
+   agents (:9102 on rank0 + rank1), and the stack itself (`vmalert` :8880,
+   `alertmanager` :9093, `victoria-metrics` self-scrape) every 15s.
+2. **OTLP push (traces + logs only)** — the proxy exports request traces and
+   logs to `http://<rank0-ip>:4318`; hardware and inference metrics are
+   scrape-only so there is no `job="mlx-metrics-proxy"` duplication.
 
-VM's remote-write name for an OTLP counter `mlx.requests` is
-`mlx_requests_total`; the OTel `service.name` becomes the `service_name` label.
+### Alerting
+
+`vmalert` evaluates 28 rules in `observability/vmalert/rules.yml`
+(`observability/vmalert/`):
+
+* **mlx-hardware (15)** — node down, disk ≥ 90%, memory pressure, thermal
+  pressure, GPU memory pressure, heat (no scheduler limit), high load, stack
+  components down (`victoria-metrics`, `vmalert`, `alertmanager`).
+* **mlx-inference (7)** — proxy down, error-rate spike, TTFT slowdown,
+  throughput drop, stalled generation, token burst, in-flight spike.
+* **mlx-quality (6)** — hallucination risk, repetition, hedging, refusal,
+  ungrounded output, low-activity gate (quality rules only fire when the model
+  is actually serving traffic).
+
+`alertmanager` (`observability/alertmanager/alertmanager.yml`) adds
+`inhibit_rules` so a proxy/node outage suppresses the cascade of secondary
+alerts. Every alert is visible in Grafana via the `Alerts` annotation and the
+`Active alerts` stat on the cluster dashboard.
 
 ### Dashboards
 
-Grafana auto-provisions two dashboards from `observability/grafana/dashboards/`
-(`MLX Cluster` — cluster-wide inference + hardware rows including GPU
-utilization/power from powermetrics, `MLX Node` — drill into a single node with
-GPU/power gauges and thermal pressure).
+Grafana auto-provisions three dashboards from `observability/grafana/dashboards/`:
+
+* **MLX Cluster** — cluster-wide inference + hardware rows: GPU utilization
+  heatmap (RdYlGn, per-node y-buckets), GPU memory used/allocated, CPU / ANE /
+  package power, active alerts, and an `ALERTS` annotation strip.
+* **MLX Node** — drill into a single node (`$node` dropdown) with GPU memory
+  gauges, CPU/ANE/power panels, thermal pressure and a node-scoped heatmap.
+* **MLX GPU & Power** — the GPU/power deep-dive: utilization heatmap,
+  frequency, GPU/ANE/package power, GPU memory.
+
+All three are file-provisioned (no UI drift), readable anonymously for kiosk
+display, and carry the `ALERTS{firing}` annotation.
 
 ![MLX Cluster dashboard](docs/screenshots/mlx-cluster.png)
 
 ![MLX Node dashboard](docs/screenshots/mlx-node.png)
 
+![MLX GPU & Power dashboard](docs/screenshots/mlx-gpu-power.png)
+
 ## OpenTelemetry
 
-Pass `--otlp-endpoint` to the proxy and/or hw agent to enable OTLP export
-(HTTP). `MLX_OTLP_ENDPOINT` is read as the default, and `start_server.sh`
+Pass `--otlp-endpoint` to the **proxy** to enable OTLP export (HTTP) of traces
+and logs. `MLX_OTLP_ENDPOINT` is read as the default, and `start_server.sh`
 defaults to `http://192.168.1.64:4318` (the local podman collector). The
-endpoint must be a base URL — the exporter appends `/v1/traces`, `/v1/metrics`
-and `/v1/logs` itself.
+endpoint must be a base URL — the exporter appends `/v1/traces` and
+`/v1/logs` itself. The hw agent is scrape-only and has no OTLP path.
 
 ```bash
 cluster/mlx_metrics_proxy.py \
   --listen 0.0.0.0:8080 --upstream 127.0.0.1:8081 \
   --node-name rank0 --otlp-endpoint http://192.168.1.64:4318
-
-cluster/mlx_hw_telemetry.py \
-  --node-name rank1 --listen 0.0.0.0:9102 \
-  --otlp-endpoint http://192.168.1.64:4318
 ```
 
 Each request becomes a `mlx.chat.completions` span carrying
 `mlx.ttft_seconds`, `mlx.gen_seconds`, token counts, tool calls,
 hallucination risk and HTTP status.
+
+## Blog
+
+Per-section field notes on the observability layer, with animated pastel SVGs
+(open `blog/index.html` locally):
+
+1. [Reading Apple Silicon GPU & Power Without Root](blog/1-hardware-telemetry.html)
+2. [28 Alert Rules and the Full Loop to Alertmanager](blog/2-alerting.html)
+3. [Three Dashboards, a GPU Heatmap, and Anonymous Kiosk Rendering](blog/3-dashboards.html)
+4. [What an External Observability Audit Found](blog/4-observability-audit.html)
 
 ## Known platform quirks
 
@@ -198,8 +239,11 @@ cluster/hosts_rev.json          ring hostfile (rank 1 side)
 cluster/logs/                   runtime logs (server, proxy, hw agents)
 tools/bench.py                  streaming TTFT / token-rate / concurrency bench
 tools/agent.py, smoke.py        distributed tool-loop demo, ring connectivity test
-observability/compose.yaml      victoria-metrics + otel-collector + grafana (podman)
+observability/compose.yaml      victoria-metrics + otel-collector + grafana + vmalert + alertmanager (podman)
 observability/setup.sh          generate vm-scrape.yml (scrape targets from your IPs)
-observability/otelcol-config.yaml   OTLP → prometheus_remote_write → VM
-observability/grafana/          auto-provisioned datasource + MLX Cluster dashboard
+observability/otelcol-config.yaml   OTLP traces/logs receiver (metrics are scrape-only)
+observability/vm-scrape.yml     scrape config: mlx-proxy, mlx-hw (x2), stack self-scrape
+observability/vmalert/rules.yml 28 alert rules (hardware / inference / quality / stack down)
+observability/alertmanager/alertmanager.yml   receivers + inhibit_rules
+observability/grafana/          auto-provisioned datasource + 3 dashboards (MLX Cluster / MLX Node / MLX GPU & Power)
 ```

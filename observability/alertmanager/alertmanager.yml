@@ -1,0 +1,48 @@
+# Alertmanager configuration. vmalert sends fired alerts here via
+# -notifier.url. The default receiver posts to a webhook; point it at your
+# Slack/Teams/email bridge (or add a receiver of your choice).
+#
+#   alertmanager.yml -> incoming alerts
+#     -> critical: on-call webhook (email / pager)
+#     -> default:  team webhook / log
+#
+# Inhibit rules: while a critical alert (e.g. the proxy is down) is firing,
+# noisier subordinate alerts (upstream down, throughput drop) are silenced.
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ["alertname", "node", "model"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: "default"
+  routes:
+    - matchers:
+        - severity = critical
+      receiver: "oncall"
+
+receivers:
+  - name: "oncall"
+    webhook_configs:
+      # Replace with your own endpoint (e.g. Slack/Teams/PagerDuty bridge).
+      - url: "http://host.containers.internal:9000/hooks/oncall"
+        send_resolved: true
+
+  - name: "default"
+    webhook_configs:
+      - url: "http://host.containers.internal:9000/hooks/alert"
+        send_resolved: true
+
+inhibit_rules:
+  - source_matchers:
+      - alertname = "MLXProxyDown"
+    target_matchers:
+      - alertname =~ "MLXUpstreamDown|MLXThroughputDrop|MLXInferenceStalled"
+    equal: ["job"]
+
+  - source_matchers:
+      - alertname =~ "MLXHardwareExporterDown"
+    target_matchers:
+      - alertname =~ "MLXGPUHighUtilization|MLXThermalThrottling|MLXLoadHigh"
+    equal: ["node"]

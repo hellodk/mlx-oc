@@ -4,9 +4,9 @@ providers:
     orgId: 1
     folder: MLX Cluster
     type: file
-    disableDeletion: false
+    disableDeletion: true
     updateIntervalSeconds: 10
-    allowUiUpdates: true
+    allowUiUpdates: false
     options:
       path: /var/lib/grafana/dashboards
       foldersFromFilesStructure: false

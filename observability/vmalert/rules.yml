@@ -1,0 +1,336 @@
+groups:
+  - name: mlx-hardware
+    interval: 30s
+    rules:
+      - alert: MLXGPUHighUtilization
+        expr: mlx_hw_gpu_utilization_percent > 95
+        for: 5m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: gpu
+        annotations:
+          summary: "GPU residency sustained above 95% on {{ $labels.node }}"
+          description: "GPU active residency is {{ $value | printf \"%.1f\" }}% for over 5 minutes. Heavy load or a stuck process."
+
+      - alert: MLXGPUMemoryPressure
+        expr: |
+          clamp_min(mlx_hw_gpu_mem_alloc_bytes / mlx_hw_gpu_mem_total_bytes, 0) > 0.9
+          and on(node) (mlx_hw_gpu_mem_total_bytes > 0)
+        for: 2m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: gpu
+        annotations:
+          summary: "GPU (unified) memory nearly exhausted on {{ $labels.node }}"
+          description: "GPU memory allocation is {{ $value | humanizePercentage }} of the unified pool. Model OOMs are likely."
+
+      - alert: MLXHighPackagePower
+        expr: mlx_hw_package_power_milliwatts > 30000
+        for: 5m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: power
+        annotations:
+          summary: "Sustained high package power on {{ $labels.node }}"
+          description: "Combined CPU+GPU+ANE power is {{ $value | printf \"%.0f\" }} mW for over 5 minutes."
+
+      - alert: MLXPowerSpike
+        expr: (mlx_hw_package_power_milliwatts - mlx_hw_package_power_milliwatts offset 2m) > 15000
+        for: 1m
+        labels:
+          severity: info
+          team: ml-platform
+          category: power
+        annotations:
+          summary: "Package power spike on {{ $labels.node }}"
+          description: "Package power jumped by {{ $value | printf \"%.0f\" }} mW in 2 minutes."
+
+      - alert: MLXThermalThrottling
+        expr: mlx_hw_thermal_pressure > 0
+        for: 5m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: thermal
+        annotations:
+          summary: "Thermal throttling active on {{ $labels.node }}"
+          description: "pmset -g therm reports a non-zero CPU scheduler limit (pressure {{ $value | printf \"%.2f\" }})."
+
+      - alert: MLXCriticalThermalPressure
+        expr: mlx_hw_thermal_pressure > 0.6
+        for: 3m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: thermal
+        annotations:
+          summary: "Critical thermal pressure on {{ $labels.node }}"
+          description: "Thermal pressure is {{ $value | printf \"%.2f\" }} — heavy scheduler throttling in effect."
+
+      - alert: MLXMemoryPressureHigh
+        expr: mlx_hw_mem_pressure < 20000
+        for: 10m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: memory
+        annotations:
+          summary: "Low free pages on {{ $labels.node }}"
+          description: "vm.page_free_count is {{ $value | printf \"%.0f\" }} — the system is under memory pressure."
+
+      - alert: MLXLoadHigh
+        expr: mlx_hw_load1 > mlx_hw_cpu_count
+        for: 10m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: cpu
+        annotations:
+          summary: "Sustained high load on {{ $labels.node }}"
+          description: "1-minute load average {{ $value | printf \"%.2f\" }} exceeds the {{ with printf \"mlx_hw_cpu_count{node='%s'}\" $labels.node | query }}{{ . | first | value }}{{ end }} logical CPUs."
+
+      - alert: MLXDiskNearlyFull
+        expr: (mlx_hw_disk_used_bytes / mlx_hw_disk_total_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: storage
+        annotations:
+          summary: "Root volume nearly full on {{ $labels.node }}"
+          description: "Disk usage is {{ $value | humanizePercentage }}."
+
+      - alert: MLXHardwareExporterDown
+        expr: up{job="mlx-hw"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: availability
+        annotations:
+          summary: "Hardware telemetry agent down on {{ $labels.instance }}"
+          description: "The mlx_hw_telemetry agent on {{ $labels.node }} has not been scraped for 2 minutes."
+
+      - alert: MLXProxyDown
+        expr: up{job="mlx-proxy"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: availability
+        annotations:
+          summary: "Metrics proxy down"
+          description: "The MLX metrics proxy on {{ $labels.instance }} has not been scraped for 2 minutes."
+
+      - alert: MLXUpstreamDown
+        expr: mlx_up{job="mlx-proxy"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: availability
+        annotations:
+          summary: "Upstream mlx_lm server unreachable"
+          description: "The proxy cannot reach its upstream mlx_lm.server backend."
+
+      - alert: MLXVictoriaMetricsDown
+        expr: up{job="victoria-metrics"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: availability
+        annotations:
+          summary: "VictoriaMetrics is down"
+          description: "The metrics database is not responding to scrapes."
+
+      - alert: MLXVmalertDown
+        expr: up{job="vmalert"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: availability
+        annotations:
+          summary: "vmalert is down"
+          description: "Alert evaluation has stopped; this alert may be stale."
+
+      - alert: MLXAlertmanagerDown
+        expr: up{job="alertmanager"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: availability
+        annotations:
+          summary: "Alertmanager is down"
+          description: "Fired alerts are not being routed to notifications."
+
+  - name: mlx-inference
+    interval: 15s
+    rules:
+      - alert: MLXHighErrorRate
+        expr: sum(rate(mlx_error_total{job="mlx-proxy"}[5m])) by (model, status) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: inference
+        annotations:
+          summary: "Elevated {{ $labels.status }} error rate for {{ $labels.model }}"
+          description: "Error rate is {{ $value | printf \"%.2f\" }} req/s for the last 5 minutes."
+
+      - alert: MLXErrorSpike
+        expr: |
+          sum(rate(mlx_error_total{job="mlx-proxy"}[5m])) by (model)
+          > 3 * (sum(rate(mlx_error_total{job="mlx-proxy"}[15m] offset 30m)) by (model) + 0.01)
+        for: 10m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: inference
+        annotations:
+          summary: "Error spike for {{ $labels.model }}"
+          description: "Errors jumped 3x above the 30-minute-ago baseline."
+
+      - alert: MLXHighTTFTP95
+        expr: histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{job="mlx-proxy"}[5m])) by (le, model)) > 5
+        for: 5m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: latency
+        annotations:
+          summary: "High time-to-first-token for {{ $labels.model }}"
+          description: "P95 TTFT is {{ $value | printf \"%.2f\" }}s over the last 5 minutes."
+
+      - alert: MLXSlowGenerationP95
+        expr: histogram_quantile(0.95, sum(rate(mlx_generation_seconds_bucket{job="mlx-proxy"}[5m])) by (le, model)) > 30
+        for: 5m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: latency
+        annotations:
+          summary: "Slow generation for {{ $labels.model }}"
+          description: "P95 generation time is {{ $value | printf \"%.2f\" }}s over the last 5 minutes."
+
+      - alert: MLXInferenceStalled
+        expr: sum(rate(mlx_tokens_completion_total{job="mlx-proxy"}[5m])) == 0 and sum(mlx_in_flight) > 0
+        for: 2m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: inference
+        annotations:
+          summary: "Inference stalled while requests are in flight"
+          description: "Requests are in flight but no completion tokens have been produced for 2 minutes. The inference engine may be deadlocked."
+
+      - alert: MLXInFlightBacklog
+        expr: mlx_in_flight > 8
+        for: 2m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: inference
+        annotations:
+          summary: "Request backlog on the proxy"
+          description: "More than 8 requests are in flight concurrently."
+
+      - alert: MLXThroughputDrop
+        expr: |
+          sum(rate(mlx_tokens_completion_total{job="mlx-proxy"}[5m])) by (model)
+          < 0.1 * (sum(rate(mlx_tokens_completion_total{job="mlx-proxy"}[30m] offset 10m)) by (model) + 1e-9)
+          and (sum(rate(mlx_tokens_completion_total{job="mlx-proxy"}[30m] offset 10m)) by (model) > 5)
+        for: 15m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: throughput
+        annotations:
+          summary: "Throughput collapse for {{ $labels.model }}"
+          description: "Completion-token rate dropped below 10% of its 30-minute baseline."
+
+  - name: mlx-quality
+    interval: 30s
+    rules:
+      - alert: MLXHallucinationRiskElevated
+        expr: |
+          mlx_hallucination_risk > 0.5
+          and sum(rate(mlx_requests_total{job="mlx-proxy"}[10m])) by (model) > 0
+        for: 5m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: hallucination
+        annotations:
+          summary: "Elevated hallucination risk for {{ $labels.model }}"
+          description: "Composite heuristic risk is {{ $value | printf \"%.2f\" }} for the last 5 minutes."
+
+      - alert: MLXHallucinationRiskCritical
+        expr: |
+          mlx_hallucination_risk > 0.8
+          and sum(rate(mlx_requests_total{job="mlx-proxy"}[10m])) by (model) > 0
+        for: 2m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: hallucination
+        annotations:
+          summary: "Critical hallucination risk for {{ $labels.model }}"
+          description: "Composite heuristic risk is {{ $value | printf \"%.2f\" }} — outputs should be reviewed."
+
+      - alert: MLXHighRepetition
+        expr: |
+          avg_over_time(mlx_heuristic_repetition[10m]) > 0.3
+          and sum(rate(mlx_requests_total{job="mlx-proxy"}[10m])) by (model) > 0
+        for: 5m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: hallucination
+        annotations:
+          summary: "High repetition for {{ $labels.model }}"
+          description: "Most-repeated word-trigram ratio averaged {{ $value | printf \"%.2f\" }} over 10 minutes."
+
+      - alert: MLXHighRefusalRate
+        expr: |
+          avg_over_time(mlx_heuristic_refusal[10m]) > 0.5
+          and sum(rate(mlx_requests_total{job="mlx-proxy"}[10m])) by (model) > 0
+        for: 10m
+        labels:
+          severity: info
+          team: ml-platform
+          category: hallucination
+        annotations:
+          summary: "High refusal rate for {{ $labels.model }}"
+          description: "Refusal pattern present in more than half of recent outputs."
+
+      - alert: MLXHighHedging
+        expr: |
+          avg_over_time(mlx_heuristic_hedging[10m]) > 0.3
+          and sum(rate(mlx_requests_total{job="mlx-proxy"}[10m])) by (model) > 0
+        for: 10m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: hallucination
+        annotations:
+          summary: "High hedge-word density for {{ $labels.model }}"
+          description: "Normalized hedge density averaged {{ $value | printf \"%.2f\" }} over 10 minutes."
+
+      - alert: MLXHighUngrounded
+        expr: |
+          avg_over_time(mlx_heuristic_ungrounded[10m]) > 0.3
+          and sum(rate(mlx_requests_total{job="mlx-proxy"}[10m])) by (model) > 0
+        for: 10m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: hallucination
+        annotations:
+          summary: "Possible ungrounded content for {{ $labels.model }}"
+          description: "Ungrounded/unsupported claims heuristic averaged {{ $value | printf \"%.2f\" }} over 10 minutes."

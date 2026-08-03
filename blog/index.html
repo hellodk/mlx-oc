@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MLX Observability — Field Notes</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#4f46e5;--accent-soft:#eef0ff;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  header.hero{padding:64px 0 40px;background:radial-gradient(1200px 420px at 80% -10%, rgba(219,39,119,.10), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(15,118,110,.09), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #dfe1ff;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(28px,5vw,44px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:18px;color:var(--muted);max-width:680px}
+  .meta{margin-top:18px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:48px 0 80px}
+  .post{display:flex;gap:20px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;margin:18px 0;text-decoration:none;color:inherit;transition:transform .15s ease,box-shadow .15s ease}
+  .post:hover{transform:translateY(-2px);box-shadow:var(--shadow),0 14px 34px rgba(16,18,32,.10)}
+  .num{flex:0 0 auto;width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:#fff}
+  .n1{background:linear-gradient(135deg,#4f46e5,#818cf8)}
+  .n2{background:linear-gradient(135deg,#0f766e,#14b8a6)}
+  .n3{background:linear-gradient(135deg,#db2777,#f472b6)}
+  .n4{background:linear-gradient(135deg,#b45309,#f59e0b)}
+  .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
+  .post p{margin:0;color:var(--muted);font-size:14.5px}
+  .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">MLX Observability &middot; Field Notes</span>
+    <h1>Making Two Mac minis<br>Actually Observable</h1>
+    <p class="sub">Four deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 28 rules, three Grafana dashboards, and what an external audit found.</p>
+    <div class="meta">
+      <span><b>Stack</b> VictoriaMetrics + vmalert + Alertmanager + Grafana</span>
+      <span><b>Agents</b> mlx_metrics_proxy :8080 &middot; mlx_hw_telemetry :9102</span>
+      <span><b>Rules</b> 28 &middot; <b>Dashboards</b> 3</span>
+    </div>
+  </div>
+</header>
+<main class="wrap">
+  <a class="post" href="1-hardware-telemetry.html">
+    <div class="num n1">1</div>
+    <div>
+      <h2>Reading Apple Silicon GPU &amp; Power Without Root</h2>
+      <p>ioreg for GPU memory (no sudo), powermetrics for utilization/power/ANE (passwordless sudo, ~15s), pmset for thermal pressure. How three zero-API data sources become a Prometheus exporter on both nodes.</p>
+      <span class="tag">GPU memory</span><span class="tag">powermetrics</span><span class="tag">thermal pressure</span><span class="tag">scrape :9102</span>
+    </div>
+  </a>
+  <a class="post" href="2-alerting.html">
+    <div class="num n2">2</div>
+    <div>
+      <h2>28 Alert Rules and the Full Loop to Alertmanager</h2>
+      <p>vmalert + Alertmanager with inhibit rules. Hardware, inference, quality and stack-down groups — and the end-to-end test where a full disk actually went firing.</p>
+      <span class="tag">vmalert</span><span class="tag">Alertmanager</span><span class="tag">inhibit_rules</span><span class="tag">end-to-end</span>
+    </div>
+  </a>
+  <a class="post" href="3-dashboards.html">
+    <div class="num n3">3</div>
+    <div>
+      <h2>Three Dashboards, a GPU Heatmap, and Anonymous Kiosk Rendering</h2>
+      <p>Cluster / Node / GPU &amp; Power dashboards, the RdYlGn utilization heatmap, ALERTS annotations — and the Grafana 13 DTO-namespace quirk that was blanking every headless screenshot.</p>
+      <span class="tag">Grafana 13</span><span class="tag">heatmap</span><span class="tag">kiosk</span><span class="tag">screenshots</span>
+    </div>
+  </a>
+  <a class="post" href="4-observability-audit.html">
+    <div class="num n4">4</div>
+    <div>
+      <h2>What an External Observability Audit Found</h2>
+      <p>Two criticals accepted, nine findings fixed: double-counted OTel metrics, NaN gauges, missing model labels, stale series, activity-gated hallucination rules, and dashboard provisioning drift.</p>
+      <span class="tag">audit</span><span class="tag">fixes</span><span class="tag">series cleanup</span><span class="tag">provisioning</span>
+    </div>
+  </a>
+</main>
+<footer class="wrap">
+  mlx-oc &middot; a two-Mac-mini distributed MLX inference cluster with full observability &middot; <a href="../README.md">repo README</a>
+</footer>
+</body>
+</html>

@@ -51,6 +51,37 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
 
+  # Alerting: vmalert evaluates the rule groups against VictoriaMetrics and
+  # forwards fired alerts to Alertmanager. Active alerts are written back to
+  # VM (`ALERTS` series) so Grafana can annotate them.
+  vmalert:
+    image: docker.io/victoriametrics/vmalert:latest
+    container_name: vmalert
+    restart: unless-stopped
+    ports:
+      - "8880:8880"        # vmalert UI: /api/v1/alerts, /api/v1/rules
+    command:
+      - -datasource.url=http://victoria-metrics:8428
+      - -remoteWrite.url=http://victoria-metrics:8428
+      - -notifier.url=http://alertmanager:9093
+      - -rule=/etc/vmalert/rules.yml
+      - -httpListenAddr=:8880
+    volumes:
+      - ./vmalert/rules.yml:/etc/vmalert/rules.yml:ro
+    depends_on:
+      - victoria-metrics
+      - alertmanager
+
+  alertmanager:
+    image: docker.io/prom/alertmanager:latest
+    container_name: alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"        # Alertmanager UI / webhook config
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+
 volumes:
   vm-data:
   grafana-data:

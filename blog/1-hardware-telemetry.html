@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>1 — Reading Apple Silicon GPU &amp; Power Without Root</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#4f46e5;--accent-soft:#eef0ff;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--red:#b91c1c;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(79,70,229,.12), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(15,118,110,.10), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #dfe1ff;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  .figure{text-align:center;margin:24px 0}
+  .figure svg{max-width:100%;height:auto}
+  .figcap{font-size:13px;color:var(--muted);margin-top:10px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+  .stat{text-align:center;padding:20px 14px}
+  .stat .big{font-size:32px;font-weight:800;letter-spacing:-.02em;color:var(--accent)}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  .pill{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;margin-right:6px}
+  .pill.ok{background:var(--teal-soft);color:var(--teal)}
+  .pill.warn{background:var(--amber-soft);color:var(--amber)}
+  .pill.info{background:var(--accent-soft);color:var(--accent)}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  blockquote{margin:16px 0;padding:12px 18px;border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 10px 10px 0;color:#3a3d57}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout .ic{font-weight:800;line-height:1.4}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Post 1 of 4 &middot; mlx_hw_telemetry</span>
+    <h1>Reading Apple Silicon GPU &amp; Power Without Root</h1>
+    <p class="sub">macOS exposes almost nothing about GPU memory, GPU utilization or die power through a public API. We found three command-line seams that together give us a full hardware picture — on both nodes, over SSH, no kernel modules.</p>
+    <div class="meta">
+      <span><b>Sources</b> ioreg &middot; powermetrics &middot; pmset</span>
+      <span><b>Exporter</b> :9102 on rank0 + rank1</span>
+      <span><b>Scrape</b> every 15s into VictoriaMetrics</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="figure">
+    <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three data sources feeding the hardware exporter">
+      <defs>
+        <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#e6e0ff"/><stop offset="1" stop-color="#c7d2fe"/>
+        </linearGradient>
+        <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#d9f3ec"/><stop offset="1" stop-color="#b2ece0"/>
+        </linearGradient>
+        <linearGradient id="g3" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ffe9f0"/><stop offset="1" stop-color="#ffd6e5"/>
+        </linearGradient>
+      </defs>
+
+      <!-- three source cards -->
+      <g transform="translate(20,30)">
+        <rect width="200" height="150" rx="14" fill="url(#g1)" opacity=".7"/>
+        <rect x="10" y="10" width="180" height="34" rx="10" fill="#fff" opacity=".85"/>
+        <text x="100" y="32" text-anchor="middle" font-size="14" font-weight="800" fill="#4338ca">ioreg</text>
+        <text x="100" y="62" text-anchor="middle" font-size="11.5" fill="#3730a3">GPU mem used / alloc / total</text>
+        <text x="100" y="80" text-anchor="middle" font-size="11.5" fill="#3730a3">IOAccelerator class</text>
+        <rect x="22" y="98" width="156" height="28" rx="14" fill="#fff" opacity=".9"/>
+        <text x="100" y="116" text-anchor="middle" font-size="11" font-weight="700" fill="#0f766e">no root &middot; 5s</text>
+      </g>
+
+      <g transform="translate(280,30)">
+        <rect width="200" height="150" rx="14" fill="url(#g2)" opacity=".7"/>
+        <rect x="10" y="10" width="180" height="34" rx="10" fill="#fff" opacity=".85"/>
+        <text x="100" y="32" text-anchor="middle" font-size="14" font-weight="800" fill="#0f766e">powermetrics</text>
+        <text x="100" y="62" text-anchor="middle" font-size="11.5" fill="#134e4a">GPU util &amp; freq</text>
+        <text x="100" y="80" text-anchor="middle" font-size="11.5" fill="#134e4a">GPU / CPU / ANE power</text>
+        <text x="100" y="98" text-anchor="middle" font-size="11.5" fill="#134e4a">package power</text>
+        <rect x="22" y="110" width="156" height="28" rx="14" fill="#fff" opacity=".9"/>
+        <text x="100" y="128" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309">passwordless sudo &middot; 15s</text>
+      </g>
+
+      <g transform="translate(540,30)">
+        <rect width="200" height="150" rx="14" fill="url(#g3)" opacity=".7"/>
+        <rect x="10" y="10" width="180" height="34" rx="10" fill="#fff" opacity=".85"/>
+        <text x="100" y="32" text-anchor="middle" font-size="14" font-weight="800" fill="#be185d">pmset -g therm</text>
+        <text x="100" y="62" text-anchor="middle" font-size="11.5" fill="#831843">CPU_Scheduler_Limit</text>
+        <text x="100" y="80" text-anchor="middle" font-size="11.5" fill="#831843">thermal pressure 0..1</text>
+        <rect x="22" y="110" width="156" height="28" rx="14" fill="#fff" opacity=".9"/>
+        <text x="100" y="128" text-anchor="middle" font-size="11" font-weight="700" fill="#0f766e">no root &middot; 30s</text>
+      </g>
+
+      <!-- animated pulses to exporter -->
+      <line x1="220" y1="105" x2="280" y2="105" stroke="#4338ca" stroke-width="2.5" stroke-linecap="round"/>
+      <circle r="5" fill="#818cf8">
+        <animate attributeName="cx" values="220;280" dur="1.6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;1;0" dur="1.6s" repeatCount="indefinite"/>
+      </circle>
+      <line x1="480" y1="105" x2="540" y2="105" stroke="#0f766e" stroke-width="2.5" stroke-linecap="round"/>
+      <circle r="5" fill="#14b8a6">
+        <animate attributeName="cx" values="480;540" dur="1.6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;1;0" dur="1.6s" repeatCount="indefinite"/>
+      </circle>
+      <line x1="740" y1="105" x2="700" y2="105" stroke="#be185d" stroke-width="2.5" stroke-linecap="round"/>
+      <circle r="5" fill="#f472b6">
+        <animate attributeName="cx" values="740;700" dur="1.6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;1;0" dur="1.6s" repeatCount="indefinite"/>
+      </circle>
+
+      <!-- exporter box -->
+      <g transform="translate(280,225)">
+        <rect width="200" height="52" rx="14" fill="#fff" stroke="#c7cbe8" stroke-width="1.5"/>
+        <rect x="0" y="0" width="200" height="30" rx="14" fill="#4f46e5"/>
+        <rect x="0" y="16" width="200" height="14" fill="#4f46e5"/>
+        <text x="100" y="20" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">mlx_hw_telemetry.py</text>
+        <text x="100" y="45" text-anchor="middle" font-size="11.5" fill="#5b6072">:9102 Prometheus text</text>
+      </g>
+      <path d="M100 180 C 100 210, 150 215, 200 225" fill="none" stroke="#4338ca" stroke-width="2" opacity=".5" stroke-dasharray="4 4"/>
+      <path d="M380 180 C 380 210, 350 215, 300 225" fill="none" stroke="#0f766e" stroke-width="2" opacity=".5" stroke-dasharray="4 4"/>
+      <path d="M640 180 C 640 210, 610 215, 560 225" fill="none" stroke="#be185d" stroke-width="2" opacity=".5" stroke-dasharray="4 4"/>
+
+      <!-- VM box -->
+      <g transform="translate(540,225)">
+        <rect width="200" height="52" rx="14" fill="url(#g2)"/>
+        <rect x="10" y="8" width="180" height="34" rx="10" fill="#fff" opacity=".9"/>
+        <text x="100" y="29" text-anchor="middle" font-size="12.5" font-weight="800" fill="#0f766e">VictoriaMetrics</text>
+      </g>
+      <line x1="480" y1="251" x2="540" y2="251" stroke="#0f766e" stroke-width="2.5" stroke-linecap="round"/>
+      <circle r="5" fill="#14b8a6">
+        <animate attributeName="cx" values="480;540" dur="1.6s" begin=".4s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;1;0" dur="1.6s" begin=".4s" repeatCount="indefinite"/>
+      </circle>
+      <text x="510" y="242" text-anchor="middle" font-size="10.5" fill="#0f766e" font-weight="700">scrape 15s</text>
+    </svg>
+    <div class="figcap">Fig 1. Three command-line seams, zero public API. Each source pulses its numbers into one exporter that VM scrapes like any Prometheus target.</div>
+  </div>
+
+  <h2><span class="num">1</span> Why there is no API</h2>
+  <p>Apple Silicon exposes no official metrics endpoint for GPU memory or utilization. There is no <code>nvidia-smi</code> equivalent, no <code>/sys</code>, no <code>IOHID</code> trick — so we composited three different command-line tools and wrapped them in a thread-safe HTTP exporter.</p>
+  <div class="card">
+    <table>
+      <tr><th>Source</th><th>What it gives</th><th>Privilege</th><th>Cadence</th></tr>
+      <tr><td><code>ioreg -c IOAccelerator</code></td><td>GPU <code>gpu_memory_used</code>, <code>gpu_memory_allocated</code>, <code>gpu_memory_total</code> (plus an IOKit utilization %)</td><td>none</td><td>~5s</td></tr>
+      <tr><td><code>powermetrics -n 1 -i 1000 --samplers cpu_power,gpu_power</code></td><td>GPU utilization %, GPU frequency, GPU/CPU/ANE/package power in mW</td><td><b>passwordless sudo</b></td><td>~15s (sampler is slow)</td></tr>
+      <tr><td><code>pmset -g therm</code></td><td><code>CPU_Scheduler_Limit</code> → thermal pressure 0..1</td><td>none</td><td>~30s</td></tr>
+    </table>
+  </div>
+
+  <div class="callout ok"><span class="ic">&#9889;</span><div><b>The sampler-name gotcha.</b> powermetrics rejects a <code>power</code> sampler name. You must pass <code>cpu_power,gpu_power</code> explicitly — <code>--samplers power</code> fails on modern macOS. Cost us a debug cycle.</div></div>
+
+  <h2><span class="num">2</span> GPU memory via ioreg — the no-root win</h2>
+  <p>The whole GPU-memory story comes from <code>ioreg</code>, so it works over SSH with no sudo — the only privilege the exporter needs anywhere is the powermetrics path. Parsing the two topmost accelerators and picking the entry whose <code>gpu_memory_used &gt; 0</code> gives us per-node GPU memory in bytes:</p>
+  <pre><code>mlx_hw_gpu_mem_total_bytes{node="rank0"}  8,589,934,592
+mlx_hw_gpu_mem_used_bytes{node="rank0"}    343,932,928
+mlx_hw_gpu_mem_alloc_bytes{node="rank0"}   12,132,352</code></pre>
+  <div class="grid2">
+    <div class="card stat"><div class="big">330.7 MB</div><div class="lbl">GPU memory in use on rank1 (16 GB node)</div></div>
+    <div class="card stat"><div class="big">131.2 MB</div><div class="lbl">GPU memory in use on rank0 (8 GB node)</div></div>
+    <div class="card stat"><div class="big">8.3 / 2.2</div><div class="lbl">load1 on rank1 / rank0 at first scrape</div></div>
+    <div class="card stat"><div class="big">0.92</div><div class="lbl">rank0 disk usage — the alert that went firing (see post 2)</div></div>
+  </div>
+
+  <h2><span class="num">3</span> Power and utilization via powermetrics</h2>
+  <p>With passwordless <code>sudo -n</code> configured for the venv's user on both machines, a subprocess samples the real silicon power rails. The <code>gpu_power</code> sampler returns GPU utilization, frequency and power in one shot; we also grab the <code>cpu</code> and <code>ane</code> rails so the dashboard can show GPU vs CPU vs ANE vs package power as separate series:</p>
+  <pre><code>mlx_hw_gpu_utilization_percent{node="rank0"}   20.89
+mlx_hw_gpu_power_milliwatts{node="rank0"}      1,234
+mlx_hw_package_power_milliwatts{node="rank0"}  15,876
+mlx_hw_ane_power_milliwatts{node="rank0"}        214</code></pre>
+  <p>Two failures are tolerated gracefully: missing sudo yields <code>NaN</code> (so panels go blank instead of lying), and GPU die temperature — which powermetrics does not expose on this M2 Pro — is deliberately <i>not</i> a gauge. The heatmap and frequency panels stand in for it.</p>
+
+  <h2><span class="num">4</span> Thermal pressure without sudo</h2>
+  <p><code>pmset -g therm</code> prints <code>CPU_Scheduler_Limit</code> — the fraction of CPU the scheduler is allowed to run under thermal load. We invert it into a 0..1 pressure gauge: <code>1 - limit</code>. It needs no sudo, so even a locked-down node still reports whether it's thermally throttling:</p>
+  <pre><code>mlx_hw_thermal_pressure{node="rank1"}  0.00</code></pre>
+
+  <h2><span class="num">5</span> Ship it to both nodes</h2>
+  <p>The exporter runs under <code>/Users/dk/venvs/mlx/bin/python</code> on rank1 — a py3.12 venv — because macOS Local-Network privacy (TCC) silently blocks the third-party py3.14 Homebrew binary from reaching local subnets over SSH (<code>EHOSTUNREACH</code>). Rank0's local copy runs on the repo's py3.14 venv. Same code, two interpreters, one lesson.</p>
+  <blockquote>Every gauge carries <code>node</code> — <code>rank0</code> or <code>rank1</code> — so the same queries power the cluster dashboard, the per-node drill-down, and node-scoped alerting.</blockquote>
+
+  <div class="callout warn"><span class="ic">&#9888;</span><div><b>Live-verified</b> on both nodes: <code>up{job="mlx-hw"}</code> is 1 for <code>192.168.1.64:9102</code> and <code>192.168.1.5:9102</code>, GPU memory and power gauges populate, and the VM delete-API left zero stale <code>mlx-metrics-proxy</code> series behind.</div></div>
+
+</main>
+
+<footer class="wrap">
+  <a href="2-alerting.html">Next: 28 alert rules and the full loop to Alertmanager &rarr;</a>
+</footer>
+</body>
+</html>

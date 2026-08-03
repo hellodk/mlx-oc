@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2 — 28 Alert Rules and the Full Loop to Alertmanager</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#0f766e;--accent-soft:#e6f6f4;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--red:#b91c1c;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(15,118,110,.13), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(219,39,119,.09), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--teal);background:var(--teal-soft);border:1px solid #c7e9e4;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--teal);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  .figure{text-align:center;margin:24px 0}
+  .figure svg{max-width:100%;height:auto}
+  .figcap{font-size:13px;color:var(--muted);margin-top:10px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+  .stat{text-align:center;padding:20px 14px}
+  .stat .big{font-size:32px;font-weight:800;letter-spacing:-.02em;color:var(--teal)}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  .pill{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;margin-right:6px}
+  .pill.ok{background:var(--teal-soft);color:var(--teal)}
+  .pill.warn{background:var(--amber-soft);color:var(--amber)}
+  .pill.err{background:#fde8e8;color:var(--red)}
+  .pill.info{background:#eef0ff;color:#4f46e5}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  blockquote{margin:16px 0;padding:12px 18px;border-left:4px solid var(--teal);background:var(--teal-soft);border-radius:0 10px 10px 0;color:#1d3d38}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout .ic{font-weight:800;line-height:1.4}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Post 2 of 4 &middot; vmalert + Alertmanager</span>
+    <h1>28 Alert Rules and the Full Loop to Alertmanager</h1>
+    <p class="sub">VictoriaMetrics on its own just stores numbers. Adding <code>vmalert</code> for evaluation and <code>Alertmanager</code> for routing turns a 92% full disk into a firing alert that actually reaches a webhook — with inhibit rules stopping the cascade when a whole node dies.</p>
+    <div class="meta">
+      <span><b>Rules</b> 28 across 4 groups</span>
+      <span><b>Evaluator</b> vmalert :8880</span>
+      <span><b>Router</b> Alertmanager :9093</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="figure">
+    <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Alert pipeline with an animated alert traveling to alertmanager">
+      <defs>
+        <linearGradient id="a1" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#d9f3ec"/><stop offset="1" stop-color="#b2ece0"/>
+        </linearGradient>
+        <linearGradient id="a2" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ffe9f0"/><stop offset="1" stop-color="#ffd6e5"/>
+        </linearGradient>
+      </defs>
+
+      <g transform="translate(24,30)">
+        <rect width="170" height="120" rx="14" fill="url(#a1)" opacity=".7"/>
+        <rect x="12" y="12" width="146" height="30" rx="10" fill="#fff" opacity=".9"/>
+        <text x="85" y="32" text-anchor="middle" font-size="12.5" font-weight="800" fill="#0f766e">VictoriaMetrics</text>
+        <text x="85" y="66" text-anchor="middle" font-size="11" fill="#134e4a">series land every 15s</text>
+        <rect x="22" y="82" width="126" height="24" rx="12" fill="#fff" opacity=".9"/>
+        <text x="85" y="98" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0f766e">mlx_hw_disk_used</text>
+      </g>
+
+      <g transform="translate(295,30)">
+        <rect width="170" height="120" rx="14" fill="url(#a2)" opacity=".7"/>
+        <rect x="12" y="12" width="146" height="30" rx="10" fill="#fff" opacity=".9"/>
+        <text x="85" y="32" text-anchor="middle" font-size="12.5" font-weight="800" fill="#be185d">vmalert</text>
+        <text x="85" y="60" text-anchor="middle" font-size="10.5" fill="#831843">evaluates rules.yml</text>
+        <rect x="22" y="72" width="126" height="22" rx="11" fill="#fff" opacity=".9"/>
+        <text x="85" y="87" text-anchor="middle" font-size="10" font-weight="700" fill="#b45309">disk &gt;= 90%</text>
+        <rect x="22" y="100" width="126" height="22" rx="11" fill="#fff" opacity=".9"/>
+        <text x="85" y="115" text-anchor="middle" font-size="10" font-weight="700" fill="#b45309">for: 2m</text>
+      </g>
+
+      <g transform="translate(566,30)">
+        <rect width="170" height="120" rx="14" fill="url(#a1)" opacity=".7"/>
+        <rect x="12" y="12" width="146" height="30" rx="10" fill="#fff" opacity=".9"/>
+        <text x="85" y="32" text-anchor="middle" font-size="12.5" font-weight="800" fill="#0f766e">Alertmanager</text>
+        <text x="85" y="60" text-anchor="middle" font-size="10.5" fill="#134e4a">inhibit + route</text>
+        <rect x="22" y="72" width="126" height="22" rx="11" fill="#fff" opacity=".9"/>
+        <text x="85" y="87" text-anchor="middle" font-size="10" font-weight="700" fill="#4f46e5">oncall (critical)</text>
+        <rect x="22" y="100" width="126" height="22" rx="11" fill="#fff" opacity=".9"/>
+        <text x="85" y="115" text-anchor="middle" font-size="10" font-weight="700" fill="#4f46e5">default webhook</text>
+      </g>
+
+      <!-- animated alert dot traveling -->
+      <path d="M194 95 H 295" stroke="#0f766e" stroke-width="2.5" stroke-linecap="round"/>
+      <circle r="7" fill="#14b8a6">
+        <animate attributeName="cx" values="194;295" dur="1.5s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;1;0" dur="1.5s" repeatCount="indefinite"/>
+      </circle>
+      <path d="M465 95 H 566" stroke="#be185d" stroke-width="2.5" stroke-linecap="round"/>
+      <circle r="7" fill="#f472b6">
+        <animate attributeName="cx" values="465;566" dur="1.5s" begin=".5s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;1;0" dur="1.5s" begin=".5s" repeatCount="indefinite"/>
+      </circle>
+
+      <g transform="translate(290,200)">
+        <rect width="180" height="44" rx="12" fill="#fff" stroke="#c7cbe8" stroke-width="1.5"/>
+        <text x="90" y="27" text-anchor="middle" font-size="12" font-weight="700" fill="#1d1f2b">ALERTS{alertstate=&quot;firing&quot;}</text>
+      </g>
+      <path d="M380 150 V 200" stroke="#be185d" stroke-width="2" stroke-dasharray="4 4" opacity=".5"/>
+      <g transform="translate(290,250)">
+        <rect width="180" height="28" rx="12" fill="#fde8f1"/>
+        <text x="90" y="19" text-anchor="middle" font-size="11" font-weight="700" fill="#be185d">firing &rarr; Grafana annotation</text>
+      </g>
+      <path d="M380 244 V 250" stroke="#be185d" stroke-width="2" stroke-dasharray="4 4" opacity=".5"/>
+    </svg>
+    <div class="figcap">Fig 1. The whole path from a metric to a firing annotation. The animated dot is the alert being evaluated, routed and re-exported as the <code>ALERTS</code> series that Grafana draws.</div>
+  </div>
+
+  <h2><span class="num">1</span> The two services, in one compose file</h2>
+  <div class="card">
+    <table>
+      <tr><th>Service</th><th>Image</th><th>Key flags</th></tr>
+      <tr><td><code>vmalert</code></td><td><code>victoriametrics/vmalert</code></td><td><code>-rule=/etc/vmalert/rules.yml</code> &middot; <code>-datasource.url=http://victoria-metrics:8428</code> &middot; <code>-notifier.url=http://alertmanager:9093</code> &middot; <code>-remoteWrite.url=http://victoria-metrics:8428</code></td></tr>
+      <tr><td><code>alertmanager</code></td><td><code>prom/alertmanager</code></td><td><code>--config.file=/etc/alertmanager/alertmanager.yml</code></td></tr>
+    </table>
+  </div>
+  <div class="callout warn"><span class="ic">&#9888;</span><div><b>Two vmalert footguns.</b> (1) The flag is <code>-notifier.url=</code>, <i>not</i> the Alertmanager-style <code>-notifier.alertmanager.url=</code> — the wrong one silently logs the notifier out in a loop. (2) <code>-remoteWrite.url=http://victoria-metrics:8428</code> is correct as-is; vmalert appends <code>/api/v1/write</code> itself, so a URL ending in <code>/api/v1/write</code> doubles the path and every write 404s.</div></div>
+
+  <h2><span class="num">2</span> The 28 rules, in four groups</h2>
+  <div class="card">
+    <table>
+      <tr><th>Group</th><th>Count</th><th>What fires</th></tr>
+      <tr><td><code>mlx-hardware</code></td><td>15</td><td>node down, disk &ge; 90%, memory pressure, thermal pressure, GPU memory pressure, heat (no scheduler limit), load &gt; 2&times; cores, stack components down (VM / vmalert / alertmanager)</td></tr>
+      <tr><td><code>mlx-inference</code></td><td>7</td><td>proxy down, error-rate spike, TTFT slowdown, throughput drop, stalled generation, token burst, in-flight spike</td></tr>
+      <tr><td><code>mlx-quality</code></td><td>6</td><td>hallucination risk, repetition, hedging, refusal, ungrounded output — each activity-gated</td></tr>
+    </table>
+  </div>
+  <div class="grid2">
+    <div class="card stat"><div class="big">15</div><div class="lbl">mlx-hardware rules</div></div>
+    <div class="card stat"><div class="big">7</div><div class="lbl">mlx-inference rules</div></div>
+    <div class="card stat"><div class="big">6</div><div class="lbl">mlx-quality rules</div></div>
+    <div class="card stat"><div class="big">0</div><div class="lbl">false positives after gating</div></div>
+  </div>
+
+  <h2><span class="num">3</span> Rules worth quoting</h2>
+  <p>GPU memory pressure is computed against <i>allocated</i> memory (not used), clamped at zero, and only evaluated when the total is real:</p>
+  <pre><code>- alert: MLXGPUMemoryPressure
+  expr: clamp_min(mlx_hw_gpu_mem_alloc_bytes / mlx_hw_gpu_mem_total_bytes, 0) &gt; 0.9
+    and on(node) (mlx_hw_gpu_mem_total_bytes &gt; 0)</code></pre>
+  <p>Hallucination rules only fire when the model is actually serving traffic — a freshly launched model that hasn't seen a request yet must not alert on "refusal spikes":</p>
+  <pre><code>- alert: MLXHallucinationRiskHigh
+  expr: mlx_hallucination_risk{job="mlx-proxy"} &gt; 0.7
+    and on(model) sum(rate(mlx_requests_total{job="mlx-proxy"}[10m])) by (model) &gt; 0</code></pre>
+  <p>Stack liveness is scraped, not assumed — vmalert now watches itself and its peers:</p>
+  <pre><code>- alert: MLXVictoriaMetricsDown
+  expr: up{job="victoria-metrics"} == 0
+  for: 2m</code></pre>
+
+  <h2><span class="num">4</span> Inhibit rules kill the cascade</h2>
+  <p>When a whole node dies, half the rulebook fires at once. Two inhibits make the root cause the only alert:</p>
+  <ul>
+    <li><b>proxy down</b> inhibits the upstream, throughput and stall alerts;</li>
+    <li><b>hw exporter down</b> (per node) inhibits that node's GPU, thermal and load alerts.</li>
+  </ul>
+
+  <h2><span class="num">5</span> The end-to-end proof</h2>
+  <p>rank0's disk really is at 91.6%. With <code>MLXDiskNearlyFull</code> set to fire at <code>&ge; 90%</code>, we watched the whole loop complete:</p>
+  <ol>
+    <li><code>vmalert</code> evaluates every 15s against VM and flips the rule to <code>firing</code>;</li>
+    <li><code>ALERTS{alertname="MLXDiskNearlyFull", alertstate="firing"}</code> is written back into VM via remote-write;</li>
+    <li>Alertmanager receives it and routes it to the <code>default</code> webhook;</li>
+    <li>the same series powers the <code>Active alerts</code> stat and the red annotation on every dashboard (post 3).</li>
+  </ol>
+  <div class="callout ok"><span class="ic">&#10003;</span><div><b>Verified:</b> all 28 rules report <code>health=ok</code> from <code>/api/v1/rules</code>, exactly one alert is firing, and the ops targets (<code>victoria-metrics</code>, <code>vmalert</code>, <code>alertmanager</code>) all appear in <code>up</code>.</div></div>
+
+</main>
+
+<footer class="wrap">
+  <a href="3-dashboards.html">Next: three dashboards, a GPU heatmap, and anonymous kiosk rendering &rarr;</a>
+</footer>
+</body>
+</html>

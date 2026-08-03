@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4 — What an External Observability Audit Found</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#b45309;--accent-soft:#fef3d7;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--red:#b91c1c;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(180,83,9,.13), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(15,118,110,.09), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--amber);background:var(--amber-soft);border:1px solid #f4ddb3;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--amber);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  .figure{text-align:center;margin:24px 0}
+  .figure svg{max-width:100%;height:auto}
+  .figcap{font-size:13px;color:var(--muted);margin-top:10px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+  .stat{text-align:center;padding:20px 14px}
+  .stat .big{font-size:32px;font-weight:800;letter-spacing:-.02em;color:var(--amber)}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  .pill{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;margin-right:6px}
+  .pill.ok{background:var(--teal-soft);color:var(--teal)}
+  .pill.warn{background:var(--amber-soft);color:var(--amber)}
+  .pill.err{background:#fde8e8;color:var(--red)}
+  .pill.info{background:#eef0ff;color:#4f46e5}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  blockquote{margin:16px 0;padding:12px 18px;border-left:4px solid var(--amber);background:var(--amber-soft);border-radius:0 10px 10px 0;color:#5c3a0e}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.err{background:#fde8e8;border:1px solid #f7c6c6}
+  .callout .ic{font-weight:800;line-height:1.4}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Post 4 of 4 &middot; External review</span>
+    <h1>What an External Observability Audit Found</h1>
+    <p class="sub">An outside pass over the whole stack came back with two accepted criticals and nine findings we actually fixed — from double-counted OTel metrics and NaN gauges to stale series and dashboard provisioning drift.</p>
+    <div class="meta">
+      <span><b>Criticals</b> 2 (accepted)</span>
+      <span><b>Fixed</b> 9</span>
+      <span><b>Rules after</b> 28 &middot; all health=ok</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="figure">
+    <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Before and after: OTel metric duplication removed">
+      <defs>
+        <linearGradient id="b1" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#fde8f1"/><stop offset="1" stop-color="#fbcfe8"/>
+        </linearGradient>
+        <linearGradient id="b2" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#d9f3ec"/><stop offset="1" stop-color="#b2ece0"/>
+        </linearGradient>
+      </defs>
+
+      <!-- BEFORE -->
+      <g transform="translate(30,24)">
+        <text x="10" y="0" font-size="12" font-weight="800" fill="#be185d">BEFORE &mdash; the same counter twice</text>
+        <rect x="10" y="14" width="300" height="96" rx="12" fill="url(#b1)" opacity=".7"/>
+        <rect x="22" y="26" width="130" height="26" rx="8" fill="#fff" opacity=".9"/>
+        <text x="87" y="44" text-anchor="middle" font-size="10.5" font-weight="800" fill="#be185d">proxy scrape</text>
+        <rect x="168" y="26" width="130" height="26" rx="8" fill="#fff" opacity=".9"/>
+        <text x="233" y="44" text-anchor="middle" font-size="10.5" font-weight="800" fill="#be185d">OTLP push</text>
+        <rect x="60" y="66" width="200" height="30" rx="8" fill="#fff" opacity=".9"/>
+        <text x="160" y="86" text-anchor="middle" font-size="10" font-weight="700" fill="#be185d">job="mlx-proxy" + job="mlx-metrics-proxy"</text>
+      </g>
+      <text x="180" y="158" text-anchor="middle" font-size="11" font-weight="700" fill="#b91c1c">double-counted rates &middot; duplicated series</text>
+
+      <!-- AFTER -->
+      <g transform="translate(430,24)">
+        <text x="10" y="0" font-size="12" font-weight="800" fill="#0f766e">AFTER &mdash; one path, one job</text>
+        <rect x="10" y="14" width="300" height="96" rx="12" fill="url(#b2)" opacity=".7"/>
+        <rect x="60" y="26" width="200" height="26" rx="8" fill="#fff" opacity=".9"/>
+        <text x="160" y="44" text-anchor="middle" font-size="10.5" font-weight="800" fill="#0f766e">scrape only &middot; traces/logs via OTLP</text>
+        <rect x="60" y="66" width="200" height="30" rx="8" fill="#fff" opacity=".9"/>
+        <text x="160" y="86" text-anchor="middle" font-size="10" font-weight="700" fill="#0f766e">job="mlx-proxy" (clean)</text>
+        <line x1="40" y1="55" x2="120" y2="55" stroke="#10b981" stroke-width="2" stroke-dasharray="5 5">
+          <animate attributeName="stroke-dashoffset" values="0;-30" dur="1.4s" repeatCount="indefinite"/>
+        </line>
+      </g>
+      <text x="580" y="158" text-anchor="middle" font-size="11" font-weight="700" fill="#0f766e">stale series purged via delete API</text>
+    </svg>
+    <div class="figcap">Fig 1. M1/M2 and HW OTLP-1 in one picture: metrics were being counted twice, so we made hardware/inference metrics scrape-only and kept OTLP for traces + logs.</div>
+  </div>
+
+  <h2><span class="num">1</span> The accepted criticals</h2>
+  <div class="card">
+    <table>
+      <tr><th>ID</th><th>Severity</th><th>Finding</th><th>Disposition</th></tr>
+      <tr><td>S1</td><td><span class="pill err">CRITICAL</span></td><td>The whole stack listens on <code>0.0.0.0</code>, LAN-exposed (RFC1918)</td><td><b>Accepted.</b> Documented; closing it needs a reverse proxy + auth, which is a separate workstream</td></tr>
+      <tr><td>S2</td><td><span class="pill err">CRITICAL</span></td><td>Grafana ships with anonymous Viewer + <code>admin/admin</code></td><td><b>Accepted.</b> Same fix: auth in front of Grafana</td></tr>
+    </table>
+  </div>
+  <div class="callout warn"><span class="ic">&#9888;</span><div><b>Transparency note.</b> We took the honest option: these are real findings, not papered over. The README documents the exposure and the accepted risk until the auth workstream lands.</div></div>
+
+  <h2><span class="num">2</span> Fixed: the metrics were counted twice</h2>
+  <div class="grid2">
+    <div class="card"><b>M1 / M2 — proxy OTel metrics removed.</b> The proxy exported every counter both as a scrape target and through OTLP, so VM held <code>job="mlx-proxy"</code> <i>and</i> <code>job="mlx-metrics-proxy"</code> with identical values. We deleted the gauge/histogram OTel instruments and the metrics MeterProvider entirely &mdash; only traces and logs stay on OTLP. A separate <code>mlx-metrics-proxy</code> scrape job was removed from the collector pipeline.</div>
+    <div class="card"><b>HW OTLP-1 — the hw agent's OTel loop deleted.</b> Its observable-gauge callbacks could only be used once, which produced <code>NaN</code>. The whole <code>_otel_loop()</code>, the <code>--otlp-endpoint</code> arg and the <code>OTLP_ENDPOINT</code> global are gone; the exporter is scrape-only.</div>
+    <div class="card"><b>M4 — heuristics got a <code>model</code> label.</b> <code>H_REPETITION</code>, <code>H_REFUSAL</code>, <code>H_HEDGE</code> and <code>H_UNGROUNDED</code> now carry <code>model</code>, and <code>composite_risk(model, ...)</code> keeps the per-model view the quality rules need. Refusal weight dropped from 0.9 to 0.25 &mdash; refusing a prompt is the opposite of hallucinating.</div>
+    <div class="card"><b>M3 — GPU memory pressure now correct.</b> The rule uses <code>mlx_hw_gpu_mem_alloc_bytes</code> (allocated, not used), <code>clamp_min(...,0)</code>, and only fires when total memory is actually reported.</div>
+  </div>
+
+  <h2><span class="num">3</span> Fixed: alert hygiene and stack liveness</h2>
+  <div class="card"><b>A1 — filters, gates and one baseline.</b> Every error, TTFT, generation, token, correlation and in-flight series and all hallucination alert rules are now scoped to <code>{job="mlx-proxy"}</code> (no more surprise series). Quality rules are gated with <code>and sum(rate(mlx_requests_total{job="mlx-proxy"}[10m])) by (model) &gt; 0</code> so a freshly launched, idle model can't fire hallucination alerts. The throughput-drop baseline was raised above 5 tok/s.</div>
+  <div class="card"><b>A3 / M6 — the stack now watches itself.</b> New <code>*Down</code> alerts (victoria-metrics, vmalert, alertmanager) backed by a VM self-scrape config that also targets <code>vmalert:8880</code> and <code>alertmanager:9093</code>. One target was dropped when the collector image proved not to expose its self-metrics on <code>:8888</code>.</div>
+  <div class="card"><b>AM — Alertmanager got teeth.</b> An <code>oncall</code> receiver for criticals and a <code>default</code> webhook, plus <code>inhibit_rules</code>: proxy-down silences the upstream/throughput/stall cascade, and hw-exporter-down silences that node's GPU/thermal/load alerts.</div>
+
+  <h2><span class="num">4</span> Fixed: dashboard drift</h2>
+  <div class="card"><b>D1 — the cluster dashboard was lying about its source.</b> A DB-managed copy had been edited in the UI and diverged from its JSON file, so provisioning was meaningless. We deleted the DB copies, set <code>disableDeletion: true</code> and <code>allowUiUpdates: false</code>, and confirmed <code>provisioned=True</code> with every dashboard anonymous-readable via the DTO endpoint.</div>
+
+  <h2><span class="num">5</span> Post-audit verification</h2>
+  <div class="callout ok"><span class="ic">&#10003;</span><div><b>All green:</b> <code>up{job="mlx-proxy",node="rank0"}==1</code>, TTFT histogram quantiles resolve (<code>histogram_quantile(0.95, ...)</code>), both hw agents up, all 28 rules report <code>health=ok</code>, exactly one alert firing (the genuine 91.6%-full disk), and the <code>mlx-metrics-proxy</code> series are gone from VM after a delete-API sweep.</div></div>
+  <blockquote>The uncomfortable pattern the audit caught: two sources for the same signal, and rules that could fire without traffic. Both are now structurally impossible, not just tuned away.</blockquote>
+
+</main>
+
+<footer class="wrap">
+  <a href="index.html">&larr; Back to all posts</a>
+</footer>
+</body>
+</html>

@@ -15,11 +15,13 @@ and records, per request:
   * hallucination  - heuristic risk signals (repetition, refusal, hedging,
                      ungrounded claims when tools were available)
 
-Metrics are served in Prometheus text format on /metrics.
+Metrics are served in Prometheus text format on /metrics. This scrape is the
+single source of truth for VM; the proxy does NOT export OTLP metrics so that
+`mlx_*` series exist exactly once (see audit note on metric duplication).
 
-Optional OpenTelemetry (--otlp-endpoint): each request becomes a trace span,
-a log record, and OTLP metric points exported to an OTLP HTTP/gRPC gateway
-(e.g. the in-cluster otel-gateway). Disabled unless --otlp-endpoint is set.
+Optional OpenTelemetry (--otlp-endpoint): each request becomes a trace span
+and a log record exported to an OTLP HTTP gateway (e.g. the in-cluster
+otel-collector). Disabled unless --otlp-endpoint is set.
 
 Usage:
   mlx_metrics_proxy.py --listen 0.0.0.0:8080 --upstream 127.0.0.1:8081
@@ -77,11 +79,6 @@ def _setup_otel(endpoint, node_name, service_name="mlx-metrics-proxy"):
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
             OTLPSpanExporter,
         )
-        from opentelemetry.sdk.metrics import MeterProvider
-        from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-        from opentelemetry.exporter.otlp.proto.http.metric_exporter import (
-            OTLPMetricExporter,
-        )
         from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
         from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
         from opentelemetry.exporter.otlp.proto.http._log_exporter import (
@@ -105,18 +102,6 @@ def _setup_otel(endpoint, node_name, service_name="mlx-metrics-proxy"):
         )
         trace.set_tracer_provider(tp)
 
-        # -- metrics -----------------------------------------------------
-        mp = MeterProvider(
-            metric_readers=[
-                PeriodicExportingMetricReader(
-                    OTLPMetricExporter(endpoint=_sig_url(endpoint, "metrics")),
-                    export_interval_millis=15000,
-                )
-            ],
-            resource=resource,
-        )
-        metrics.set_meter_provider(mp)
-
         # -- logs --------------------------------------------------------
         lp = LoggerProvider(resource=resource)
         lp.add_log_record_processor(
@@ -134,47 +119,6 @@ def _setup_otel(endpoint, node_name, service_name="mlx-metrics-proxy"):
 
         class Otel:
             tracer = tp.get_tracer("mlx.proxy")
-            meter = mp.get_meter("mlx.proxy")
-
-            req_counter = meter.create_counter(
-                "mlx.requests", unit="1", description="requests served"
-            )
-            token_counter = meter.create_counter(
-                "mlx.tokens.completion", unit="1", description="completion tokens"
-            )
-            tool_counter = meter.create_counter(
-                "mlx.tool_calls", unit="1", description="tool calls"
-            )
-            ttft_hist = meter.create_histogram(
-                "mlx.ttft.seconds", unit="s", description="time to first token"
-            )
-            rate_hist = meter.create_histogram(
-                "mlx.token_rate.tps", unit="1", description="tokens per second"
-            )
-            risk_hist = meter.create_histogram(
-                "mlx.hallucination.risk", unit="1", description="heuristic risk"
-            )
-            temp_gauge = meter.create_up_down_counter(
-                "mlx.temperature", unit="1", description="sampling temperature"
-            )
-            risk_gauge = meter.create_up_down_counter(
-                "mlx.hallucination.risk.last", unit="1", description="last risk"
-            )
-
-            @staticmethod
-            def record(model, streaming, ttft, gen_time, comp_tokens, rate,
-                       temperature, risk, tool_calls, status, flagged):
-                attrs = {"model": model}
-                Otel.req_counter.add(1, {**attrs, "streaming": str(streaming).lower()})
-                Otel.token_counter.add(comp_tokens, attrs)
-                Otel.tool_counter.add(tool_calls, attrs)
-                if ttft is not None:
-                    Otel.ttft_hist.record(ttft, attrs)
-                if rate is not None:
-                    Otel.rate_hist.record(rate, attrs)
-                Otel.risk_hist.record(risk, attrs)
-                Otel.temp_gauge.add(0, {**attrs, "value": str(temperature)})
-                Otel.risk_gauge.add(0, {**attrs, "value": str(risk)})
 
             @staticmethod
             def span(name, **attrs):
@@ -250,12 +194,13 @@ FLAGS = Counter(
     "Requests flagged as high hallucination risk (>0.5)",
     ["model"],
 )
-H_REPET = Gauge("mlx_heuristic_repetition", "Most-repeated word-trigram ratio (0..1)")
-H_REFUSAL = Gauge("mlx_heuristic_refusal", "1 if a refusal pattern was detected")
-H_HEDGE = Gauge("mlx_heuristic_hedging", "Normalized hedge-word density (0..1)")
+H_REPET = Gauge("mlx_heuristic_repetition", "Most-repeated word-trigram ratio (0..1)", ["model"])
+H_REFUSAL = Gauge("mlx_heuristic_refusal", "1 if a refusal pattern was detected", ["model"])
+H_HEDGE = Gauge("mlx_heuristic_hedging", "Normalized hedge-word density (0..1)", ["model"])
 H_UNGROUNDED = Gauge(
     "mlx_heuristic_ungrounded",
     "1 if factual-looking answer was produced without any tool call",
+    ["model"],
 )
 UPSTREAM_UP = Gauge(
     "mlx_up",
@@ -327,16 +272,17 @@ def heuristic_ungrounded(content: str, tools_provided: bool, tool_calls: int) ->
     return 1.0 if has_numbers else 0.0
 
 
-def composite_risk(content: str, tools_provided: bool, tool_calls: int) -> tuple:
+def composite_risk(model: str, content: str, tools_provided: bool, tool_calls: int) -> tuple:
     rep = heuristic_repetition(content)
     ref = heuristic_refusal(content)
     hed = heuristic_hedging(content)
     ung = heuristic_ungrounded(content, tools_provided, tool_calls)
-    risk = min(1.0, 0.5 * rep + 0.9 * ref + 0.4 * hed + 0.7 * ung)
-    H_REPET.set(rep)
-    H_REFUSAL.set(ref)
-    H_HEDGE.set(hed)
-    H_UNGROUNDED.set(ung)
+    # refusal is the *opposite* of a hallucination, so it is weighted lightly.
+    risk = min(1.0, 0.5 * rep + 0.25 * ref + 0.4 * hed + 0.7 * ung)
+    H_REPET.labels(model).set(rep)
+    H_REFUSAL.labels(model).set(ref)
+    H_HEDGE.labels(model).set(hed)
+    H_UNGROUNDED.labels(model).set(ung)
     return risk, bool(risk > 0.5)
 
 
@@ -558,7 +504,7 @@ class Proxy(BaseHTTPRequestHandler):
             TOOL_CALLS.labels(model).inc(tool_calls)
             TEMPERATURE.labels(model).set(temperature)
 
-            risk, flagged = composite_risk(content, tools_provided, tool_calls)
+            risk, flagged = composite_risk(model, content, tools_provided, tool_calls)
             RISK.labels(model).set(risk)
             RISK_HIST.labels(model).observe(risk)
             if flagged:
@@ -577,13 +523,6 @@ class Proxy(BaseHTTPRequestHandler):
                 span.set_attribute("mlx.hallucination_flagged", flagged)
                 span.set_attribute("http.response.status_code", status)
                 span.set_status("OK")
-                _OTEL.record(
-                    model, streaming,
-                    t_first_token - t_send if t_first_token else None,
-                    gen_time, comp_tokens,
-                    comp_tokens / gen_time if comp_tokens > 0 and gen_time > 0 else None,
-                    temperature, risk, tool_calls, status, flagged,
-                )
                 span.end()
 
         except (socket.error, http.client.HTTPException, ConnectionRefusedError) as exc:

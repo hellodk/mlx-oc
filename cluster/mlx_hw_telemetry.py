@@ -14,14 +14,13 @@ back the "hardware → LLM" monitoring story:
   * CPU temperature (best effort: powermetrics via sudo, else NaN)
   * a per-node availability gauge and uptime
 
-Metrics are served in Prometheus text format on :9102/metrics and, when
-`--otlp-endpoint` is given, also pushed as OTLP metrics to an OTLP gateway
-(e.g. the in-cluster otel-gateway) where the cluster Prometheus can scrape
-them via the collector's prometheus exporter.
+Metrics are served in Prometheus text format on :9102/metrics. This scrape is
+the single source of truth for VictoriaMetrics (the hardware agent does not
+push OTLP metrics, so `mlx_hw_*` series exist exactly once in VM).
 
 Usage:
   mlx_hw_telemetry.py --node-name rank0 --listen 0.0.0.0:9102
-  mlx_hw_telemetry.py --node-name rank1 --otlp-endpoint http://192.168.1.10:30318
+  mlx_hw_telemetry.py --node-name rank1 --listen 0.0.0.0:9102
 """
 
 import argparse
@@ -40,7 +39,6 @@ from prometheus_client import Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 NODE = "unknown"
 LISTEN = ("0.0.0.0", 9102)
-OTLP_ENDPOINT = ""
 SAMPLE_INTERVAL = 5.0
 
 # --------------------------------------------------------------------------
@@ -64,7 +62,13 @@ G_GPU_UTIL = Gauge("mlx_hw_gpu_utilization_percent", "GPU active residency % (Na
 G_GPU_FREQ = Gauge("mlx_hw_gpu_frequency_mhz", "GPU HW active frequency (NaN if unavailable)", ["node"])
 G_GPU_POWER = Gauge("mlx_hw_gpu_power_milliwatts", "GPU power draw (NaN if unavailable)", ["node"])
 G_PKG_POWER = Gauge("mlx_hw_package_power_milliwatts", "Combined CPU+GPU(+ANE) package power (NaN if unavailable)", ["node"])
+G_CPU_POWER = Gauge("mlx_hw_cpu_power_milliwatts", "CPU cluster power (NaN if unavailable)", ["node"])
+G_ANE_POWER = Gauge("mlx_hw_ane_power_milliwatts", "Neural Engine power (NaN if unavailable)", ["node"])
 G_THERMAL = Gauge("mlx_hw_thermal_pressure", "Thermal throttling pressure 0..1 (pmset -g therm)", ["node"])
+G_GPU_MEM_USED = Gauge("mlx_hw_gpu_mem_used_bytes", "GPU memory in use (IOKit In use system memory)", ["node"])
+G_GPU_MEM_ALLOC = Gauge("mlx_hw_gpu_mem_alloc_bytes", "GPU memory allocated (IOKit Alloc system memory)", ["node"])
+G_GPU_MEM_TOTAL = Gauge("mlx_hw_gpu_mem_total_bytes", "Total unified GPU memory (IORegistry VRAM,totalMB)", ["node"])
+G_GPU_UTIL_IOKIT = Gauge("mlx_hw_gpu_iokit_util_percent", "GPU activity from IOKit Device Utilization %", ["node"])
 
 _PAGE_SIZE = 0
 _MEM_TOTAL = 0
@@ -73,7 +77,10 @@ _PROC_MATCH = None
 # Cache for the slow powermetrics GPU/power sampler (runs on its own cadence).
 _GPU_LOCK = threading.Lock()
 _GPU_STATS = {"util": float("nan"), "freq": float("nan"),
-              "gpu_power": float("nan"), "pkg_power": float("nan")}
+              "gpu_power": float("nan"), "pkg_power": float("nan"),
+              "cpu_power": float("nan"), "ane_power": float("nan"),
+              "gpu_mem_used": float("nan"), "gpu_mem_alloc": float("nan"),
+              "gpu_mem_total": float("nan"), "gpu_util_iokit": float("nan")}
 GPU_SAMPLE_INTERVAL = 15.0
 
 
@@ -142,10 +149,44 @@ def _cpu_temp():
         return float("nan")
 
 
+def _gpu_iokit_stats():
+    """GPU memory + activity via IOKit (ioreg, no root).
+    Returns (used, alloc, total, util) as floats; NaN when unavailable."""
+    used = alloc = total = util = float("nan")
+    try:
+        out = subprocess.run(
+            ["ioreg", "-c", "IOAccelerator", "-r", "-d", "2"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        ).stdout
+        m = re.search(r'"In use system memory"=(\d+)', out)
+        if m:
+            used = float(m.group(1))
+        m = re.search(r'"Alloc system memory"=(\d+)', out)
+        if m:
+            alloc = float(m.group(1))
+        m = re.search(r'"VRAM,totalMB"=(\d+)', out)
+        if m:
+            total = float(m.group(1)) * 1024 * 1024
+        else:
+            # Unified memory on Apple Silicon: cap = physical RAM.
+            mem = _sysctl("hw.memsize", "")
+            if mem:
+                total = float(mem)
+        m = re.search(r'"Device Utilization %"=(\d+)', out)
+        if m:
+            util = float(m.group(1))
+    except Exception:
+        pass
+    return used, alloc, total, util
+
+
 def _gpu_power_stats():
-    """Best-effort GPU + package power via powermetrics. Updates the cache."""
+    """Best-effort GPU/CPU/ANE/package power via powermetrics + IOKit GPU
+    memory. Updates the cache."""
     global _GPU_STATS
-    util = freq = gpu_power = pkg_power = float("nan")
+    util = freq = gpu_power = pkg_power = cpu_power = ane_power = float("nan")
     try:
         out = subprocess.run(
             [
@@ -156,7 +197,6 @@ def _gpu_power_stats():
             text=True,
             timeout=8,
         ).stdout
-        in_gpu = False
         for line in out.splitlines():
             m = re.search(r"GPU HW active residency:\s*([\d.]+)%", line)
             if m:
@@ -170,12 +210,22 @@ def _gpu_power_stats():
             m = re.search(r"GPU Power:\s*([\d.]+)\s*mW", line, re.I)
             if m:
                 gpu_power = float(m.group(1))
+            m = re.search(r"CPU Power:\s*([\d.]+)\s*mW", line, re.I)
+            if m:
+                cpu_power = float(m.group(1))
+            m = re.search(r"ANE Power:\s*([\d.]+)\s*mW", line, re.I)
+            if m:
+                ane_power = float(m.group(1))
     except Exception:
         pass
+    gpu_mem_used, gpu_mem_alloc, gpu_mem_total, gpu_util_iokit = _gpu_iokit_stats()
     with _GPU_LOCK:
         _GPU_STATS = {
             "util": util, "freq": freq,
             "gpu_power": gpu_power, "pkg_power": pkg_power,
+            "cpu_power": cpu_power, "ane_power": ane_power,
+            "gpu_mem_used": gpu_mem_used, "gpu_mem_alloc": gpu_mem_alloc,
+            "gpu_mem_total": gpu_mem_total, "gpu_util_iokit": gpu_util_iokit,
         }
 
 
@@ -254,7 +304,13 @@ def _sample():
     G_GPU_FREQ.labels(NODE).set(stats["freq"])
     G_GPU_POWER.labels(NODE).set(stats["gpu_power"])
     G_PKG_POWER.labels(NODE).set(stats["pkg_power"])
+    G_CPU_POWER.labels(NODE).set(stats["cpu_power"])
+    G_ANE_POWER.labels(NODE).set(stats["ane_power"])
     G_THERMAL.labels(NODE).set(_thermal_pressure())
+    G_GPU_MEM_USED.labels(NODE).set(stats["gpu_mem_used"])
+    G_GPU_MEM_ALLOC.labels(NODE).set(stats["gpu_mem_alloc"])
+    G_GPU_MEM_TOTAL.labels(NODE).set(stats["gpu_mem_total"])
+    G_GPU_UTIL_IOKIT.labels(NODE).set(stats["gpu_util_iokit"])
     G_MEM_TOTAL.labels(NODE).set(_MEM_TOTAL)
     G_MEM_USED.labels(NODE).set(used)
     G_MEM_PRESSURE.labels(NODE).set(free_pages)
@@ -295,90 +351,18 @@ def _prom_scrape(host, port, path):
         pass
 
 
-def _otel_loop():
-    """Push current metric snapshot as OTLP metrics every SAMPLE_INTERVAL."""
-    if not OTLP_ENDPOINT:
-        return
-    try:
-        from opentelemetry import metrics
-        from opentelemetry.sdk.resources import Resource, SERVICE_NAME, HOST_NAME
-        from opentelemetry.sdk.metrics import MeterProvider
-        from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-        from opentelemetry.exporter.otlp.proto.http.metric_exporter import (
-            OTLPMetricExporter,
-        )
-
-        resource = Resource.create(
-            {
-                SERVICE_NAME: "mlx-hw-telemetry",
-                HOST_NAME: socket.gethostname(),
-                "mlx.node.name": NODE,
-            }
-        )
-        reader = PeriodicExportingMetricReader(
-            OTLPMetricExporter(endpoint=OTLP_ENDPOINT), export_interval_millis=10000
-        )
-        provider = MeterProvider(metric_readers=[reader], resource=resource)
-        metrics.set_meter_provider(provider)
-        meter = metrics.get_meter("mlx.hw")
-
-        load_g = meter.create_observable_gauge(
-            "mlx.hw.load",
-            callbacks=[
-                lambda obs: [obs.observe(v, {"node": NODE}) for v in os.getloadavg()]
-            ],
-        )
-        temp_g = meter.create_observable_gauge(
-            "mlx.hw.cpu_temp_celsius",
-            callbacks=[lambda obs: obs.observe(_cpu_temp(), {"node": NODE})],
-        )
-        used_g = meter.create_observable_gauge(
-            "mlx.hw.mem_used_bytes",
-            callbacks=[lambda obs: obs.observe(_mem_info()[0], {"node": NODE})],
-        )
-        gpu_util_g = meter.create_observable_gauge(
-            "mlx.hw.gpu_utilization_percent",
-            callbacks=[
-                lambda obs: obs.observe(
-                    _GPU_STATS["util"] if not _GPU_LOCK.locked() else float("nan"),
-                    {"node": NODE},
-                )
-            ],
-        )
-        pkg_power_g = meter.create_observable_gauge(
-            "mlx.hw.package_power_milliwatts",
-            callbacks=[
-                lambda obs: obs.observe(
-                    _GPU_STATS["pkg_power"] if not _GPU_LOCK.locked() else float("nan"),
-                    {"node": NODE},
-                )
-            ],
-        )
-
-        while True:
-            time.sleep(SAMPLE_INTERVAL)
-    except Exception as exc:
-        print(f"[hw] OTel loop disabled: {exc!r}", flush=True)
-
-
 def main():
-    global NODE, LISTEN, OTLP_ENDPOINT, _MEM_TOTAL, _PROC_MATCH
+    global NODE, LISTEN, _MEM_TOTAL, _PROC_MATCH
 
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--node-name", default=os.environ.get("MLX_NODE_NAME", socket.gethostname()))
     ap.add_argument("--listen", default="0.0.0.0:9102")
-    ap.add_argument(
-        "--otlp-endpoint",
-        default=os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
-        help="OTLP HTTP endpoint for metrics (e.g. http://192.168.1.10:30318)",
-    )
     ap.add_argument("--interval", type=float, default=5.0)
     ap.add_argument("--worker-match", default="mlx_lm.server")
     args = ap.parse_args()
 
     NODE = args.node_name
     LISTEN = (args.listen.rsplit(":", 1)[0], int(args.listen.rsplit(":", 1)[1]))
-    OTLP_ENDPOINT = args.otlp_endpoint
     SAMPLE_INTERVAL = max(1.0, args.interval)
     _PROC_MATCH = args.worker_match
     _MEM_TOTAL = int(_sysctl("hw.memsize", "0") or 0)
@@ -396,12 +380,10 @@ def main():
 
     threading.Thread(target=_loop, daemon=True).start()
     threading.Thread(target=_gpu_sampler_loop, daemon=True).start()
-    threading.Thread(target=_otel_loop, daemon=True).start()
 
     server = ThreadingHTTPServer(LISTEN, Handler)
     print(
-        f"[hw] node={NODE} listening on {LISTEN[0]}:{LISTEN[1]} "
-        f"otlp={'on' if OTLP_ENDPOINT else 'off'}",
+        f"[hw] node={NODE} listening on {LISTEN[0]}:{LISTEN[1]}",
         flush=True,
     )
     try:
