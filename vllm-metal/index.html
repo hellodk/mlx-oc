@@ -361,10 +361,10 @@
 <ol>
   <li><strong>macOS 14+ (Sonoma)</strong> — required for MLX 0.19+ and vllm-metal compatibility.</li>
   <li><strong>Python 3.11+</strong> — already on both nodes via the hydra stack.</li>
-  <li><strong>vLLM 0.6+</strong> with the <code>mlx</code> backend installed: <code>pip install "vllm[mlx]"</code></li>
+  <li><strong>vLLM 0.6.3+</strong> with the <code>mlx</code> backend: <code>pip install "vllm[mlx]"</code> — vLLM auto-detects Apple Silicon and uses the MLX backend, but pass <code>--backend mlx</code> explicitly for clarity. Verify the entry point <code>vllm.entrypoints.openai.api_server</code> is correct for your vLLM version; in vLLM 0.6.3+ the OpenAI-compatible server is at that path, but check with <code>python -m vllm.entrypoints.openai.api_server --help</code> after installation.</li>
   <li><strong>MLX 0.19+</strong> — <code>pip install mlx</code></li>
   <li><strong>Model weights</strong> — download once to a shared location or replicate to each node: <code>python -c "from huggingface_hub import snapshot_download; snapshot_download('meta-llama/Llama-3.1-8B-Instruct', local_dir='/models/Llama-3.1-8B-Instruct')"</code></li>
-  <li><strong>Firewall</strong> — allow inbound TCP on <code>:8000</code> (vllm-metal API) from the LAN.</li>
+  <li><strong>GPU memory utilization</strong> — On Apple Silicon, memory is unified (CPU + GPU share the same pool). <code>--gpu-memory-utilization 0.85</code> reserves 85% of the unified memory for vLLM's KV cache and model weights; the remaining 15% is for the OS, mlx_lm.server, and other processes. On a 16 GB Mac Mini this is tight — vLLM's model weights alone can consume 6–8 GB for Llama-3.1-8B (float16), leaving ~5–6 GB for KV cache. Monitor with <code>mlx_hw_telemetry.py</code> at <code>:9102</code>. On 32 GB Mac Studios this is comfortable.</li>
 </ol>
 </div>
 
@@ -378,12 +378,12 @@
     "-m", "vllm.entrypoints.openai.api_server",
     "--host", "0.0.0.0",
     "--port", "8000",
+    "--backend", "mlx",
     "--model", "/models/Llama-3.1-8B-Instruct",
     "--dtype", "float16",
     "--max-model-len", "32768",
     "--gpu-memory-utilization", "0.85",
     "--max-num-seqs", "8",
-    "--enable-chunked-prefill",
     "--disable-log-requests"
   ],
   "RunAtLoad": true,
@@ -391,6 +391,7 @@
   "StandardOutPath": "/var/log/hydra/vllm-metal.out.log",
   "StandardErrorPath": "/var/log/hydra/vllm-metal.err.log"
 }</code></pre>
+<p>Note: <code>--enable-chunked-prefill</code> is omitted because vLLM V1 (the engine used by the MLX backend) has chunked prefill always enabled by default and does not support disabling it via CLI flags. Adding <code>--enable-chunked-prefill</code> may cause an "unrecognized arguments" error on vLLM V1.</p>
 <p>Then <code>sudo launchctl bootstrap system /Library/LaunchDaemons/com.hydra.vllm-metal.plist</code>.</p>
 </div>
 
@@ -453,8 +454,12 @@ server {
 </div>
 
 <div class="callout warn">
-  <span class="ic">⚠ GPU memory contention</span><span>Both vllm-metal and the existing hydra stack (mlx_metrics_proxy, mlx_kv_cache_agent) share the same unified memory pool. Set <code>--gpu-memory-utilization 0.85</code> on vllm-metal and ensure the existing stack's memory footprint is accounted for. On a 16 GB Mac Mini, vllm-metal's 85% allocation leaves ~2.4 GB for the rest of the system — tight but workable. On 32 GB models, this is not a concern.</span>
-</div>
+   <span class="ic">⚠ MLX backend limitations</span><span>The MLX backend in vLLM has known constraints: it supports only a subset of model architectures (primarily Llama, Mistral, Qwen, and Gemma families), does not support all quantization formats (GPTQ/AWQ may not work), and has limited support for multi-lora serving. Verify your target model is MLX-compatible before committing to this deployment path. See the <a href="https://github.com/vllm-project/vllm/blob/main/MLX_ENGINE.md">vLLM MLX engine docs</a> for the latest compatibility matrix.</span>
+ </div>
+
+ <div class="callout warn">
+   <span class="ic">⚠ GPU memory contention</span><span>Both vllm-metal and the existing hydra stack (mlx_metrics_proxy, mlx_kv_cache_agent) share the same unified memory pool. Set <code>--gpu-memory-utilization 0.85</code> on vllm-metal and ensure the existing stack's memory footprint is accounted for. On a 16 GB Mac Mini, vllm-metal's 85% allocation leaves ~2.4 GB for the rest of the system — tight but workable. On 32 GB models, this is not a concern.</span>
+ </div>
 </section>
 
 <section>
@@ -462,8 +467,12 @@ server {
 
 <p>vllm-metal exposes Prometheus metrics at <code>:8000/metrics</code> (OpenAI-compatible servers in vLLM include a built-in Prometheus exporter). The existing hydra observability stack can scrape these directly or via the OTel pipeline.</p>
 
-<div class="card">
-<h3>6.1 Metrics to scrape</h3>
+<div class="callout info">
+   <span class="ic">ℹ Metric name verification</span><span>vLLM's Prometheus metric names use a colon prefix in the exposition format (e.g., <code>vllm:gpu_utilization</code> rather than <code>vllm_gpu_utilization</code>). The metric names listed above are the canonical Prometheus names after relabeling. Verify the exact names by querying <code>:8000/metrics</code> after deployment and adjust the vm-scrape relabeling rules accordingly.</span>
+ </div>
+
+ <div class="card">
+ <h3>6.1 Metrics to scrape</h3>
 <table>
   <tr><th>Metric</th><th>Source</th><th>Port</th><th>Already scraped?</th></tr>
   <tr><td><code>vllm_request_duration_seconds</code></td><td>vllm-metal</td><td>:8000</td><td><span class="pill warn">No — add to vm-scrape</span></td></tr>
@@ -534,7 +543,7 @@ server {
     <ul>
       <li><strong>No authentication on :8000</strong> — vllm-metal's OpenAI server has no auth by default. Since the Mac Minis are on a private LAN/VPN, this is acceptable. For the VPN-facing endpoint, consider adding an nginx <code>auth_basic</code> layer or a lightweight API key check.</li>
       <li><strong>Firewall</strong> — macOS Application Firewall should allow incoming connections on <code>:8000</code>. Add via <code>sudo /usr/libexec/ApplicationFirewall/socketfilterfw --addport 8000/tcp</code>.</li>
-      <li><strong>TLS</strong> — not required on the private LAN. If VPN termination happens at a gateway, TLS is already handled there.</li>
+      <li><strong>Model warm-up</strong> — vLLM's MLX backend compiles Metal shaders on the first request. Send a dummy request after startup to trigger compilation before real traffic arrives: <code>curl -s http://localhost:8000/v1/chat/completions -H 'Content-Type: application/json' -d '{"model":"/models/Llama-3.1-8B-Instruct","messages":[{"role":"user","content":"hi"}],"max_tokens":1}'</code></li>
       <li><strong>Model weights</strong> — stored on local disk at <code>/models/</code>. No S3/GCS dependency. Replicate with <code>rsync</code> if updating models.</li>
     </ul>
   </div>
