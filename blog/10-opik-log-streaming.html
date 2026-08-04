@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>10 — The Other Half of the Story: Streaming Server Logs into Opik</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#0f766e;--accent-soft:#e6f6f4;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(15,118,110,.11), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(219,39,119,.08), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #a7d8d0;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+  .stat{text-align:center;padding:20px 14px}
+  .stat .big{font-size:32px;font-weight:800;letter-spacing:-.02em;color:var(--accent)}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  blockquote{margin:16px 0;padding:12px 18px;border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 10px 10px 0;color:#06392f}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+  <a href="5-opik-llm-tracing.html">Opik</a>
+  <a href="6-opik-feedback-loop.html">Feedback</a>
+  <a href="7-mlx-inference-performance.html">Performance</a>
+  <a href="8-hydra-vs-mlx-oc.html">Hydra vs mlx-oc</a>
+  <a href="9-model-serving-resilience.html">Serving health</a>
+  <a href="10-opik-log-streaming.html" style="color:var(--accent);font-weight:700">Server logs</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">10 of 10 &middot; streaming + correlation</span>
+    <h1>The Other Half of the Story</h1>
+    <p class="sub">Every request produces a trace in our proxy &mdash; and a stack of raw lines in <code>logs/server.log</code> that has never been shipped anywhere. The proxy&rsquo;s Opik paths exist but are switched off, and its OTel logs pipeline ends at a <code>podman logs</code> stdout. This post is the plan to put the server&rsquo;s side of the story next to the trace: enable tracing, add a filtered log tailer, and keep the flood gates closed.</p>
+    <div class="meta">
+      <span><b>Verified</b> mlx project is empty &middot; 0 traces &middot; 0 logs</span>
+      <span><b>New agent</b> mlx_server_log_tailer :9106</span>
+      <span><b>Path</b> OTLP &rarr; Opik /api/v1/private/otel</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section>
+<h2><span class="num">1</span>What is actually in Opik right now: nothing</h2>
+<p>We checked. The <code>mlx</code> project exists on the self-hosted Opik at <code>192.168.1.10:32173</code>, and it holds <strong>zero traces and zero logs</strong>. Three separate gaps cause this:</p>
+<ol>
+  <li><strong>Tracing is wired but off.</strong> The proxy has two Opik paths &mdash; the SDK (<code>--opik-endpoint</code>) and OTLP ingestion (<code>--opik-otlp-endpoint</code>) &mdash; but <code>start_server.sh</code> only passes them when <code>OPIK_ENDPOINT</code> / <code>OPIK_OTLP_ENDPOINT</code> are exported. They aren&rsquo;t. The running proxy has <code>--otlp-endpoint</code> (to our otel-collector) and nothing else.</li>
+  <li><strong>The proxy&rsquo;s logs pipeline goes to a dead end.</strong> <code>_setup_otel</code> builds a <code>LoggerProvider</code> + <code>LoggingHandler</code> and an <code>OTLPLogExporter</code> &mdash; but only toward the local collector, whose <code>logs</code> pipeline terminates at a <code>debug</code> exporter. Meaning <code>podman logs</code> stdout. Not persisted. Not Opik.</li>
+  <li><strong>The server&rsquo;s own log never leaves the machine.</strong> <code>logs/server.log</code> is read by exactly two processes: the KV-cache agent (turns lines into Prometheus gauges) and the supervisor (sniffs the tail for a crash reason). The raw stream is consumed for metrics and discarded.</li>
+</ol>
+<p>So today, Opik can show you the proxy&rsquo;s verdict on a request (TTFT, tokens, hallucination heuristics) but nothing about what the <em>server</em> saw &mdash; the Metal fault, the rank that walked off, the generation lines. The crash from post 9 is the canonical example: the whole story lived in <code>server.log</code>, and none of it made it to the trace system.</p>
+
+<div class="callout warn"><span class="ic">The gap</span><span>Metrics measure, traces explain the request, and logs contain the incident &mdash; but only if they end up next to each other. Right now the third stream is silently thrown away.</span></div>
+</section>
+
+<section>
+<h2><span class="num">2</span>Why server logs belong beside traces</h2>
+<p>Consider the debugging questions our trace pipeline cannot answer today:</p>
+<ul>
+  <li><em>This trace is slow &mdash; did the KV cache miss?</em> That answer is a line in <code>server.log</code>, not in any metric or span.</li>
+  <li><em>This request errored &mdash; was it a Metal fault, a rank down, or a model-side crash?</em> The proxy only knows it got a 503. The typed reason is a <code>[METAL]</code> / <code>[WARN] Node with rank&hellip;</code> line.</li>
+  <li><em>What did the server actually generate vs. what the proxy reported?</em> Generation lines carry the ground truth.</li>
+</ul>
+<p>The honest caveat: raw server logs are <strong>noisy</strong>. In steady state our <code>server.log</code> is mostly HTTP access lines &mdash; one per request. Shipping every line into Opik would bury the signal in trivia and bloat the database. The plan therefore treats <strong>filtering as the core feature</strong>, not an afterthought (&sect;4).</p>
+</section>
+
+<section>
+<h2><span class="num">3</span>The plan: one pipeline, two paths</h2>
+<p>One OTLP pipeline, two feeds &mdash; but <strong>not into the same sink</strong>. During implementation we confirmed what the docs hinted: Opik&rsquo;s OTel ingestion is <strong>trace-only</strong> (<code>/api/v1/private/otel/v1/logs</code> &rarr; 404 while <code>/v1/traces</code> works; the <code>opik</code> SDK 2.2.13 has no log API). So the split is honest: traces &rarr; Opik, logs &rarr; the otel-collector&rsquo;s durable JSONL file.</p>
+
+<div class="card">
+<h3>Path A &mdash; switch request tracing on</h3>
+<p>Set <code>OPIK_OTLP_ENDPOINT=http://192.168.1.10:32173/api/v1/private/otel</code> in <code>start_server.sh</code>. The proxy&rsquo;s existing second span processor (<code>mlx_metrics_proxy.py:137</code>) then ships every chat completion to Opik stamped with OpenInference attributes.</p>
+<p><strong>Decision:</strong> use the OTLP path and keep the Opik SDK path <em>off</em>. Enabling both would create <strong>two traces per request</strong> (SDK + OTLP each log one). One pipeline is cheaper to reason about and shares its exporter stack with the log tailer. The SDK path stays documented as an optional fallback.</p>
+</div>
+
+<div class="card">
+<h3>Path B &mdash; a server-log tailer (new)</h3>
+<p>New <code>mlx_server_log_tailer.py</code>, same shape as the KV-cache agent:</p>
+<ul>
+  <li>Opens <code>logs/server.log</code>, <strong>seeks to the current end</strong> on start (no backfill flood), then follows at a 500&nbsp;ms poll. Optional <code>--backfill N</code> seeds the last N lines once.</li>
+  <li>Classifies each line by regex into severity + category.</li>
+  <li>Emits an OTLP LogRecord per qualifying line to the collector (<code>:4318</code>): body = raw line; attributes for severity, category, source (<code>mlx_lm.server</code>), <code>service.name</code>, <code>mlx.node.name</code>.</li>
+  <li>Exports self-health on <code>:9106</code> (<code>mlx_log_tailer_up</code>, <code>lines_total{severity,category}</code>, <code>shipped_total</code>, <code>dropped_total</code>, <code>errors_total</code>) so a dead tailer is visible in VictoriaMetrics.</li>
+</ul>
+<p>One more thing implementation surfaced: the supervisor was running <code>mlx_lm.server</code> with inherited stdout, so its output went into <code>supervisor.log</code> and <code>server.log</code> was never fed. The supervisor now redirects the server&rsquo;s output into <code>server.log</code> &mdash; the file the KV agent, the tailer, and the crash-sniffer all read.</p>
+</div>
+</section>
+
+<section>
+<h2><span class="num">4</span>The tailer in detail</h2>
+<table>
+  <tr><th>Signal in the line</th><th>Severity</th><th>Category</th><th>Shipped by default?</th></tr>
+  <tr><td><code>[METAL]</code> / <code>Command buffer execution failed</code> / <code>kIOGPUCommandBufferCallback</code></td><td>error</td><td>gpu</td><td>yes</td></tr>
+  <tr><td><code>[WARN]</code> / <code>Node with rank</code> / <code>exited with code</code></td><td>warning</td><td>rank</td><td>yes</td></tr>
+  <tr><td><code>Traceback</code> / <code>ERROR</code> / <code>fatal</code> / <code>SIGABRT</code></td><td>error</td><td>python</td><td>yes</td></tr>
+  <tr><td>KV-cache / generation lines (<code>cache</code>, <code>tokens</code>, <code>ttft</code>, <code>gen</code>)</td><td>info</td><td>generation</td><td>yes</td></tr>
+  <tr><td>HTTP access lines (<code>"POST /v1/&hellip;</code>)</td><td>info</td><td>http</td><td><strong>no</strong> (opt-in <code>--include-http</code>)</td></tr>
+</table>
+
+<pre><code>python3 cluster/mlx_server_log_tailer.py \
+  --log-file cluster/logs/server.log \
+  --otlp-endpoint http://192.168.1.64:4318 \
+  --project mlx --listen 0.0.0.0:9106</code></pre>
+
+<div class="callout ok"><span class="ic">Why filter-first</span><span>In steady state the filtered stream is a handful of lines per day &mdash; the 4B-era log is almost all HTTP access lines, which we drop by default. <code>--include-http</code> and <code>--all</code> are opt-in and documented as expensive (MBs/day under bench load).</span></div>
+</section>
+
+<section>
+<h2><span class="num">5</span>Keeping the flood out</h2>
+<ul>
+  <li><strong>Filter first</strong> &mdash; the default classifier already drops the dominant noise class.</li>
+  <li><strong>Rate cap</strong> &mdash; token bucket, default <code>--max-rate 50 lines/s</code>. A crash-spam loop or <code>--all</code> cannot outrun the budget.</li>
+  <li><strong>Backfill OFF by default</strong> &mdash; <code>--backfill N</code> exists only for initial seeding, so a tailer restart never replays the whole file into the pipeline.</li>
+  <li><strong>Bounded queue</strong> &mdash; the SDK&rsquo;s <code>BatchLogRecordProcessor</code> caps the in-memory buffer (2048 records); if the collector is unreachable we drop-and-count (<code>dropped_total{reason="rate_limit"}</code>), never unbounded buffering.</li>
+</ul>
+
+<div class="callout info"><span class="ic">Scope note</span><span>Phase 1 ships <strong>project-level</strong> logs &mdash; every record lands in the collector&rsquo;s JSONL file, correlated to Opik traces by time and service attributes. Precise trace-attachment (a log line pinned inside its own trace) needs a request-ID that flows proxy &rarr; upstream &rarr; <code>server.log</code> &rarr; <code>trace_id</code>; <code>mlx_lm.server</code> doesn&rsquo;t emit one today. That&rsquo;s phase 2, explicitly deferred &mdash; as is a true Opik Logs tab, which needs an Opik version with a logs feature.</span></div>
+</section>
+
+<section>
+<h2><span class="num">6</span>Acceptance gates</h2>
+<ol>
+  <li><code>./start_server.sh restart</code> &rarr; status shows <code>log_tailer RUNNING</code>, <code>:9106/metrics</code> returns 200, <code>mlx_log_tailer_up 1</code>.</li>
+  <li>One request &rarr; Opik shows exactly <strong>one</strong> new trace in <code>mlx</code> (no duplicates), with an LLM span carrying input/output/usage; the same request&rsquo;s server lines appear in the collector&rsquo;s JSONL file (<code>podman cp otel-collector:/var/log/otelcol/mlx-server-logs.jsonl</code>) with the right severity/category, and <code>mlx_log_tailer_lines_total</code> increments.</li>
+  <li>VictoriaMetrics has an <code>mlx-logtailer</code> target up; the new <code>MLXLogTailerDown</code> and <code>MLXLogTailerNotSending</code> warning rules evaluate without firing.</li>
+  <li>No regression: <code>mlx_server_*</code> and <code>mlx_kv_*</code> metrics unchanged; the SDK path stays OFF to guarantee one-trace-per-request.</li>
+</ol>
+</section>
+
+<section>
+<h2><span class="num">7</span>What we deliberately didn&rsquo;t build</h2>
+<ul>
+  <li><strong>Trace-attached server logs</strong> &mdash; needs request-ID plumbing through the proxy and into <code>server.log</code>. Documented, not built.</li>
+  <li><strong>Structured parsing</strong> of KV-cache/generation lines into typed attributes &mdash; phase 1 keeps the body as free text.</li>
+  <li><strong>More alerting</strong> beyond <code>MLXLogTailerDown</code> / <code>MLXLogTailerNotSending</code>.</li>
+  <li><strong>An SSH tail for rank1&rsquo;s worker log</strong> &mdash; the distributed run&rsquo;s output (including &ldquo;Node with rank 1 exited&rdquo;) is mirrored into rank0&rsquo;s <code>server.log</code>; verified true during implementation, so no separate tail was needed.</li>
+</ul>
+<p>Full plan with rationale, noise budget and file list: <a href="../docs/opik-log-streaming.md">docs/opik-log-streaming.md</a>.</p>
+</section>
+
+</main>
+
+<footer class="wrap">
+  mlx-oc &middot; post 10 of 10 &middot; streaming server logs into Opik &middot; <a href="../README.md">repo README</a>
+</footer>
+</body>
+</html>

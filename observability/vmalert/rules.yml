@@ -243,6 +243,30 @@ groups:
           summary: "mlx_lm.server crashed with a Metal GPU fault"
           description: "A Metal command-buffer / GPU error killed the server. Typical of unified-memory pressure or a bad kernel; check mlx_hw_gpu_mem_* and reduce --gpu-memory-utilization / max-num-seqs."
 
+      - alert: MLXLogTailerDown
+        expr: mlx_log_tailer_up{job="mlx-logtailer"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: observability
+        annotations:
+          summary: "mlx_server_log_tailer is down"
+          description: "No server.log lines are reaching Opik. Restart with ./start_server.sh restart; check logs/logtailer.log and mlx_log_tailer_errors_total."
+
+      - alert: MLXLogTailerNotSending
+        expr: |
+          increase(mlx_log_tailer_shipped_total{job="mlx-logtailer"}[15m]) == 0
+          and on() mlx_log_tailer_up{job="mlx-logtailer"} == 1
+        for: 5m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: observability
+        annotations:
+          summary: "Log tailer up but nothing shipped"
+          description: "The tailer is healthy but has not shipped a log line in 15 minutes. If the server is idle that is expected; if it is serving, the export path to Opik may be broken."
+
   - name: mlx-inference
     interval: 15s
     rules:

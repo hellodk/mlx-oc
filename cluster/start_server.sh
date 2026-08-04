@@ -9,6 +9,7 @@
 #   mlx_metrics_proxy.py       :8080  0.0.0.0 public OpenAI API + /metrics
 #   mlx_hw_telemetry.py        :9102  on BOTH nodes (Prometheus hardware metrics)
 #   mlx_kv_cache_agent.py      :9104  KV-cache / context-length gauges
+#   mlx_server_log_tailer.py   :9106  streams server.log -> Opik (OTLP logs)
 #
 # opencode and other clients talk to the proxy on :8080; the proxy records
 # TTFT, token rate, temperature and hallucination-risk heuristics, and can
@@ -32,11 +33,20 @@ MODEL="mlx-community/Qwen3.5-4B-MLX-8bit"
 LOG="$DIR/logs"
 RANK1="192.168.1.5"
 
+# Opik OTLP ingestion for traces (proxy) + logs (logtailer). On by default so
+# one trace per request lands in the "mlx" project; override to disable.
+OPIK_OTLP="${OPIK_OTLP_ENDPOINT:-http://192.168.1.10:32173/api/v1/private/otel}"
+
+# Primary OTLP gateway (otel-collector): metrics/traces/logs from the proxy and
+# the logtailer. Its logs pipeline writes a durable JSONL file.
+OTLP="${MLX_OTLP_ENDPOINT:-http://192.168.1.64:4318}"
+
 BOOT="$LOG/bootstrap.log"
 PID_SRV="$LOG/supervisor.pid"
 PID_PROXY="$LOG/proxy.pid"
 PID_HW0="$LOG/hw0.pid"
 PID_KV="$LOG/kv.pid"
+PID_LT="$LOG/logtailer.pid"
 
 mkdir -p "$LOG"
 
@@ -50,6 +60,18 @@ alive() { # alive <pidfile>
   [[ -f "$1" ]] && kill -0 "$(cat "$1")" 2>/dev/null
 }
 
+wait_port_free() { # wait_port_free <port> [ttl]
+  local port=$1 ttl=${2:-30} t0=$SECONDS
+  while (( SECONDS - t0 < ttl )); do
+    if ! lsof -nP -iTCP:$port -sTCP:LISTEN >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  warn "port $port still in use after ${ttl}s"
+  return 1
+}
+
 # --- preflight ----------------------------------------------------------------
 preflight() {
   info "preflight: venv=$VENV mlx_venv=$MLX_VENV model=$MODEL rank1=$RANK1"
@@ -60,7 +82,7 @@ preflight() {
     || { fail "$VENV missing prometheus_client"; ok=0; }
   ssh -o ConnectTimeout=5 -o BatchMode=yes "$RANK1" "true" 2>/dev/null \
     || { fail "cannot ssh to $RANK1 (passwordless auth required)"; ok=0; }
-  for p in 8081 8080 9102 9104 9105; do
+  for p in 8081 8080 9102 9104 9105 9106; do
     if lsof -nP -iTCP:$p -sTCP:LISTEN >/dev/null 2>&1; then
       warn "port $p already in use - is the stack already running?"
     fi
@@ -94,11 +116,10 @@ start_server() {
 
 start_proxy() {
   info "starting mlx_metrics_proxy -> logs/proxy.log"
-  local otlp="${MLX_OTLP_ENDPOINT:-http://192.168.1.64:4318}"
   local proxy_args=(--listen 0.0.0.0:8080 --upstream 127.0.0.1:8081
-                    --default-temp 0.0 --node-name rank0 --otlp-endpoint "$otlp")
+                    --default-temp 0.0 --node-name rank0 --otlp-endpoint "$OTLP"
+                    --opik-otlp-endpoint "$OPIK_OTLP")
   if [[ -n "${OPIK_ENDPOINT:-}" ]]; then proxy_args+=(--opik-endpoint "$OPIK_ENDPOINT"); fi
-  if [[ -n "${OPIK_OTLP_ENDPOINT:-}" ]]; then proxy_args+=(--opik-otlp-endpoint "$OPIK_OTLP_ENDPOINT"); fi
   nohup "$VENV/bin/python" "$DIR/mlx_metrics_proxy.py" "${proxy_args[@]}" \
     > "$LOG/proxy.log" 2>&1 &
   echo $! > "$PID_PROXY"
@@ -137,6 +158,20 @@ start_kv() {
   info "kv agent pid $(cat "$PID_KV") -> logs/kvagent.log"
 }
 
+start_logtailer() {
+  info "starting mlx_server_log_tailer -> otel-collector logs -> logs/logtailer.log"
+  wait_port_free 9106 20 || true
+  nohup "$VENV/bin/python" "$DIR/mlx_server_log_tailer.py" \
+    --log-file "$LOG/server.log" \
+    --otlp-endpoint "$OTLP" \
+    --project mlx \
+    --listen 0.0.0.0:9106 \
+    > "$LOG/logtailer.log" 2>&1 &
+  echo $! > "$PID_LT"
+  disown
+  info "logtailer pid $(cat "$PID_LT") -> logs/logtailer.log"
+}
+
 # --- readiness ----------------------------------------------------------------
 wait_ready() {
   local ttl=${1:-180}
@@ -159,12 +194,13 @@ status() {
   local up down name port
   up="$(curl -s -o /dev/null -w '%{http_code}' -m 3 http://127.0.0.1:8081/v1/models 2>/dev/null)"; [[ "$up" == 200 ]] && up=UP || up=DOWN
   echo "  mlx_lm.server   :8081  $up (process: $(pgrep -f mlx_lm.server | wc -l | tr -d ' ') alive)"
-  for pidf in "$PID_SRV" "$PID_PROXY" "$PID_HW0" "$PID_KV"; do
+  for pidf in "$PID_SRV" "$PID_PROXY" "$PID_HW0" "$PID_KV" "$PID_LT"; do
     case "$pidf" in
       *supervisor*) name=supervisor; port=9105 ;;
       *proxy*)      name=proxy;      port=8080 ;;
       *hw0*)        name=hw_rank0;   port=9102 ;;
       *kv*)         name=kv_agent;   port=9104 ;;
+      *logtailer*)  name=logtailer;  port=9106 ;;
     esac
     if alive "$pidf"; then
       local http="$(curl -s -o /dev/null -w '%{http_code}' -m 3 "http://127.0.0.1:$port/metrics" 2>/dev/null)"
@@ -183,7 +219,7 @@ status() {
 # --- stop ----------------------------------------------------------------------
 stop() {
   info "stopping stack (local + $RANK1)"
-  for pidf in "$PID_SRV" "$PID_PROXY" "$PID_HW0" "$PID_KV"; do
+  for pidf in "$PID_SRV" "$PID_PROXY" "$PID_HW0" "$PID_KV" "$PID_LT"; do
     alive "$pidf" && kill "$(cat "$pidf")" 2>/dev/null && info "killed $(basename "$pidf") pid $(cat "$pidf")"
   done
   # Belt-and-braces for stragglers (supervisor term propagates to mlx.launch,
@@ -192,10 +228,11 @@ stop() {
   pkill -f "mlx_kv_cache_agent.py" 2>/dev/null
   pkill -f "mlx_hw_telemetry.py" 2>/dev/null
   pkill -f "mlx_server_supervisor.py" 2>/dev/null
+  pkill -f "mlx_server_log_tailer.py" 2>/dev/null
   pkill -f "mlx_lm.server" 2>/dev/null
   pkill -f "mlx.launch" 2>/dev/null
   ssh -o ConnectTimeout=5 "$RANK1" "pkill -f 'mlx_hw_telemetry.py'; pkill -f 'mlx_lm.server'; pkill -f 'mlx.launch'" 2>/dev/null
-  for pidf in "$PID_SRV" "$PID_PROXY" "$PID_HW0" "$PID_KV"; do rm -f "$pidf"; done
+  for pidf in "$PID_SRV" "$PID_PROXY" "$PID_HW0" "$PID_KV" "$PID_LT"; do rm -f "$pidf"; done
   info "stopped"
 }
 
@@ -204,10 +241,15 @@ ACTION="${1:-start}"
 case "$ACTION" in
   start)
     preflight || exit 1
+    # After a stop, the old supervisor/server can take a few seconds to release
+    # :9105/:8081; spawning the new supervisor first would die on EADDRINUSE.
+    wait_port_free 9105 30 || true
+    wait_port_free 8081 30 || true
     start_server
     start_proxy
     start_hw
     start_kv
+    start_logtailer
     wait_ready || exit 1
     sleep 3
     status
@@ -217,10 +259,10 @@ case "$ACTION" in
     info "serving: curl -s http://127.0.0.1:9105/metrics | grep mlx_server"
     ;;
   stop) stop ;;
-  restart) stop; sleep 2; preflight || exit 1; start_server; start_proxy; start_hw; start_kv; wait_ready || exit 1; status ;;
+  restart) stop; sleep 2; preflight || exit 1; wait_port_free 9105 30 || true; wait_port_free 8081 30 || true; start_server; start_proxy; start_hw; start_kv; start_logtailer; wait_ready || exit 1; status ;;
   status) status ;;
   logs)
-    for f in "$LOG"/supervisor.log "$LOG"/server.log "$LOG"/proxy.log "$LOG"/hw0.log "$LOG"/kvagent.log; do
+    for f in "$LOG"/supervisor.log "$LOG"/server.log "$LOG"/proxy.log "$LOG"/hw0.log "$LOG"/kvagent.log "$LOG"/logtailer.log; do
       [[ -f "$f" ]] || continue
       echo "--- $f ---"
       tail -40 "$f"

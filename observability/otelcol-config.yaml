@@ -1,7 +1,10 @@
 # OpenTelemetry Collector config for the temporary podman observability stack.
 # Receives OTLP from the MLX proxy / hw agents and:
 #   - metrics -> VictoriaMetrics via Prometheus remote write
-#   - traces / logs -> debug (stdout), so they are visible in `podman logs`
+#   - logs    -> JSONL file (durable, mounted from compose) + debug (stdout)
+#   - traces  -> debug (stdout); per-request LLM traces also go to Opik directly
+#                from the proxy (OPIK_OTLP_ENDPOINT), Opik has no OTLP logs
+#                ingestion so logs stop here.
 receivers:
   otlp:
     protocols:
@@ -12,6 +15,8 @@ receivers:
 
 processors:
   batch:
+    send_batch_size: 128
+    timeout: 5s
 
 exporters:
   prometheus_remote_write:
@@ -22,6 +27,11 @@ exporters:
     verbosity: basic
     sampling_initial: 2
     sampling_thereafter: 0
+  file:
+    path: /var/log/otelcol/mlx-server-logs.jsonl
+    rotation:
+      max_megabytes: 50
+      max_backups: 5
 
 service:
   pipelines:
@@ -36,4 +46,4 @@ service:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug]
+      exporters: [file, debug]

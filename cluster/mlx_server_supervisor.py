@@ -123,7 +123,17 @@ class Supervisor:
         self.child_started = time.monotonic()
         self.state = 2  # starting
         G_STATE.set(2)
-        return subprocess.Popen(cmd, cwd=self.args.cwd)
+        # The server inherits our stdout/stderr otherwise, which buries its
+        # logs in supervisor.log. Redirect it into server.log (the file the
+        # KV-cache agent, log tailer and crash-sniffer all consume).
+        server_log = open(self.args.server_log, "ab")
+        return subprocess.Popen(
+            cmd,
+            cwd=self.args.cwd,
+            stdin=subprocess.DEVNULL,
+            stdout=server_log,
+            stderr=subprocess.STDOUT,
+        )
 
     def run(self):
         G_STATE.set(0)

@@ -22,17 +22,22 @@ services:
 
   # Optional: OTLP gateway so the MLX proxy / hw agents can push
   # traces, metrics and logs (--otlp-endpoint http://192.168.1.64:4318).
-  # Metrics are remote-written into VictoriaMetrics; traces/logs go to stdout.
+  # Metrics are remote-written into VictoriaMetrics; logs are appended to a
+  # JSONL file in the mlx-logs volume; traces go to stdout.
   otel-collector:
     image: docker.io/otel/opentelemetry-collector-contrib:latest
     container_name: otel-collector
     restart: unless-stopped
+    # The file-exporter volume is root-owned inside the podman VM; run as root
+    # so the logs pipeline can append its JSONL file (ephemeral stack).
+    user: "0"
     ports:
       - "4317:4317"        # OTLP gRPC
       - "4318:4318"        # OTLP HTTP
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./otelcol-config.yaml:/etc/otelcol/config.yaml:ro
+      - mlx-logs:/var/log/otelcol
 
   grafana:
     image: docker.io/grafana/grafana:latest
@@ -85,3 +90,4 @@ services:
 volumes:
   vm-data:
   grafana-data:
+  mlx-logs:
