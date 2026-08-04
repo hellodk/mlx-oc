@@ -1,0 +1,8 @@
+{
+  "mode": "independent-replicas",
+  "note": "SGLang has no ring/tensor-parallel backend for Apple Silicon (no NCCL/CUDA). These are two independently load-balanced replicas, not one distributed model like cluster/hosts.json's MLX ring backend.",
+  "nodes": [
+    {"name": "rank0", "ssh": "127.0.0.1", "lan_ip": "192.168.1.64", "port": 30000},
+    {"name": "rank1", "ssh": "192.168.1.5", "lan_ip": "192.168.1.5", "port": 30000}
+  ]
+}

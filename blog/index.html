@@ -39,6 +39,7 @@
   .n12{background:linear-gradient(135deg,#b45309,#f59e0b)}
   .n13{background:linear-gradient(135deg,#334155,#e11d48)}
   .n14{background:linear-gradient(135deg,#4f46e5,#db2777)}
+  .n15{background:linear-gradient(135deg,#ea580c,#0f766e)}
   .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
   .post p{margin:0;color:var(--muted);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
@@ -50,7 +51,7 @@
   <div class="wrap">
     <span class="kicker">MLX Observability &middot; Field Notes</span>
     <h1>Making Two Mac minis<br>Actually Observable</h1>
-    <p class="sub">Fourteen deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 28 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, a performance dashboard that finally shows the KV cache and context window, a head-to-head with hydra&rsquo;s push-first fleet stack, how a real GPU crash exposed the missing process-level truth &mdash; now fixed with a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that stress the cluster like an agent &mdash; and the streamed server runtime log that finally carries an incident&rsquo;s server-side context into Opik. The final three posts take the crash story to its end: a per-reason fault ledger in Grafana, the forensics that found the fault lives on the remote rank, and the consolidated decision ledger we now choose from.</p>
+    <p class="sub">Fifteen deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 28 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, a performance dashboard that finally shows the KV cache and context window, a head-to-head with hydra&rsquo;s push-first fleet stack, how a real GPU crash exposed the missing process-level truth &mdash; now fixed with a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that stress the cluster like an agent &mdash; the streamed server runtime log that finally carries an incident&rsquo;s server-side context into Opik, a per-reason fault ledger in Grafana, the forensics that found the fault lives on the remote rank, and the consolidated decision ledger we now choose from &mdash; and an experimental SGLang scaffold with an unverified Apple Silicon backend.</p>
     <div class="meta">
       <span><b>Stack</b> VictoriaMetrics + vmalert + Alertmanager + Grafana</span>
       <span><b>Agents</b> mlx_metrics_proxy :8080 &middot; mlx_hw_telemetry :9102 &middot; mlx_kv_cache_agent :9104</span>
@@ -169,6 +170,14 @@
       <h2>The Decision Ledger: Tuning, metal_gpu_error, and Every Recommendation in One Place</h2>
       <p>The cluster&rsquo;s knowledge consolidated into the three artifacts we now choose from: a tuning guide for edge scenarios (streaming, tools, concurrency, long transcripts &mdash; across model, proxy and client), a prevent/respond/recover plan for metal_gpu_error, and the complete recommendation ledger &mdash; 21 items with priority, effort, dependency and a live status column. Decision 08-05: the ring stays &mdash; no single-node serving &mdash; so the plan is supervisor recovery hardening + the containment P0s + load shaping. The rest of the ledger is still a menu.</p>
       <span class="tag">tuning</span><span class="tag">metal_gpu_error plan</span><span class="tag">recommendation ledger</span><span class="tag">decision</span><span class="tag">ring retained</span>
+    </div>
+  </a>
+  <a class="post" href="15-sglang-on-two-mac-minis.html">
+    <div class="num n15">15</div>
+    <div>
+      <h2>SGLang on Two Mac Minis: A Scaffold, Not a Benchmark</h2>
+      <p>A third engine joins the MLX-vs-vllm-metal comparison &mdash; two independent replicas (no ring, no NCCL), native <code>sglang:*</code> Prometheus metrics already scraped, and an unverified Apple Silicon device backend stated plainly instead of glossed over.</p>
+      <span class="tag">SGLang</span><span class="tag">experimental</span><span class="tag">unverified backend</span><span class="tag">independent replicas</span>
     </div>
   </a>
 </main>

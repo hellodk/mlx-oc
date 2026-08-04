@@ -8,3 +8,5 @@ tools/bench-reports/
 observability/data/
 observability/vm-scrape.yml
 .DS_Store
+graphify-out/
+sglang/logs/*.log

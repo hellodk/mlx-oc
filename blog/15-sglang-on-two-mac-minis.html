@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>9 — SGLang on Two Mac Minis: A Scaffold, Not a Benchmark</title>
+<meta name="description" content="SGLang joins the MLX vs vllm-metal comparison on two Mac Minis as an experimental scaffold — two independent replicas, native Prometheus metrics, and an unverified Apple Silicon device backend stated plainly, not glossed over.">
+<meta name="keywords" content="SGLang, MLX, vllm-metal, Apple Silicon, Mac Mini, LLM inference, Prometheus metrics, observability, CUDA, Metal backend, inference benchmarking">
+<meta name="author" content="hellodk">
+<meta property="article:published_time" content="2026-08-04T00:00:00+05:30">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SGLang on Two Mac Minis: A Scaffold, Not a Benchmark">
+<meta property="og:description" content="Two independent SGLang replicas, native sglang:* Prometheus metrics wired into VictoriaMetrics, and an unverified Apple Silicon device backend — documented honestly before any real benchmark run.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="SGLang on Two Mac Minis: A Scaffold, Not a Benchmark">
+<meta name="twitter:description" content="A third engine joins the MLX vs vllm-metal comparison. SGLang's primary backend is CUDA — nobody has confirmed it runs on these Mac Minis' GPUs at all.">
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#ea580c;--accent-soft:#ffedd5;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--red:#b91c1c;--red-soft:#fee2e2;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(234,88,12,.13), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(15,118,110,.09), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #fed7aa;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  .figure{text-align:center;margin:24px 0}
+  .figure svg{max-width:100%;height:auto}
+  .figcap{font-size:13px;color:var(--muted);margin-top:10px;text-align:left}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+  .stat{text-align:center;padding:20px 14px}
+  .stat .big{font-size:28px;font-weight:800;letter-spacing:-.02em;color:var(--accent)}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  .pill{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;margin-right:6px}
+  .pill.ok{background:var(--teal-soft);color:var(--teal)}
+  .pill.warn{background:var(--amber-soft);color:var(--amber)}
+  .pill.info{background:#eef0ff;color:#4f46e5}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  blockquote{margin:16px 0;padding:12px 18px;border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 10px 10px 0;color:#7c2d12}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.danger{background:var(--red-soft);border:1px solid #fecaca}
+  .callout .ic{font-weight:800;line-height:1.4}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+  <a href="5-opik-llm-tracing.html">Opik</a>
+  <a href="6-opik-feedback-loop.html">Feedback</a>
+  <a href="7-mlx-inference-performance.html">Performance</a>
+  <a href="8-hydra-vs-mlx-oc.html">Hydra vs mlx-oc</a>
+  <a href="9-model-serving-resilience.html">Serving health</a>
+  <a href="10-opik-log-streaming.html">Server logs</a>
+  <a href="11-agentic-edge-cases.html">Edge cases</a>
+  <a href="12-fault-error-restart-analysis.html">Fault ledger</a>
+  <a href="13-agentic-forensics.html">Agentic forensics</a>
+  <a href="14-recommendations-decision.html">Decision ledger</a>
+  <a href="../vllm-metal/index.html">vllm-metal plan</a>
+  <a href="15-sglang-on-two-mac-minis.html" style="color:var(--accent);font-weight:700">SGLang</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">15 of 15 &middot; Experimental scaffold</span>
+    <h1>SGLang on Two Mac Minis:<br>A Scaffold, Not a Benchmark</h1>
+    <p class="sub">A third engine joins the MLX-vs-vllm-metal comparison in <code>sglang/</code> &mdash; but SGLang's primary backend is CUDA, and nobody has confirmed it runs on Apple Silicon GPUs at all. Here is the independent-replica architecture, the native <code>sglang:*</code> metrics already wired into VictoriaMetrics, and the unverified device backend that has to be resolved before any of this produces a real number.</p>
+    <div class="meta">
+      <span><b>Status</b> Experimental scaffold &mdash; device backend unverified</span>
+      <span><b>Shape</b> 2 independent replicas &middot; no ring/TP</span>
+      <span><b>Port</b> :30000 &middot; /health &middot; /metrics</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section>
+    <h2><span class="num">1</span>Why SGLang, and why now</h2>
+    <p>The MLX ring backend in <code>cluster/</code> has been running and instrumented since blog post 1. <code>vllm-metal/index.html</code> documents a draft plan for a second engine &mdash; an OpenAI-compatible MLX serving layer, load-balanced across the same two nodes. <code>sglang/</code> is the scaffolding for a <strong>third</strong> engine: the goal is a real, measured three-way comparison of MLX vs vllm-metal vs SGLang on the same two Mac Minis (<code>192.168.1.64</code>/<code>10.0.0.1</code> rank0, <code>192.168.1.5</code>/<code>10.0.0.2</code> rank1).</p>
+
+    <div class="grid2">
+      <div class="card stat">
+        <div class="big">3</div>
+        <div class="lbl">Engines in the planned comparison</div>
+      </div>
+      <div class="card stat">
+        <div class="big">0</div>
+        <div class="lbl">Inference requests run against SGLang so far</div>
+      </div>
+    </div>
+
+    <p>This work takes inspiration from <code>hydra</code>, a much larger, mostly design-stage 28&ndash;40 node enterprise LLM fleet project. Hydra already built SGLang-aware Grafana dashboards and Prometheus alert rules (<code>sglang-inference.json</code>, <code>sglang-inference.yaml</code>) <em>before</em> ever running a real SGLang node. So the question this post exists to ask plainly &mdash; does SGLang even run acceptably on this hardware &mdash; is not a solved problem on either side of that comparison.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">2</span>Architecture reality: two independent replicas, not a ring</h2>
+    <p>MLX's <code>cluster/</code> setup distributes <strong>one logical model</strong> across both nodes using <code>mlx.launch --backend ring</code> &mdash; MLX's own NCCL-free ring collectives. SGLang has no equivalent ring or tensor-parallel backend for Apple Silicon: its distributed code paths assume NCCL and CUDA GPUs, neither of which exists here. So <code>sglang/start_server.sh</code> launches two <strong>fully independent</strong> SGLang server processes, one per Mac Mini, each serving its own complete copy of the model on its own <code>:30000</code> endpoint.</p>
+
+    <div class="figure">
+      <svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Architecture diagram: clients route through a documented nginx load balancer to two independent SGLang replicas on rank0 and rank1, with no ring or tensor-parallel link between them">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#5b6072"/>
+          </marker>
+        </defs>
+
+        <text x="380" y="26" font-size="13" font-weight="800" text-anchor="middle" fill="#1d1f2b">SGLang On Two Mac Minis &mdash; Independent Replicas, Not A Ring</text>
+
+        <!-- Clients -->
+        <rect x="280" y="50" width="200" height="40" rx="10" fill="#eef0ff" stroke="#c7d2fe" stroke-width="1.5"/>
+        <text x="380" y="68" font-size="12" font-weight="700" text-anchor="middle" fill="#1d1f2b">Clients</text>
+        <text x="380" y="83" font-size="10" text-anchor="middle" fill="#5b6072">OpenAI-Compatible Requests</text>
+
+        <line x1="380" y1="90" x2="380" y2="118" stroke="#5b6072" stroke-width="1.5" marker-end="url(#ah)"/>
+
+        <!-- Load balancer (dashed = documented, not scripted here) -->
+        <rect x="260" y="118" width="240" height="50" rx="10" fill="#fef3d7" stroke="#b45309" stroke-width="1.5" stroke-dasharray="6 4"/>
+        <text x="380" y="138" font-size="12" font-weight="700" text-anchor="middle" fill="#1d1f2b">nginx Load Balancer</text>
+        <text x="380" y="153" font-size="9" text-anchor="middle" fill="#5b6072">Round-Robin &middot; Documented, Not Scripted</text>
+
+        <path d="M380,168 L380,192 L185,192 L185,210" fill="none" stroke="#5b6072" stroke-width="1.5" marker-end="url(#ah)"/>
+        <path d="M380,168 L380,192 L575,192 L575,210" fill="none" stroke="#5b6072" stroke-width="1.5" marker-end="url(#ah)"/>
+
+        <!-- Node 1 -->
+        <rect x="40" y="210" width="290" height="180" rx="12" fill="#e6f6f4" stroke="#0f766e" stroke-width="1.5"/>
+        <text x="185" y="232" font-size="12" font-weight="800" text-anchor="middle" fill="#0f766e">rank0 &middot; 192.168.1.64</text>
+
+        <rect x="52" y="248" width="266" height="58" rx="8" fill="#ffffff" stroke="#c7e9e4" stroke-width="1"/>
+        <text x="185" y="266" font-size="11" font-weight="700" text-anchor="middle" fill="#1d1f2b">SGLang :30000</text>
+        <text x="185" y="280" font-size="9.5" font-weight="700" text-anchor="middle" fill="#ea580c">Device Backend: UNVERIFIED</text>
+        <text x="185" y="293" font-size="9" text-anchor="middle" fill="#5b6072">/health &middot; /metrics &middot; sglang:* metrics</text>
+        <circle cx="302" cy="256" r="5" fill="#ea580c">
+          <animate attributeName="opacity" values="1;.35;1" dur="2s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="302" cy="256" r="5" fill="none" stroke="#ea580c" stroke-width="1.5">
+          <animate attributeName="r" values="5;13;5" dur="2s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values=".8;0;.8" dur="2s" repeatCount="indefinite"/>
+        </circle>
+
+        <rect x="52" y="314" width="266" height="50" rx="8" fill="#ffffff" stroke="#c7e9e4" stroke-width="1"/>
+        <text x="185" y="332" font-size="10" font-weight="700" text-anchor="middle" fill="#1d1f2b">mlx_hw_telemetry :9102</text>
+        <text x="185" y="346" font-size="9" text-anchor="middle" fill="#5b6072">Reused As-Is &middot; Engine-Agnostic</text>
+
+        <text x="185" y="378" font-size="8.5" text-anchor="middle" fill="#5b6072">curl 127.0.0.1:30000/health</text>
+
+        <!-- Node 2 -->
+        <rect x="430" y="210" width="290" height="180" rx="12" fill="#fde8f1" stroke="#db2777" stroke-width="1.5"/>
+        <text x="575" y="232" font-size="12" font-weight="800" text-anchor="middle" fill="#db2777">rank1 &middot; 192.168.1.5</text>
+
+        <rect x="442" y="248" width="266" height="58" rx="8" fill="#ffffff" stroke="#fad1e1" stroke-width="1"/>
+        <text x="575" y="266" font-size="11" font-weight="700" text-anchor="middle" fill="#1d1f2b">SGLang :30000</text>
+        <text x="575" y="280" font-size="9.5" font-weight="700" text-anchor="middle" fill="#ea580c">Device Backend: UNVERIFIED</text>
+        <text x="575" y="293" font-size="9" text-anchor="middle" fill="#5b6072">/health &middot; /metrics &middot; sglang:* metrics</text>
+        <circle cx="698" cy="256" r="5" fill="#ea580c">
+          <animate attributeName="opacity" values="1;.35;1" dur="2s" begin="1s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="698" cy="256" r="5" fill="none" stroke="#ea580c" stroke-width="1.5">
+          <animate attributeName="r" values="5;13;5" dur="2s" begin="1s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values=".8;0;.8" dur="2s" begin="1s" repeatCount="indefinite"/>
+        </circle>
+
+        <rect x="442" y="314" width="266" height="50" rx="8" fill="#ffffff" stroke="#fad1e1" stroke-width="1"/>
+        <text x="575" y="332" font-size="10" font-weight="700" text-anchor="middle" fill="#1d1f2b">mlx_hw_telemetry :9102</text>
+        <text x="575" y="346" font-size="9" text-anchor="middle" fill="#5b6072">Reused As-Is &middot; Engine-Agnostic</text>
+
+        <text x="575" y="378" font-size="8.5" text-anchor="middle" fill="#5b6072">curl 192.168.1.5:30000/health</text>
+
+        <!-- No-ring indicator, centered in the gap between the two nodes -->
+        <text x="380" y="232" font-size="10" font-weight="800" text-anchor="middle" fill="#dc2626">NO RING</text>
+        <circle cx="380" cy="277" r="15" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+        <text x="380" y="282" font-size="14" font-weight="800" text-anchor="middle" fill="#dc2626">&#10005;</text>
+        <text x="380" y="310" font-size="9" font-weight="800" text-anchor="middle" fill="#dc2626">NO NCCL/TP</text>
+        <text x="380" y="332" font-size="9" font-weight="700" text-anchor="middle" fill="#5b6072">2 INDEPENDENT</text>
+        <text x="380" y="346" font-size="9" font-weight="700" text-anchor="middle" fill="#5b6072">REPLICAS</text>
+
+        <!-- Flow dots matching the visible arrow paths exactly -->
+        <circle r="4" fill="#ea580c" opacity=".8">
+          <animateMotion dur="2s" repeatCount="indefinite" path="M380,90 L380,118"/>
+        </circle>
+        <circle r="4" fill="#0f766e" opacity=".8">
+          <animateMotion dur="2.5s" repeatCount="indefinite" path="M380,168 L380,192 L185,192 L185,210"/>
+        </circle>
+        <circle r="4" fill="#db2777" opacity=".8">
+          <animateMotion dur="2.5s" begin="1.25s" repeatCount="indefinite" path="M380,168 L380,192 L575,192 L575,210"/>
+        </circle>
+      </svg>
+      <div class="figcap">Two fully independent SGLang server processes, one per Mac Mini, each behind its own <code>:30000</code> endpoint &mdash; the same independent-replica shape as vllm-metal, not the ring-backend shape MLX uses in <code>cluster/</code>. The orange pulsing dot marks the one thing this diagram cannot vouch for: whether the device backend behind that endpoint is actually the GPU.</div>
+    </div>
+
+    <table>
+      <tr><th>Engine</th><th>Distribution model</th><th>What runs where</th></tr>
+      <tr><td>MLX (<code>cluster/</code>)</td><td>Ring backend (<code>mlx.launch --backend ring</code>)</td><td>One logical model, sharded across both nodes</td></tr>
+      <tr><td>vllm-metal (<code>vllm-metal/</code>)</td><td>Independent replicas, nginx round-robin</td><td>Two full model copies, load-balanced</td></tr>
+      <tr><td>SGLang (<code>sglang/</code>)</td><td>Independent replicas, nginx round-robin (reused pattern)</td><td>Two full model copies, load-balanced &mdash; no ring/TP option on Apple Silicon</td></tr>
+    </table>
+
+    <p>Load balancing across the two SGLang replicas is <strong>documented, not scripted</strong> in this repo: <code>sglang/start_server.sh</code> deliberately does not duplicate an nginx config, and instead points at <code>vllm-metal/index.html</code> section 5 ("Load balancing and routing"), which already covers exactly this two-node-independent-replica shape.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">3</span>The unverified device backend &mdash; stated plainly</h2>
+
+    <div class="callout danger">
+      <span class="ic">&#9888; Read this before running anything</span>
+      <span>SGLang's primary backend is <strong>CUDA</strong> &mdash; NVIDIA GPUs via FlashInfer/Triton kernels. There is <strong>no confirmed, mainstream Metal/MLX backend for SGLang</strong> analogous to vLLM's MLX fork (<code>vllm-metal</code>, already documented in this repo). Nothing in <code>sglang/</code> claims SGLang runs on Apple Silicon GPUs &mdash; let alone runs well. <code>sglang/start_server.sh</code> leaves <code>SGLANG_DEVICE</code> unset on purpose: the correct value here, if one even exists, is <strong>unverified</strong>. Running the script as-is lets SGLang auto-detect a device, which will most likely fall back to CPU &mdash; and a CPU fallback would almost certainly be too slow to be a meaningful comparison point against MLX or vllm-metal, both of which run on the GPU. Confirm device support against SGLang's own documentation and <code>--help</code> output before this scaffold is useful for anything beyond exercising the launch/log/health-check plumbing.</span>
+    </div>
+
+    <p>This is why <code>sglang/hosts.json</code> and <code>start_server.sh</code> are written the way they are: they wire up the parts that don't depend on the answer &mdash; two independent processes, log paths, health/metrics polling &mdash; and refuse to guess at the part that does. <code>SGLANG_MODEL</code> also has no default; the MLX-quantized model id used by <code>cluster/</code> (<code>mlx-community/Qwen3-1.7B-4bit</code>) is not loadable by SGLang, so a real HuggingFace checkpoint has to be chosen explicitly once the device question is answered.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">4</span>Plugging into the existing observability stack</h2>
+
+    <p>MLX's <code>mlx_lm.server</code> ships with zero metrics, which is why <code>cluster/mlx_metrics_proxy.py</code> exists as a sidecar. SGLang needs no such thing: like vllm-metal, it emits <strong>native Prometheus metrics</strong> directly on <code>:30000/metrics</code>, under the <code>sglang:*</code> namespace &mdash; for example <code>sglang:time_to_first_token_seconds_bucket</code>, <code>sglang:num_running_reqs</code>, <code>sglang:num_waiting_reqs</code>, <code>sglang:token_usage</code>, <code>sglang:cache_hit_rate</code>, and <code>sglang:gen_throughput</code>. Health lives at <code>:30000/health</code>.</p>
+
+    <p>Hardware telemetry needs no new code either. <code>cluster/mlx_hw_telemetry.py</code> is engine-agnostic &mdash; it reads Apple Silicon CPU, RAM, GPU and power data via <code>ioreg</code>, <code>powermetrics</code>, and <code>pmset</code>, with nothing MLX-specific in it &mdash; and it is already running on both nodes at <code>:9102</code> via <code>cluster/start_server.sh</code>. It is reused as-is.</p>
+
+    <table>
+      <tr><th>Port</th><th>Service</th><th>Node(s)</th><th>Notes</th></tr>
+      <tr><td><code>:30000</code></td><td>SGLang server (API + /health + /metrics)</td><td>Both, independent</td><td>Native Prometheus metrics under <code>sglang:*</code></td></tr>
+      <tr><td><code>:9102</code></td><td><code>mlx_hw_telemetry.py</code></td><td>Both</td><td>Reused as-is, engine-agnostic, no changes needed</td></tr>
+      <tr><td><code>:8080</code></td><td><code>mlx_metrics_proxy.py</code></td><td>rank0 only</td><td>MLX-only sidecar &mdash; SGLang needs no equivalent</td></tr>
+      <tr><td><code>:8000</code></td><td>vllm-metal API</td><td>Both, independent</td><td>Also native metrics, no proxy</td></tr>
+    </table>
+
+    <div class="card">
+      <h3>Scrape job (already added to <code>observability/vm-scrape.tmpl.yml</code>)</h3>
+      <pre><code># Experimental / unverified: two independent sglang replicas (no ring/TP
+# backend on Apple Silicon). Native sglang:* Prometheus metrics, no proxy
+# sidecar needed. See sglang/ and README.md "SGLang (experimental)".
+- job_name: sglang
+  scrape_interval: 15s
+  metrics_path: /metrics
+  static_configs:
+    - targets:
+        - "__MLX_IP__:30000"
+      labels:
+        service: sglang
+        node: rank0
+        provider: "sglang"
+    - targets:
+        - "__RANK1_IP__:30000"
+      labels:
+        service: sglang
+        node: rank1
+        provider: "sglang"</code></pre>
+      <p>The <code>provider: "sglang"</code> label is deliberate: it is the same key MLX and vllm-metal would carry if a cross-engine normalization layer (recording rules folding <code>mlx_*</code>/<code>vllm:*</code>/<code>sglang:*</code> into one <code>mlxoc:llm:*</code> namespace) is added later, following the pattern <code>suggestions.md</code> describes from Hydra.</p>
+    </div>
+
+    <div class="callout ok"><span class="ic">One real thing this section is not claiming</span><span>The scrape job is wired in and will happily return "no data" or connection-refused metrics for <code>up{job="sglang"}</code> until an actual SGLang process is listening on <code>:30000</code>. Wiring the pipe is not the same as confirming what flows through it.</span></div>
+  </section>
+
+  <section>
+    <h2><span class="num">5</span>Status: experimental scaffold</h2>
+
+    <div class="grid2">
+      <div class="card">
+        <h3>Done</h3>
+        <ul>
+          <li><code>sglang/hosts.json</code> &mdash; describes the two-node independent-replica shape (not a ring hostfile like <code>cluster/hosts.json</code>)</li>
+          <li><code>sglang/start_server.sh</code> / <code>stop_server.sh</code> &mdash; launch/log/health-check plumbing for two independent processes, one local, one over ssh</li>
+          <li><code>observability/vm-scrape.tmpl.yml</code> &mdash; <code>sglang</code> scrape job added, labeled <code>provider: "sglang"</code></li>
+          <li>README <code>## SGLang (experimental)</code> section documenting all of the above</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Not done</h3>
+        <ul>
+          <li>No SGLang process has been started on either Mac Mini</li>
+          <li>No real inference request has been sent to <code>:30000</code></li>
+          <li>No benchmark numbers exist &mdash; none of the vllm-metal-style "~30 tok/s" figures apply here; this post has zero of its own</li>
+          <li>Device backend (CPU vs any GPU path) is unconfirmed</li>
+          <li><code>SGLANG_MODEL</code> is unset (<code>REPLACE_ME_HF_MODEL_ID</code> placeholder)</li>
+          <li>nginx load balancer for the two replicas is not scripted, only documented by reference</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Next steps, in order</h3>
+    <ol>
+      <li>Confirm SGLang's actual device support for Apple Silicon against SGLang's own docs and <code>python3 -m sglang.launch_server --help</code> &mdash; does a Metal/MPS path exist at all, or is CPU-only the honest answer?</li>
+      <li>If a real GPU path exists: set <code>SGLANG_DEVICE</code> explicitly and pick a real <code>SGLANG_MODEL</code> (a standard HuggingFace checkpoint &mdash; not an MLX-quantized artifact).</li>
+      <li>If it's CPU-only: decide whether a CPU number is even worth recording next to MLX's and vllm-metal's GPU numbers, or whether SGLang gets marked "not comparable on this hardware" instead of forcing a misleading side-by-side.</li>
+      <li>Once genuinely live, run the same measurement methodology already used for the MLX ring &mdash; the <code>tools/bench.py</code> streaming TTFT / token-rate / concurrency approach documented in the README's Benchmarks section and blog post 7 &mdash; so all three engines are measured the same way, not three different ways.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="num">6</span>Further reading</h2>
+    <p>The full comparison against Hydra &mdash; including a diagnosed vLLM-MLX bug Hydra hit on this exact same rank1 IP (<code>192.168.1.5</code>), and the case for treating mlx-oc as the better base for real 2-node benchmarking &mdash; lives in <a href="../suggestions.md"><code>suggestions.md</code></a> at the repo root. Hydra's own SGLang dashboards and alert rules (<code>sglang-inference.json</code>, <code>sglang-inference.yaml</code>) were built ahead of any live SGLang node too, so the uncertainty documented here isn't a solved problem on either side of the fence.</p>
+  </section>
+
+</main>
+
+<footer class="wrap">
+  mlx-oc &middot; a two-Mac-mini distributed MLX inference cluster with full observability &middot; <code>sglang/</code> is an experimental scaffold, not a completed deployment &middot; <a href="../README.md">repo README</a> &middot; <a href="../suggestions.md">suggestions.md</a>
+</footer>
+</body>
+</html>

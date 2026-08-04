@@ -29,6 +29,7 @@ mlx_hw_telemetry.py :9102  per-node CPU / RAM / disk / GPU / power (both nodes)
 | `cluster/mlx_hw_telemetry.py` | both nodes | 0.0.0.0:9102 | hardware telemetry (load, memory pressure, disk, worker CPU/RSS, CPU temp, GPU util/power, package power, thermal pressure) |
 | `cluster/start_server.sh` / `stop_server.sh` | rank 0 | – | launch / tear down the whole stack |
 | `observability/compose.yaml` | podman (rank 0) | 8428 / 4317 / 4318 / 3000 / 8880 / 9093 | VictoriaMetrics + otel-collector + Grafana + vmalert + Alertmanager |
+| `sglang/start_server.sh` / `stop_server.sh` **(experimental, unverified device backend)** | both nodes, independent replicas | 0.0.0.0:30000 | scaffolding to launch two standalone SGLang servers (no ring/TP); Apple Silicon GPU support is unconfirmed |
 
 Model: `mlx-community/Qwen3-1.7B-4bit` (change `MODEL` in `start_server.sh`).
 
@@ -75,6 +76,44 @@ Run them yourself:
 
 .venv/bin/python tools/bench.py --concurrency 4 --max-tokens 256 \
   --iters 5 --label "4-way burst"
+```
+
+## SGLang (experimental)
+
+`sglang/` is scaffolding for a third engine in a planned three-way benchmark
+(MLX ring vs. `vllm-metal` vs. SGLang) on the same two Mac minis. Nothing in
+this folder has been run — it is orchestration/observability wiring only.
+
+**Unverified device backend, stated plainly:** SGLang's primary backend is
+CUDA (FlashInfer/Triton kernels on NVIDIA GPUs). There is no confirmed,
+mainstream Metal/MLX backend for SGLang comparable to `vllm-metal`'s MLX
+fork. `sglang/start_server.sh` leaves `SGLANG_DEVICE` unset by default and
+warns loudly — confirm against SGLang's own docs before assuming Apple
+Silicon GPU support works, or works well, at all.
+
+**Architecture — independent replicas, not one distributed model:** unlike
+`cluster/`'s MLX ring backend (`mlx.launch --backend ring`, one logical model
+split across both nodes), SGLang has no ring/tensor-parallel backend for
+Apple Silicon (no NCCL/CUDA available). So each node runs its own complete,
+independent SGLang replica on `:30000`. Load balancing across the two
+replicas (nginx round-robin) is documented, not scripted — reuse the pattern
+already written up in `vllm-metal/index.html` (section 5, "Load balancing
+and routing") instead of duplicating an nginx config here.
+
+**No metrics proxy needed:** unlike `mlx_lm.server` (which needed
+`cluster/mlx_metrics_proxy.py` as a sidecar because it has no metrics of its
+own), SGLang emits native Prometheus metrics on its own `/metrics` under the
+`sglang:*` namespace (e.g. `sglang:time_to_first_token_seconds_bucket`,
+`sglang:num_running_reqs`, `sglang:num_waiting_reqs`, `sglang:token_usage`,
+`sglang:cache_hit_rate`, `sglang:gen_throughput`). Hardware telemetry is
+reused as-is from `cluster/mlx_hw_telemetry.py` (already running on both
+nodes at `:9102` — it's engine-agnostic).
+
+```bash
+SGLANG_MODEL=<hf-model-id> ./sglang/start_server.sh   # launches both replicas
+curl -s http://127.0.0.1:30000/health
+curl -s http://127.0.0.1:30000/metrics | head
+./sglang/stop_server.sh
 ```
 
 ## Metrics (Prometheus)
@@ -383,4 +422,8 @@ observability/grafana/dashboards/   four provisioned dashboards (incl. mlx-perfo
 observability/vmalert/rules.yml 28 alert rules (hardware / inference / quality / stack down)
 observability/alertmanager/alertmanager.yml   receivers + inhibit_rules
 observability/grafana/          auto-provisioned datasource + 3 dashboards (MLX Cluster / MLX Node / MLX GPU & Power)
+sglang/start_server.sh          launch two independent sglang replicas (experimental, unverified device backend)
+sglang/stop_server.sh           stop the above
+sglang/hosts.json               independent-replica node config (rank0 + rank1) — NOT a ring hostfile
+sglang/logs/                    runtime logs (sglang0.log, sglang1.log)
 ```
