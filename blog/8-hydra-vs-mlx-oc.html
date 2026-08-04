@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>8 — Hydra vs mlx-oc: Two Monitoring Architectures, One Metric Contract</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#0e7490;--accent-soft:#e0f2fe;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--red:#b91c1c;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(14,116,144,.13), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(79,70,229,.09), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #bae6fd;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  .figure{text-align:center;margin:24px 0}
+  .figure svg{max-width:100%;height:auto}
+  .figcap{font-size:13px;color:var(--muted);margin-top:10px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+  .stat{text-align:center;padding:20px 14px}
+  .stat .big{font-size:32px;font-weight:800;letter-spacing:-.02em;color:var(--accent)}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  .pill{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;margin-right:6px}
+  .pill.ok{background:var(--teal-soft);color:var(--teal)}
+  .pill.warn{background:var(--amber-soft);color:var(--amber)}
+  .pill.info{background:#eef0ff;color:#4f46e5}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  blockquote{margin:16px 0;padding:12px 18px;border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 10px 10px 0;color:#0c4a5c}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout .ic{font-weight:800;line-height:1.4}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+  img.shot{max-width:100%;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+  <a href="5-opik-llm-tracing.html">Opik</a>
+  <a href="6-opik-feedback-loop.html">Feedback</a>
+  <a href="7-mlx-inference-performance.html">Performance</a>
+  <a href="8-hydra-vs-mlx-oc.html">Hydra vs mlx-oc</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">8 of 8 &middot; Architecture comparison</span>
+    <h1>Hydra vs mlx-oc: Two Monitoring Architectures,<br>One Metric Contract</h1>
+    <p class="sub">mlx-oc scrapes healthy nodes directly; hydra pushes everything through an OTel pipeline. Both track the same Apple Silicon GPU on the same macOS APIs &mdash; and both let the metric names silently drift until a dashboard panel goes dead. Here is the side-by-side, the apple-silicon-exporter answer, and the drift I just fixed in hydra.</p>
+    <div class="meta">
+      <span><b>hydra</b> push-first &middot; OTLP &middot; Go exporter</span>
+      <span><b>mlx-oc</b> pull-first &middot; scrape &middot; Python exporter</span>
+      <span><b>Fixed</b> 13 files &middot; 1 schema doc</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="figure">
+    <svg viewBox="0 0 760 490" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Side-by-side architecture diagram of hydra (push-first OTLP) and mlx-oc (pull-first scrape) monitoring">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#5b6072"/>
+        </marker>
+      </defs>
+
+      <text x="150" y="30" font-size="13" font-weight="800" text-anchor="middle" fill="#0e7490">hydra &middot; push-first (OTLP)</text>
+      <text x="575" y="30" font-size="13" font-weight="800" text-anchor="middle" fill="#db2777">mlx-oc &middot; pull-first (scrape)</text>
+
+      <line x1="380" y1="55" x2="380" y2="450" stroke="#e5e7f0" stroke-width="2" stroke-dasharray="4 4"/>
+
+      <g font-size="11" text-anchor="middle">
+        <rect x="60" y="70" width="180" height="36" rx="8" fill="#e0f2fe" stroke="#0e7490"/>
+        <text x="150" y="92" fill="#1d1f2b">Apple Silicon node</text>
+        <rect x="60" y="130" width="180" height="44" rx="8" fill="#fff" stroke="#e5e7f0"/>
+        <text x="150" y="147" fill="#1d1f2b">apple-silicon-exporter</text>
+        <text x="150" y="163" fill="#5b6072" font-size="10">Go &middot; root &middot; :9101</text>
+        <rect x="60" y="198" width="180" height="44" rx="8" fill="#fff" stroke="#e5e7f0"/>
+        <text x="150" y="215" fill="#1d1f2b">OTel agent</text>
+        <text x="150" y="231" fill="#5b6072" font-size="10">prometheus/apple_hw</text>
+        <rect x="60" y="266" width="180" height="36" rx="8" fill="#fff" stroke="#e5e7f0"/>
+        <text x="150" y="288" fill="#1d1f2b">OTel collector :4317</text>
+        <rect x="60" y="326" width="180" height="44" rx="8" fill="#fff" stroke="#e5e7f0"/>
+        <text x="150" y="343" fill="#1d1f2b">VictoriaMetrics :8428</text>
+        <text x="150" y="359" fill="#5b6072" font-size="10">cluster=hydra &middot; 90d</text>
+        <rect x="60" y="394" width="180" height="44" rx="8" fill="#fff" stroke="#e5e7f0"/>
+        <text x="150" y="411" fill="#1d1f2b">Grafana + Alertmanager</text>
+        <text x="150" y="427" fill="#5b6072" font-size="10">Slack &middot; Loki &middot; Opik</text>
+
+        <rect x="470" y="70" width="210" height="36" rx="8" fill="#fde8f1" stroke="#db2777"/>
+        <text x="575" y="92" fill="#1d1f2b">Mac mini node</text>
+        <rect x="470" y="130" width="210" height="44" rx="8" fill="#fff" stroke="#e5e7f0"/>
+        <text x="575" y="147" fill="#1d1f2b">mlx_hw_telemetry :9102</text>
+        <text x="575" y="163" fill="#5b6072" font-size="10">ioreg &middot; powermetrics &middot; pmset</text>
+        <rect x="470" y="198" width="210" height="44" rx="8" fill="#fff" stroke="#e5e7f0"/>
+        <text x="575" y="215" fill="#1d1f2b">mlx_metrics_proxy :8080</text>
+        <text x="575" y="231" fill="#5b6072" font-size="10">llm + quality gauges</text>
+        <rect x="470" y="266" width="210" height="36" rx="8" fill="#fff" stroke="#e5e7f0"/>
+        <text x="575" y="288" fill="#1d1f2b">mlx_kv_cache_agent :9104</text>
+        <rect x="470" y="326" width="210" height="44" rx="8" fill="#fff" stroke="#e5e7f0"/>
+        <text x="575" y="343" fill="#1d1f2b">VictoriaMetrics</text>
+        <text x="575" y="359" fill="#5b6072" font-size="10">192.168.1.64:8428</text>
+        <rect x="470" y="394" width="210" height="44" rx="8" fill="#fff" stroke="#e5e7f0"/>
+        <text x="575" y="411" fill="#1d1f2b">Grafana :3000 &middot; vmalert</text>
+        <text x="575" y="427" fill="#5b6072" font-size="10">28 rules</text>
+      </g>
+
+      <g stroke="#5b6072" stroke-width="1.5" marker-end="url(#ah)">
+        <line x1="250" y1="106" x2="250" y2="128"/>
+        <line x1="250" y1="174" x2="250" y2="196"/>
+        <line x1="250" y1="242" x2="250" y2="264"/>
+        <line x1="250" y1="302" x2="250" y2="324"/>
+        <line x1="250" y1="370" x2="250" y2="392"/>
+        <line x1="690" y1="106" x2="690" y2="128"/>
+        <line x1="690" y1="174" x2="690" y2="196"/>
+        <line x1="690" y1="242" x2="690" y2="264"/>
+        <line x1="690" y1="302" x2="690" y2="324"/>
+        <line x1="690" y1="370" x2="690" y2="392"/>
+      </g>
+
+      <text x="150" y="472" font-size="10.5" text-anchor="middle" fill="#5b6072">root exporter scraped by the agent, pushed OTLP &rarr; VM</text>
+      <text x="575" y="472" font-size="10.5" text-anchor="middle" fill="#5b6072">healthy VMs scraped directly by VM</text>
+    </svg>
+    <div class="figcap">Two pipelines, same job: Apple Silicon hardware into VictoriaMetrics. hydra pushes (OTLP everywhere), mlx-oc pulls (direct scrape).</div>
+  </div>
+
+  <section>
+    <h2><span class="num">1</span>Two architectures, compared honestly</h2>
+    <p>hydra is the &ldquo;fleet-first&rdquo; stack: an OTel agent on every Mac scrapes the local exporters, then remote-writes through a central OTel collector to VictoriaMetrics. Prometheus&rsquo;s own :9090 only self-scrapes the stack components and remote-writes too. mlx-oc is the opposite: the metrics database itself reaches out to scrape each healthy node&rsquo;s exporters. Same underlying data sources (IOKit/powermetrics on macOS), opposite plumbing.</p>
+
+    <table>
+      <tr><th>Dimension</th><th>hydra</th><th>mlx-oc</th></tr>
+      <tr><td>Ingestion</td><td>Push: OTel agent per node &rarr; collector :4317/:4318 &rarr; VM :8428</td><td>Pull: VM scrapes node exporters directly via <code>vm-scrape.tmpl.yml</code></td></tr>
+      <tr><td>Hardware exporter</td><td><code>apple-silicon-exporter</code> (Go, root, :9101)</td><td><code>mlx_hw_telemetry.py</code> (Python, sudo-less, :9102)</td></tr>
+      <tr><td>Metadata</td><td>Resource attributes promoted to labels: <code>node_id</code>, <code>pool</code>, <code>cluster=hydra</code></td><td>Static job/instance labels from the scrape config</td></tr>
+      <tr><td>Retention</td><td>90 days</td><td>Long-term, self-hosted</td></tr>
+      <tr><td>Alerting</td><td>Prometheus :9090 rules + Alertmanager &rarr; Slack</td><td>vmalert + Alertmanager, 28 rules</td></tr>
+      <tr><td>Logs / tracing</td><td>Loki + Opik</td><td>Opik on k0s</td></tr>
+      <tr><td>Fleet simulation</td><td>Mock exporter fleet :5900&ndash;:5950</td><td>None (two real nodes)</td></tr>
+    </table>
+
+    <div class="callout ok"><span class="ic">Takeaway</span><span>Push scales to hundreds of nodes behind NATs and keeps secrets off the scraper; pull is dramatically simpler to operate for two trusted VMs on a LAN. Neither is wrong &mdash; hydra optimizes for fleet growth, mlx-oc for set-and-forget.</span></div>
+  </section>
+
+  <section>
+    <h2><span class="num">2</span>&ldquo;Have we used the apple-silicon-exporter?&rdquo; &mdash; yes, it is the hydra production path</h2>
+    <p>The short answer: hydra runs the <strong>Go</strong> <code>apple-silicon-exporter</code> in production. It is built and installed by the <code>hw-exporter</code> and <code>otel-mac-agent</code> Ansible roles into <code>/usr/local/bin/apple-silicon-exporter</code>, runs as a launchd daemon (<code>com.hydra.apple-exporter</code>) on <code>127.0.0.1:9101/metrics</code>, and is scraped by the OTel agent&rsquo;s <code>prometheus/apple_hw</code> receiver, which filters <code>apple_*</code> and remote-writes to VictoriaMetrics. A legacy Python exporter survives in <code>monitoring/mac-mini/apple-gpu-exporter/</code> as a dev-mode auto-start tool only.</p>
+
+    <p>Because the Go exporter needs root and uses native macOS APIs, it sees more than mlx-oc&rsquo;s sudo-less exporter &mdash; most notably <code>apple_scrape_success{collector="iokit|powermetrics|metal"}</code>, which turns a dying sub-collector into an alert instead of a mystery. mlx-oc&rsquo;s exporter trades that depth for zero-credentials operation.</p>
+
+    <table>
+      <tr><th>Metric</th><th>hydra (Go exporter)</th><th>mlx-oc (Python exporter)</th></tr>
+      <tr><td>GPU utilization</td><td><code>apple_gpu_utilization_percent</code></td><td><code>gpu_utilization</code></td></tr>
+      <tr><td>GPU power</td><td><code>apple_gpu_power_watts</code></td><td><code>gpu_power_watts</code></td></tr>
+      <tr><td>GPU temperature</td><td><code>apple_gpu_temperature_celsius</code></td><td><code>gpu_temp_c</code></td></tr>
+      <tr><td>Thermal state</td><td><code>apple_thermal_pressure</code> (0&ndash;3)</td><td><code>thermal_pressure_level</code></td></tr>
+      <tr><td>Throttling</td><td><code>apple_thermal_throttle_active</code></td><td><code>thermal_throttle_active</code></td></tr>
+      <tr><td>Collector health</td><td><code>apple_scrape_success{collector=...}</code></td><td>&mdash;</td></tr>
+    </table>
+    <p class="figcap">Same sensors, two name conventions &mdash; the exact class of divergence that caused the drift below.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">3</span>The drift I just fixed in hydra</h2>
+    <p>Auditing hydra&rsquo;s consumers against the exporter&rsquo;s actual output surfaced <strong>every</strong> classic way metric names rot:</p>
+    <ul>
+      <li><strong>Dead dashboard panel.</strong> &ldquo;Power by Component&rdquo; queried <code>apple_{cpu,gpu,ane}_power</code> &mdash; missing the <code>_watts</code> suffix the exporter emits. Silent dead series in production.</li>
+      <li><strong>Benchmarks parsing ghosts.</strong> <code>llm_bench.py</code> and <code>run-with-gpu.sh</code> read the legacy Python exporter&rsquo;s <code>apple_gpu_power_milliwatts</code>/<code>apple_gpu_active_ratio</code>, which the Go exporter never emits.</li>
+      <li><strong>Alerts matching a label that does not exist.</strong> <code>CriticalThermalPressure</code>/<code>SustainedThermalPressure</code> used <code>apple_thermal_pressure{level="critical"}</code>, but the gauge is numeric (0=nominal&hellip;3=critical). The alerts could never fire.</li>
+      <li><strong>Node-down alert keyed to the wrong scrape job.</strong> <code>up{job="hw-exporter"}</code> vs the OTel agent&rsquo;s actual job <code>apple-silicon-hardware</code> &mdash; also never fire under the mac-agent deployment.</li>
+      <li><strong>Docs describing a dead API.</strong> Three architecture/plan docs referenced <code>apple_gpu_temp_c</code>, <code>apple_gpu_power_milliwatts</code>, <code>apple_gpu_frequency_hz</code>.</li>
+      <li><strong>Two exporters, two vocabularies.</strong> The legacy Python exporter emitted milliwatts and active-ratio; production emits watts and percent.</li>
+    </ul>
+
+    <p>The fixes are one commit (<code>48bcc2f</code>): dashboard targets corrected to <code>apple_*_power_watts</code> with the <code>pool</code> filter, benchmarks and the legacy exporter rewired to the canonical names (watts &times;1000 back into the existing <code>gpu_power_mw</code> column), both alert files rewritten against the numeric thermal scale, the node-down alert matching either job name, all docs corrected, and the old audit marked SUPERSEDED.</p>
+
+    <div class="card">
+      <h3>The one-file fix that prevents round two</h3>
+      <p>The real cure is a pinned contract. hydra now has <code>monitoring/metric-schema.md</code>: the canonical <code>apple_*</code> metric table (ground truth = the Go exporter), plus a map of every consumer &mdash; dashboard, alert file, OTel keep-regex, benchmark, mock fleet. A rename is now a diff against one file instead of a repo-wide grep gamble.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">4</span>What each stack should steal from the other</h2>
+    <div class="grid2">
+      <div class="card">
+        <h3>mlx-oc &larr; hydra</h3>
+        <ul>
+          <li><code>scrape_success{collector=...}</code>-style per-source health, not just exporter-up.</li>
+          <li>A metric-schema doc before the next exporter rename.</li>
+          <li>The fleet-simulation mock: two nodes are fine until you need a third.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>hydra &larr; mlx-oc</h3>
+        <ul>
+          <li>A sudo-less exporter mode for dev machines where root is a headache.</li>
+          <li>vmalert in place of a self-scraping Prometheus &mdash; one less moving part.</li>
+          <li>KV-cache/context visibility as a first-class metric, not a side quest.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout warn"><span class="ic">Lesson</span><span>The architecture differences (push vs pull) were always fine. The failures came from <em>names</em>, not <em>plumbing</em> &mdash; and the fix was a contract, not a config.</span></div>
+  </section>
+
+</main>
+
+<footer class="wrap">
+  mlx-oc &middot; a two-Mac-mini distributed MLX inference cluster with full observability &middot; hydra compared against it as the fleet-scale reference &middot; <a href="../README.md">repo README</a>
+</footer>
+</body>
+</html>
