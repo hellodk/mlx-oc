@@ -92,7 +92,7 @@
 <main class="wrap">
 
   <div class="figure">
-    <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Feedback loop: proxy logs heuristic scores, evaluator judges via the cluster and writes scores back">
+    <svg viewBox="0 0 840 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Feedback loop: proxy logs heuristic scores, evaluator judges via the cluster and writes scores back">
       <defs>
         <linearGradient id="c1" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stop-color="#e6f6f4"/><stop offset="1" stop-color="#c7e9e4"/>
@@ -106,62 +106,61 @@
       </defs>
 
       <!-- client -->
-      <g transform="translate(30,10)">
-        <rect x="0" y="20" width="140" height="74" rx="12" fill="url(#c3)" opacity=".75"/>
-        <text x="70" y="50" text-anchor="middle" font-size="11" font-weight="800" fill="#be185d">curl / opencode</text>
-        <text x="70" y="70" text-anchor="middle" font-size="9.5" font-weight="700" fill="#be185d">/v1/chat/completions</text>
+      <g transform="translate(24,75)">
+        <rect x="0" y="0" width="130" height="80" rx="12" fill="url(#c3)" opacity=".75"/>
+        <text x="65" y="28" text-anchor="middle" font-size="11" font-weight="800" fill="#be185d">curl / opencode</text>
+        <text x="65" y="52" text-anchor="middle" font-size="9.5" font-weight="700" fill="#be185d">/v1/chat/completions</text>
       </g>
 
       <!-- proxy -->
-      <g transform="translate(210,10)">
-        <rect x="0" y="0" width="170" height="120" rx="12" fill="url(#c2)" opacity=".7"/>
-        <text x="85" y="22" text-anchor="middle" font-size="11" font-weight="800" fill="#6d28d9">mlx_metrics_proxy</text>
-        <text x="85" y="44" text-anchor="middle" font-size="9" font-weight="600" fill="#6d28d9">:8080 &rarr; mlx_lm.server</text>
-        <rect x="10" y="56" width="150" height="26" rx="8" fill="#fff" opacity=".9"/>
-        <text x="85" y="73" text-anchor="middle" font-size="9" font-weight="800" fill="#6d28d9">log heuristic scores</text>
-        <rect x="10" y="88" width="150" height="26" rx="8" fill="#fff" opacity=".9"/>
-        <text x="85" y="105" text-anchor="middle" font-size="9" font-weight="800" fill="#6d28d9">X-Mlx-Trace: 0 honored</text>
+      <g transform="translate(190,20)">
+        <rect x="0" y="0" width="150" height="190" rx="12" fill="url(#c2)" opacity=".7"/>
+        <text x="75" y="22" text-anchor="middle" font-size="11" font-weight="800" fill="#6d28d9">mlx_metrics_proxy</text>
+        <text x="75" y="44" text-anchor="middle" font-size="9" font-weight="600" fill="#6d28d9">:8080 &rarr; mlx_lm.server</text>
+        <rect x="10" y="62" width="130" height="28" rx="8" fill="#fff" opacity=".9"/>
+        <text x="75" y="80" text-anchor="middle" font-size="9" font-weight="800" fill="#6d28d9">log heuristic scores</text>
+        <rect x="10" y="98" width="130" height="28" rx="8" fill="#fff" opacity=".9"/>
+        <text x="75" y="116" text-anchor="middle" font-size="9" font-weight="800" fill="#6d28d9">X-Mlx-Trace: 0 honored</text>
       </g>
 
       <!-- opik -->
-      <g transform="translate(470,0)">
-        <rect x="0" y="10" width="250" height="130" rx="12" fill="url(#c1)" opacity=".8"/>
-        <text x="125" y="36" text-anchor="middle" font-size="11" font-weight="800" fill="#0f766e">Opik (self-hosted)</text>
-        <text x="125" y="56" text-anchor="middle" font-size="9" font-weight="600" fill="#0f766e">traces + feedback scores</text>
-        <text x="125" y="76" text-anchor="middle" font-size="9" font-weight="600" fill="#0f766e">:32173 NodePort &middot; project "mlx"</text>
-        <rect x="20" y="90" width="210" height="26" rx="8" fill="#fff" opacity=".9"/>
-        <text x="125" y="107" text-anchor="middle" font-size="9" font-weight="800" fill="#0f766e">PUT /traces/feedback-scores</text>
+      <g transform="translate(560,20)">
+        <rect x="0" y="0" width="240" height="180" rx="12" fill="url(#c1)" opacity=".8"/>
+        <text x="120" y="22" text-anchor="middle" font-size="11" font-weight="800" fill="#0f766e">Opik (self-hosted)</text>
+        <text x="120" y="44" text-anchor="middle" font-size="9" font-weight="600" fill="#0f766e">traces + feedback scores</text>
+        <rect x="10" y="80" width="220" height="28" rx="8" fill="#fff" opacity=".9"/>
+        <text x="120" y="98" text-anchor="middle" font-size="9" font-weight="800" fill="#0f766e">PUT /traces/feedback-scores</text>
+        <text x="120" y="148" text-anchor="middle" font-size="9" font-weight="600" fill="#0f766e">:32173 NodePort &middot; project "mlx"</text>
       </g>
 
       <!-- evaluator -->
-      <g transform="translate(100,240)">
-        <rect x="0" y="0" width="190" height="92" rx="12" fill="url(#c2)" opacity=".6"/>
-        <text x="95" y="24" text-anchor="middle" font-size="11" font-weight="800" fill="#6d28d9">opik_evaluator.py</text>
-        <text x="95" y="46" text-anchor="middle" font-size="9" font-weight="600" fill="#6d28d9">polls traces &middot; builds judge prompt</text>
-        <text x="95" y="66" text-anchor="middle" font-size="9" font-weight="600" fill="#6d28d9">parses {"correctness": ...}</text>
-        <text x="95" y="84" text-anchor="middle" font-size="9" font-weight="600" fill="#6d28d9">temp 0.0 &middot; X-Mlx-Trace: 0</text>
+      <g transform="translate(60,260)">
+        <rect x="0" y="0" width="220" height="90" rx="12" fill="url(#c2)" opacity=".6"/>
+        <text x="110" y="24" text-anchor="middle" font-size="11" font-weight="800" fill="#6d28d9">opik_evaluator.py</text>
+        <text x="110" y="46" text-anchor="middle" font-size="9" font-weight="600" fill="#6d28d9">polls traces &middot; builds judge prompt</text>
+        <text x="110" y="66" text-anchor="middle" font-size="9" font-weight="600" fill="#6d28d9">parses {"correctness": ...} &middot; temp 0.0</text>
       </g>
 
       <!-- arrows -->
-      <line x1="178" y1="72" x2="204" y2="72" stroke="#7c3aed" stroke-width="2" stroke-dasharray="5 5">
+      <line x1="160" y1="115" x2="184" y2="115" stroke="#7c3aed" stroke-width="2" stroke-dasharray="5 5">
         <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
       </line>
-      <line x1="386" y1="72" x2="464" y2="72" stroke="#0f766e" stroke-width="2" stroke-dasharray="5 5">
+      <line x1="344" y1="96" x2="554" y2="96" stroke="#7c3aed" stroke-width="2" stroke-dasharray="5 5">
         <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
       </line>
-      <text x="425" y="60" text-anchor="middle" font-size="9" font-weight="700" fill="#0f766e">scores in-band</text>
-      <line x1="595" y1="140" x2="220" y2="235" stroke="#6d28d9" stroke-width="2" stroke-dasharray="5 5">
+      <text x="450" y="80" text-anchor="middle" font-size="9" font-weight="700" fill="#7c3aed">scores in-band</text>
+      <line x1="344" y1="132" x2="554" y2="132" stroke="#b45309" stroke-width="2" stroke-dasharray="5 5">
         <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
       </line>
-      <text x="470" y="205" text-anchor="middle" font-size="9" font-weight="700" fill="#6d28d9">GET traces (pending)</text>
-      <line x1="185" y1="245" x2="260" y2="140" stroke="#0f766e" stroke-width="2" stroke-dasharray="5 5">
+      <text x="450" y="116" text-anchor="middle" font-size="9" font-weight="700" fill="#b45309">PUT scores</text>
+      <path d="M640 200 L640 260 L280 260" fill="none" stroke="#0f766e" stroke-width="2" stroke-dasharray="5 5">
+        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
+      </path>
+      <text x="652" y="230" font-size="9" font-weight="700" fill="#0f766e">GET traces (pending)</text>
+      <line x1="250" y1="260" x2="250" y2="210" stroke="#6d28d9" stroke-width="2" stroke-dasharray="5 5">
         <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
       </line>
-      <text x="205" y="178" text-anchor="middle" font-size="9" font-weight="700" fill="#0f766e">judge via proxy</text>
-      <line x1="295" y1="66" x2="465" y2="66" stroke="#b45309" stroke-width="2" stroke-dasharray="5 5">
-        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
-      </line>
-      <text x="380" y="52" text-anchor="middle" font-size="9" font-weight="700" fill="#b45309">PUT scores</text>
+      <text x="258" y="235" font-size="9" font-weight="700" fill="#6d28d9">judge via proxy</text>
     </svg>
     <div class="figcap">Fig 1. Two score writers, one Opik. The proxy logs heuristic scores in-band as every request finishes; the evaluator reads traces, asks the cluster to rate the answer, and writes judge scores back. Both flows land on the same trace.</div>
   </div>

@@ -134,22 +134,16 @@
         <text x="100" y="128" text-anchor="middle" font-size="11" font-weight="700" fill="#0f766e">no root &middot; 30s</text>
       </g>
 
-      <!-- animated pulses to exporter -->
-      <line x1="220" y1="105" x2="280" y2="105" stroke="#4338ca" stroke-width="2.5" stroke-linecap="round"/>
-      <circle r="5" fill="#818cf8">
-        <animate attributeName="cx" values="220;280" dur="1.6s" repeatCount="indefinite"/>
-        <animate attributeName="opacity" values="0;1;0" dur="1.6s" repeatCount="indefinite"/>
-      </circle>
-      <line x1="480" y1="105" x2="540" y2="105" stroke="#0f766e" stroke-width="2.5" stroke-linecap="round"/>
-      <circle r="5" fill="#14b8a6">
-        <animate attributeName="cx" values="480;540" dur="1.6s" repeatCount="indefinite"/>
-        <animate attributeName="opacity" values="0;1;0" dur="1.6s" repeatCount="indefinite"/>
-      </circle>
-      <line x1="740" y1="105" x2="700" y2="105" stroke="#be185d" stroke-width="2.5" stroke-linecap="round"/>
-      <circle r="5" fill="#f472b6">
-        <animate attributeName="cx" values="740;700" dur="1.6s" repeatCount="indefinite"/>
-        <animate attributeName="opacity" values="0;1;0" dur="1.6s" repeatCount="indefinite"/>
-      </circle>
+      <!-- curved flows into exporter -->
+      <path d="M100 180 C 100 210, 150 215, 200 225" fill="none" stroke="#4338ca" stroke-width="2" opacity=".5" stroke-dasharray="4 4">
+        <animate attributeName="stroke-dashoffset" values="0;-16" dur="1.6s" repeatCount="indefinite"/>
+      </path>
+      <path d="M380 180 C 380 210, 350 215, 300 225" fill="none" stroke="#0f766e" stroke-width="2" opacity=".5" stroke-dasharray="4 4">
+        <animate attributeName="stroke-dashoffset" values="0;-16" dur="1.6s" begin=".4s" repeatCount="indefinite"/>
+      </path>
+      <path d="M640 180 C 640 210, 610 215, 560 225" fill="none" stroke="#be185d" stroke-width="2" opacity=".5" stroke-dasharray="4 4">
+        <animate attributeName="stroke-dashoffset" values="0;-16" dur="1.6s" begin=".8s" repeatCount="indefinite"/>
+      </path>
 
       <!-- exporter box -->
       <g transform="translate(280,225)">
@@ -159,9 +153,6 @@
         <text x="100" y="20" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">mlx_hw_telemetry.py</text>
         <text x="100" y="45" text-anchor="middle" font-size="11.5" fill="#5b6072">:9102 Prometheus text</text>
       </g>
-      <path d="M100 180 C 100 210, 150 215, 200 225" fill="none" stroke="#4338ca" stroke-width="2" opacity=".5" stroke-dasharray="4 4"/>
-      <path d="M380 180 C 380 210, 350 215, 300 225" fill="none" stroke="#0f766e" stroke-width="2" opacity=".5" stroke-dasharray="4 4"/>
-      <path d="M640 180 C 640 210, 610 215, 560 225" fill="none" stroke="#be185d" stroke-width="2" opacity=".5" stroke-dasharray="4 4"/>
 
       <!-- VM box -->
       <g transform="translate(540,225)">
