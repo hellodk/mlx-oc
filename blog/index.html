@@ -33,6 +33,7 @@
   .n6{background:linear-gradient(135deg,#0f766e,#d97706)}
   .n7{background:linear-gradient(135deg,#0e7490,#22d3ee)}
   .n8{background:linear-gradient(135deg,#b91c1c,#f59e0b)}
+  .n9{background:linear-gradient(135deg,#334155,#64748b)}
   .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
   .post p{margin:0;color:var(--muted);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
@@ -44,7 +45,7 @@
   <div class="wrap">
     <span class="kicker">MLX Observability &middot; Field Notes</span>
     <h1>Making Two Mac minis<br>Actually Observable</h1>
-    <p class="sub">Eight deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 28 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, a performance dashboard that finally shows the KV cache and context window, and a head-to-head with hydra&rsquo;s push-first fleet stack.</p>
+    <p class="sub">Nine deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 28 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, a performance dashboard that finally shows the KV cache and context window, a head-to-head with hydra&rsquo;s push-first fleet stack &mdash; and how a real GPU crash exposed the missing process-level truth, now fixed with a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that finally stress the cluster like an agent.</p>
     <div class="meta">
       <span><b>Stack</b> VictoriaMetrics + vmalert + Alertmanager + Grafana</span>
       <span><b>Agents</b> mlx_metrics_proxy :8080 &middot; mlx_hw_telemetry :9102 &middot; mlx_kv_cache_agent :9104</span>
@@ -115,6 +116,14 @@
       <h2>Hydra vs mlx-oc: Two Monitoring Architectures, One Metric Contract</h2>
       <p>Push-first OTLP (hydra) vs pull-first direct scrape (mlx-oc), where the Go apple-silicon-exporter actually runs, and the metric-name drift that had a production dashboard panel silently dead &mdash; fixed in one commit with a pinned schema doc.</p>
       <span class="tag">hydra</span><span class="tag">apple-silicon-exporter</span><span class="tag">metric drift</span><span class="tag">OTLP vs scrape</span>
+    </div>
+  </a>
+  <a class="post" href="9-model-serving-resilience.html">
+    <div class="num n9">9</div>
+    <div>
+      <h2>The Night the GPU Crashed: Serving Health, Supervision &amp; Load Testing</h2>
+      <p>A Metal command-buffer fault killed mlx_lm.server while the proxy kept serving 503s &mdash; the alert fired but nothing restarted anything and no metric said "model loaded." Now: a supervising watchdog with backoff, serving-status metrics, an alert signal-to-noise dashboard, and load tests for both plain and agentic traffic.</p>
+      <span class="tag">mlx_server_supervisor</span><span class="tag">crash recovery</span><span class="tag">alert dashboard</span><span class="tag">load testing</span><span class="tag">agentic</span>
     </div>
   </a>
 </main>

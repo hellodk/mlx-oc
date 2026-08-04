@@ -169,6 +169,80 @@ groups:
           summary: "Alertmanager is down"
           description: "Fired alerts are not being routed to notifications."
 
+  - name: mlx-serving
+    interval: 15s
+    rules:
+      # Process-level truth from mlx_server_supervisor.py (:9105). A Metal GPU
+      # fault can kill mlx_lm.server while the proxy stays up; these rules
+      # surface the actual serving state and recovery, not just reachability.
+      - alert: MLXServerDown
+        expr: mlx_server_up{job="mlx-supervisor"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: availability
+        annotations:
+          summary: "mlx_lm.server process is down"
+          description: "The supervisor reports the mlx_lm.server process down. Check mlx_server_last_exit_code and mlx_server_last_crash_reason."
+
+      - alert: MLXModelNotLoaded
+        expr: mlx_server_ready{job="mlx-supervisor"} == 1 and mlx_model_loaded{job="mlx-supervisor"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: availability
+        annotations:
+          summary: "Server process up but model not being served"
+          description: "mlx_lm.server is responding but /v1/models has not reported the model as loaded for 2 minutes."
+
+      - alert: MLXServerCrashLoop
+        expr: increase(mlx_server_restarts_total{job="mlx-supervisor"}[15m]) > 3
+        for: 2m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: availability
+        annotations:
+          summary: "mlx_lm.server crash loop"
+          description: "More than 3 restarts in 15 minutes (reason: {{ $labels.reason }}). The supervisor is backing off; manual investigation required."
+
+      - alert: MLXServerRepeatedCrashes
+        expr: increase(mlx_server_restarts_total{job="mlx-supervisor"}[1h]) > 5
+        for: 2m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: availability
+        annotations:
+          summary: "mlx_lm.server crashing repeatedly over the last hour"
+          description: "{{ $value | printf \"%.0f\" }} restarts in the last hour. Sustained instability (likely Metal GPU / memory pressure)."
+
+      - alert: MLXServerReadyProbeFailing
+        expr: |
+          increase(mlx_server_health_checks_total{job="mlx-supervisor", result="fail"}[10m])
+          > 6 * (increase(mlx_server_health_checks_total{job="mlx-supervisor", result="ok"}[10m]) + 0.01)
+        for: 5m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: availability
+        annotations:
+          summary: "Serving health probe mostly failing"
+          description: "Health-probe failures dominate the last 10 minutes; the model may be unservable even though the process is up."
+
+      - alert: MLXServerMetalFault
+        expr: mlx_server_last_crash_reason{reason="metal_gpu_error"} == 1
+        for: 1m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: gpu
+        annotations:
+          summary: "mlx_lm.server crashed with a Metal GPU fault"
+          description: "A Metal command-buffer / GPU error killed the server. Typical of unified-memory pressure or a bad kernel; check mlx_hw_gpu_mem_* and reduce --gpu-memory-utilization / max-num-seqs."
+
   - name: mlx-inference
     interval: 15s
     rules:

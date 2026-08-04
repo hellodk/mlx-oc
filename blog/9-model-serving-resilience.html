@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>9 — The Night the GPU Crashed: Serving Health, Supervision &amp; Load Testing</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#b91c1c;--accent-soft:#fee2e2;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(185,28,28,.11), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(15,118,110,.09), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #fca5a5;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  .figcap{font-size:13px;color:var(--muted);margin-top:10px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+  .stat{text-align:center;padding:20px 14px}
+  .stat .big{font-size:32px;font-weight:800;letter-spacing:-.02em;color:var(--accent)}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  .pill{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;margin-right:6px}
+  .pill.ok{background:var(--teal-soft);color:var(--teal)}
+  .pill.warn{background:var(--amber-soft);color:var(--amber)}
+  .pill.err{background:var(--accent-soft);color:var(--accent)}
+  .pill.info{background:#eef0ff;color:#4f46e5}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  blockquote{margin:16px 0;padding:12px 18px;border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 10px 10px 0;color:#4c0519}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+  <a href="5-opik-llm-tracing.html">Opik</a>
+  <a href="6-opik-feedback-loop.html">Feedback</a>
+  <a href="7-mlx-inference-performance.html">Performance</a>
+  <a href="8-hydra-vs-mlx-oc.html">Hydra vs mlx-oc</a>
+  <a href="9-model-serving-resilience.html" style="color:var(--accent);font-weight:700">Serving health</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">9 of 9 &middot; resilience + load</span>
+    <h1>The Night the GPU Crashed</h1>
+    <p class="sub">A Metal command-buffer fault silently killed <code>mlx_lm.server</code> while the proxy kept answering 503s. The alert fired &mdash; but it was generic, nothing restarted the server, and no metric could say "the model is actually loaded and serving right now." This post fixes all three: a supervising watchdog, serving-status metrics, an alert dashboard, and a load-testing plan that finally stresses the cluster the way an agent would.</p>
+    <div class="meta">
+      <span><b>Incident</b> 2026-08-04 21:15 &middot; Metal GPU error</span>
+      <span><b>New agent</b> mlx_server_supervisor :9105</span>
+      <span><b>New dashboard</b> MLX Alerts &amp; Serving Health</span>
+      <span><b>Load tools</b> bench_load.py &middot; bench_agentic.py</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section>
+<h2><span class="num">1</span>What actually happened</h2>
+<p>At 21:15 the distributed <code>mlx_lm.server</code> died. The proxy on <code>:8080</code> kept running and kept returning <code>503 mlx upstream unavailable</code>. The last lines of <code>logs/server.log</code> told the whole story in one line:</p>
+<pre><code>libc++abi: terminating due to uncaught exception of type std::runtime_error:
+[METAL] Command buffer execution failed: Ignored (for causing prior/excessive GPU errors)
+[WARN] Node with rank 1 exited with code 255
+[WARN] Node with rank 0 exited with code -15</code></pre>
+<p>Three things were true at once, and they were the problem:</p>
+<ol>
+  <li><strong>The alert did fire</strong> &mdash; <code>MLXUpstreamDown</code> (<code>mlx_up == 0</code>) went critical. But it only said "upstream unreachable." It could not say <em>why</em>, or whether this was a process crash versus a slow network versus a hung queue.</li>
+  <li><strong>Nothing restarted anything.</strong> The stack was launched by a fire-and-forget <code>nohup ... &amp;</code> script. No watchdog, no launchd, no retry. The cluster sat down until someone noticed.</li>
+  <li><strong>The observability stack could not answer "is the model loaded and serving right now?"</strong> We had per-request TTFT, KV-cache usage, GPU residency &mdash; but no metric for process liveness, model-loaded state, uptime, or restart count.</li>
+</ol>
+<p>Also hiding in the logs: the hardware-telemetry agents on <em>both</em> nodes had never started at all &mdash; the start script passed <code>--otlp-endpoint</code> to a script that doesn't accept that flag. So <code>MLXHardwareExporterDown</code> was firing on two nodes simultaneously. That is the same class of bug: the launcher never checked that what it "started" was actually up.</p>
+
+<div class="callout warn"><span class="ic">The lesson</span><span>A serving stack is only as observable as its <em>lowest</em> layer. Request metrics tell you the proxy is alive. You need a process-level, health-level and model-level view, plus something that restarts the thing when it dies &mdash; and a way to know it did.</span></div>
+</section>
+
+<section>
+<h2><span class="num">2</span>Design: three layers of truth</h2>
+<p>The redesign splits "is the cluster OK?" into three layers, each scraped independently so they can disagree with each other in useful ways:</p>
+
+<div class="card">
+<h3>Layer 1 &mdash; Process (new: <code>mlx_server_supervisor.py</code> :9105)</h3>
+<p>A watchdog that owns the <code>mlx.launch</code> child. It spawns the server, waits on it, and on exit records <strong>exit code</strong>, sniffs the server-log tail for a crash <strong>reason</strong> (metal / oom / python / exit), and restarts with exponential backoff <code>5s &rarr; 60s</code>. It exports:</p>
+<table>
+  <tr><th>Metric</th><th>Meaning</th></tr>
+  <tr><td><code>mlx_server_up</code></td><td>1 if the mlx_lm.server <em>process</em> is alive</td></tr>
+  <tr><td><code>mlx_server_ready</code></td><td>1 if <code>/v1/models</code> returns HTTP 200</td></tr>
+  <tr><td><code>mlx_model_loaded{model}</code></td><td>1 once the health probe actually saw the model</td></tr>
+  <tr><td><code>mlx_server_restarts_total</code></td><td>restarts performed (crash-loop detection input)</td></tr>
+  <tr><td><code>mlx_server_uptime_seconds</code></td><td>current process uptime</td></tr>
+  <tr><td><code>mlx_server_last_exit_code</code></td><td>exit code of the last crash</td></tr>
+  <tr><td><code>mlx_server_last_crash_reason{reason}</code></td><td>1 on the reason that killed it</td></tr>
+  <tr><td><code>mlx_server_health_checks_total{result}</code></td><td>ok/fail outcomes for the S/N probe</td></tr>
+</table>
+<p>The process/ready/model split is deliberate: a server can be <em>up but not ready</em> (loading weights, compiling Metal shaders) or <em>ready but the model vanished</em> &mdash; only <code>mlx_model_loaded</code> distinguishes those.</p>
+</div>
+
+<div class="card">
+<h3>Layer 2 &mdash; Control plane (new: <code>start_server.sh</code> rewrite)</h3>
+<p>The launcher now has <code>start | stop | restart | status | logs</code>, timestamped logging into <code>cluster/logs/</code>, preflight checks (venvs, passwordless SSH to node B, ports free), a <strong>readiness wait</strong> that blocks until <code>/v1/models</code> answers before returning success, and pidfiles per component. It fails loudly with a non-zero exit instead of printing <code>nohup ... &amp;</code> and crossing its fingers. The stale <code>--otlp-endpoint</code> flag that killed the hw agents is gone.</p>
+<pre><code>./start_server.sh start     # preflight -> launch 4 components -> wait ready -> status table
+./start_server.sh status    # per-component: RUNNING/STOPPED + /metrics HTTP code + last crash
+./start_server.sh logs      # tail of every log, one section each
+./start_server.sh restart</code></pre>
+</div>
+
+<div class="card">
+<h3>Layer 3 &mdash; Process supervision at boot (plist, kept local)</h3>
+<p>A <code>com.hydra.mlx-server.plist</code> LaunchDaemon is written under <code>cluster/</code> (git-ignored, intentionally <strong>not pushed</strong> yet). It runs the supervisor with <code>KeepAlive: true</code> and <code>ThrottleInterval: 30</code>, so launchd restarts the supervisor if <em>it</em> dies while the supervisor handles the app-level crash/backoff &mdash; two layers of restart for two failure modes. The plist is the "turn the whole cluster into a boot service" artifact, staged for later.</p>
+</div>
+</section>
+
+<section>
+<h2><span class="num">3</span>Alerting that says what broke</h2>
+<p>Five new rules in the <code>mlx-serving</code> group turn the crash from a mystery into a typed event:</p>
+<table>
+  <tr><th>Rule</th><th>Expression (essence)</th><th>Severity</th></tr>
+  <tr><td><code>MLXServerDown</code></td><td><code>mlx_server_up == 0</code> for 1m</td><td>critical</td></tr>
+  <tr><td><code>MLXModelNotLoaded</code></td><td>ready == 1 and model_loaded == 0 for 2m</td><td>warning</td></tr>
+  <tr><td><code>MLXServerCrashLoop</code></td><td><code>increase(restarts[15m]) &gt; 3</code></td><td>critical</td></tr>
+  <tr><td><code>MLXServerRepeatedCrashes</code></td><td><code>increase(restarts[1h]) &gt; 5</code></td><td>critical</td></tr>
+  <tr><td><code>MLXServerMetalFault</code></td><td><code>last_crash_reason{reason="metal_gpu_error"} == 1</code></td><td>critical</td></tr>
+</table>
+<p>The Metal fault alert is the one that matters most: it names the failure mode, points at <code>mlx_hw_gpu_mem_*</code>, and suggests the knobs (<code>--gpu-memory-utilization</code>, <code>--max-num-seqs</code>). A restart is no longer silent &mdash; the restart counter and reason are time-series, so a crash-loop lands in the dashboard as a sawtooth with a red "metal" tag, not a single ambiguous page.</p>
+</section>
+
+<section>
+<h2><span class="num">4</span>An alert dashboard that cuts the noise</h2>
+<p>New dashboard <strong>MLX Alerts &amp; Serving Health</strong> (<code>uid: mlx-alerts</code>) has three rows:</p>
+<ul>
+  <li><strong>Alert state</strong> &mdash; active firing count, firing-by-severity bar gauge, and an alert <em>event rate</em> panel (<code>rate(ALERTS[5m])</code>) so you see re-arm storms, not just a single series.</li>
+  <li><strong>Serving status</strong> &mdash; process/ready/model stat with UP/DOWN mapping, serving-status history, restart rate, and uptime.</li>
+  <li><strong>Signal-to-noise</strong> &mdash; last crash reason, health-probe ok-vs-fail ratio, and a <strong>flapping-alerts table</strong> (<code>increase(ALERTS[15m])</code>) ranking the alerts that fire and resolve repeatedly. Flapping alerts are the noise; this panel names them so they can be silenced or threshold-tuned.</li>
+</ul>
+<p>It rides on the existing <code>ALERTS</code> series that vmalert remote-writes into VictoriaMetrics &mdash; no new exporter needed for the alert half, only the supervisor for the serving half.</p>
+</section>
+
+<section>
+<h2><span class="num">5</span>Load testing: plain, then agentic</h2>
+<p>Two new tools under <code>tools/</code>. Both drive real traffic through the proxy (so every request lands in Opik automatically via the existing tracer, and in VictoriaMetrics), and both emit JSON reports into <code>tools/bench-reports/</code> (git-ignored).</p>
+
+<div class="card">
+<h3><code>bench_load.py</code> &mdash; traffic &amp; capacity</h3>
+<ul>
+  <li><code>--sweep</code>: ramp concurrency 1 &rarr; 2 &rarr; 4 &rarr; 8 &rarr; 16, each for <code>--duration</code>, with a settle pause so KV-cache/GPU state rebalances between levels.</li>
+  <li><code>--sustain N</code>: soak at fixed concurrency, while <strong>snapshotting the cluster's own metrics</strong> every few seconds &mdash; proxy up, GPU memory, KV-cache utilization, supervisor state &mdash; so a throughput number is always correlated with memory pressure.</li>
+  <li>Reports TTFT p50/p95/p99, tokens/sec, throughput, error rate per level.</li>
+</ul>
+<pre><code>python3 tools/bench_load.py --sweep --duration 30 --label "qwen3.5-4b-8bit sweep"
+python3 tools/bench_load.py --sustain 8 --duration 120 --label "soak-8w-2m"</code></pre>
+</div>
+
+<div class="card">
+<h3><code>bench_agentic.py</code> &mdash; how an agent actually loads the box</h3>
+<p>Single prompts understate pressure: an agent re-sends the <em>whole transcript</em> every turn, fires bursts of tool calls, and thrashes the KV cache. <code>bench_agentic.py</code> runs multi-turn tool-calling loops against a stub tool registry (calculator / weather / time) with three scenarios: a single-tool arithmetic chain, a three-tool "gather information then consolidate" task, and a multi-step planner. Per run it records turns, per-turn TTFT, tool-call count and JSON-validity rate, whether it finished in budget, and wall time; <code>--agents N</code> runs loops concurrently for realistic agentic load.</p>
+<pre><code>python3 tools/bench_agentic.py --scenario tri_tool --runs 10
+python3 tools/bench_agentic.py --scenario planner --agents 3 --runs 10</code></pre>
+</div>
+
+<div class="callout info"><span class="ic">Tooling recommendation</span><span><strong>Opik</strong> (already self-hosted + wired into the proxy) for per-trace, per-turn, per-tool-call inspection of agent runs and quality feedback &mdash; free, self-hosted, OpenInference-native. <strong>Our harness + VictoriaMetrics</strong> for repeatable load/SLO numbers. If you want a third-party load generator instead, <code>ghz</code>/<code>k6</code>/<code>locust</code> are drop-in replacements for the traffic side (they just hit the OpenAI endpoint), and LangSmith/Helicone are hosted Opik-alikes &mdash; but they send your data out of the building, which this stack was built to avoid.</span></div>
+</section>
+
+<section>
+<h2><span class="num">6</span>Post-incident checklist</h2>
+<ol>
+  <li><code>./start_server.sh start</code> &mdash; preflight, launch, wait-ready, status table (this is the whole recovery, now).</li>
+  <li>Watch <code>curl -s 127.0.0.1:9105/metrics | grep mlx_server</code> for up=1, ready=1, model_loaded=1.</li>
+  <li>Open <strong>MLX Alerts &amp; Serving Health</strong>; the Metal-fault reason should show "none" and restarts should be flat.</li>
+  <li>Run <code>bench_load.py --sweep</code> + <code>bench_agentic.py</code> to re-establish capacity after the model change.</li>
+  <li>When ready for boot supervision: install the staged <code>com.hydra.mlx-server.plist</code> (deliberately not committed).</li>
+</ol>
+</section>
+
+<section>
+<h2><span class="num">7</span>What this changes</h2>
+<ul>
+  <li>A crash is now <strong>typed</strong> (metal / oom / python) and <strong>counted</strong>, and the cluster <strong>recovers itself</strong> with backoff.</li>
+  <li>"Is the model serving?" is now a first-class question with its own metrics and dashboard, not a guess from a 503 body.</li>
+  <li>The start script proves what it started; the preflight catches the class of bug that silently downed both hw agents.</li>
+  <li>Load testing covers both shapes of traffic &mdash; steady concurrent requests and context-growing agent loops &mdash; with results correlated to the cluster's own memory/KV/GPU state.</li>
+</ul>
+</section>
+
+</main>
+
+<footer class="wrap">
+  mlx-oc &middot; post 9 of 9 &middot; serving health, supervision &amp; load testing &middot; <a href="../README.md">repo README</a>
+</footer>
+</body>
+</html>
