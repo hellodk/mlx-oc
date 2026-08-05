@@ -70,8 +70,9 @@ CLASSIFIERS = [
         "python",
     ),
     (
-        re.compile(r"\b(tokens/s|ttft|gen:.*ms|generation|prefill|prompt:"
-                   r"|context length|kv cache)\b", re.I),
+        re.compile(r"\b(tokens/s|ttft|gen:.*ms|generation|prefill|prompt"
+                   r" cache|prompt processing|processing progress|cache"
+                   r" sequence|context length|kv cache)\b", re.I),
         "info",
         "generation",
     ),

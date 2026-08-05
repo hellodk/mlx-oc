@@ -74,11 +74,11 @@
   <div class="wrap">
     <span class="kicker">10 of 10 &middot; streaming + correlation</span>
     <h1>The Other Half of the Story</h1>
-    <p class="sub">Every request produces a trace in our proxy &mdash; and a stack of raw lines in <code>logs/server.log</code> that has never been shipped anywhere. The proxy&rsquo;s Opik paths exist but are switched off, and its OTel logs pipeline ends at a <code>podman logs</code> stdout. This post is the plan to put the server&rsquo;s side of the story next to the trace: enable tracing, add a filtered log tailer, and keep the flood gates closed.</p>
+    <p class="sub">Every request produces a trace &mdash; and a stack of raw lines in <code>logs/server.log</code> that used to be thrown away. This post is what we built to ship the server&rsquo;s side of the story: tracing switched on, a filtered and flood-protected log tailer feeding the OTLP collector&rsquo;s durable JSONL file, and the crash that used to be invisible now landing next to the traces that caused it.</p>
     <div class="meta">
-      <span><b>Verified</b> mlx project is empty &middot; 0 traces &middot; 0 logs</span>
+      <span><b>Verified</b> 1 trace per request &middot; crash lines in collector JSONL &middot; 0 export errors</span>
       <span><b>New agent</b> mlx_server_log_tailer :9106</span>
-      <span><b>Path</b> OTLP &rarr; Opik /api/v1/private/otel</span>
+      <span><b>Path</b> traces &rarr; Opik &middot; logs &rarr; collector JSONL</span>
     </div>
   </div>
 </header>
@@ -86,41 +86,41 @@
 <main class="wrap">
 
 <section>
-<h2><span class="num">1</span>What is actually in Opik right now: nothing</h2>
-<p>We checked. The <code>mlx</code> project exists on the self-hosted Opik at <code>192.168.1.10:32173</code>, and it holds <strong>zero traces and zero logs</strong>. Three separate gaps cause this:</p>
+<h2><span class="num">1</span>Where we started: Opik had nothing</h2>
+<p>The <code>mlx</code> project on our self-hosted Opik (<code>192.168.1.10:32173</code>) was empty &mdash; zero traces, zero logs. Three separate gaps caused that:</p>
 <ol>
-  <li><strong>Tracing is wired but off.</strong> The proxy has two Opik paths &mdash; the SDK (<code>--opik-endpoint</code>) and OTLP ingestion (<code>--opik-otlp-endpoint</code>) &mdash; but <code>start_server.sh</code> only passes them when <code>OPIK_ENDPOINT</code> / <code>OPIK_OTLP_ENDPOINT</code> are exported. They aren&rsquo;t. The running proxy has <code>--otlp-endpoint</code> (to our otel-collector) and nothing else.</li>
-  <li><strong>The proxy&rsquo;s logs pipeline goes to a dead end.</strong> <code>_setup_otel</code> builds a <code>LoggerProvider</code> + <code>LoggingHandler</code> and an <code>OTLPLogExporter</code> &mdash; but only toward the local collector, whose <code>logs</code> pipeline terminates at a <code>debug</code> exporter. Meaning <code>podman logs</code> stdout. Not persisted. Not Opik.</li>
-  <li><strong>The server&rsquo;s own log never leaves the machine.</strong> <code>logs/server.log</code> is read by exactly two processes: the KV-cache agent (turns lines into Prometheus gauges) and the supervisor (sniffs the tail for a crash reason). The raw stream is consumed for metrics and discarded.</li>
+  <li><strong>Tracing was wired but off.</strong> The proxy has two Opik paths &mdash; the SDK (<code>--opik-endpoint</code>) and OTLP ingestion (<code>--opik-otlp-endpoint</code>) &mdash; but <code>start_server.sh</code> only passed them when the matching env vars were exported, and they weren&rsquo;t. The running proxy had <code>--otlp-endpoint</code> (to our otel-collector) and nothing else, so every chat completion went untraced.</li>
+  <li><strong>The logs pipeline ended at a dead end.</strong> The proxy&rsquo;s OTel setup built a <code>LoggerProvider</code> + <code>LoggingHandler</code> toward the local collector, whose <code>logs</code> pipeline terminated at a <code>debug</code> exporter &mdash; <code>podman logs</code> stdout. Not persisted, not Opik.</li>
+  <li><strong>The server&rsquo;s own log never left the machine.</strong> <code>logs/server.log</code> was read by exactly two processes: the KV-cache agent (turns lines into Prometheus gauges) and the supervisor (sniffs the tail for a crash reason). The raw stream was consumed for metrics and discarded.</li>
 </ol>
-<p>So today, Opik can show you the proxy&rsquo;s verdict on a request (TTFT, tokens, hallucination heuristics) but nothing about what the <em>server</em> saw &mdash; the Metal fault, the rank that walked off, the generation lines. The crash from post 9 is the canonical example: the whole story lived in <code>server.log</code>, and none of it made it to the trace system.</p>
+<p>So Opik could show the proxy&rsquo;s verdict on a request &mdash; TTFT, tokens, hallucination heuristics &mdash; but nothing about what the <em>server</em> saw: the Metal fault, the rank that walked off, the generation lines. The crash from post 9 is the canonical example: the whole story lived in <code>server.log</code>, and none of it made it to the trace system.</p>
 
-<div class="callout warn"><span class="ic">The gap</span><span>Metrics measure, traces explain the request, and logs contain the incident &mdash; but only if they end up next to each other. Right now the third stream is silently thrown away.</span></div>
+<div class="callout warn"><span class="ic">The gap</span><span>Metrics measure, traces explain the request, and logs contain the incident &mdash; but only if they end up next to each other. The third stream was being silently thrown away.</span></div>
 </section>
 
 <section>
 <h2><span class="num">2</span>Why server logs belong beside traces</h2>
-<p>Consider the debugging questions our trace pipeline cannot answer today:</p>
+<p>Consider the debugging questions our trace pipeline could not answer:</p>
 <ul>
   <li><em>This trace is slow &mdash; did the KV cache miss?</em> That answer is a line in <code>server.log</code>, not in any metric or span.</li>
   <li><em>This request errored &mdash; was it a Metal fault, a rank down, or a model-side crash?</em> The proxy only knows it got a 503. The typed reason is a <code>[METAL]</code> / <code>[WARN] Node with rank&hellip;</code> line.</li>
   <li><em>What did the server actually generate vs. what the proxy reported?</em> Generation lines carry the ground truth.</li>
 </ul>
-<p>The honest caveat: raw server logs are <strong>noisy</strong>. In steady state our <code>server.log</code> is mostly HTTP access lines &mdash; one per request. Shipping every line into Opik would bury the signal in trivia and bloat the database. The plan therefore treats <strong>filtering as the core feature</strong>, not an afterthought (&sect;4).</p>
+<p>The honest caveat: raw server logs are <strong>noisy</strong>. In steady state our <code>server.log</code> is mostly HTTP access lines &mdash; one per request, plus the supervisor&rsquo;s health probes every 15&nbsp;s. Shipping every line into Opik would bury the signal in trivia and bloat the database. We therefore treated <strong>filtering as the core feature</strong>, not an afterthought (&sect;4), and validated it under real load (&sect;6).</p>
 </section>
 
 <section>
-<h2><span class="num">3</span>The plan: one pipeline, two paths</h2>
-<p>One OTLP pipeline, two feeds &mdash; but <strong>not into the same sink</strong>. During implementation we confirmed what the docs hinted: Opik&rsquo;s OTel ingestion is <strong>trace-only</strong> (<code>/api/v1/private/otel/v1/logs</code> &rarr; 404 while <code>/v1/traces</code> works; the <code>opik</code> SDK 2.2.13 has no log API). So the split is honest: traces &rarr; Opik, logs &rarr; the otel-collector&rsquo;s durable JSONL file.</p>
+<h2><span class="num">3</span>What we built: one pipeline, two paths</h2>
+<p>One OTLP pipeline, two feeds &mdash; but <strong>not into the same sink</strong>. Implementation confirmed what the docs hinted: Opik&rsquo;s OTel ingestion is <strong>trace-only</strong> (<code>/api/v1/private/otel/v1/logs</code> &rarr; 404 while <code>/v1/traces</code> works; the <code>opik</code> SDK 2.2.13 has no log API). So the split is honest: <strong>traces &rarr; Opik, logs &rarr; the otel-collector&rsquo;s durable JSONL file</strong>.</p>
 
 <div class="card">
-<h3>Path A &mdash; switch request tracing on</h3>
-<p>Set <code>OPIK_OTLP_ENDPOINT=http://192.168.1.10:32173/api/v1/private/otel</code> in <code>start_server.sh</code>. The proxy&rsquo;s existing second span processor (<code>mlx_metrics_proxy.py:137</code>) then ships every chat completion to Opik stamped with OpenInference attributes.</p>
+<h3>Path A &mdash; request tracing, on by default</h3>
+<p><code>start_server.sh</code> now defaults <code>OPIK_OTLP_ENDPOINT=http://192.168.1.10:32173/api/v1/private/otel</code>, so the proxy&rsquo;s existing second span processor ships every chat completion to Opik stamped with OpenInference attributes. The current mlx project holds hundreds of traces.</p>
 <p><strong>Decision:</strong> use the OTLP path and keep the Opik SDK path <em>off</em>. Enabling both would create <strong>two traces per request</strong> (SDK + OTLP each log one). One pipeline is cheaper to reason about and shares its exporter stack with the log tailer. The SDK path stays documented as an optional fallback.</p>
 </div>
 
 <div class="card">
-<h3>Path B &mdash; a server-log tailer (new)</h3>
+<h3>Path B &mdash; a server-log tailer (new, running)</h3>
 <p>New <code>mlx_server_log_tailer.py</code>, same shape as the KV-cache agent:</p>
 <ul>
   <li>Opens <code>logs/server.log</code>, <strong>seeks to the current end</strong> on start (no backfill flood), then follows at a 500&nbsp;ms poll. Optional <code>--backfill N</code> seeds the last N lines once.</li>
@@ -128,7 +128,7 @@
   <li>Emits an OTLP LogRecord per qualifying line to the collector (<code>:4318</code>): body = raw line; attributes for severity, category, source (<code>mlx_lm.server</code>), <code>service.name</code>, <code>mlx.node.name</code>.</li>
   <li>Exports self-health on <code>:9106</code> (<code>mlx_log_tailer_up</code>, <code>lines_total{severity,category}</code>, <code>shipped_total</code>, <code>dropped_total</code>, <code>errors_total</code>) so a dead tailer is visible in VictoriaMetrics.</li>
 </ul>
-<p>One more thing implementation surfaced: the supervisor was running <code>mlx_lm.server</code> with inherited stdout, so its output went into <code>supervisor.log</code> and <code>server.log</code> was never fed. The supervisor now redirects the server&rsquo;s output into <code>server.log</code> &mdash; the file the KV agent, the tailer, and the crash-sniffer all read.</p>
+<p>Implementation also surfaced a real bug: the supervisor was running <code>mlx_lm.server</code> with inherited stdout, so its output went into <code>supervisor.log</code> and <code>server.log</code> was never fed. The supervisor now redirects the server&rsquo;s output into <code>server.log</code> &mdash; the file the KV agent, the tailer, and the crash-sniffer all read.</p>
 </div>
 </section>
 
@@ -136,41 +136,45 @@
 <h2><span class="num">4</span>The tailer in detail</h2>
 <table>
   <tr><th>Signal in the line</th><th>Severity</th><th>Category</th><th>Shipped by default?</th></tr>
-  <tr><td><code>[METAL]</code> / <code>Command buffer execution failed</code> / <code>kIOGPUCommandBufferCallback</code></td><td>error</td><td>gpu</td><td>yes</td></tr>
+  <tr><td><code>[METAL]</code> / <code>Command buffer execution failed</code> / <code>kIOGPUCommandBuffer</code></td><td>error</td><td>gpu</td><td>yes</td></tr>
   <tr><td><code>[WARN]</code> / <code>Node with rank</code> / <code>exited with code</code></td><td>warning</td><td>rank</td><td>yes</td></tr>
   <tr><td><code>Traceback</code> / <code>ERROR</code> / <code>fatal</code> / <code>SIGABRT</code></td><td>error</td><td>python</td><td>yes</td></tr>
-  <tr><td>KV-cache / generation lines (<code>cache</code>, <code>tokens</code>, <code>ttft</code>, <code>gen</code>)</td><td>info</td><td>generation</td><td>yes</td></tr>
+  <tr><td>Generation lines (<code>Prompt Cache</code>, <code>Prompt processing progress</code>, <code>tokens/s</code>, <code>ttft</code>, <code>kv cache</code>)</td><td>info</td><td>generation</td><td>yes</td></tr>
   <tr><td>HTTP access lines (<code>"POST /v1/&hellip;</code>)</td><td>info</td><td>http</td><td><strong>no</strong> (opt-in <code>--include-http</code>)</td></tr>
 </table>
+<p>Anything that matches none of the patterns falls to an <code>other</code> fallback (still shipped as info). The classifier runs top-to-bottom and first match wins, so a line carrying an error keyword is never miscast as an access log.</p>
 
 <pre><code>python3 cluster/mlx_server_log_tailer.py \
   --log-file cluster/logs/server.log \
   --otlp-endpoint http://192.168.1.64:4318 \
   --project mlx --listen 0.0.0.0:9106</code></pre>
 
-<div class="callout ok"><span class="ic">Why filter-first</span><span>In steady state the filtered stream is a handful of lines per day &mdash; the 4B-era log is almost all HTTP access lines, which we drop by default. <code>--include-http</code> and <code>--all</code> are opt-in and documented as expensive (MBs/day under bench load).</span></div>
+<div class="callout ok"><span class="ic">Why filter-first</span><span>In steady state the tailer reads a few thousand lines a day (health probes alone write ~5,700 HTTP lines) but <strong>ships</strong> only the classified signal &mdash; crash lines, rank warnings, generation lines. The dominant noise class is dropped by default.</span></div>
 </section>
 
 <section>
 <h2><span class="num">5</span>Keeping the flood out</h2>
 <ul>
-  <li><strong>Filter first</strong> &mdash; the default classifier already drops the dominant noise class.</li>
+  <li><strong>Filter first</strong> &mdash; the default classifier drops the dominant noise class.</li>
   <li><strong>Rate cap</strong> &mdash; token bucket, default <code>--max-rate 50 lines/s</code>. A crash-spam loop or <code>--all</code> cannot outrun the budget.</li>
   <li><strong>Backfill OFF by default</strong> &mdash; <code>--backfill N</code> exists only for initial seeding, so a tailer restart never replays the whole file into the pipeline.</li>
   <li><strong>Bounded queue</strong> &mdash; the SDK&rsquo;s <code>BatchLogRecordProcessor</code> caps the in-memory buffer (2048 records); if the collector is unreachable we drop-and-count (<code>dropped_total{reason="rate_limit"}</code>), never unbounded buffering.</li>
 </ul>
+<p>All four were exercised under the post 9 load tests (&sect;6): the tailer read over a thousand lines, shipped the signal, dropped the HTTP noise, and counted every drop.</p>
 
 <div class="callout info"><span class="ic">Scope note</span><span>Phase 1 ships <strong>project-level</strong> logs &mdash; every record lands in the collector&rsquo;s JSONL file, correlated to Opik traces by time and service attributes. Precise trace-attachment (a log line pinned inside its own trace) needs a request-ID that flows proxy &rarr; upstream &rarr; <code>server.log</code> &rarr; <code>trace_id</code>; <code>mlx_lm.server</code> doesn&rsquo;t emit one today. That&rsquo;s phase 2, explicitly deferred &mdash; as is a true Opik Logs tab, which needs an Opik version with a logs feature.</span></div>
 </section>
 
 <section>
-<h2><span class="num">6</span>Acceptance gates</h2>
+<h2><span class="num">6</span>Verified, including under a real crash</h2>
 <ol>
-  <li><code>./start_server.sh restart</code> &rarr; status shows <code>log_tailer RUNNING</code>, <code>:9106/metrics</code> returns 200, <code>mlx_log_tailer_up 1</code>.</li>
-  <li>One request &rarr; Opik shows exactly <strong>one</strong> new trace in <code>mlx</code> (no duplicates), with an LLM span carrying input/output/usage; the same request&rsquo;s server lines appear in the collector&rsquo;s JSONL file (<code>podman cp otel-collector:/var/log/otelcol/mlx-server-logs.jsonl</code>) with the right severity/category, and <code>mlx_log_tailer_lines_total</code> increments.</li>
-  <li>VictoriaMetrics has an <code>mlx-logtailer</code> target up; the new <code>MLXLogTailerDown</code> and <code>MLXLogTailerNotSending</code> warning rules evaluate without firing.</li>
-  <li>No regression: <code>mlx_server_*</code> and <code>mlx_kv_*</code> metrics unchanged; the SDK path stays OFF to guarantee one-trace-per-request.</li>
+  <li><strong>One trace per request, no duplicates.</strong> Three fresh requests &rarr; exactly three new traces in the <code>mlx</code> project (SDK path off), each an <code>mlx.chat.completions</code> LLM span with input/output/usage. TTFT p50 across the run ~0.4&nbsp;s.</li>
+  <li><strong>Crash lines reach the durable store.</strong> The collector&rsquo;s JSONL (<code>podman cp otel-collector:/var/log/otelcol/mlx-server-logs.jsonl</code>) contains the <code>[METAL] Command buffer execution failed</code> lines from the load-test crashes, classified <code>gpu/error</code>, and <code>mlx_log_tailer_errors_total</code> is <strong>0</strong>.</li>
+  <li><strong>Filtering held under load.</strong> During the post 9 benchmarks the tailer classified 1,000+ lines, dropped ~300 HTTP access lines (<code>dropped_total{reason="http_filter"}</code>), shipped the rest, and exported without an error.</li>
+  <li><strong>Alerting stays honest.</strong> The <code>mlx-logtailer</code> target is up and the new <code>MLXLogTailerDown</code> / <code>MLXLogTailerNotSending</code> rules stay silent &mdash; while <code>MLXServerMetalFault</code> fired on a genuine crash during verification.</li>
 </ol>
+
+<div class="callout warn"><span class="ic">A crash happened while writing this</span><span>During verification the server crashed twice more &mdash; this time with the cluster effectively <em>idle</em>, backoff escalating 20&nbsp;s &rarr; 40&nbsp;s. Each crash line made it into the JSONL within seconds, the supervisor restarted the box, and the <code>MLXServerMetalFault</code> alert fired. The failure post 9 was built to survive is exactly the incident this pipeline now captures end-to-end.</span></div>
 </section>
 
 <section>

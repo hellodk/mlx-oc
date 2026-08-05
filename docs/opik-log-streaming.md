@@ -188,4 +188,4 @@ All five passed on 2026-08-05 (3 requests → 3 traces, no duplicates).
 | `observability/otelcol-config.yaml` | logs pipeline → `file` exporter (durable JSONL) |
 | `observability/compose.yaml` | `mlx-logs` volume, collector `user: "0"` |
 | `blog/10-opik-log-streaming.html` | **new** blog post |
-| `docs/opik-log-streaming.md` | **this plan** |
+| `docs/opik-log-streaming.md` | this doc (plan → IMPLEMENTED) |

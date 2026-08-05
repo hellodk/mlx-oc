@@ -46,7 +46,7 @@
   <div class="wrap">
     <span class="kicker">MLX Observability &middot; Field Notes</span>
     <h1>Making Two Mac minis<br>Actually Observable</h1>
-    <p class="sub">Ten deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 28 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, a performance dashboard that finally shows the KV cache and context window, a head-to-head with hydra&rsquo;s push-first fleet stack, how a real GPU crash exposed the missing process-level truth &mdash; now fixed with a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that stress the cluster like an agent &mdash; and the plan to stream the server&rsquo;s runtime log next to its traces so an incident carries its server-side context into Opik.</p>
+    <p class="sub">Ten deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 28 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, a performance dashboard that finally shows the KV cache and context window, a head-to-head with hydra&rsquo;s push-first fleet stack, how a real GPU crash exposed the missing process-level truth &mdash; now fixed with a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that stress the cluster like an agent &mdash; and the streamed server runtime log that finally carries an incident&rsquo;s server-side context into Opik.</p>
     <div class="meta">
       <span><b>Stack</b> VictoriaMetrics + vmalert + Alertmanager + Grafana</span>
       <span><b>Agents</b> mlx_metrics_proxy :8080 &middot; mlx_hw_telemetry :9102 &middot; mlx_kv_cache_agent :9104</span>
@@ -131,7 +131,7 @@
     <div class="num n10">10</div>
     <div>
       <h2>The Other Half of the Story: Streaming Server Logs into Opik</h2>
-      <p>Opik's mlx project is empty: tracing is wired but switched off, and the server's runtime log has never left the machine. A concrete plan to enable the OTLP trace path and add a filtered, flood-protected log tailer so a Metal fault or rank-down warning sits next to the trace that caused it.</p>
+      <p>Tracing was wired but switched off, and the server's runtime log had never left the machine. Now: the OTLP trace path is on by default (one trace per request), and a filtered, flood-protected log tailer ships crash and generation lines to the collector's durable JSONL &mdash; verified when a Metal fault fired mid-test and every line landed.</p>
       <span class="tag">Opik</span><span class="tag">log streaming</span><span class="tag">OTLP</span><span class="tag">mlx_server_log_tailer</span><span class="tag">correlation</span>
     </div>
   </a>

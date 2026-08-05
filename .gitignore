@@ -7,3 +7,4 @@ cluster/*.plist
 tools/bench-reports/
 observability/data/
 observability/vm-scrape.yml
+.DS_Store
