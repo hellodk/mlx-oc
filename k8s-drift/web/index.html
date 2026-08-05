@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>k8s drift</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: #0f1419; color: #e6edf3; }
+  header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+           padding: 12px 20px; border-bottom: 1px solid #21262d;
+           background: #161b22; position: sticky; top: 0; z-index: 5; }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .3px; }
+  #sources { font-size: 12px; color: #8b949e; display: flex; gap: 8px; flex-wrap: wrap; }
+  .src { background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+         padding: 2px 8px; }
+  .src b { color: #e6edf3; font-weight: 600; }
+  .warn { color: #d29922; font-size: 12px; }
+  header .spacer { flex: 1; }
+  button, select { background: #21262d; color: #e6edf3; border: 1px solid #30363d;
+                   border-radius: 6px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
+  button:hover { background: #30363d; }
+  label { font-size: 12px; color: #8b949e; display: flex; align-items: center; gap: 5px; }
+  main { padding: 16px 20px 60px; max-width: 1200px; margin: 0 auto; }
+  #summary { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .card { background: #161b22; border: 1px solid #21262d; border-radius: 8px;
+          padding: 10px 14px; min-width: 150px; }
+  .card h3 { margin: 0 0 6px; font-size: 13px; color: #8b949e; font-weight: 600; }
+  .card .n { font-size: 22px; font-weight: 700; }
+  .card .n.ok { color: #3fb950; } .card .n.diff { color: #d29922; }
+  .card .n.only { color: #f85149; }
+  nav#tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  nav#tabs button.active { background: #1f6feb; border-color: #1f6feb; }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; background: #161b22;
+          border: 1px solid #21262d; border-radius: 8px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #21262d;
+           font-size: 13px; vertical-align: top; }
+  th { color: #8b949e; font-weight: 600; background: #1c2128; }
+  tr.row { cursor: pointer; }
+  tr.row:hover td { background: #1c2128; }
+  .badge { display: inline-block; border-radius: 20px; padding: 1px 10px;
+           font-size: 11px; font-weight: 700; letter-spacing: .3px; }
+  .b-OK { background: #12281b; color: #3fb950; border: 1px solid #1f4d2b; }
+  .b-DIFF { background: #2a2010; color: #d29922; border: 1px solid #4d3a13; }
+  .b-ONLY_A, .b-ONLY_B { background: #2d1117; color: #f85149; border: 1px solid #5c1c27; }
+  .ns { color: #8b949e; font-size: 12px; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .diffs { display: none; }
+  .diffs.open { display: block; }
+  .diffs table td:first-child { color: #8b949e; width: 40%; }
+  .diffs table td:nth-child(2) { color: #f85149; }
+  .diffs table td:nth-child(3) { color: #3fb950; }
+  .v { word-break: break-all; max-width: 420px; white-space: pre-wrap; }
+  .empty { color: #8b949e; text-align: center; padding: 30px; }
+  .revealbox { background: #161b22; border: 1px solid #21262d; border-radius: 8px;
+               margin: 6px 0; padding: 8px 12px; }
+  .revealbox .k { color: #8b949e; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>k8s drift</h1>
+  <div id="sources"></div>
+  <div class="spacer"></div>
+  <label><input type="checkbox" id="auto" checked> auto-refresh 30s</label>
+  <button id="refresh">Refresh</button>
+</header>
+<main>
+  <section id="summary"></section>
+  <nav id="tabs"></nav>
+  <div class="toolbar">
+    <select id="ns"><option value="">all namespaces</option></select>
+    <span id="count"></span>
+    <button id="revealBtn" hidden>show secret values</button>
+  </div>
+  <table>
+    <thead><tr><th>name</th><th>status</th><th>namespace</th><th>drift</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div id="empty" class="empty" hidden>no resources in this view</div>
+</main>
+<script>
+const state = { kind: "deployments", ns: "", reveal: false, last: null };
+const $ = id => document.getElementById(id);
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g,
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function shortVal(v) {
+  const s = typeof v === "string" ? v : JSON.stringify(v);
+  return s.length > 220 ? s.slice(0, 220) + "…" : s;
+}
+
+async function getJSON(url, opts) {
+  const r = await fetch(url, opts);
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+  return r.json();
+}
+
+async function loadConfig() {
+  const cfg = await getJSON("/api/config");
+  const src = x => `<span class="src">${esc(x.source)}</span>`;
+  $("sources").innerHTML = `${src(cfg.source_a)} vs ${src(cfg.source_b)}` +
+    (cfg.same_cluster
+      ? ' <span class="warn">same source — identity check, expected zero drift</span>'
+      : "");
+  const ns = $("ns");
+  for (const n of cfg.namespaces) {
+    const o = document.createElement("option");
+    o.value = n; o.textContent = n; ns.appendChild(o);
+  }
+  if (!cfg.reveal_allowed) $("revealBtn").hidden = true;
+  state.kinds = cfg.kinds;
+  state.label = cfg.kind_label;
+}
+
+async function loadSummary() {
+  const s = await getJSON("/api/summary");
+  const cards = state.kinds.map(k => {
+    const c = s.counts[k];
+    return `<div class="card"><h3>${esc(state.label[k])}</h3>
+      <div><span class="n diff">${c.diff}</span> diff
+           &middot; <span class="n only">${c.only_a + c.only_b}</span> one-side
+           &middot; <span class="n ok">${c.ok}</span> ok
+           &middot; <span class="n" style="color:#8b949e">${c.total}</span> total</div></div>`;
+  }).join("");
+  $("summary").innerHTML = cards;
+  $("tabs").innerHTML = state.kinds.map(k =>
+    `<button data-k="${k}" class="${k === state.kind ? "active" : ""}">${esc(state.label[k])}</button>`).join("");
+  document.querySelectorAll("#tabs button").forEach(b =>
+    b.onclick = () => { state.kind = b.dataset.k; state.reveal = false;
+      $("revealBtn").hidden = state.kind !== "secrets"; loadRows(); loadSummary(); });
+}
+
+async function loadRows() {
+  const q = new URLSearchParams({ kind: state.kind, ns: state.ns });
+  if (state.kind === "secrets" && state.reveal) q.set("reveal", "1");
+  const d = await getJSON("/api/drift?" + q);
+  const rows = Object.values(d.rows);
+  $("count").textContent = rows.length + " resources";
+  $("empty").hidden = rows.length > 0;
+  const tb = $("rows");
+  if (!rows.length) { tb.innerHTML = ""; return; }
+  tb.innerHTML = rows.map(r => {
+    const status = r.status;
+    const drift = r.diff.length
+      ? `<details class="diffs"><summary>${r.diff.length} field${r.diff.length > 1 ? "s" : ""} differ</summary>
+         <table><thead><tr><th>field</th><th>A</th><th>B</th></tr></thead><tbody>` +
+        r.diff.map(d => `<tr><td class="mono">${esc(d.path)}</td>
+            <td class="v">${esc(shortVal(d.a))}</td>
+            <td class="v">${esc(shortVal(d.b))}</td></tr>`).join("") +
+        `</tbody></table></details>`
+      : status === "OK" ? "<span class='ns'>identical</span>"
+      : status === "ONLY_A" ? "<span class='ns'>missing in B</span>"
+      : "<span class='ns'>missing in A</span>";
+    let revealBlock = "";
+    if (r.a_values || r.b_values) {
+      const vals = (side, v) => v ? Object.entries(v).map(([k, val]) =>
+        `<div class="revealbox"><span class="k">${esc(side)} ${esc(k)}</span>
+         <div class="v mono">${esc(val)}</div></div>`).join("") : "";
+      revealBlock = vals("A", r.a_values) + vals("B", r.b_values);
+    }
+    return `<tr class="row"><td class="mono"><b>${esc(r.name)}</b></td>
+        <td><span class="badge b-${status}">${status}</span></td>
+        <td class="ns">${esc(r.namespace)}</td><td>${drift}${revealBlock}</td></tr>`;
+  }).join("");
+  tb.querySelectorAll("tr.row").forEach((tr, i) =>
+    tr.onclick = () => {
+      const d = tb.querySelectorAll(".diffs")[i];
+      if (d) d.classList.toggle("open");
+    });
+}
+
+async function refresh() {
+  await getJSON("/api/refresh", { method: "POST" });
+  await Promise.all([loadSummary(), loadRows()]);
+}
+
+$("refresh").onclick = refresh;
+$("ns").onchange = () => { state.ns = $("ns").value; loadRows(); };
+$("revealBtn").onclick = () => {
+  state.reveal = !state.reveal;
+  $("revealBtn").textContent = state.reveal ? "hide secret values" : "show secret values";
+  loadRows();
+};
+$("auto").onchange = () => {
+  clearInterval(window._auto);
+  if ($("auto").checked) window._auto = setInterval(refresh, 30000);
+};
+
+(async () => {
+  try {
+    const params = new URLSearchParams(location.search);
+    if (params.get("kind")) state.kind = params.get("kind");
+    if (params.get("reveal") === "1") {
+      state.reveal = true;
+      $("revealBtn").textContent = "hide secret values";
+    }
+    await loadConfig();
+    $("revealBtn").hidden = state.kind !== "secrets";
+    await Promise.all([loadSummary(), loadRows()]);
+    if ($("auto").checked) window._auto = setInterval(refresh, 30000);
+  } catch (e) {
+    $("summary").innerHTML = `<div class="warn">load failed: ${esc(e.message)}</div>`;
+  }
+})();
+</script>
+</body>
+</html>
