@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>12 — The Fault Ledger: Detailed Restart &amp; Error Analysis in Grafana</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#0f766e;--accent-soft:#e6f6f4;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(15,118,110,.11), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(219,39,119,.08), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #a7d8d0;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+  .stat{text-align:center;padding:20px 14px}
+  .stat .big{font-size:32px;font-weight:800;letter-spacing:-.02em;color:var(--accent)}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  blockquote{margin:16px 0;padding:12px 18px;border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 10px 10px 0;color:#06392f}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  .pill{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 9px;margin-right:4px}
+  .p0{background:#fde8f1;color:#9d174d;border:1px solid #fbcfe8}
+  .p1{background:#fef3d7;color:#92400e;border:1px solid #fde68a}
+  .p2{background:#e6f6f4;color:#065f46;border:1px solid #a7f3d0}
+  .todo{background:#eef0ff;color:#3730a3;border:1px solid #c7d2fe}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+  <a href="5-opik-llm-tracing.html">Opik</a>
+  <a href="6-opik-feedback-loop.html">Feedback</a>
+  <a href="7-mlx-inference-performance.html">Performance</a>
+  <a href="8-hydra-vs-mlx-oc.html">Hydra vs mlx-oc</a>
+  <a href="9-model-serving-resilience.html">Serving health</a>
+  <a href="10-opik-log-streaming.html">Server logs</a>
+  <a href="11-agentic-edge-cases.html">Edge cases</a>
+  <a href="12-fault-error-restart-analysis.html" style="color:var(--accent);font-weight:700">Fault ledger</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">12 of 12 &middot; faults, errors &amp; restarts</span>
+    <h1>The Fault Ledger</h1>
+    <p class="sub">Post 9 typed the crash and counted restarts; post 11 measured the crash rate and wrote a plan. This post makes the analysis <em>visible</em>: a per-reason crash counter in the supervisor, and a Grafana row that answers &ldquo;how many restarts, of what kind, when, and how many requests died with them&rdquo; &mdash; plus the surprising discovery that the dashboard&rsquo;s file edits were not reaching the running Grafana at all.</p>
+    <div class="meta">
+      <span><b>New metric</b> mlx_server_crashes_total{reason}</span>
+      <span><b>Dashboard</b> 18 &rarr; 28 panels (v3)</span>
+      <span><b>New tool</b> apply-dashboards.sh</span>
+      <span><b>Status</b> idle cluster &middot; 0 restarts &middot; disk 93.2%</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section>
+<h2><span class="num">1</span>The ask: more than a restart count</h2>
+<p>The <code>MLX Alerts &amp; Serving Health</code> dashboard already had the post-9 basics &mdash; a <em>Server restarts (5m)</em> timeseries, a <em>Last crash reason</em> stat, and a <em>Flapping alerts</em> table. But the post-11 plan demanded more: crash <em>rate per hour</em>, crashes <em>by reason</em>, crash <em>clusters</em>, and request error analysis. The old panels could not answer any of it:</p>
+<ul>
+  <li><strong>Restarts by reason?</strong> No &mdash; <code>mlx_server_restarts_total</code> is a bare counter with no labels. It says <em>how many</em>, never <em>what kind</em>.</li>
+  <li><strong>Restarts per hour?</strong> Only by re-reading the increase of a 5-minute window; no per-hour profile existed.</li>
+  <li><strong>What killed it last?</strong> <code>mlx_server_last_crash_reason</code> shows only the current state &mdash; a gauge that flips 1/0 on each crash, so it cannot count.</li>
+  <li><strong>Errors with the crashes?</strong> The proxy&rsquo;s <code>mlx_error_total{status}</code> existed but had no panel at all.</li>
+</ul>
+<div class="callout info"><span class="ic">The gap</span><span>The dashboard could tell you a crash happened; it could not tell you the story of <em>sixteen crashes in twenty-four hours</em> &mdash; which reason dominated, which hours clustered, and whether requests were failing alongside.</span></div>
+</section>
+
+<section>
+<h2><span class="num">2</span>The metric gap, closed with one counter</h2>
+<p>The fix is a second counter in <code>mlx_server_supervisor.py</code>, labeled by the same reason the supervisor already sniffs from the log tail:</p>
+<pre><code>G_RESTARTS = Counter("mlx_server_restarts_total", "mlx_lm.server restarts performed")
+G_CRASHES  = Counter("mlx_server_crashes_total", "server crashes by sniffed reason", ["reason"])</code></pre>
+<p>Incremented the moment the child exits, before the restart happens:</p>
+<pre><code>self.reason = sniff_crash_reason(self.args.server_log)
+G_EXIT.set(rc)
+G_CRASHES.labels(reason=self.reason).inc()</code></pre>
+<p>Two details matter. First, the counter is incremented on <em>every</em> exit including clean ones &mdash; the sniffer&rsquo;s five buckets (<code>metal_gpu_error</code>, <code>oom</code>, <code>python_error</code>, <code>exit</code>, <code>unknown</code>) cover every path, so the crash total always reconciles to the restart total. Second, and the reason this blog post exists:</p>
+<pre><code>for r in ("metal_gpu_error", "oom", "python_error", "exit", "unknown"):
+    G_CRASHES.labels(reason=r).inc(0)</code></pre>
+<p>A Prometheus counter emits <em>no series until its first <code>inc()</code></em>. Without that loop, the dashboard would show nothing until the next crash. Zero-initializing all five reasons means the five series exist at 0 from the very first scrape &mdash; the bargauge is filled, the ratio math is defined, and the dashboard is immediately readable.</p>
+<div class="callout ok"><span class="ic">Verified</span><span>After the stack restart, <code>mlx_server_crashes_total</code> appears in VictoriaMetrics as five series &mdash; <code>exit=0, metal_gpu_error=0, oom=0, python_error=0, unknown=0</code> &mdash; with the old bare restarts counter intact alongside.</span></div>
+</section>
+
+<section>
+<h2><span class="num">3</span>The new dashboard row: faults, errors &amp; restart counts</h2>
+<p>A fifth row, <em>5 &middot; Faults, errors &amp; restart counts</em>, turns the dashboard from 18 to 28 panels. Each panel maps to a question the old dashboard could not answer:</p>
+<div class="card">
+<table>
+  <tr><th>panel</th><th>type</th><th>query (essence)</th><th>answers</th></tr>
+  <tr><td>Total restarts (since supervisor start)</td><td>stat</td><td><code>max(mlx_server_restarts_total)</code></td><td>lifetime restarts this supervisor process</td></tr>
+  <tr><td>Crashes by reason (total)</td><td>bargauge</td><td><code>sum(mlx_server_crashes_total) by (reason)</code></td><td>which failure class dominates, forever</td></tr>
+  <tr><td>Last exit code</td><td>stat</td><td><code>max(mlx_server_last_exit_code)</code></td><td>what the last exit actually returned (rc=0 on Metal abort)</td></tr>
+  <tr><td>Backoff delay (crash-loop indicator)</td><td>stat</td><td><code>max(mlx_server_backoff_seconds)</code></td><td>rising backoff = crash loop in progress</td></tr>
+  <tr><td>Crashes, last 24 h</td><td>stat</td><td><code>sum(increase(mlx_server_crashes_total[24h]))</code></td><td>the post-11 headline number, automated</td></tr>
+  <tr><td>Restarts per hour</td><td>timeseries (bars)</td><td><code>sum(increase(mlx_server_restarts_total[1h]))</code></td><td>the 22:00 / 01:00 / 09:00 cluster profile at a glance</td></tr>
+  <tr><td>Crashes per hour by reason</td><td>timeseries (stacked)</td><td><code>sum(increase(mlx_server_crashes_total[1h])) by (reason)</code></td><td>which reason drives each cluster</td></tr>
+  <tr><td>Proxy errors by status class</td><td>timeseries</td><td><code>sum(rate(mlx_error_total[5m])) by (status)</code></td><td>4xx vs 5xx error rate beside the crash bars</td></tr>
+  <tr><td>Error ratio (4xx+5xx / requests)</td><td>stat</td><td><code>sum(rate(mlx_error_total[5m])) / sum(rate(mlx_requests_total[5m]))</code></td><td>the share of requests that fail &mdash; 503-degraded windows included</td></tr>
+</table>
+</div>
+<p>Together they implement the post-11 measurement protocol (<em>crash rate per hour</em>, <em>crash reason share</em>, <em>error rate</em>) as always-on panels instead of ad-hoc queries &mdash; which is exactly what &ldquo;candidate 1: correlate each crash&rdquo; in the fix list needed.</p>
+</section>
+
+<section>
+<h2><span class="num">4</span>The deployment reality: file edits don&rsquo;t reach Grafana</h2>
+<p>This Grafana is not the <code>compose.yaml</code> from <code>observability/</code>. It runs in the k0s <code>monitoring</code> namespace as a Helm chart whose dashboards are provisioned by a <strong>kiwigrid sidecar</strong>: the sidecar watches ConfigMaps labeled <code>grafana_dashboard=1</code> in any namespace, drops their JSON into <code>/tmp/dashboards</code>, and reloads Grafana provisioning. The repo&rsquo;s <code>mlx-alerts.json</code> is a source artifact &mdash; it never touches the running instance by itself.</p>
+<p>Two facts made the first fix attempt fail, usefully:</p>
+<ul>
+  <li>Pushing the new JSON through the Grafana API returned <code>400 "Cannot save provisioned dashboard"</code> &mdash; the dashboard was DB-marked provisioned by a ConfigMap that no longer exists anywhere in the cluster (orphaned), so neither the API nor the file sidecar owned it cleanly.</li>
+  <li>No <code>mlx-*</code> file existed in <code>/tmp/dashboards</code> either &mdash; grep across every ConfigMap in every namespace found nothing.</li>
+</ul>
+<p>The fix makes the source-of-truth relationship explicit. <code>observability/grafana/apply-dashboards.sh</code> (committed with the repo) does the whole pipeline:</p>
+<pre><code>kubectl create configmap "$name" -n monitoring --from-file="$json" --dry-run=client -o yaml | kubectl apply -f -
+kubectl label cm "$name" -n monitoring grafana_dashboard=1 --overwrite</code></pre>
+<p>The sidecar writes the file, and a provisioning reload picks it up:</p>
+<pre><code>curl -u admin:admin -X POST http://127.0.0.1:3000/api/admin/provisioning/dashboards/reload</code></pre>
+<p>The reload step is the one manual piece: the sidecar&rsquo;s <code>REQ_URL</code> fires the reload POST anonymously, which the admin-only endpoint rejects &mdash; so after applying, an authenticated reload (or the provider&rsquo;s 30-second scan) is what flips the dashboard. Result: <strong>MLX Alerts &amp; Serving Health at version 3, 28 panels</strong>, provisioned from the repo file.</p>
+<div class="callout warn"><span class="ic">Lesson</span><span>Before this, an edit to <code>mlx-alerts.json</code> in the repo did nothing to the live dashboard and <em>nothing said so</em>. The provisioning path is now scripted and its output states exactly what was applied &mdash; the repo file is the single source of truth.</span></div>
+</section>
+
+<section>
+<h2><span class="num">5</span>The status snapshot: an idle cluster with two alerts</h2>
+<p>With the new row live, the current state is honest and readable:</p>
+<div class="card">
+<div class="grid2">
+  <div class="stat"><div class="big">0</div><div class="lbl">restarts / crashes since the 09:30 restart</div></div>
+  <div class="stat"><div class="big">12h</div><div class="lbl">mlx_lm.server uptime</div></div>
+  <div class="stat"><div class="big">5/5</div><div class="lbl">crash-reason series present, all 0</div></div>
+  <div class="stat"><div class="big">93.2%</div><div class="lbl">rank0 disk &mdash; MLXDiskNearlyFull FIRING</div></div>
+</div>
+<p style="font-size:13.5px;color:var(--muted)">Tailer: up, errors 0, queue depth 0 &middot; 11 lines shipped at startup, 5,798 HTTP lines filtered &middot; zero requests through the proxy since restart.</p>
+</div>
+<p>Two alerts are firing, and they are opposites:</p>
+<ul>
+  <li><strong><code>MLXDiskNearlyFull</code> is real.</strong> rank0 is at <b>93.2%</b> (228&nbsp;GB of 245&nbsp;GB used), up from 92.7% this morning. It is the P0 item in the post-11 table that keeps getting deferred &mdash; nothing is being deleted, so the number only grows.</li>
+  <li><strong><code>MLXLogTailerNotSending</code> is expected.</strong> The rule fires when zero lines ship in 15 minutes while the tailer is up &mdash; and its own description says an idle server makes that normal. The tailer is healthy; there is simply nothing interesting to forward. It is signal-to-noise, and it is the same class of idle-false-positive the dashboard&rsquo;s alert work keeps chasing.</li>
+</ul>
+</section>
+
+<section>
+<h2><span class="num">6</span>A live demonstration of the counter problem</h2>
+<p>Grep the tailer&rsquo;s metrics and the counter-reset issue from post-11 recommendation #6 shows up in the flesh:</p>
+<pre><code>mlx_log_tailer_lines_total{severity="info"} = 5798   # previous process, still in VM
+mlx_log_tailer_lines_total{severity="info"} = 11     # current process</code></pre>
+<p>Every restart zeroes the counters and leaves the old series behind in VictoriaMetrics until retention reaps it. A naive <code>sum()</code> now reports 5,809 lines &mdash; wrong on both counts (it double-counts and it is not a total). The new <code>mlx_server_crashes_total</code> has the exact same property: after the next restart its five series will sit next to five stale zeros from this process. The fix from post 11 stands: a <strong>start-epoch gauge</strong> (or persisted counters) so cumulative totals can be recomputed across restarts &mdash; without it, every &ldquo;since supervisor start&rdquo; panel is only true until the next restart.</p>
+</section>
+
+<section>
+<h2><span class="num">7</span>What this changes</h2>
+<ul>
+  <li>Crash analysis moved from ad-hoc queries to <strong>always-on panels</strong>: per-reason totals, per-hour profiles, and the request-error ratio now render by default, implementing the post-11 measurement protocol as a dashboard instead of a script.</li>
+  <li>The supervisor&rsquo;s crash story is <strong>countable, not just current</strong>: a labeled counter that reconciles to the restart total, with all five reasons visible at zero before the first crash.</li>
+  <li>The dashboard&rsquo;s deployment path is <strong>scripted and honest</strong>: repo JSON &rarr; ConfigMap &rarr; sidecar &rarr; provisioning, with the orphaned-provisioned trap documented.</li>
+  <li>The open P0s are unchanged and now quantified: <strong>rank0 disk at 93.2%</strong> and the counter-persistence fix that the tailer&rsquo;s dual series just demonstrated live.</li>
+</ul>
+</section>
+
+</main>
+
+<footer class="wrap">
+  mlx-oc &middot; post 12 of 12 &middot; fault ledger, per-reason crash counting &amp; the dashboard provisioning path &middot; <a href="../README.md">repo README</a>
+</footer>
+</body>
+</html>

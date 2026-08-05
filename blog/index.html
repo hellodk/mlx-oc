@@ -36,6 +36,7 @@
   .n9{background:linear-gradient(135deg,#334155,#64748b)}
   .n10{background:linear-gradient(135deg,#0f766e,#22d3ee)}
   .n11{background:linear-gradient(135deg,#7c3aed,#22d3ee)}
+  .n12{background:linear-gradient(135deg,#b45309,#f59e0b)}
   .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
   .post p{margin:0;color:var(--muted);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
@@ -142,6 +143,14 @@
       <h2>Edge Cases Are the Load: Tools, Streaming, and the Zero-Completion Traces</h2>
       <p>Agentic benchmark runs uncovered the real load shape &mdash; and the token ledger exposed 63% of traces ending with zero completion tokens. Cause found: streaming + tools is a reproducible metal_gpu_error trigger on this 4B-8bit ring. Full metrics review, a tuning plan for edge scenarios, a containment + 10-candidate fix list for the Metal fault, and a prioritized recommendation table.</p>
       <span class="tag">agentic</span><span class="tag">metal_gpu_error</span><span class="tag">zero-completion traces</span><span class="tag">tuning</span><span class="tag">recommendations</span>
+    </div>
+  </a>
+  <a class="post" href="12-fault-error-restart-analysis.html">
+    <div class="num n12">12</div>
+    <div>
+      <h2>The Fault Ledger: Detailed Restart &amp; Error Analysis in Grafana</h2>
+      <p>A bare restarts counter and a last-crash gauge could not answer "how many, of what kind, when." New: a per-reason mlx_server_crashes_total counter (zero-initialized for all five reasons), a nine-panel Faults, Errors &amp; Restart Counts row (18&rarr;28 panels), and apply-dashboards.sh &mdash; because the live k8s Grafana is provisioned by a sidecar from labeled ConfigMaps, and editing the repo JSON did nothing until that path was scripted. Plus an idle-cluster status snapshot and a live demo of the counter-reset problem.</p>
+      <span class="tag">fault analysis</span><span class="tag">mlx_server_crashes_total</span><span class="tag">Grafana provisioning</span><span class="tag">sidecar</span><span class="tag">restart counts</span>
     </div>
   </a>
 </main>
