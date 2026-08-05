@@ -79,11 +79,13 @@
   <a href="10-opik-log-streaming.html">Server logs</a>
   <a href="11-agentic-edge-cases.html">Edge cases</a>
   <a href="12-fault-error-restart-analysis.html">Fault ledger</a>
+  <a href="13-agentic-forensics.html">Agentic forensics</a>
+  <a href="14-recommendations-decision.html">Decision ledger</a>
 </div></nav>
 
 <header class="hero">
   <div class="wrap">
-    <span class="kicker">Post 7 of 7 &middot; Context &amp; KV cache</span>
+    <span class="kicker">Post 7 of 14 &middot; Context &amp; KV cache</span>
     <h1>The Performance Dashboard: KV Cache and Context, Finally Visible</h1>
     <p class="sub">The cluster already exported hardware, request and quality metrics. The one thing nobody could see was the thing that decides how much of a 40,960-token window a request actually uses &mdash; the prompt (KV) cache and the context length. This week a log-tailing agent on :9104 plus a handful of proxy gauges put both in VictoriaMetrics, and a fourth Grafana dashboard renders them.</p>
     <div class="meta">

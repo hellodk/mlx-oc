@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>14 — The Decision Ledger: Tuning, metal_gpu_error, and Every Recommendation in One Place</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#4f46e5;--accent-soft:#eef0ff;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(219,39,119,.10), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(15,118,110,.10), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #dfe1ff;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  .pill{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 9px;margin-right:4px}
+  .p0{background:#fde8f1;color:#9d174d;border:1px solid #fbcfe8}
+  .p1{background:#fef3d7;color:#92400e;border:1px solid #fde68a}
+  .p2{background:#e6f6f4;color:#065f46;border:1px solid #a7f3d0}
+  .todo{background:#eef0ff;color:#3730a3;border:1px solid #c7d2fe}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+  <a href="5-opik-llm-tracing.html">Opik</a>
+  <a href="6-opik-feedback-loop.html">Feedback</a>
+  <a href="7-mlx-inference-performance.html">Performance</a>
+  <a href="8-hydra-vs-mlx-oc.html">Hydra vs mlx-oc</a>
+  <a href="9-model-serving-resilience.html">Serving health</a>
+  <a href="10-opik-log-streaming.html">Server logs</a>
+  <a href="11-agentic-edge-cases.html">Edge cases</a>
+  <a href="12-fault-error-restart-analysis.html">Fault ledger</a>
+  <a href="13-agentic-forensics.html">Agentic forensics</a>
+  <a href="14-recommendations-decision.html" style="color:var(--accent);font-weight:700">Decision ledger</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">14 of 14 &middot; the decision</span>
+    <h1>The Decision Ledger</h1>
+    <p class="sub">Post 13 gave us the root cause: a heterogeneous ring whose remote M4 faults and then poisons the GPU, with a readiness check that cannot see it. This post is everything the cluster has learned, consolidated into the three artifacts we now choose from &mdash; a tuning guide for edge scenarios, a handling plan for <code>metal_gpu_error</code>, and the complete recommendation ledger. Status column is live: <em>pending</em> means &ldquo;decision required&rdquo;.</p>
+    <div class="meta">
+      <span><b>Source posts</b> 9 &middot; 10 &middot; 11 &middot; 12 &middot; 13</span>
+      <span><b>Ledger</b> 21 recommendations &middot; 1 promoted to P0 &middot; 1 resolved</span>
+      <span><b>Decision</b> pending &mdash; section 5</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section>
+<h2><span class="num">1</span>What we are deciding on</h2>
+<p>The story compressed to one paragraph. Two agentic requests and a trivial request all died to <code>metal_gpu_error</code>. Crash reports exist only on rank1 &mdash; an M4 16&nbsp;GB paired with an M2 8&nbsp;GB on an MLX ring &mdash; and the faulting thread is <code>mlx::core::metal::EventImpl::check_error()</code> on the GPU stream thread. The M4&rsquo;s GPU faults under load (one genuine <code>GPU Timeout</code> among the crashes), then the device stays wedged, so the <em>next</em> request crashes too until a restart lands on a healed device. The supervisor&rsquo;s <code>/v1/models</code> readiness check cannot tell a wedged GPU from a healthy one. Full evidence in post 13.</p>
+<p>Everything below exists to answer one question: <strong>do we keep the ring, or become a single node?</strong> Sections 2 and 3 are the tuning and the fault plan; section 4 is the ledger; section 5 is the decision.</p>
+</section>
+
+<section>
+<h2><span class="num">2</span>Tuning the model for edge scenarios</h2>
+<p>The scenarios that hurt: streaming, tool-calling turns, concurrent agent loops, long transcripts, and the cascade after a crash. Each knob below maps to one or more of them. Grouped by where the knob lives.</p>
+
+<h3>Model &amp; serving</h3>
+<div class="card">
+<table>
+  <tr><th>knob</th><th>what it does</th><th>edge scenario it targets</th><th>effort</th></tr>
+  <tr><td><b>Single-node serving (ring disabled)</b></td><td>serves the 4B-8bit from rank0 alone; removes the heterogeneous GPU pair, LAN collectives and the &ldquo;rank1 dies first&rdquo; cascade</td><td>all of them &mdash; the root cause</td><td>medium</td></tr>
+  <tr><td><b>Cap <code>max_tokens</code></b></td><td>bounds the longest single generation and the command-buffer budget it consumes</td><td>streaming, long generations</td><td>low</td></tr>
+  <tr><td><b>Cap context window</b> (below the model&rsquo;s 32&ndash;40&nbsp;k)</td><td>bounds prefill size and KV growth per request</td><td>long transcripts, concurrent agents</td><td>low</td></tr>
+  <tr><td><b>Chunk long prefills</b> + prefill watchdog</td><td>splits huge prompts; alerts/kills on a prefill that runs too long</td><td>the <code>GPU Timeout</code> class, 17&ndash;24&nbsp;k prefills</td><td>medium</td></tr>
+  <tr><td><b>Quantize to 4-bit</b> or run 1.7B-4bit for the agentic route</td><td>less GPU memory per token; smaller command buffers</td><td>tools, concurrency</td><td>medium</td></tr>
+  <tr><td><b>Reserve GPU headroom</b> (MLX memory limit)</td><td>stops the allocator from painting the device into a corner before submission</td><td>concurrency, cascade state</td><td>low</td></tr>
+  <tr><td><b>Pin mlx/mlx-lm versions</b></td><td>removes upgrade drift from the failure surface</td><td>all &mdash; already verified identical (0.32.0 / 0.31.3)</td><td>done</td></tr>
+  <tr><td><b>Bounded prompt cache</b></td><td>caps the in-RAM cached sequences (1.24&nbsp;G seen) so reused prompts cannot pile up</td><td>long agent sessions</td><td>low</td></tr>
+</table>
+</div>
+
+<h3>Proxy (routing &amp; load shaping)</h3>
+<div class="card">
+<table>
+  <tr><th>knob</th><th>what it does</th><th>edge scenario it targets</th><th>effort</th></tr>
+  <tr><td><b>Queue + in-flight cap (4) + Retry-After</b></td><td>removes the burst path that precedes crashes instead of stacking requests</td><td>concurrent agents</td><td>low</td></tr>
+  <tr><td><b>Gate tools on the 4B route</b></td><td>reject or reroute <code>tools</code> requests to a model that obeys tool directives</td><td>tools, planner</td><td>low</td></tr>
+  <tr><td><b>Request normalization</b></td><td>strip <code>tools</code> / cap messages at the edge so the model only ever sees supported shapes</td><td>tools, long transcripts</td><td>low</td></tr>
+  <tr><td><b>Real streaming usage object</b></td><td>emit <code>usage</code> in stream chunks so the client can show live cost and detect dead streams</td><td>streaming</td><td>medium</td></tr>
+  <tr><td><b>Stream keep-alives + timeouts</b></td><td>detect the empty/truncated stream (the 28-completion-token symptom) instead of hanging</td><td>streaming, crash windows</td><td>low</td></tr>
+  <tr><td><b>Degraded-window handling</b></td><td>serve 503 with <code>Retry-After</code> + a health-flag the client understands, not empty 200s</td><td>crash/restart windows</td><td>low</td></tr>
+</table>
+</div>
+
+<h3>Client / agent (opencode side)</h3>
+<div class="card">
+<table>
+  <tr><th>knob</th><th>what it does</th><th>edge scenario it targets</th><th>effort</th></tr>
+  <tr><td><b>Retry-with-backoff on 5xx</b></td><td>turns the supervisor&rsquo;s auto-restart into a transparent blip instead of a dead turn</td><td>crash/restart windows</td><td>low</td></tr>
+  <tr><td><b>Transcript trimmer / summarizer</b></td><td>keeps agent transcripts from growing unbounded; every turn re-sends the whole history today</td><td>long agent sessions</td><td>high</td></tr>
+  <tr><td><b>Stagger tool turns</b></td><td>serialize or throttle simultaneous tool-calling turns</td><td>concurrent agents</td><td>low</td></tr>
+  <tr><td><b>Streaming&rarr;non-streaming fallback</b></td><td>fall back to plain completion when a stream dies, instead of dropping the answer</td><td>streaming</td><td>medium</td></tr>
+</table>
+</div>
+
+<h3>Observability that tunes itself</h3>
+<div class="card">
+<table>
+  <tr><th>knob</th><th>what it does</th><th>edge scenario it targets</th><th>effort</th></tr>
+  <tr><td><b>Crash&harr;request correlation</b></td><td>join each crash to its in-flight request, GPU/RAM state and alert payload</td><td>every experiment&rsquo;s measurement</td><td>low</td></tr>
+  <tr><td><b>Start-epoch counters</b></td><td>makes cumulative totals recomputable across restarts (the dual-series trap, post 12)</td><td>crash/restart windows</td><td>low</td></tr>
+  <tr><td><b>Ingest rank1 crash reports</b></td><td>alert on new <code>Python-*.ips</code> &mdash; found incidents the server log missed</td><td>crash forensics</td><td>medium</td></tr>
+  <tr><td><b>Lower crash-loop threshold</b></td><td>page on clusters (&gt;2 restarts/h) rather than single faults</td><td>crash loops</td><td>low</td></tr>
+</table>
+</div>
+</section>
+
+<section>
+<h2><span class="num">3</span>Handling <code>metal_gpu_error</code></h2>
+<p>The plan in three parts: prevent the fault, respond to it, and recover into a state the readiness check actually proves.</p>
+
+<h3>Prevent</h3>
+<ul>
+  <li><strong>Remove the ring</strong> &mdash; serve the 4B-8bit from rank0 alone. This is the root-cause fix from post 13, not a mitigation.</li>
+  <li><strong>If the ring stays:</strong> pair like GPUs (M2+M2 or M4+M4), cap <code>max_tokens</code> and context, reserve GPU headroom, keep versions pinned.</li>
+  <li><strong>Bound the load shapes that fault the M4</strong>: chunk long prefills, gate concurrent agent loops, watch prefill duration.</li>
+</ul>
+
+<h3>Respond (already in place)</h3>
+<ul>
+  <li>Supervisor with typed crash reason and backoff ladder 5&rarr;10&rarr;20&rarr;40&nbsp;s; every crash auto-recovered.</li>
+  <li><code>MLXServerMetalFault</code> alert; per-reason counters on the fault-ledger dashboard (post 12); crash lines and traces shipped to Opik (post 10).</li>
+</ul>
+
+<h3>Recover (the gap post 13 exposed)</h3>
+<div class="callout warn"><span class="ic">The gap</span><span>After a Metal fault the GPU device stays wedged, but the supervisor respawns in ~5&nbsp;s and declares <em>ready</em> on a <code>/v1/models</code> 200. The next real request is the first submission into the poisoned device &mdash; and it crashes again.</span></div>
+<ol>
+  <li><strong>Post-Metal cooldown:</strong> after a <code>metal_gpu_error</code>, wait longer than the ordinary backoff (e.g. &ge;30&nbsp;s) so the device actually clears before respawning.</li>
+  <li><strong>First-generation probe:</strong> before setting <code>ready=1</code>, run a real 1-token generation against the model. HTTP-up is not GPU-functional.</li>
+  <li><strong>Grace window:</strong> reject or queue requests for the first seconds after restart (the proxy already 503s during the load window &mdash; extend it through the probe).</li>
+  <li><strong>Escalation:</strong> if N consecutive restarts still fault, stop respawning, page, and surface the rank1 crash report path &mdash; the device needs human attention, not another 5&nbsp;s loop.</li>
+</ol>
+</section>
+
+<section>
+<h2><span class="num">4</span>The recommendation ledger</h2>
+<p>Every open recommendation from posts 11&ndash;13 in one table. <span class="pill p0">P0</span> blocks serving reliability &middot; <span class="pill p1">P1</span> should ship <span class="pill p2">P2</span> can wait. <span class="pill todo">decide</span> means the status column is the open decision.</p>
+<div class="card">
+<table>
+  <tr><th>#</th><th>recommendation</th><th>priority</th><th>effort</th><th>dependency</th><th>status</th></tr>
+  <tr><td>1</td><td>Free disk on rank0 (93.6% full, <code>MLXDiskNearlyFull</code> firing)</td><td><span class="pill p0">P0</span></td><td>low</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>2</td><td>Queue + in-flight cap (4) + Retry-After at the proxy</td><td><span class="pill p0">P0</span></td><td>low</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>3</td><td>Gate tools on the 4B route (reject/reroute streaming+tools)</td><td><span class="pill p0">P0</span></td><td>low</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>4</td><td>Correlate every crash with its in-flight request + GPU/RAM state</td><td><span class="pill p0">P0</span></td><td>low</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>5</td><td>Fix the KV-cache agent parser (dead metric)</td><td><span class="pill p1">P1</span></td><td>low</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>6</td><td>Persist cumulative counters across supervisor/proxy restarts</td><td><span class="pill p1">P1</span></td><td>low</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>7</td><td>Cap <code>max_tokens</code> and context window at the server</td><td><span class="pill p1">P1</span></td><td>low</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>8</td><td>Lower crash-loop alert threshold to &gt;2 restarts/h</td><td><span class="pill p1">P1</span></td><td>low</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>9</td><td>Emit/pass-through a real streaming usage object</td><td><span class="pill p1">P1</span></td><td>medium</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>10</td><td>Pin a single mlx/mlx-lm version</td><td><span class="pill p1">P1</span></td><td>low</td><td>&mdash;</td><td><b>resolved</b> &mdash; both nodes 0.32.0 / 0.31.3</td></tr>
+  <tr><td>11</td><td>Single-node test (ring disabled)</td><td><span class="pill p0">P0</span></td><td>medium</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>12</td><td>Quantize 4B to 4-bit; try 1.7B for the agentic route</td><td><span class="pill p2">P2</span></td><td>medium</td><td>after #11</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>13</td><td>Reserve GPU memory headroom (MLX memory limit)</td><td><span class="pill p2">P2</span></td><td>low</td><td>after #11</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>14</td><td>Stream/chunk long prefills + prefill watchdog</td><td><span class="pill p2">P2</span></td><td>medium</td><td>after #11</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>15</td><td>Client retry-with-backoff on 5xx (opencode side)</td><td><span class="pill p1">P1</span></td><td>low</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>16</td><td>Summarizer/transcript trimmer for long agent sessions</td><td><span class="pill p2">P2</span></td><td>high</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>17</td><td>Supervisor post-Metal cooldown + first-generation readiness probe</td><td><span class="pill p0">P0</span></td><td>low</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>18</td><td>Grace window after restart (reject/queue until probe passes)</td><td><span class="pill p0">P0</span></td><td>low</td><td>after #17</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>19</td><td>Homogeneous ring requirement if ring is retained (M2+M2 or M4+M4)</td><td><span class="pill p1">P1</span></td><td>medium</td><td>if #11 rejected</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>20</td><td>Ingest/alert on rank1 <code>DiagnosticReports</code> (.ips)</td><td><span class="pill p2">P2</span></td><td>medium</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>21</td><td>Crash-loop escalation: stop respawning + page after N consecutive Metal faults</td><td><span class="pill p1">P1</span></td><td>low</td><td>after #17</td><td><span class="pill todo">decide</span></td></tr>
+</table>
+</div>
+</section>
+
+<section>
+<h2><span class="num">5</span>The decision</h2>
+<p>The evidence in post 13 makes the direction clear. Recommended call, with the containment work running in parallel so nothing waits on the big decision:</p>
+<div class="card">
+<table>
+  <tr><th>decision</th><th>recommended</th><th>why</th></tr>
+  <tr><td>Single-node (drop the ring)</td><td><b>yes &mdash; do the test this week</b></td><td>4B-8bit fits rank0&rsquo;s 8&nbsp;GB; removes the heterogeneous pair that post 13 identified as the fault origin. Cheapest discriminator that is also likely the permanent fix.</td></tr>
+  <tr><td>Supervisor recovery hardening (#17&ndash;18)</td><td><b>yes &mdash; ship with #11</b></td><td>small change; without it the post-crash request always eats the second crash.</td></tr>
+  <tr><td>Containment P0s (#1&ndash;4)</td><td><b>yes &mdash; in parallel</b></td><td>disk, queue, tool gate and correlation are independent of the ring decision.</td></tr>
+  <tr><td>Tool routing on the 4B</td><td><b>gate now, revisit after #11</b></td><td>the 4B ignores planner directives anyway (post 11); decide the agentic model after single-node capacity is real.</td></tr>
+  <tr><td>Definition of done</td><td><b>24 h crash-free under the agentic workload</b></td><td>crash rate per hour &rarr; ~0; <code>completion&gt;0</code> trace ratio &rarr; 1.0; error rate &rarr; 0. Measured on the post-12 dashboard.</td></tr>
+</table>
+</div>
+<div class="callout ok"><span class="ic">The ask</span><span>Nothing on this page is committed yet. Post 13 gave us the cause; this post gives us the menu. Pick from the ledger, and the cluster work resumes with the chosen items as tickets.</span></div>
+</section>
+
+</main>
+
+<footer class="wrap">
+  mlx-oc &middot; post 14 of 14 &middot; the decision ledger &mdash; tuning, the metal_gpu_error plan, and all 21 recommendations in one place &middot; <a href="../README.md">repo README</a>
+</footer>
+</body>
+</html>

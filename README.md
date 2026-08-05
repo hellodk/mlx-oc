@@ -335,6 +335,13 @@ Per-section field notes on the observability layer, with animated pastel SVGs
 5. [Self-Hosted LLM Tracing: the MLX Proxy Talks to Opik](blog/5-opik-llm-tracing.html)
 6. [The Feedback Loop: Every Chat Completion Gets Scored](blog/6-opik-feedback-loop.html)
 7. [The Performance Dashboard: KV Cache and Context, Finally Visible](blog/7-mlx-inference-performance.html)
+8. [Hydra vs mlx-oc: Two Monitoring Architectures, One Metric Contract](blog/8-hydra-vs-mlx-oc.html)
+9. [The Night the GPU Crashed: Serving Health, Supervision & Load Testing](blog/9-model-serving-resilience.html)
+10. [The Other Half of the Story: Streaming Server Logs into Opik](blog/10-opik-log-streaming.html)
+11. [Edge Cases Are the Load: Tools, Streaming, and the Zero-Completion Traces](blog/11-agentic-edge-cases.html)
+12. [The Fault Ledger: Detailed Restart & Error Analysis in Grafana](blog/12-fault-error-restart-analysis.html)
+13. [The Fault Is Remote: Why rank1 Dies First](blog/13-agentic-forensics.html)
+14. [The Decision Ledger: Tuning, metal_gpu_error, and Every Recommendation](blog/14-recommendations-decision.html)
 
 ## Known platform quirks
 

@@ -37,6 +37,8 @@
   .n10{background:linear-gradient(135deg,#0f766e,#22d3ee)}
   .n11{background:linear-gradient(135deg,#7c3aed,#22d3ee)}
   .n12{background:linear-gradient(135deg,#b45309,#f59e0b)}
+  .n13{background:linear-gradient(135deg,#334155,#e11d48)}
+  .n14{background:linear-gradient(135deg,#4f46e5,#db2777)}
   .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
   .post p{margin:0;color:var(--muted);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
@@ -48,7 +50,7 @@
   <div class="wrap">
     <span class="kicker">MLX Observability &middot; Field Notes</span>
     <h1>Making Two Mac minis<br>Actually Observable</h1>
-    <p class="sub">Ten deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 28 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, a performance dashboard that finally shows the KV cache and context window, a head-to-head with hydra&rsquo;s push-first fleet stack, how a real GPU crash exposed the missing process-level truth &mdash; now fixed with a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that stress the cluster like an agent &mdash; and the streamed server runtime log that finally carries an incident&rsquo;s server-side context into Opik.</p>
+    <p class="sub">Fourteen deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 28 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, a performance dashboard that finally shows the KV cache and context window, a head-to-head with hydra&rsquo;s push-first fleet stack, how a real GPU crash exposed the missing process-level truth &mdash; now fixed with a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that stress the cluster like an agent &mdash; and the streamed server runtime log that finally carries an incident&rsquo;s server-side context into Opik. The final three posts take the crash story to its end: a per-reason fault ledger in Grafana, the forensics that found the fault lives on the remote rank, and the consolidated decision ledger we now choose from.</p>
     <div class="meta">
       <span><b>Stack</b> VictoriaMetrics + vmalert + Alertmanager + Grafana</span>
       <span><b>Agents</b> mlx_metrics_proxy :8080 &middot; mlx_hw_telemetry :9102 &middot; mlx_kv_cache_agent :9104</span>
@@ -151,6 +153,22 @@
       <h2>The Fault Ledger: Detailed Restart &amp; Error Analysis in Grafana</h2>
       <p>A bare restarts counter and a last-crash gauge could not answer "how many, of what kind, when." New: a per-reason mlx_server_crashes_total counter (zero-initialized for all five reasons), a nine-panel Faults, Errors &amp; Restart Counts row (18&rarr;28 panels), and apply-dashboards.sh &mdash; because the live k8s Grafana is provisioned by a sidecar from labeled ConfigMaps, and editing the repo JSON did nothing until that path was scripted. Plus an idle-cluster status snapshot and a live demo of the counter-reset problem.</p>
       <span class="tag">fault analysis</span><span class="tag">mlx_server_crashes_total</span><span class="tag">Grafana provisioning</span><span class="tag">sidecar</span><span class="tag">restart counts</span>
+    </div>
+  </a>
+  <a class="post" href="13-agentic-forensics.html">
+    <div class="num n13">13</div>
+    <div>
+      <h2>The Fault Is Remote: Why rank1 Dies First</h2>
+      <p>A five-token request crashed the box minutes after two agentic requests did &mdash; so the trigger was never just streaming+tools. macOS crash reports exist only on rank1 (an M4 16&nbsp;GB paired with the M2 8&nbsp;GB on the ring), the faulting thread is mlx&rsquo;s own GPU stream thread, and the fatal pattern is a heterogeneous ring whose faster GPU faults, then poisons the device so the next request dies too &mdash; a readiness check of /v1/models cannot see it. Version skew is ruled out: both nodes run mlx 0.32.0 / mlx-lm 0.31.3. Single-node is promoted to P0.</p>
+      <span class="tag">rank1</span><span class="tag">crash reports</span><span class="tag">heterogeneous ring</span><span class="tag">GPU stream thread</span><span class="tag">poisoned device</span>
+    </div>
+  </a>
+  <a class="post" href="14-recommendations-decision.html">
+    <div class="num n14">14</div>
+    <div>
+      <h2>The Decision Ledger: Tuning, metal_gpu_error, and Every Recommendation in One Place</h2>
+      <p>The cluster&rsquo;s knowledge consolidated into the three artifacts we now choose from: a tuning guide for edge scenarios (streaming, tools, concurrency, long transcripts &mdash; across model, proxy and client), a prevent/respond/recover plan for metal_gpu_error, and the complete recommendation ledger &mdash; 21 items with priority, effort, dependency and a live status column. The recommendation: single-node serving + supervisor recovery hardening, with the containment P0s running in parallel. Nothing committed yet &mdash; this is the decision.</p>
+      <span class="tag">tuning</span><span class="tag">metal_gpu_error plan</span><span class="tag">recommendation ledger</span><span class="tag">decision</span><span class="tag">single-node</span>
     </div>
   </a>
 </main>

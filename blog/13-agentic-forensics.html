@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>13 — The Fault Is Remote: Why rank1 Dies First</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#0f766e;--accent-soft:#e6f6f4;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(15,118,110,.11), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(219,39,119,.08), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #a7d8d0;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+  .stat{text-align:center;padding:20px 14px}
+  .stat .big{font-size:32px;font-weight:800;letter-spacing:-.02em;color:var(--accent)}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  blockquote{margin:16px 0;padding:12px 18px;border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 10px 10px 0;color:#06392f}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  .pill{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 9px;margin-right:4px}
+  .p0{background:#fde8f1;color:#9d174d;border:1px solid #fbcfe8}
+  .p1{background:#fef3d7;color:#92400e;border:1px solid #fde68a}
+  .p2{background:#e6f6f4;color:#065f46;border:1px solid #a7f3d0}
+  .todo{background:#eef0ff;color:#3730a3;border:1px solid #c7d2fe}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+  <a href="5-opik-llm-tracing.html">Opik</a>
+  <a href="6-opik-feedback-loop.html">Feedback</a>
+  <a href="7-mlx-inference-performance.html">Performance</a>
+  <a href="8-hydra-vs-mlx-oc.html">Hydra vs mlx-oc</a>
+  <a href="9-model-serving-resilience.html">Serving health</a>
+  <a href="10-opik-log-streaming.html">Server logs</a>
+  <a href="11-agentic-edge-cases.html">Edge cases</a>
+  <a href="12-fault-error-restart-analysis.html">Fault ledger</a>
+  <a href="13-agentic-forensics.html" style="color:var(--accent);font-weight:700">Agentic forensics</a>
+  <a href="14-recommendations-decision.html">Decision ledger</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">13 of 14 &middot; agentic forensics &amp; the remote fault</span>
+    <h1>The Fault Is Remote: Why rank1 Dies First</h1>
+    <p class="sub">Post 11 called <code>metal_gpu_error</code> a streaming+tools trigger and suspected version skew. Both were wrong. A fresh incident &mdash; two real agentic requests, then a trivial five-token request crashing the box &mdash; sent us to the machines themselves. The macOS crash reports live on only one of them, the backtrace names the GPU stream thread, and the whole failure mode turns out to be a heterogeneous ring with a poisoned GPU.</p>
+    <div class="meta">
+      <span><b>New evidence</b> crash reports exist only on rank1</span>
+      <span><b>Backtrace</b> mlx::core::metal::EventImpl::check_error</span>
+      <span><b>Versions</b> mlx 0.32.0 / mlx-lm 0.31.3 &mdash; identical (skew ruled out)</span>
+      <span><b>Status</b> single-node promoted to P0 &middot; decisions in post 14</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section>
+<h2><span class="num">1</span>A trivial request just crashed the box</h2>
+<p>The cluster had been idle and healthy for twelve hours &mdash; <code>restarts_total=0</code>, all five crash-reason series at zero, the new fault-ledger dashboard quiet. Then two streaming requests from the agent arrived: <b>24,579 prompt tokens</b> across two tool-turn transcripts, and <b>28 completion tokens</b> total. The server died mid-generation at <b>22:06:49</b> with <code>metal_gpu_error</code>; the supervisor restarted it in five seconds.</p>
+<p>Six minutes later, in a check that was supposed to confirm recovery, a <em>non-streaming</em> request with <code>max_tokens=5</code> and a two-word prompt also returned an empty body and crashed the server again at <b>22:12:55</b>. A second near-identical request, after the next restart, answered &ldquo;<code>ok</code>&rdquo;.</p>
+<div class="callout warn"><span class="ic">Why this matters</span><span>Post 11 claimed streaming+tools was &ldquo;the reliable crash trigger&rdquo;. A five-token plain request crashing the box proves the trigger is not the request &mdash; it is the <em>state of the machine</em> after a previous crash.</span></div>
+</section>
+
+<section>
+<h2><span class="num">2</span>The crash reports only live on rank1</h2>
+<p>macOS writes a <code>.ips</code> crash report (DiagnosticReports) for every process that aborts &mdash; but not for processes that are merely SIGTERM&rsquo;d. So we asked both machines who actually crashed:</p>
+<div class="card">
+<div class="grid2">
+  <div class="stat"><div class="big">rank1</div><div class="lbl">12 Python crash reports &mdash; every incident, plus 3 the server log never showed</div></div>
+  <div class="stat"><div class="big">rank0</div><div class="lbl">0 crash reports &mdash; killed by the launcher, never faulted</div></div>
+</div>
+</div>
+<p>Every report is <code>SIGABRT</code> / <em>Abort trap: 6</em> &mdash; the exact <code>libc++abi: terminating due to uncaught exception</code> path from the server log &mdash; from a Homebrew Python 3.12.13 that loaded <code>libmlx.dylib</code> and the <code>AGXMetalG16G_B0</code> Metal driver. The times line up one-to-one with every <code>metal_gpu_error</code> in <code>server.log</code>, and three more (Aug 4 22:10, 22:41, 23:08) show the crash rate was worse than any log-based count ever admitted.</p>
+</section>
+
+<section>
+<h2><span class="num">3</span>The backtrace names the GPU stream thread</h2>
+<p>The faulting thread in the rank1 report is unambiguous &mdash; this is <code>mlx</code>&rsquo;s own Metal event waiter throwing:</p>
+<pre><code>mlx::core::metal::EventImpl::check_error()          # &lt;- throws
+mlx::core::Event::wait(mlx::core::Stream)
+mlx::core::scheduler::StreamThread::thread_fn()      # the GPU stream thread
+  &#9500;&#9472; __cxa_throw &#8594; failed_throw &#8594; terminate &#8594; abort &#8594; SIGABRT
+  &#9492;&#9472; plus two mlx::core::distributed::ring::SocketThread::worker() threads in the process</code></pre>
+<p>The GPU command-buffer event reported a failure and mlx decided to throw instead of retry. So the crash is <strong>not</strong> on the serving host&rsquo;s main thread and <strong>not</strong> an OOM &mdash; it is the remote M4&rsquo;s GPU stream thread aborting the whole process while the ring&rsquo;s socket threads sit beside it.</p>
+</section>
+
+<section>
+<h2><span class="num">4</span>The ring dies in a specific order</h2>
+<p>Post-11 the ordering looked muddy. Re-read with the crash reports in hand, the local launcher log tells a clean story:</p>
+<pre><code>[ring] Receiving from socket 4 failed with errno 32      # ring link to rank1 breaks
+[ring] Sending to socket 4 failed with errno 32
+[ring] Too many send/recv errors. Aborting...
+libc++abi: terminating ... [METAL] ... SubmissionsIgnored  # the abort, streamed back
+[WARN] Node with rank 1 exited with code 255               # rank1 died first
+[WARN] Node with rank 0 exited with code -15               # rank0 was SIGTERM&rsquo;d</code></pre>
+<p>rank1&rsquo;s process aborts on its GPU stream thread &rarr; the ring socket goes dead (errno 32/54) &rarr; rank0&rsquo;s ring gives up and the launcher terminates it. The local <code>metal_gpu_error</code> on rank0 is a <strong>cascade</strong>. That is why every incident looks like a server crash from the local side while the evidence (crash reports) sits on the remote machine.</p>
+</section>
+
+<section>
+<h2><span class="num">5</span>What survived the blame</h2>
+<p>The full metric pass clears everything except the ring itself:</p>
+<div class="card">
+<table>
+  <tr><th>hypothesis</th><th>verdict</th><th>evidence (25 h window, both ranks)</th></tr>
+  <tr><td>Version skew across nodes</td><td><b>ruled out</b></td><td>mlx <code>0.32.0</code> / mlx-lm <code>0.31.3</code> identical on rank0 and rank1</td></tr>
+  <tr><td>rank1 GPU exhausted</td><td><b>ruled out</b></td><td>GPU mem max 4.85&nbsp;G of 16&nbsp;G &middot; util max 94% &middot; thermal pressure 0</td></tr>
+  <tr><td>rank1 RAM pressure</td><td><b>ruled out</b></td><td>mem max 11.5&nbsp;G of 16&nbsp;G &middot; mem pressure fine &middot; load1 max 4.4</td></tr>
+  <tr><td>Context overflow</td><td><b>ruled out</b></td><td>context used max 7,149 of 32&ndash;40&nbsp;k (17%)</td></tr>
+  <tr><td>KV-cache pressure</td><td><b>ruled out</b></td><td>kv cache max 1.8&nbsp;G &middot; 7 sequences &middot; est max context 4.38&nbsp;G</td></tr>
+  <tr><td>Request volume</td><td><b>ruled out</b></td><td>5 requests in 25 h (4 streaming, 1 plain), one 5xx</td></tr>
+  <tr><td>rank0 was the fault origin</td><td><b>ruled out</b></td><td>zero crash reports on rank0 &middot; exit code -15 (SIGTERM, killed)</td></tr>
+</table>
+</div>
+<p>One genuinely different error appears in the ledger: at 00:38 the crash was <code>kIOGPUCommandBufferCallbackErrorTimeout</code>, not the <code>...SubmissionsIgnored</code> that dominates. A real GPU compute timeout on the remote M4 is the one signal that says &ldquo;this Metal kernel ran too long&rdquo; &mdash; the shape of a very long prefill.</p>
+</section>
+
+<section>
+<h2><span class="num">6</span>The full crash ledger</h2>
+<div class="card">
+<table>
+  <tr><th>time (IST)</th><th>trigger</th><th>error class</th><th>crash report on rank1?</th></tr>
+  <tr><td>08-04 21:15</td><td>POST</td><td>SubmissionsIgnored</td><td>&mdash;</td></tr>
+  <tr><td>08-04 22:10</td><td>POST</td><td>SubmissionsIgnored</td><td>yes (not in server.log)</td></tr>
+  <tr><td>08-04 22:41</td><td>POST</td><td>SubmissionsIgnored</td><td>yes (not in server.log)</td></tr>
+  <tr><td>08-04 23:08</td><td>POST</td><td>SubmissionsIgnored</td><td>yes (not in server.log)</td></tr>
+  <tr><td>08-05 00:38</td><td>POST</td><td><b>GPU Timeout</b></td><td>yes</td></tr>
+  <tr><td>08-05 00:45</td><td>POST</td><td>SubmissionsIgnored</td><td>yes</td></tr>
+  <tr><td>08-05 00:55</td><td><b>idle &mdash; zero traffic</b></td><td>SubmissionsIgnored</td><td>yes</td></tr>
+  <tr><td>08-05 08:02</td><td>agentic bench (tools)</td><td>SubmissionsIgnored</td><td>yes</td></tr>
+  <tr><td>08-05 08:18</td><td>agentic bench (tools)</td><td>SubmissionsIgnored</td><td>yes</td></tr>
+  <tr><td>08-05 08:42</td><td>agentic bench (tools)</td><td>SubmissionsIgnored</td><td>yes</td></tr>
+  <tr><td>08-05 09:13</td><td>streaming + tools repro</td><td>SubmissionsIgnored</td><td>yes</td></tr>
+  <tr><td>08-05 22:06</td><td>two agentic streaming requests</td><td>SubmissionsIgnored</td><td>yes</td></tr>
+  <tr><td>08-05 22:12</td><td><b>trivial max_tokens=5 request</b></td><td>SubmissionsIgnored</td><td>yes</td></tr>
+</table>
+</div>
+</section>
+
+<section>
+<h2><span class="num">7</span>The mechanism: a heterogeneous ring and a wedged GPU</h2>
+<p>Put the pieces together and the failure mode is consistent across all thirteen incidents:</p>
+<ul>
+  <li>The ring pairs an <strong>M2 8&nbsp;GB</strong> (rank0) with an <strong>M4 16&nbsp;GB</strong> (rank1). MLX distributed collectives assume homogeneous devices; a fast 16&nbsp;GB M4 doing ring all-gathers with a slow 8&nbsp;GB M2 over the LAN is exactly the shape that produces Metal command-buffer timeouts on the faster node. The one <code>GPU Timeout</code> crash is the fingerprint.</li>
+  <li>Once the M4&rsquo;s GPU device has an error, it stays <strong>wedged</strong>: subsequent command buffers are <em>Ignored (for causing prior/excessive GPU errors)</em>. The process usually aborts immediately &mdash; but the abort can also surface later on an idle path, which is why there is an idle crash at 00:55 and why the <code>SubmissionsIgnored</code> class repeats.</li>
+  <li>The supervisor&rsquo;s health check is <code>GET /v1/models</code> &mdash; HTTP-up, not GPU-functional. A respawn lands in the still-wedged device and reports <em>ready</em>. The first real generation (any request, even <code>max_tokens=5</code>) is then the first GPU submission into the poisoned device &rarr; instant &ldquo;Ignored&rdquo; &rarr; second crash. It recovers only when a restart cycle happens to land on a healed device &mdash; which is why the second trivial request answered &ldquo;ok&rdquo;.</li>
+</ul>
+<div class="callout info"><span class="ic">The corrected story</span><span>Not streaming+tools. Not version skew. A heterogeneous 2-node ring whose faster GPU faults under load and then poisons the device so the <em>next</em> request crashes too, with a readiness check that cannot tell a wedged GPU from a healthy one.</span></div>
+</section>
+
+<section>
+<h2><span class="num">8</span>What this changes</h2>
+<ul>
+  <li><strong>Single-node is no longer a test &mdash; it is the fix.</strong> Qwen3.5-4B-8bit fits in rank0&rsquo;s 8&nbsp;GB alone (~4&nbsp;GB weights, measured GPU footprint 4.8&nbsp;G peak). Removing the ring removes the heterogeneous pair, the LAN collectives, and the &ldquo;rank1 dies first&rdquo; cascade in one move. Blog-11 item 11 is promoted to P0.</li>
+  <li><strong>Recovery must be hardened.</strong> After a <code>metal_gpu_error</code> the supervisor needs a real cooldown and a first-generation probe before declaring ready &mdash; not just a <code>/v1/models</code> 200. Otherwise the post-crash request always eats the second crash.</li>
+  <li><strong>Crash reports are observability.</strong> rank1&rsquo;s <code>DiagnosticReports</code> found incidents the server log missed. Ingesting them (or at least alerting on new <code>Python-*.ips</code>) closes a blind spot that was hiding the true crash rate.</li>
+  <li><strong>Version pin is done.</strong> Both nodes already run mlx 0.32.0 / mlx-lm 0.31.3. Blog-11 recommendation #8 is resolved as &ldquo;verified &mdash; no action&rdquo;.</li>
+</ul>
+</section>
+
+</main>
+
+<footer class="wrap">
+  mlx-oc &middot; post 13 of 14 &middot; agentic forensics, crash reports on rank1, and the heterogeneous-ring mechanism &middot; <a href="../README.md">repo README</a>
+</footer>
+</body>
+</html>
