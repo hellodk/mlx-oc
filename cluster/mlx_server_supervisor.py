@@ -28,6 +28,7 @@ Metrics (:9105/metrics)
   mlx_server_ready                      1 if /v1/models returns 200
   mlx_model_loaded{model="..."}         1 once the health probe saw the model
   mlx_server_restarts_total             number of times the server was restarted
+  mlx_server_crashes_total{reason}      server crashes by sniffed reason
   mlx_server_uptime_seconds             current child process uptime
   mlx_server_last_exit_code             exit code of the most recent child exit
   mlx_server_last_crash_reason{reason}  metal_gpu_error / oom / python_error / unknown / none
@@ -77,6 +78,9 @@ G_MODEL = Gauge(
     ["model"],
 )
 G_RESTARTS = Counter("mlx_server_restarts_total", "mlx_lm.server restarts performed")
+G_CRASHES = Counter(
+    "mlx_server_crashes_total", "server crashes by sniffed reason", ["reason"]
+)
 G_UPTIME = Gauge("mlx_server_uptime_seconds", "current mlx_lm.server process uptime")
 G_EXIT = Gauge("mlx_server_last_exit_code", "exit code of the most recent child exit")
 G_REASON = Gauge(
@@ -152,6 +156,7 @@ class Supervisor:
             self.exit_code = rc
             self.reason = sniff_crash_reason(self.args.server_log)
             G_EXIT.set(rc)
+            G_CRASHES.labels(reason=self.reason).inc()
             for r in ("metal_gpu_error", "oom", "python_error", "exit", "unknown"):
                 G_REASON.labels(reason=r).set(1 if r == self.reason else 0)
             G_UPTIME.set(0)
@@ -283,6 +288,11 @@ def main():
     host, _, port = args.listen.rpartition(":")
     sup = Supervisor(args)
     MetricsHandler.supervisor = sup
+
+    # Emit all crash-reason series at 0 so the dashboard has every reason
+    # present before the first crash (counters only appear once incremented).
+    for r in ("metal_gpu_error", "oom", "python_error", "exit", "unknown"):
+        G_CRASHES.labels(reason=r).inc(0)
 
     threading.Thread(target=sup.health_loop, daemon=True).start()
     httpd = ThreadingHTTPServer((host or "0.0.0.0", int(port or 9105)), MetricsHandler)
