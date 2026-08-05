@@ -95,7 +95,7 @@
 <main class="wrap">
 
 <section>
-<div class="callout warn"><span class="ic">Update &mdash; post 13</span><span>Two claims here have been corrected by deeper forensics. The <b>version-skew suspect is ruled out</b>: both nodes run mlx <code>0.32.0</code> / mlx-lm <code>0.31.3</code>, identical. And <b>streaming+tools is not the only trigger</b>: macOS crash reports exist only on rank1 &mdash; an M4 16&nbsp;GB paired with the M2 8&nbsp;GB in a heterogeneous ring &mdash; and the faulting thread is mlx&rsquo;s own GPU stream thread. After a Metal fault the device stays poisoned, so the <em>next</em> request crashes too (even a trivial <code>max_tokens=5</code> one). The single-node test (item 11) is promoted to <span class="pill p0">P0</span>. Full forensics: <a href="13-agentic-forensics.html">post 13</a> &middot; decisions: <a href="14-recommendations-decision.html">post 14</a>.</span></div>
+<div class="callout warn"><span class="ic">Update &mdash; post 13</span><span>Two claims here have been corrected by deeper forensics. The <b>version-skew suspect is ruled out</b>: both nodes run mlx <code>0.32.0</code> / mlx-lm <code>0.31.3</code>, identical. And <b>streaming+tools is not the only trigger</b>: macOS crash reports exist only on rank1 &mdash; an M4 16&nbsp;GB paired with the M2 8&nbsp;GB in a heterogeneous ring &mdash; and the faulting thread is mlx&rsquo;s own GPU stream thread. After a Metal fault the device stays poisoned, so the <em>next</em> request crashes too (even a trivial <code>max_tokens=5</code> one). <b>Decision (post 14, 08-05): the ring is retained &mdash; no single-node serving</b> &mdash; so the plan moves to supervisor recovery hardening and the mitigation list. Full forensics: <a href="13-agentic-forensics.html">post 13</a> &middot; decisions: <a href="14-recommendations-decision.html">post 14</a>.</span></div>
 </section>
 
 <section>
@@ -295,7 +295,7 @@
   <tr><td>8</td><td>Lower crash-loop alert threshold to &gt;2 restarts/h</td><td><span class="pill p1">P1</span></td><td>low</td><td>pending</td></tr>
   <tr><td>9</td><td>Emit/pass-through a real streaming usage object</td><td><span class="pill p1">P1</span></td><td>medium</td><td>pending</td></tr>
   <tr><td>10</td><td>Pin a single mlx/mlx-lm version</td><td><span class="pill p1">P1</span></td><td>low</td><td>pending</td></tr>
-  <tr><td>11</td><td>Single-node test (ring disabled)</td><td><span class="pill p2">P2</span></td><td>medium</td><td>pending</td></tr>
+  <tr><td>11</td><td>Single-node test (ring disabled)</td><td><span class="pill p2">P2</span></td><td>medium</td><td>rejected &mdash; ring retained (post 14)</td></tr>
   <tr><td>12</td><td>Quantize 4B to 4-bit; try 1.7B for agentic route</td><td><span class="pill p2">P2</span></td><td>medium</td><td>pending</td></tr>
   <tr><td>13</td><td>Reserve GPU memory headroom</td><td><span class="pill p2">P2</span></td><td>low</td><td>pending</td></tr>
   <tr><td>14</td><td>Stream/chunk long prefills + prefill watchdog</td><td><span class="pill p2">P2</span></td><td>medium</td><td>pending</td></tr>

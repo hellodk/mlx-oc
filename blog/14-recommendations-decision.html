@@ -78,11 +78,11 @@
   <div class="wrap">
     <span class="kicker">14 of 14 &middot; the decision</span>
     <h1>The Decision Ledger</h1>
-    <p class="sub">Post 13 gave us the root cause: a heterogeneous ring whose remote M4 faults and then poisons the GPU, with a readiness check that cannot see it. This post is everything the cluster has learned, consolidated into the three artifacts we now choose from &mdash; a tuning guide for edge scenarios, a handling plan for <code>metal_gpu_error</code>, and the complete recommendation ledger. Status column is live: <em>pending</em> means &ldquo;decision required&rdquo;.</p>
+    <p class="sub">Post 13 gave us the root cause: a heterogeneous ring whose remote M4 faults and then poisons the GPU, with a readiness check that cannot see it. This post is everything the cluster has learned, consolidated into the three artifacts we now choose from &mdash; a tuning guide for edge scenarios, a handling plan for <code>metal_gpu_error</code>, and the complete recommendation ledger. The first decision is recorded here: <strong>the ring stays &mdash; no single-node serving</strong> &mdash; so the plan leans on recovery hardening, containment and load-shaping instead.</p>
     <div class="meta">
       <span><b>Source posts</b> 9 &middot; 10 &middot; 11 &middot; 12 &middot; 13</span>
-      <span><b>Ledger</b> 21 recommendations &middot; 1 promoted to P0 &middot; 1 resolved</span>
-      <span><b>Decision</b> pending &mdash; section 5</span>
+      <span><b>Ledger</b> 21 recommendations &middot; 1 rejected &middot; 1 resolved</span>
+      <span><b>Decision 08-05</b> ring stays &mdash; no single-node serving</span>
     </div>
   </div>
 </header>
@@ -92,7 +92,7 @@
 <section>
 <h2><span class="num">1</span>What we are deciding on</h2>
 <p>The story compressed to one paragraph. Two agentic requests and a trivial request all died to <code>metal_gpu_error</code>. Crash reports exist only on rank1 &mdash; an M4 16&nbsp;GB paired with an M2 8&nbsp;GB on an MLX ring &mdash; and the faulting thread is <code>mlx::core::metal::EventImpl::check_error()</code> on the GPU stream thread. The M4&rsquo;s GPU faults under load (one genuine <code>GPU Timeout</code> among the crashes), then the device stays wedged, so the <em>next</em> request crashes too until a restart lands on a healed device. The supervisor&rsquo;s <code>/v1/models</code> readiness check cannot tell a wedged GPU from a healthy one. Full evidence in post 13.</p>
-<p>Everything below exists to answer one question: <strong>do we keep the ring, or become a single node?</strong> Sections 2 and 3 are the tuning and the fault plan; section 4 is the ledger; section 5 is the decision.</p>
+<p>The first decision is made: <strong>the ring stays</strong> &mdash; no single-node serving. That means the M4 will still fault from time to time, and the quality of our <em>recovery</em> is what makes those faults survivable. Sections 2 and 3 are the tuning and the fault plan; section 4 is the ledger; section 5 is the decision.</p>
 </section>
 
 <section>
@@ -103,7 +103,7 @@
 <div class="card">
 <table>
   <tr><th>knob</th><th>what it does</th><th>edge scenario it targets</th><th>effort</th></tr>
-  <tr><td><b>Single-node serving (ring disabled)</b></td><td>serves the 4B-8bit from rank0 alone; removes the heterogeneous GPU pair, LAN collectives and the &ldquo;rank1 dies first&rdquo; cascade</td><td>all of them &mdash; the root cause</td><td>medium</td></tr>
+  <tr><td><b>Single-node serving (ring disabled)</b></td><td>serves the 4B-8bit from rank0 alone; removes the heterogeneous GPU pair, LAN collectives and the &ldquo;rank1 dies first&rdquo; cascade</td><td>all of them &mdash; the root cause</td><td>medium &middot; <b>rejected 08-05</b></td></tr>
   <tr><td><b>Cap <code>max_tokens</code></b></td><td>bounds the longest single generation and the command-buffer budget it consumes</td><td>streaming, long generations</td><td>low</td></tr>
   <tr><td><b>Cap context window</b> (below the model&rsquo;s 32&ndash;40&nbsp;k)</td><td>bounds prefill size and KV growth per request</td><td>long transcripts, concurrent agents</td><td>low</td></tr>
   <tr><td><b>Chunk long prefills</b> + prefill watchdog</td><td>splits huge prompts; alerts/kills on a prefill that runs too long</td><td>the <code>GPU Timeout</code> class, 17&ndash;24&nbsp;k prefills</td><td>medium</td></tr>
@@ -193,15 +193,15 @@
   <tr><td>8</td><td>Lower crash-loop alert threshold to &gt;2 restarts/h</td><td><span class="pill p1">P1</span></td><td>low</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
   <tr><td>9</td><td>Emit/pass-through a real streaming usage object</td><td><span class="pill p1">P1</span></td><td>medium</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
   <tr><td>10</td><td>Pin a single mlx/mlx-lm version</td><td><span class="pill p1">P1</span></td><td>low</td><td>&mdash;</td><td><b>resolved</b> &mdash; both nodes 0.32.0 / 0.31.3</td></tr>
-  <tr><td>11</td><td>Single-node test (ring disabled)</td><td><span class="pill p0">P0</span></td><td>medium</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
-  <tr><td>12</td><td>Quantize 4B to 4-bit; try 1.7B for the agentic route</td><td><span class="pill p2">P2</span></td><td>medium</td><td>after #11</td><td><span class="pill todo">decide</span></td></tr>
-  <tr><td>13</td><td>Reserve GPU memory headroom (MLX memory limit)</td><td><span class="pill p2">P2</span></td><td>low</td><td>after #11</td><td><span class="pill todo">decide</span></td></tr>
-  <tr><td>14</td><td>Stream/chunk long prefills + prefill watchdog</td><td><span class="pill p2">P2</span></td><td>medium</td><td>after #11</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>11</td><td>Single-node test (ring disabled)</td><td><span class="pill p2">P2</span></td><td>medium</td><td>&mdash;</td><td><b>rejected</b> &mdash; ring retained (decision 08-05)</td></tr>
+  <tr><td>12</td><td>Quantize 4B to 4-bit; try 1.7B for the agentic route</td><td><span class="pill p2">P2</span></td><td>medium</td><td>ring retained</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>13</td><td>Reserve GPU memory headroom (MLX memory limit)</td><td><span class="pill p2">P2</span></td><td>low</td><td>ring retained</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>14</td><td>Stream/chunk long prefills + prefill watchdog</td><td><span class="pill p2">P2</span></td><td>medium</td><td>ring retained</td><td><span class="pill todo">decide</span></td></tr>
   <tr><td>15</td><td>Client retry-with-backoff on 5xx (opencode side)</td><td><span class="pill p1">P1</span></td><td>low</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
   <tr><td>16</td><td>Summarizer/transcript trimmer for long agent sessions</td><td><span class="pill p2">P2</span></td><td>high</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
   <tr><td>17</td><td>Supervisor post-Metal cooldown + first-generation readiness probe</td><td><span class="pill p0">P0</span></td><td>low</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
   <tr><td>18</td><td>Grace window after restart (reject/queue until probe passes)</td><td><span class="pill p0">P0</span></td><td>low</td><td>after #17</td><td><span class="pill todo">decide</span></td></tr>
-  <tr><td>19</td><td>Homogeneous ring requirement if ring is retained (M2+M2 or M4+M4)</td><td><span class="pill p1">P1</span></td><td>medium</td><td>if #11 rejected</td><td><span class="pill todo">decide</span></td></tr>
+  <tr><td>19</td><td>Homogeneous ring pairing (M2+M2 or M4+M4) &mdash; the structural option now that the ring stays</td><td><span class="pill p1">P1</span></td><td>medium</td><td>ring retained</td><td><span class="pill todo">decide</span></td></tr>
   <tr><td>20</td><td>Ingest/alert on rank1 <code>DiagnosticReports</code> (.ips)</td><td><span class="pill p2">P2</span></td><td>medium</td><td>&mdash;</td><td><span class="pill todo">decide</span></td></tr>
   <tr><td>21</td><td>Crash-loop escalation: stop respawning + page after N consecutive Metal faults</td><td><span class="pill p1">P1</span></td><td>low</td><td>after #17</td><td><span class="pill todo">decide</span></td></tr>
 </table>
@@ -210,18 +210,19 @@
 
 <section>
 <h2><span class="num">5</span>The decision</h2>
-<p>The evidence in post 13 makes the direction clear. Recommended call, with the containment work running in parallel so nothing waits on the big decision:</p>
+<p>The first decision is recorded on 08-05: <strong>no single-node serving &mdash; the ring stays.</strong> With that fixed, the plan below is what the cluster work becomes. Nothing else here is decided yet; the rest of the ledger is still a menu.</p>
 <div class="card">
 <table>
-  <tr><th>decision</th><th>recommended</th><th>why</th></tr>
-  <tr><td>Single-node (drop the ring)</td><td><b>yes &mdash; do the test this week</b></td><td>4B-8bit fits rank0&rsquo;s 8&nbsp;GB; removes the heterogeneous pair that post 13 identified as the fault origin. Cheapest discriminator that is also likely the permanent fix.</td></tr>
-  <tr><td>Supervisor recovery hardening (#17&ndash;18)</td><td><b>yes &mdash; ship with #11</b></td><td>small change; without it the post-crash request always eats the second crash.</td></tr>
-  <tr><td>Containment P0s (#1&ndash;4)</td><td><b>yes &mdash; in parallel</b></td><td>disk, queue, tool gate and correlation are independent of the ring decision.</td></tr>
-  <tr><td>Tool routing on the 4B</td><td><b>gate now, revisit after #11</b></td><td>the 4B ignores planner directives anyway (post 11); decide the agentic model after single-node capacity is real.</td></tr>
-  <tr><td>Definition of done</td><td><b>24 h crash-free under the agentic workload</b></td><td>crash rate per hour &rarr; ~0; <code>completion&gt;0</code> trace ratio &rarr; 1.0; error rate &rarr; 0. Measured on the post-12 dashboard.</td></tr>
+  <tr><th>decision</th><th>verdict</th><th>why</th></tr>
+  <tr><td>Single-node serving</td><td><b>rejected</b> &mdash; ring stays</td><td>decision recorded 08-05; the heterogeneous M4/M2 pair remains the fault origin, so recovery and load-shaping carry the weight instead.</td></tr>
+  <tr><td>Supervisor recovery hardening (#17&ndash;18, #21)</td><td><b>ship next</b></td><td>now the load-bearing fix: post-Metal cooldown, a real first-generation probe, a grace window, and crash-loop escalation. Without these the post-crash request always eats the second crash.</td></tr>
+  <tr><td>Containment P0s (#1&ndash;4)</td><td><b>ship in parallel</b></td><td>disk, queue, tool gate and correlation are independent of the ring decision.</td></tr>
+  <tr><td>Load shaping to protect the M4 (#7, #14, #13, #12)</td><td><b>follows hardening</b></td><td>cap max_tokens/context, chunk long prefills + prefill watchdog, GPU headroom, quantization &mdash; the prevention half once recovery is solid.</td></tr>
+  <tr><td>Tool routing on the 4B</td><td><b>gate now</b></td><td>the 4B ignores planner directives anyway (post 11).</td></tr>
+  <tr><td>Definition of done</td><td><b>crashes auto-recover with zero user-visible failure</b></td><td>with the ring retained, crash-free is not a realistic bar; instead: every crash restarted and probed before ready, no empty responses, error rate ~0, crash&harr;request correlation visible per incident.</td></tr>
 </table>
 </div>
-<div class="callout ok"><span class="ic">The ask</span><span>Nothing on this page is committed yet. Post 13 gave us the cause; this post gives us the menu. Pick from the ledger, and the cluster work resumes with the chosen items as tickets.</span></div>
+<div class="callout ok"><span class="ic">Decision recorded</span><span>Ring retained on 08-05 &mdash; no single-node serving. The cluster work resumes with supervisor recovery hardening and the containment P0s as the first tickets; the remaining ledger rows stay open pending the next decision pass.</span></div>
 </section>
 
 </main>

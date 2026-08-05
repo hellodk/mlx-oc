@@ -159,7 +159,7 @@
     <div class="num n13">13</div>
     <div>
       <h2>The Fault Is Remote: Why rank1 Dies First</h2>
-      <p>A five-token request crashed the box minutes after two agentic requests did &mdash; so the trigger was never just streaming+tools. macOS crash reports exist only on rank1 (an M4 16&nbsp;GB paired with the M2 8&nbsp;GB on the ring), the faulting thread is mlx&rsquo;s own GPU stream thread, and the fatal pattern is a heterogeneous ring whose faster GPU faults, then poisons the device so the next request dies too &mdash; a readiness check of /v1/models cannot see it. Version skew is ruled out: both nodes run mlx 0.32.0 / mlx-lm 0.31.3. Single-node is promoted to P0.</p>
+      <p>A five-token request crashed the box minutes after two agentic requests did &mdash; so the trigger was never just streaming+tools. macOS crash reports exist only on rank1 (an M4 16&nbsp;GB paired with the M2 8&nbsp;GB on the ring), the faulting thread is mlx&rsquo;s own GPU stream thread, and the fatal pattern is a heterogeneous ring whose faster GPU faults, then poisons the device so the next request dies too &mdash; a readiness check of /v1/models cannot see it. Version skew is ruled out: both nodes run mlx 0.32.0 / mlx-lm 0.31.3. Decision 08-05: the ring stays &mdash; the plan moves to recovery hardening and load shaping.</p>
       <span class="tag">rank1</span><span class="tag">crash reports</span><span class="tag">heterogeneous ring</span><span class="tag">GPU stream thread</span><span class="tag">poisoned device</span>
     </div>
   </a>
@@ -167,8 +167,8 @@
     <div class="num n14">14</div>
     <div>
       <h2>The Decision Ledger: Tuning, metal_gpu_error, and Every Recommendation in One Place</h2>
-      <p>The cluster&rsquo;s knowledge consolidated into the three artifacts we now choose from: a tuning guide for edge scenarios (streaming, tools, concurrency, long transcripts &mdash; across model, proxy and client), a prevent/respond/recover plan for metal_gpu_error, and the complete recommendation ledger &mdash; 21 items with priority, effort, dependency and a live status column. The recommendation: single-node serving + supervisor recovery hardening, with the containment P0s running in parallel. Nothing committed yet &mdash; this is the decision.</p>
-      <span class="tag">tuning</span><span class="tag">metal_gpu_error plan</span><span class="tag">recommendation ledger</span><span class="tag">decision</span><span class="tag">single-node</span>
+      <p>The cluster&rsquo;s knowledge consolidated into the three artifacts we now choose from: a tuning guide for edge scenarios (streaming, tools, concurrency, long transcripts &mdash; across model, proxy and client), a prevent/respond/recover plan for metal_gpu_error, and the complete recommendation ledger &mdash; 21 items with priority, effort, dependency and a live status column. Decision 08-05: the ring stays &mdash; no single-node serving &mdash; so the plan is supervisor recovery hardening + the containment P0s + load shaping. The rest of the ledger is still a menu.</p>
+      <span class="tag">tuning</span><span class="tag">metal_gpu_error plan</span><span class="tag">recommendation ledger</span><span class="tag">decision</span><span class="tag">ring retained</span>
     </div>
   </a>
 </main>

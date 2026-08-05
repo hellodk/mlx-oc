@@ -88,7 +88,7 @@
       <span><b>New evidence</b> crash reports exist only on rank1</span>
       <span><b>Backtrace</b> mlx::core::metal::EventImpl::check_error</span>
       <span><b>Versions</b> mlx 0.32.0 / mlx-lm 0.31.3 &mdash; identical (skew ruled out)</span>
-      <span><b>Status</b> single-node promoted to P0 &middot; decisions in post 14</span>
+      <span><b>Decision 08-05</b> ring stays &middot; plan in post 14</span>
     </div>
   </div>
 </header>
@@ -191,7 +191,7 @@ libc++abi: terminating ... [METAL] ... SubmissionsIgnored  # the abort, streamed
 <section>
 <h2><span class="num">8</span>What this changes</h2>
 <ul>
-  <li><strong>Single-node is no longer a test &mdash; it is the fix.</strong> Qwen3.5-4B-8bit fits in rank0&rsquo;s 8&nbsp;GB alone (~4&nbsp;GB weights, measured GPU footprint 4.8&nbsp;G peak). Removing the ring removes the heterogeneous pair, the LAN collectives, and the &ldquo;rank1 dies first&rdquo; cascade in one move. Blog-11 item 11 is promoted to P0.</li>
+  <li><strong>Single-node was the structural fix, and it is rejected.</strong> Qwen3.5-4B-8bit fits in rank0&rsquo;s 8&nbsp;GB alone (~4&nbsp;GB weights, measured GPU footprint 4.8&nbsp;G peak), and removing the ring removes the heterogeneous pair and the &ldquo;rank1 dies first&rdquo; cascade in one move &mdash; but the decision on 08-05 is to keep the ring. The consequence: the M4 will still fault occasionally, so recovery quality and load shaping are now the load-bearing fixes (decision ledger, post 14).</li>
   <li><strong>Recovery must be hardened.</strong> After a <code>metal_gpu_error</code> the supervisor needs a real cooldown and a first-generation probe before declaring ready &mdash; not just a <code>/v1/models</code> 200. Otherwise the post-crash request always eats the second crash.</li>
   <li><strong>Crash reports are observability.</strong> rank1&rsquo;s <code>DiagnosticReports</code> found incidents the server log missed. Ingesting them (or at least alerting on new <code>Python-*.ips</code>) closes a blind spot that was hiding the true crash rate.</li>
   <li><strong>Version pin is done.</strong> Both nodes already run mlx 0.32.0 / mlx-lm 0.31.3. Blog-11 recommendation #8 is resolved as &ldquo;verified &mdash; no action&rdquo;.</li>
