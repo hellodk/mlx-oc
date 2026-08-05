@@ -74,11 +74,12 @@
   <a href="8-hydra-vs-mlx-oc.html">Hydra vs mlx-oc</a>
   <a href="9-model-serving-resilience.html" style="color:var(--accent);font-weight:700">Serving health</a>
   <a href="10-opik-log-streaming.html">Server logs</a>
+  <a href="11-agentic-edge-cases.html">Agentic edge cases</a>
 </div></nav>
 
 <header class="hero">
   <div class="wrap">
-    <span class="kicker">9 of 9 &middot; resilience + load</span>
+    <span class="kicker">9 of 11 &middot; resilience + load</span>
     <h1>The Night the GPU Crashed</h1>
     <p class="sub">A Metal command-buffer fault silently killed <code>mlx_lm.server</code> while the proxy kept answering 503s. The alert fired &mdash; but it was generic, nothing restarted the server, and no metric could say "the model is actually loaded and serving right now." This post fixes all three: a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that finally stress the cluster the way an agent would &mdash; and the first run <em>reproduced the crash</em>, then survived it.</p>
     <div class="meta">
@@ -197,7 +198,7 @@ python3 tools/bench_agentic.py --scenario planner --agents 3 --runs 10</code></p
 <div class="callout info"><span class="ic">Tooling recommendation</span><span><strong>Opik</strong> (already self-hosted + wired into the proxy) for per-trace, per-turn, per-tool-call inspection of agent runs and quality feedback &mdash; free, self-hosted, OpenInference-native. <strong>Our harness + VictoriaMetrics</strong> for repeatable load/SLO numbers. If you want a third-party load generator instead, <code>ghz</code>/<code>k6</code>/<code>locust</code> are drop-in replacements for the traffic side (they just hit the OpenAI endpoint), and LangSmith/Helicone are hosted Opik-alikes &mdash; but they send your data out of the building, which this stack was built to avoid.</span></div>
 
 <h3>Measured: first run &mdash; Qwen3.5-4B-8bit on the 2-node ring</h3>
-<p>Ran both harnesses against the live cluster. The headline isn&rsquo;t a throughput number &mdash; it&rsquo;s that <strong>the load test reproduced the very crash class post 9 exists for</strong>: five <code>metal_gpu_error</code> crashes, every one caught, typed and auto-restarted by the supervisor. Three came during the benchmarks &mdash; long streaming generations (the load test&rsquo;s 17k-token prompt) and a two-agent run &mdash; and <strong>two more came later with the cluster effectively idle</strong>. The honest read: the 4B-8bit ring on this hardware is not stable, load or no load, and the backoff ladder (5&nbsp;s &rarr; 5&nbsp;s &rarr; 10&nbsp;s &rarr; 20&nbsp;s &rarr; 40&nbsp;s) is what keeps a crash from becoming an outage. Plain concurrency was not the trigger &mdash; a 1&rarr;16-worker sweep ran to completion with zero errors.</p>
+<p>Ran both harnesses against the live cluster. The headline isn&rsquo;t a throughput number &mdash; it&rsquo;s that <strong>the load test reproduced the very crash class post 9 exists for</strong>: seven <code>metal_gpu_error</code> crashes since the supervisor was introduced, every one caught, typed and auto-restarted. Three came during the benchmarks &mdash; long streaming generations (the load test&rsquo;s 17k-token prompt) and a two-agent run &mdash; two more came with the cluster effectively <em>idle</em>, and <strong>two more today from single streaming + tools turns</strong> (the opencode route; reproduced on demand in post 11). The honest read: the 4B-8bit ring on this hardware is not stable, load or no load, and the backoff ladder (5&nbsp;s &rarr; 5&nbsp;s &rarr; 10&nbsp;s &rarr; 20&nbsp;s &rarr; 40&nbsp;s) is what keeps a crash from becoming an outage. Plain concurrency was not the trigger &mdash; a 1&rarr;16-worker sweep ran to completion with zero errors.</p>
 
 <div class="card">
 <h3>Capacity sweep (<code>bench_load.py --sweep</code>, medium prompt, 20s/level)</h3>
@@ -216,13 +217,13 @@ python3 tools/bench_agentic.py --scenario planner --agents 3 --runs 10</code></p
 <h3>Agentic (<code>bench_agentic.py</code>, 3 runs per scenario)</h3>
 <ul>
   <li><b>calculator</b>: 5 turns, 4 tool calls, <b>100% valid</b>, per-turn TTFT mean 0.74&nbsp;s, ~17&nbsp;s per run.</li>
-  <li><b>tri_tool</b>: 2 turns, 3 tool calls, <b>100% valid</b>, TTFT mean 2.3&nbsp;s (max 5.3&nbsp;s), ~15&nbsp;s per run.</li>
+  <li><b>tri_tool</b>: 2 turns, 3 tool calls, <b>100% valid</b>, TTFT mean 3.4&nbsp;s (max 5.3&nbsp;s), ~17&nbsp;s per run.</li>
   <li><b>planner</b>: <b>0 tool calls</b> &mdash; the 4B model answered in one turn and ignored the tool instruction. A quality finding: the multi-step planner scenario needs a model that actually obeys tool directives (or a stronger prompt).</li>
   <li><b>2 concurrent agents (calculator)</b>: crashed the server with <code>metal_gpu_error</code> &mdash; where 16 concurrent plain requests had just survived. Recovery took ~40&nbsp;s (backoff 10s + weight reload) and the cluster was serving again without intervention.</li>
 </ul>
 </div>
 
-<div class="callout warn"><span class="ic">&#9888;</span><span><b>Recommendations from the first run.</b> (1) Treat concurrent agent loops as the heaviest load shape &mdash; two simultaneous agents crashed the box where sixteen plain requests did not; the growing transcript + tool-call bursts are a different GPU-pressure profile. (2) The longest generations correlated with a <code>GPU Timeout</code> crash &mdash; keep multi-thousand-token prefills off the 4B-8bit ring until the instability is understood. (3) Non-streaming requests returned 503 while the box was degrading <em>before</em> a crash &mdash; worth watching as a warning signal, but we haven&rsquo;t proven it predicts every restart. (4) The supervisor closed the post-6 gap for real: five crashes, five recoveries, no manual step &mdash; and the log tailer shipped every crash line to the collector&rsquo;s JSONL (post 10).</span></div>
+<div class="callout warn"><span class="ic">&#9888;</span><span><b>Recommendations from the first run.</b> (1) Treat concurrent agent loops as the heaviest load shape &mdash; two simultaneous agents crashed the box where sixteen plain requests did not; the growing transcript + tool-call bursts are a different GPU-pressure profile. (2) The longest generations correlated with a <code>GPU Timeout</code> crash &mdash; keep multi-thousand-token prefills off the 4B-8bit ring until the instability is understood. (3) Non-streaming requests returned 503 while the box was degrading <em>before</em> a crash &mdash; worth watching as a warning signal, but we haven&rsquo;t proven it predicts every restart. (4) The supervisor closed the post-6 gap for real: seven crashes, seven recoveries, no manual step &mdash; and the log tailer shipped every crash line to the collector&rsquo;s JSONL (post 10). Post 11 digs into the newest finding: <strong>a single streaming + tools turn is now a reproducible crash trigger</strong>, and traces show those turns end with zero completion tokens.</span></div>
 </section>
 
 <section>
@@ -239,7 +240,7 @@ python3 tools/bench_agentic.py --scenario planner --agents 3 --runs 10</code></p
 <section>
 <h2><span class="num">7</span>What this changes</h2>
 <ul>
-  <li>A crash is now <strong>typed</strong> (metal / oom / python) and <strong>counted</strong>, and the cluster <strong>recovers itself</strong> with backoff &mdash; proven under load, when three Metal crashes were caught and restarted with no manual step.</li>
+  <li>A crash is now <strong>typed</strong> (metal / oom / python) and <strong>counted</strong>, and the cluster <strong>recovers itself</strong> with backoff &mdash; proven under load, when seven Metal crashes were caught and restarted with no manual step.</li>
   <li>"Is the model serving?" is now a first-class question with its own metrics and dashboard, not a guess from a 503 body.</li>
   <li>The start script proves what it started; the preflight catches the class of bug that silently downed both hw agents.</li>
   <li>Load testing covers both shapes of traffic &mdash; steady concurrent requests and context-growing agent loops &mdash; with results correlated to the cluster's own memory/KV/GPU state.</li>
@@ -249,7 +250,7 @@ python3 tools/bench_agentic.py --scenario planner --agents 3 --runs 10</code></p
 </main>
 
 <footer class="wrap">
-  mlx-oc &middot; post 9 of 9 &middot; serving health, supervision &amp; load testing &middot; <a href="../README.md">repo README</a>
+  mlx-oc &middot; post 9 of 11 &middot; serving health, supervision &amp; load testing &middot; <a href="../README.md">repo README</a>
 </footer>
 </body>
 </html>

@@ -35,6 +35,7 @@
   .n8{background:linear-gradient(135deg,#b91c1c,#f59e0b)}
   .n9{background:linear-gradient(135deg,#334155,#64748b)}
   .n10{background:linear-gradient(135deg,#0f766e,#22d3ee)}
+  .n11{background:linear-gradient(135deg,#7c3aed,#22d3ee)}
   .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
   .post p{margin:0;color:var(--muted);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
@@ -133,6 +134,14 @@
       <h2>The Other Half of the Story: Streaming Server Logs into Opik</h2>
       <p>Tracing was wired but switched off, and the server's runtime log had never left the machine. Now: the OTLP trace path is on by default (one trace per request), and a filtered, flood-protected log tailer ships crash and generation lines to the collector's durable JSONL &mdash; verified when a Metal fault fired mid-test and every line landed.</p>
       <span class="tag">Opik</span><span class="tag">log streaming</span><span class="tag">OTLP</span><span class="tag">mlx_server_log_tailer</span><span class="tag">correlation</span>
+    </div>
+  </a>
+  <a class="post" href="11-agentic-edge-cases.html">
+    <div class="num n11">11</div>
+    <div>
+      <h2>Edge Cases Are the Load: Tools, Streaming, and the Zero-Completion Traces</h2>
+      <p>Agentic benchmark runs uncovered the real load shape &mdash; and the token ledger exposed 63% of traces ending with zero completion tokens. Cause found: streaming + tools is a reproducible metal_gpu_error trigger on this 4B-8bit ring. Full metrics review, a tuning plan for edge scenarios, a containment + 10-candidate fix list for the Metal fault, and a prioritized recommendation table.</p>
+      <span class="tag">agentic</span><span class="tag">metal_gpu_error</span><span class="tag">zero-completion traces</span><span class="tag">tuning</span><span class="tag">recommendations</span>
     </div>
   </a>
 </main>

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>11 — Edge Cases Are the Load: Tools, Streaming, and the Zero-Completion Traces</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#0f766e;--accent-soft:#e6f6f4;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(15,118,110,.11), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(219,39,119,.08), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #a7d8d0;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+  .stat{text-align:center;padding:20px 14px}
+  .stat .big{font-size:32px;font-weight:800;letter-spacing:-.02em;color:var(--accent)}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  blockquote{margin:16px 0;padding:12px 18px;border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 10px 10px 0;color:#06392f}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  .pill{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 9px;margin-right:4px}
+  .p0{background:#fde8f1;color:#9d174d;border:1px solid #fbcfe8}
+  .p1{background:#fef3d7;color:#92400e;border:1px solid #fde68a}
+  .p2{background:#e6f6f4;color:#065f46;border:1px solid #a7f3d0}
+  .todo{background:#eef0ff;color:#3730a3;border:1px solid #c7d2fe}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+  <a href="5-opik-llm-tracing.html">Opik</a>
+  <a href="6-opik-feedback-loop.html">Feedback</a>
+  <a href="7-mlx-inference-performance.html">Performance</a>
+  <a href="8-hydra-vs-mlx-oc.html">Hydra vs mlx-oc</a>
+  <a href="9-model-serving-resilience.html">Serving health</a>
+  <a href="10-opik-log-streaming.html">Server logs</a>
+  <a href="11-agentic-edge-cases.html" style="color:var(--accent);font-weight:700">Edge cases</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">11 of 11 &middot; agentic + edge cases</span>
+    <h1>Edge Cases Are the Load</h1>
+    <p class="sub">The agentic benchmark suite ran, the token counters looked nearly dead, and &ldquo;why so little token consumption?&rdquo; turned out to be a crash report. This post is the full accounting: the agentic work we performed, the zero-completion trace investigation, a pass over every other metric, and a recommendation list for tuning the model to survive tools, streaming and concurrency &mdash; plus a concrete plan for the <code>metal_gpu_error</code>.</p>
+    <div class="meta">
+      <span><b>Data</b> 385 traces &middot; 121k prompt / 10.7k completion &middot; 63% completion=0</span>
+      <span><b>Crashes</b> 16 restarts in 24h &middot; <code>metal_gpu_error</code></span>
+      <span><b>Status</b> recommendations captured &mdash; decisions pending</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section>
+<h2><span class="num">1</span>The agentic work we performed</h2>
+<p><code>tools/bench_agentic.py</code> drives multi-turn tool-calling loops at the proxy &mdash; not single prompts, but the thing a coding agent or operator does: every turn re-sends the full transcript, the model emits <code>tool_calls</code>, a deterministic stub registry (calculator / get_weather / get_time) &ldquo;executes&rdquo; them, and the loop continues until the model answers without tools. Each run records turns, tool-call validity, per-turn TTFT, wall time, and is inspectable turn-by-turn in Opik. Reports land in git-ignored <code>tools/bench-reports/</code>. Qwen3.5-4B-MLX-8bit, three runs per scenario:</p>
+
+<div class="card">
+<h3>Agentic scenarios (<code>bench_agentic.py</code>)</h3>
+<table>
+  <tr><th>scenario</th><th>config</th><th>turns</th><th>tool calls</th><th>valid</th><th>done</th><th>wall / run</th><th>TTFT mean</th></tr>
+  <tr><td><b>calculator</b></td><td>1 agent &times; 3</td><td>5</td><td>4</td><td>100%</td><td>yes</td><td>~17 s</td><td>0.72 s</td></tr>
+  <tr><td><b>tri_tool</b></td><td>1 agent &times; 3</td><td>2</td><td>3</td><td>100%</td><td>yes</td><td>~17 s</td><td>3.4 s (max 5.3 s)</td></tr>
+  <tr><td><b>planner</b></td><td>1 agent &times; 3</td><td>1</td><td>0</td><td>&mdash;</td><td>yes</td><td>~27 s</td><td>2.4 s</td></tr>
+  <tr><td><b>2&times; calculator</b></td><td>2 agents &times; 6</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>no</td><td>&mdash;</td><td><b>crash</b> <code>metal_gpu_error</code></td></tr>
+</table>
+</div>
+
+<p><strong>What the runs told us.</strong> Single-turn tool calling is genuinely fine &mdash; calculator and tri_tool produced 100% valid calls and completed in budget. The planner scenario is a <em>quality</em> finding: the 4B model answered in one turn and ignored the tool directive entirely, so a multi-step planning loop needs a model that actually obeys tool instructions or a stronger prompt. And the concurrency finding is the one that matters: <strong>two simultaneous calculator agents crashed the box where sixteen concurrent plain requests had just survived</strong>. Tool-call traffic is a different GPU-pressure profile from plain text generation.</p>
+
+<div class="callout ok"><span class="ic">The short version</span><span>Agentic traffic was load-tested and the harness earned its keep: it reproduced the exact crash class the serving-health work (post 9) was built around &mdash; and today it did so again, with a twist (section 2).</span></div>
+</section>
+
+<section>
+<h2><span class="num">2</span>The token-consumption investigation: why 63% of traces have zero completion</h2>
+<p>Asked &ldquo;why do I not see much token consumption?&rdquo; against the Opik dashboard, the aggregate answer looked like an accounting bug:</p>
+<div class="card">
+<div class="grid2">
+  <div class="stat"><div class="big">385</div><div class="lbl">traces in the mlx project</div></div>
+  <div class="stat"><div class="big">121,088</div><div class="lbl">prompt tokens</div></div>
+  <div class="stat"><div class="big">10,657</div><div class="lbl">completion tokens</div></div>
+  <div class="stat"><div class="big">63%</div><div class="lbl">of traces with completion = 0</div></div>
+</div>
+<p style="font-size:13.5px;color:var(--muted)">Today alone: 15 traces, 49,124 prompt tokens, <b>291</b> completion tokens &mdash; the working session sent huge prompts and generated almost nothing.</p>
+</div>
+
+<p>It is not a measurement bug. Pulling one of today&rsquo;s streaming traces apart showed:</p>
+<ul>
+  <li>span output <code>{"content": "", "tool_calls": 0}</code> &mdash; <strong>empty</strong>;</li>
+  <li><code>ttft == gen_time</code> (27.3 s) &mdash; the proxy&rsquo;s TTFT fallback fires only when <em>no token ever arrived</em>;</li>
+  <li>request shape: <code>stream: true</code>, <code>tools_provided: true</code> &mdash; an opencode turn with tools enabled;</li>
+  <li>27 seconds after the trace started, the supervisor logged <code>server exited rc=0 reason=metal_gpu_error</code>.</li>
+</ul>
+
+<p>The dying server sends an empty SSE stream, the proxy records what it received (nothing), and Opik reports <code>usage: {prompt: 7184, completion: 0}</code>. Then the supervisor restarts the box and the next turn repeats the cycle &mdash; every turn re-sends the whole transcript (that&rsquo;s the 7k+ prompt tokens each), so prompt tokens climb while completion stays pinned near zero.</p>
+
+<div class="callout warn"><span class="ic">Reproduced on demand</span><span>While writing this, a single <code>stream:true + tools</code> request crashed the server (supervisor: <code>restarts_total 0&rarr;2</code>, log line <code>09:13:40 metal_gpu_error</code>; the request returned a 0-byte response). Plain streaming without tools answered normally and counted +61 completion tokens in the same window. <b>Streaming + tools is the reliable crash trigger on this 4B-8bit ring.</b></span></div>
+
+<p>So &ldquo;low token consumption&rdquo; is really a <em>crash report</em>: tool-using turns kill the model before it can generate. The counters were honest; the model was not surviving.</p>
+</section>
+
+<section>
+<h2><span class="num">3</span>The rest of the metrics review</h2>
+<p>Full pass over every exporter, alert and store on the stack (live, after the 08:37 restart unless noted):</p>
+<div class="card">
+<h3>Serving &amp; proxy</h3>
+<table>
+  <tr><th>metric</th><th>value</th><th>reading</th></tr>
+  <tr><td>requests (since restart)</td><td>8 (5 streaming, 2 non-stream 4B; 1 non-stream 1.7B)</td><td>low traffic &mdash; this stack serves us, not a fleet</td></tr>
+  <tr><td>errors</td><td>3&times; 5xx</td><td>the 503 degraded windows around crashes</td></tr>
+  <tr><td>TTFT mean</td><td>24.7 s across 7 requests</td><td>skewed by the 27 s dying stream, not a latency signal</td></tr>
+  <tr><td><code>mlx_tool_calls_total</code></td><td>0</td><td>tool turns died before a call was recorded</td></tr>
+  <tr><td>hallucination risk mean</td><td>0.017</td><td>healthy</td></tr>
+  <tr><td>context utilization</td><td>0.16%</td><td>context is not the pressure source</td></tr>
+  <tr><td>in-flight</td><td>0</td><td>no queue, no cap today</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>Hardware (rank0 / rank1, Mac mini)</h3>
+<table>
+  <tr><th>metric</th><th>rank0</th><th>rank1</th><th>reading</th></tr>
+  <tr><td>RAM used / total</td><td>7.2 / 8.6 GB (84%)</td><td>9.6 GB</td><td>tight &mdash; no headroom for a bigger model</td></tr>
+  <tr><td>disk used / total</td><td>227 / 245 GB <b>(92.7%)</b></td><td>147 GB</td><td><b><code>MLXDiskNearlyFull</code> FIRING &mdash; needs a cleanup now</b></td></tr>
+  <tr><td>GPU util</td><td>21% @ 800 MHz</td><td>3.8%</td><td>idle-ish; not a thermal story right now</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>Agents &amp; stores</h3>
+<table>
+  <tr><th>component</th><th>state</th></tr>
+  <tr><td>All 6 scrape targets (<code>mlx-proxy/hw/kv/supervisor/logtailer</code> &times;2 hw)</td><td><b>UP</b></td></tr>
+  <tr><td><code>mlx_server_log_tailer</code></td><td>errors 0; shipped 41 generation + 11 python/error + 2 gpu/error + 4 rank/warning; dropped 359 HTTP lines</td></tr>
+  <tr><td>vmalert</td><td><code>MLXServerMetalFault</code> firing (today&rsquo;s crash); <code>MLXDiskNearlyFull</code> firing; crash-loop rules (<code>&gt;3/15m</code>, <code>&gt;5/1h</code>) silent because crashes are spread out</td></tr>
+  <tr><td><code>mlx_kv_cache_agent</code> (:9104)</td><td><b>dead metric</b> &mdash; all cache gauges 0 despite &ldquo;Prompt Cache: N sequences, M GB&rdquo; lines in <code>server.log</code>; parser no longer matches the log format (<code>kv=0 B/tok</code>)</td></tr>
+  <tr><td>VictoriaMetrics totals</td><td>only the current proxy process (8 requests); every restart zeroes counters &mdash; <b>cumulative history survives only in Opik</b></td></tr>
+</table>
+</div>
+
+<h3>Crashes, last 24 h (from VictoriaMetrics + supervisor log)</h3>
+<table>
+  <tr><th>window</th><th>restarts</th><th>trigger</th></tr>
+  <tr><td>08-04 22:00</td><td>7</td><td>profile v1 / v2 load tests (long streaming + 17k-token prompt)</td></tr>
+  <tr><td>08-04 23:00</td><td>2</td><td>post-benchmark settling</td></tr>
+  <tr><td>08-05 01:00</td><td>3</td><td>two-agent concurrent test + trailing</td></tr>
+  <tr><td>08-05 08:00</td><td>2</td><td><b>idle</b> (08:02, 08:18)</td></tr>
+  <tr><td>08-05 09:00</td><td>2</td><td>08:42 opencode tool turn; 09:13 our repro &mdash; both streaming + tools</td></tr>
+</table>
+<p>16 restarts in 24 h, every one caught and typed by the supervisor. The signature is stable: long prefills, concurrent agent loops, and now single <em>streaming + tool</em> turns &mdash; plus two genuinely idle crashes that rule out load as the only cause.</p>
+</section>
+
+<section>
+<h2><span class="num">4</span>Tuning for edge scenarios: tools, streaming, concurrency, long context</h2>
+<p>Organized by the scenario that stresses the box. Each lever is listed with why it targets the failure we actually saw &mdash; not generic advice.</p>
+
+<h3>4.1 Tools / agentic traffic (the crash trigger)</h3>
+<ul>
+  <li><strong>Route tool-call traffic away from the 4B.</strong> The model ignored the planner directive entirely and dies on streaming+tools turns. Either reject/queue <code>tools</code> requests at the proxy for this model (one flag), or point opencode&rsquo;s tool-enabled route at a model that obeys tool instructions.</li>
+  <li><strong>Gate and cap tools.</strong> Limit the number of declared tools and schema size per request &mdash; smaller <code>tools</code> payloads mean shorter prefills and less GPU churn on every turn.</li>
+  <li><strong>Serialize agent turns.</strong> Two concurrent agents crashed where sixteen plain requests survived. A proxy-side semaphore (cap in-flight at 4, the measured throughput peak) plus a queue turns the burst into a line.</li>
+  <li><strong>Keep transcripts from growing unbounded.</strong> Every turn re-sends the whole transcript; with a small context budget this is pure pressure. A summarizer/trimmer at the client is the real fix for long agent sessions.</li>
+</ul>
+
+<h3>4.2 Streaming</h3>
+<ul>
+  <li><strong>Complete the usage story.</strong> mlx_lm.server&rsquo;s streaming response has no final <code>usage</code> object, so the proxy falls back to word counts (&sect;2 of the log-streaming post). Wire <code>stream_options: {"include_usage": true}</code> handling end-to-end, or emit a usage chunk from the server, so completion tokens are measured, not estimated.</li>
+  <li><strong>Treat streaming+tools as the heaviest load shape.</strong> It now has the same standing as the 17k-token prefill and two-agent runs &mdash; plan capacity around it.</li>
+</ul>
+
+<h3>4.3 Concurrency</h3>
+<ul>
+  <li><strong>Cap in-flight work at the proxy.</strong> The sweep peaks at concurrency 4 (~28 tok/s) then saturates; a semaphore + <code>503</code> with <code>Retry-After</code> beats letting a burst reach the GPU.</li>
+  <li><strong>Add client retry with backoff.</strong> opencode currently shows the 503 degraded window as a hard failure; a retry on 5xx would have papered over the restart windows.</li>
+</ul>
+
+<h3>4.4 Long context / long prefill</h3>
+<ul>
+  <li><strong>Cap the context window.</strong> <code>ctx=40960</code> but we use &lt;0.2% of it; dropping to e.g. 8k lowers KV memory and prefill cost per turn.</li>
+  <li><strong>Chunk or stream long prefills.</strong> The 17k-token prompt correlated with a <code>GPU Timeout</code> crash; incremental prefills spread the load.</li>
+  <li><strong>Watch <code>mlx_context_utilization</code>.</strong> It&rsquo;s the canary for prefill pressure; alert before 80%.</li>
+</ul>
+
+<h3>4.5 Generation control</h3>
+<ul>
+  <li><strong>Enforce <code>max_tokens</code> per route</strong> so a runaway generation cannot pin the GPU for minutes (the 27 s dying stream was effectively this).</li>
+  <li><strong>Keep <code>temperature 0.0</code> for tool calls</strong> (already the default) and add explicit stop sequences for the tool-call format.</li>
+</ul>
+
+<h3>4.6 Make tuning measurable</h3>
+<ul>
+  <li><strong>Fix the KV-cache agent parser</strong> &mdash; cache utilization is currently invisible, so none of the above can be validated against memory pressure.</li>
+  <li><strong>Stop losing history on restart.</strong> Export a start-epoch gauge (or persist counters to VM as cumulative series) so cumulative token/request totals survive proxy restarts &mdash; today only Opik remembers.</li>
+  <li><strong>Lower the crash-loop alert threshold</strong> (e.g. <code>&gt;2 restarts/hour</code>) so tool-crash clusters page instead of hiding under <code>MLXServerMetalFault</code>.</li>
+</ul>
+</section>
+
+<section>
+<h2><span class="num">5</span>Handling <code>metal_gpu_error</code></h2>
+<h3>What it is</h3>
+<p>A Metal command-buffer execution failure on Apple Silicon &mdash; seen as <code>kIOGPUCommandBufferCallbackErrorSubmissionsIgnored</code> and <code>...Timeout</code> &mdash; aborting <code>mlx_lm.server</code> mid-generation. The proxy keeps serving 503s in the window; the supervisor restarts with backoff; the alert fires. It is the single biggest reliability problem on this cluster.</p>
+
+<h3>What we know</h3>
+<ul>
+  <li>Environment: Qwen3.5-4B <b>8bit</b>, 2-node ring over the LAN, 8 GB Mac mini GPUs, ~84% RAM used.</li>
+  <li>16 restarts in 24 h; triggers observed: long single-stream prefills (17k), concurrent agent loops, single streaming+tools turns, and <em>twice while effectively idle</em>.</li>
+  <li>Plain concurrency does not trigger it (1&rarr;16 sweep, zero errors). It is not thermal (GPU 21%, no thermal alert). It is not context pressure (0.16%).</li>
+  <li>It is <em>not</em> a hard fault every time &mdash; one crash is listed as &ldquo;Ignored (for causing prior/excessive GPU errors)&rdquo;, i.e. a cascade once the GPU driver decides to drop submissions.</li>
+</ul>
+
+<h3>Containment today (already in place)</h3>
+<ul>
+  <li>Supervisor with typed crash reason + backoff ladder 5&rarr;5&rarr;10&rarr;20&rarr;40 s; every crash auto-recovered.</li>
+  <li><code>MLXServerMetalFault</code> alert; crash lines shipped by the log tailer to the collector JSONL; traces record the empty stream.</li>
+</ul>
+
+<h3>Fix candidates to evaluate (this is the plan, not a claim)</h3>
+<table>
+  <tr><th>#</th><th>candidate</th><th>why</th><th>effort</th></tr>
+  <tr><td>1</td><td><b>Correlate each crash with its in-flight request</b> &mdash; join proxy log, trace, GPU/RAM at crash time, and alert payload</td><td>today we type the crash but not the cause; this makes every experiment measurable</td><td>low</td></tr>
+  <tr><td>2</td><td><b>Lower crash-loop threshold</b> to &gt;2 restarts/h</td><td>page on clusters, not single faults</td><td>low</td></tr>
+  <tr><td>3</td><td><b>Queue + in-flight cap (4) + Retry-After</b> at the proxy</td><td>remove the burst path that precedes crashes</td><td>low</td></tr>
+  <tr><td>4</td><td><b>Gate tools</b> on the 4B route (reject or reroute)</td><td>removes the reproducible streaming+tools trigger</td><td>low</td></tr>
+  <tr><td>5</td><td><b>Cap max_tokens and context window</b> at the server</td><td>bounds the longest generations and prefill size</td><td>low</td></tr>
+  <tr><td>6</td><td><b>Test single-node (rank 0 only)</b>, ring disabled</td><td>isolates the 2-node network ring as the instability</td><td>medium</td></tr>
+  <tr><td>7</td><td><b>Drop quantization to 4-bit / try 1.7B-4bit</b> for the agentic route</td><td>less GPU memory pressure on every token</td><td>medium</td></tr>
+  <tr><td>8</td><td><b>Pin a single mlx/mlx-lm version</b> (fingerprint shows 0.31.3/0.32.0 mixed)</td><td>rules out a version-skew bug in the Metal path</td><td>low</td></tr>
+  <tr><td>9</td><td><b>Reserve GPU memory headroom</b> (MLX memory limit) on the 8 GB GPU</td><td>avoids OOM-adjacent GPU states before submission</td><td>low</td></tr>
+  <tr><td>10</td><td><b>Stream/chunk long prefills</b> and add a prefill watchdog</td><td>targets the GPU Timeout class</td><td>medium</td></tr>
+</table>
+
+<div class="callout info"><span class="ic">Measurement protocol</span><span>Before/after each candidate: <b>crash rate per hour</b> (VM), <b>completion&gt;0 trace ratio</b> (Opik), <b>TTFT p50</b> and <b>error rate</b> (VM). A candidate is &ldquo;winning&rdquo; if it moves crash rate to ~0 for 24 h under the same agentic workload. Also free disk on rank0 (92.7%) regardless &mdash; that alert is independent of the GPU problem.</span></div>
+</section>
+
+<section>
+<h2><span class="num">6</span>The recommendation list</h2>
+<p>Everything from sections 4&ndash;5 in one table, prioritized. This is the artifact we will pick from next &mdash; nothing here is committed yet except the measurement of the problem.</p>
+<div class="card">
+<table>
+  <tr><th>#</th><th>recommendation</th><th>priority</th><th>effort</th><th>status</th></tr>
+  <tr><td>1</td><td>Free disk on rank0 (92.7% full, alert firing)</td><td><span class="pill p0">P0</span></td><td>low</td><td>pending</td></tr>
+  <tr><td>2</td><td>Queue + cap in-flight (4) + Retry-After at the proxy</td><td><span class="pill p0">P0</span></td><td>low</td><td>pending</td></tr>
+  <tr><td>3</td><td>Gate tools on the 4B route (reject/reroute streaming+tools)</td><td><span class="pill p0">P0</span></td><td>low</td><td>pending</td></tr>
+  <tr><td>4</td><td>Correlate every crash with its in-flight request + GPU/RAM state</td><td><span class="pill p0">P0</span></td><td>low</td><td>pending</td></tr>
+  <tr><td>5</td><td>Fix the KV-cache agent parser (dead metric)</td><td><span class="pill p1">P1</span></td><td>low</td><td>pending</td></tr>
+  <tr><td>6</td><td>Persist cumulative counters across proxy restarts</td><td><span class="pill p1">P1</span></td><td>low</td><td>pending</td></tr>
+  <tr><td>7</td><td>Cap max_tokens and context window at the server</td><td><span class="pill p1">P1</span></td><td>low</td><td>pending</td></tr>
+  <tr><td>8</td><td>Lower crash-loop alert threshold to &gt;2 restarts/h</td><td><span class="pill p1">P1</span></td><td>low</td><td>pending</td></tr>
+  <tr><td>9</td><td>Emit/pass-through a real streaming usage object</td><td><span class="pill p1">P1</span></td><td>medium</td><td>pending</td></tr>
+  <tr><td>10</td><td>Pin a single mlx/mlx-lm version</td><td><span class="pill p1">P1</span></td><td>low</td><td>pending</td></tr>
+  <tr><td>11</td><td>Single-node test (ring disabled)</td><td><span class="pill p2">P2</span></td><td>medium</td><td>pending</td></tr>
+  <tr><td>12</td><td>Quantize 4B to 4-bit; try 1.7B for agentic route</td><td><span class="pill p2">P2</span></td><td>medium</td><td>pending</td></tr>
+  <tr><td>13</td><td>Reserve GPU memory headroom</td><td><span class="pill p2">P2</span></td><td>low</td><td>pending</td></tr>
+  <tr><td>14</td><td>Stream/chunk long prefills + prefill watchdog</td><td><span class="pill p2">P2</span></td><td>medium</td><td>pending</td></tr>
+  <tr><td>15</td><td>Client retry-with-backoff on 5xx (opencode side)</td><td><span class="pill p1">P1</span></td><td>low</td><td>pending</td></tr>
+  <tr><td>16</td><td>Summarizer/transcript trimmer for long agent sessions</td><td><span class="pill p2">P2</span></td><td>high</td><td>pending</td></tr>
+</table>
+</div>
+</section>
+
+<section>
+<h2><span class="num">7</span>What we decide next</h2>
+<p>The open decisions, deliberately not resolved here:</p>
+<ol>
+  <li><strong>Tool routing</strong> &mdash; keep tools on the 4B with a gate, or move the agentic route to a model that obeys tool directives (1.7B is unlikely; a 7B/8B is too big for 8 GB)?</li>
+  <li><strong>Containment first</strong> &mdash; ship P0 items 1&ndash;4 (disk, queue, tool gate, crash correlation) before any root-cause experiment?</li>
+  <li><strong>Root-cause order</strong> &mdash; single-node ring test first (item 11) or quantization first (item 12)? The ring test is the cheapest discriminator.</li>
+  <li><strong>Observability debt</strong> &mdash; KV-agent parser and counter persistence (items 5&ndash;6) before or alongside the serving changes?</li>
+  <li><strong>Acceptance</strong> &mdash; agree on the 24 h crash-free window under the agentic workload as the definition of done.</li>
+</ol>
+</section>
+
+</main>
+
+<footer class="wrap">
+  mlx-oc &middot; post 11 of 11 &middot; agentic edge cases, zero-completion traces, and the metal_gpu_error plan &middot; <a href="../README.md">repo README</a>
+</footer>
+</body>
+</html>
