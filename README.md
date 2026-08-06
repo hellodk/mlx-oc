@@ -379,6 +379,24 @@ judge (otherwise it rates its own rating prompts forever); the write endpoint is
 search-index backed, so just-finished traces can briefly appear with empty
 outputs and are skipped until the index catches up.
 
+### Opik dashboards
+
+`tools/opik_dashboards.py` provisions a project-scoped dashboard for the `mlx`
+project (name "mlx: serving health & quality", type `multi_project`): an
+Overview of latency p50/p90/p99, errors, tokens, estimated cost and the three
+judge feedback-score cards, plus Trends time series for trace volume, duration,
+token usage, cost, error rate and LLM spans broken down by model. It is
+idempotent (delete-by-name then recreate), so re-running re-provisions the live
+instance from the repo definition:
+
+```bash
+OPIK_BASE_URL=http://192.168.1.10:32173/api python tools/opik_dashboards.py
+```
+
+Gotcha: the SDK requires the self-hosted base URL to end in `/api` (bare
+`http://host:port` makes nginx answer with the frontend `index.html`); and every
+widget id must appear in its section's `layout` or creation is rejected.
+
 ## Blog
 
 Per-section field notes on the observability layer, with animated pastel SVGs
@@ -400,6 +418,7 @@ Per-section field notes on the observability layer, with animated pastel SVGs
 14. [The Decision Ledger: Tuning, metal_gpu_error, and Every Recommendation](blog/14-recommendations-decision.html)
 15. [SGLang on Two Mac Minis: A Scaffold, Not a Benchmark](blog/15-sglang-on-two-mac-minis.html)
 16. [Distributed MLX Tuning: The Lever Table, Applied and Measured](blog/16-mlx-distributed-options-tuning.html)
+17. [Opik Custom Dashboards: The mlx Project Gets a Live Health & Quality View](blog/17-opik-dashboards.html)
 
 ## Known platform quirks
 

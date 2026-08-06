@@ -80,11 +80,12 @@
   <a href="14-recommendations-decision.html">Decision ledger</a>
   <a href="15-sglang-on-two-mac-minis.html">SGLang</a>
   <a href="16-mlx-distributed-options-tuning.html">Distributed MLX</a>
+  <a href="17-opik-dashboards.html">Opik dashboards</a>
 </div></nav>
 
 <header class="hero">
   <div class="wrap">
-    <span class="kicker">9 of 16 &middot; resilience + load</span>
+    <span class="kicker">9 of 17 &middot; resilience + load</span>
     <h1>The Night the GPU Crashed</h1>
     <p class="sub">A Metal command-buffer fault silently killed <code>mlx_lm.server</code> while the proxy kept answering 503s. The alert fired &mdash; but it was generic, nothing restarted the server, and no metric could say "the model is actually loaded and serving right now." This post fixes all three: a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that finally stress the cluster the way an agent would &mdash; and the first run <em>reproduced the crash</em>, then survived it.</p>
     <div class="meta">
@@ -255,7 +256,7 @@ python3 tools/bench_agentic.py --scenario planner --agents 3 --runs 10</code></p
 </main>
 
 <footer class="wrap">
-  mlx-oc &middot; post 9 of 16 &middot; serving health, supervision &amp; load testing &middot; <a href="../README.md">repo README</a>
+  mlx-oc &middot; post 9 of 17 &middot; serving health, supervision &amp; load testing &middot; <a href="../README.md">repo README</a>
 </footer>
 </body>
 </html>

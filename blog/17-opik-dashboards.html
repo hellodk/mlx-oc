@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>17 — Opik Custom Dashboards: The mlx Project Gets a Live View</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#4f46e5;--accent-soft:#eef0ff;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(219,39,119,.10), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(15,118,110,.10), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #dfe1ff;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  .pill{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 9px;margin-right:4px}
+  .p0{background:#fde8f1;color:#9d174d;border:1px solid #fbcfe8}
+  .p1{background:#fef3d7;color:#92400e;border:1px solid #fde68a}
+  .p2{background:#e6f6f4;color:#065f46;border:1px solid #a7f3d0}
+  .todo{background:#eef0ff;color:#3730a3;border:1px solid #c7d2fe}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+  <a href="5-opik-llm-tracing.html">Opik</a>
+  <a href="6-opik-feedback-loop.html">Feedback</a>
+  <a href="7-mlx-inference-performance.html">Performance</a>
+  <a href="8-hydra-vs-mlx-oc.html">Hydra vs mlx-oc</a>
+  <a href="9-model-serving-resilience.html">Serving health</a>
+  <a href="10-opik-log-streaming.html">Server logs</a>
+  <a href="11-agentic-edge-cases.html">Edge cases</a>
+  <a href="12-fault-error-restart-analysis.html">Fault ledger</a>
+  <a href="13-agentic-forensics.html">Agentic forensics</a>
+  <a href="14-recommendations-decision.html">Decision ledger</a>
+  <a href="15-sglang-on-two-mac-minis.html">SGLang</a>
+  <a href="16-mlx-distributed-options-tuning.html">Distributed MLX</a>
+  <a href="17-opik-dashboards.html" style="color:var(--accent);font-weight:700">Opik dashboards</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">17 of 17 &middot; the Opik-native surface</span>
+    <h1>Opik Custom Dashboards: The mlx Project Gets a Live Health &amp; Quality View</h1>
+    <p class="sub">Post 5 traced every request into Opik and post 6 added the online feedback loop that scores each one. The question we finally answered: can Opik itself turn that data into a dashboard we keep, share and version &mdash; no Grafana import needed? Yes &mdash; and the answer is a 120-line idempotent script in the repo.</p>
+    <div class="meta">
+      <span><b>Source posts</b> 5 &middot; 6 &middot; 12</span>
+      <span><b>Widgets</b> 11 cards + 6 time series</span>
+      <span><b>Result</b> created &middot; verified &middot; reproducible</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section>
+<h2><span class="num">1</span>The ask: dashboards where the traces already are</h2>
+<p>The Grafana surface (posts 3, 7, 12) reads <em>metrics</em>. But the request-level truth &mdash; latency, token usage, cost, and the judge scores from post 6 &mdash; lives in Opik as <em>traces</em>, in the <code>mlx</code> project. Post 12 wanted the fault ledger in Grafana because that was the only surface that could show it. The same question applies to Opik: <strong>can we add custom dashboards in Opik?</strong> The answer is yes, and the deployment already proves it:</p>
+<pre><code>$ curl -s http://192.168.1.10:32173/api/v1/private/dashboards
+{"content":[],"page":1,"size":0,"total":0,...}</code></pre>
+<p>An empty list &mdash; the endpoint is live, sortable by <code>type</code>, and simply unused. Two probes mapped the real surface: <code>/api/dashboards</code> is a 404 and <code>/api/v1/private/dashboards/types</code> does not exist (no enum endpoint), so the contract has to be read from the SDK source rather than discovered.</p>
+</section>
+
+<section>
+<h2><span class="num">2</span>Two surfaces, one API</h2>
+<p>Opik exposes dashboards at two levels, and confusing them sends you hunting for a widget that cannot exist:</p>
+<table>
+  <tr><th>Surface</th><th>Type</th><th>Widgets</th><th>Scope</th></tr>
+  <tr><td>Workspace <b>Dashboards</b> page</td><td><code>multi_project</code> / <code>experiments</code></td><td>Time series, single metric, Markdown &mdash; plus Metrics line/bar/radar &amp; Leaderboard for experiments</td><td>workspace or one project</td></tr>
+  <tr><td>Per-project <b>Insights</b> tab</td><td>built-in read-only Project Overview</td><td>trace volume, errors, latency, cost, feedback scores, thread activity</td><td>one project, auto-scoped</td></tr>
+</table>
+<p>Both write through the same REST API; the SDK type <code>DashboardType</code> only has <code>multi_project</code> and <code>experiments</code>, and a <code>multi_project</code> dashboard created with a <code>project_name</code> becomes the project-scoped kind. The important consequences:</p>
+<ul>
+  <li><b>Widget types are checked against the dashboard type</b> &mdash; <code>TEXT_MARKDOWN</code>, <code>PROJECT_METRICS</code> and <code>PROJECT_STATS_CARD</code> are valid on <code>multi_project</code>; experiment-only widgets are rejected at construction time, not at render time.</li>
+  <li><b>Feedback scores are first-class metrics</b>. The <code>project_stats_card</code> metric accepts the dynamic <code>feedback_scores.&lt;name&gt;</code> form &mdash; so the judge scores from post 6 (<code>correctness</code>, <code>helpfulness</code>, <code>hallucination_free</code>) are just card metrics with no special wiring.</li>
+  <li><b>Breakdown is typed.</b> Trace metrics break down by tags/name/error; span metrics add <code>model</code>, <code>provider</code>, <code>type</code> &mdash; which is exactly where the proxy&rsquo;s stamped <code>model</code> metadata lands.</li>
+</ul>
+</section>
+
+<section>
+<h2><span class="num">3</span>The SDK path and the two gotchas</h2>
+<p>The local SDK is 2.2.13 &mdash; the same version as the deployed backend &mdash; and ships full dashboard support: <code>Opik.create_dashboard(...)</code>, <code>get_dashboards(...)</code>, <code>get_dashboard(...)</code>, <code>delete_dashboard(...)</code>, plus <code>opik.api_objects.dashboard.types</code> with the <code>DashboardType</code>, <code>WidgetType</code>, <code>ProjectMetricType</code>, <code>StatsCardMetric</code>, <code>BreakdownField</code> and <code>ChartType</code> enums. Two things were only learnable by running it:</p>
+<p class="callout warn"><span class="ic">!</span><span><b>Gotcha 1 — the base URL needs <code>/api</code>.</b> <code>Opik(host="http://192.168.1.10:32173")</code> makes the SDK request <code>/v1/private/dashboards</code> relative to the bare host, and the frontend nginx answers with the SPA&rsquo;s <code>index.html</code> &mdash; you get a <code>JSONDecodeError</code> with an HTML body. Self-hosted clients must pass <code>http://192.168.1.10:32173/api</code> (the evaluator already used the full <code>/api/v1/private</code> REST path for the same reason).</span></p>
+<p class="callout warn"><span class="ic">!</span><span><b>Gotcha 2 — widgets and layout are cross-validated.</b> Every widget id must appear in exactly one <code>layout</code> item in the same section, and no layout item may reference a missing widget. The dashboard config is a raw blob the wrapper PATCHes back, so ids must be generated once and reused in both lists.</span></p>
+<p>Also worth noting: the models are pydantic with <code>extra="allow"</code> and a snake_case&rarr;camelCase alias, so fields the backend needs but the model does not declare (like the stats-card <code>metric_name</code> and <code>stats</code>) still serialize correctly on the wire.</p>
+</section>
+
+<section>
+<h2><span class="num">4</span>The dashboard we built</h2>
+<p>Everything landed in one file, <code>tools/opik_dashboards.py</code>, which is idempotent: it looks up the dashboard by name, deletes it if present, and recreates it &mdash; so the definition in the repo is the source of truth and a re-run re-provisions the live instance. The dashboard is <b>project-scoped to <code>mlx</code></b> (created with <code>project_name="mlx"</code>), type <code>multi_project</code>, name <strong>&ldquo;mlx: serving health &amp; quality&rdquo;</strong>, with two sections:</p>
+<table>
+  <tr><th>Section</th><th>Widget</th><th>Config</th></tr>
+  <tr><td rowspan="2"><b>Overview</b></td><td>Markdown banner</td><td>what the project is and how the scores are written</td></tr>
+  <tr><td>10 single-metric cards</td><td><code>trace_count</code> &middot; <code>duration.p50/.p90/.p99</code> &middot; <code>error_count</code> &middot; <code>usage.total_tokens</code> &middot; <code>total_estimated_cost_sum</code> &middot; <code>feedback_scores.correctness/.helpfulness/.hallucination_free</code></td></tr>
+  <tr><td rowspan="6"><b>Trends</b></td><td>Trace volume</td><td><code>TRACE_COUNT</code>, line</td></tr>
+  <tr><td>Trace duration</td><td><code>DURATION</code>, line</td></tr>
+  <tr><td>Token usage</td><td><code>TOKEN_USAGE</code>, line</td></tr>
+  <tr><td>Estimated cost</td><td><code>COST</code>, line</td></tr>
+  <tr><td>Error rate</td><td><code>TRACE_ERROR_RATE</code>, line</td></tr>
+  <tr><td>LLM spans by model</td><td><code>SPAN_COUNT</code>, line, breakdown by <code>model</code> (span-level metadata)</td></tr>
+</table>
+<pre><code>$ OPIK_BASE_URL=http://192.168.1.10:32173/api python tools/opik_dashboards.py
+[dashboards] created 'mlx: serving health &amp; quality' -&gt; 019fd63d-ad7c-749c-a246-cf980a76a4df
+[dashboards] verified: id=019fd63d-ad7c-749c-a246-cf980a76a4df name='mlx: serving health &amp; quality'</code></pre>
+</section>
+
+<section>
+<h2><span class="num">5</span>Verification: the config round-trips</h2>
+<p>Re-reading the live dashboard through <code>GET /api/v1/private/dashboards</code> confirms every widget came back intact &mdash; the backend stored the config as sent, including the dynamic feedback-score metrics and the model breakdown:</p>
+<pre><code>dashboard: mlx: serving health &amp; quality  type= multi_project
+  project_id= 019fc8bf-ce1c-7047-be58-a50900b4621a   # = the mlx project
+  section: Overview
+    text_markdown   | header
+    project_stats_card | Total traces | trace_count
+    project_stats_card | Latency p50  | duration.p50
+    ... project_stats_card | Correctness | feedback_scores.correctness
+    ... project_stats_card | Hallucination-free | feedback_scores.hallucination_free
+  section: Trends
+    project_metrics | Trace volume    | TRACE_COUNT
+    project_metrics | Trace duration  | DURATION
+    project_metrics | Token usage     | TOKEN_USAGE
+    project_metrics | Estimated cost  | COST
+    project_metrics | Error rate      | TRACE_ERROR_RATE
+    project_metrics | LLM spans by model | SPAN_COUNT | breakdown= model</code></pre>
+<p>Because the <code>mlx</code> project has a stream of traces (post 5) and every one carries the judge scores (post 6), the dashboard is not a scaffold &mdash; it starts populated, and a browser at the dashboard URL is a live view that updates as requests flow.</p>
+</section>
+
+<section>
+<h2><span class="num">6</span>Where this leaves the stack</h2>
+<ul>
+  <li><b>Grafana stays the metrics surface</b> (posts 3, 7, 12) &mdash; VM-stored hardware, engine and fault-ledger counters.</li>
+  <li><b>Opik is now a first-class dashboard surface too</b>, scoped to the traces and judge scores that never touch VictoriaMetrics.</li>
+  <li><b>The script is the provisioner</b>, in the same spirit as post 12&rsquo;s <code>apply-dashboards.sh</code> for Grafana: edit the repo, re-run, done.</li>
+</ul>
+<p class="callout ok"><span class="ic">&#10003;</span><span>Closed loop: trace every request (post 5) &rarr; score it (post 6) &rarr; render it natively in Opik (this post). The mlx project&rsquo;s health &amp; quality view is live at <code>192.168.1.10:32173</code>.</span></p>
+</section>
+
+</main>
+
+<footer class="wrap">
+  mlx-oc &middot; a two-Mac-mini distributed MLX inference cluster with full observability &middot; <a href="../README.md">repo README</a>
+</footer>
+</body>
+</html>

@@ -40,6 +40,8 @@
   .n13{background:linear-gradient(135deg,#334155,#e11d48)}
   .n14{background:linear-gradient(135deg,#4f46e5,#db2777)}
   .n15{background:linear-gradient(135deg,#ea580c,#0f766e)}
+  .n16{background:linear-gradient(135deg,#b45309,#4f46e5)}
+  .n17{background:linear-gradient(135deg,#4f46e5,#0f766e)}
   .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
   .post p{margin:0;color:var(--muted);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
@@ -51,7 +53,7 @@
   <div class="wrap">
     <span class="kicker">MLX Observability &middot; Field Notes</span>
     <h1>Making Two Mac minis<br>Actually Observable</h1>
-    <p class="sub">Fifteen deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 28 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, a performance dashboard that finally shows the KV cache and context window, a head-to-head with hydra&rsquo;s push-first fleet stack, how a real GPU crash exposed the missing process-level truth &mdash; now fixed with a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that stress the cluster like an agent &mdash; the streamed server runtime log that finally carries an incident&rsquo;s server-side context into Opik, a per-reason fault ledger in Grafana, the forensics that found the fault lives on the remote rank, and the consolidated decision ledger we now choose from &mdash; and an experimental SGLang scaffold with an unverified Apple Silicon backend.</p>
+    <p class="sub">Seventeen deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 28 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, a performance dashboard that finally shows the KV cache and context window, a head-to-head with hydra&rsquo;s push-first fleet stack, how a real GPU crash exposed the missing process-level truth &mdash; now fixed with a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that stress the cluster like an agent &mdash; the streamed server runtime log that finally carries an incident&rsquo;s server-side context into Opik, a per-reason fault ledger in Grafana, the forensics that found the fault lives on the remote rank, and the consolidated decision ledger we now choose from &mdash; an experimental SGLang scaffold with an unverified Apple Silicon backend, the tuning lever table measured on the ring, and now the Opik-native dashboard that renders the mlx project&rsquo;s traces and judge scores in place.</p>
     <div class="meta">
       <span><b>Stack</b> VictoriaMetrics + vmalert + Alertmanager + Grafana</span>
       <span><b>Agents</b> mlx_metrics_proxy :8080 &middot; mlx_hw_telemetry :9102 &middot; mlx_kv_cache_agent :9104</span>
@@ -186,6 +188,14 @@
       <h2>Distributed MLX Tuning: The Lever Table, Applied and Measured</h2>
       <p>Before any tuning, the network premise died: the ring was already on dedicated Gigabit Ethernet (<code>10.0.0.0/24</code> on <code>en0</code>, 0.48&nbsp;ms RTT) &mdash; there was no WireGuard to remove. Then the lever table went from theory to implementation: decode/prefill concurrency, prefill step size, and prompt cache + a decode cap, each restarted and measured. Four levers, five restarts, zero errors and zero new <code>metal_gpu_error</code> crashes &mdash; with the structural options (pipeline, Thunderbolt, homogeneous pair) still deferred.</p>
       <span class="tag">tuning</span><span class="tag">decode-concurrency</span><span class="tag">ring</span><span class="tag">Gigabit Ethernet</span><span class="tag">benchmarked</span>
+    </div>
+  </a>
+  <a class="post" href="17-opik-dashboards.html">
+    <div class="num n17">17</div>
+    <div>
+      <h2>Opik Custom Dashboards: The mlx Project Gets a Live Health &amp; Quality View</h2>
+      <p>Can Opik itself turn the traces and judge scores into a dashboard we keep and version &mdash; no Grafana import needed? Yes. A 120-line idempotent script (<code>tools/opik_dashboards.py</code>) provisions a project-scoped dashboard for <code>mlx</code> &mdash; an Overview of latency p50/p90/p99, errors, tokens, cost and the feedback-score cards, plus six Trends time series including LLM spans broken down by model &mdash; with the two gotchas that only running it reveals: the self-hosted base URL needs an <code>/api</code> suffix (or nginx answers with the SPA&rsquo;s index.html), and every widget id must appear in its section&rsquo;s layout.</p>
+      <span class="tag">Opik</span><span class="tag">dashboards</span><span class="tag">feedback scores</span><span class="tag">create_dashboard</span><span class="tag">idempotent</span>
     </div>
   </a>
 </main>
