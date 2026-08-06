@@ -35,6 +35,8 @@ Model: `mlx-community/Qwen3-1.7B-4bit` (change `MODEL` in `start_server.sh`).
 
 ## Quick start
 
+Air-gapped / offline install (wheelhouse + model transfer): see [INSTALL.md](INSTALL.md).
+
 ```bash
 ./cluster/start_server.sh        # launches server (both nodes), proxy, hw agents
 curl -s http://127.0.0.1:8080/v1/models
