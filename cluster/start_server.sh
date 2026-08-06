@@ -107,8 +107,6 @@ start_server() {
   local srv_cmd="$MLX_VENV/bin/mlx.launch --hostfile $DIR/hosts.json --backend ring \
 --cwd $DIR --python $MLX_VENV/bin/python -- $MLX_VENV/bin/python -m mlx_lm.server \
 --model $MODEL --host 127.0.0.1 --port 8081 \
---decode-concurrency 8 --prompt-concurrency 4 --prefill-step-size 512 \
---prompt-cache-size 2 --max-tokens 1024 \
 --chat-template-args '{\"enable_thinking\":false}'"
 
   nohup "$VENV/bin/python" "$DIR/mlx_server_supervisor.py" \
