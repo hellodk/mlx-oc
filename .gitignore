@@ -7,6 +7,7 @@ cluster/*.plist
 tools/bench-reports/
 observability/data/
 observability/vm-scrape.yml
+opencode.json
 .DS_Store
 graphify-out/
 sglang/logs/*.log

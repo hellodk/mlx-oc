@@ -3,18 +3,18 @@
   "provider": {
     "mlx-dist": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "MLX Distributed (2x Mac mini, Qwen3-1.7B-4bit)",
+      "name": "MLX Distributed (2x Mac mini, __MLX_MODEL__)",
       "options": {
         "baseURL": "http://127.0.0.1:8080/v1",
         "apiKey": "no-key"
       },
       "models": {
-        "mlx-community/Qwen3-1.7B-4bit": {
-          "name": "Qwen3 1.7B (distributed)",
+        "__MLX_MODEL__": {
+          "name": "__MLX_MODEL__ (distributed)",
           "tool_call": true
         }
       }
     }
   },
-  "model": "mlx-dist/mlx-community/Qwen3-1.7B-4bit"
+  "model": "mlx-dist/__MLX_MODEL__"
 }

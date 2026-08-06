@@ -17,6 +17,7 @@ Usage:
 
 import argparse
 import json
+import os
 import statistics
 import threading
 import time
@@ -24,7 +25,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-MODEL = "mlx-community/Qwen3-1.7B-4bit"
+MODEL = os.environ.get("MLX_MODEL", "mlx-community/Qwen3.5-4B-MLX-8bit")
 
 SHORT = "Reply in two sentences: what is a distributed inference cluster?"
 MEDIUM = (

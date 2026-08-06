@@ -8,9 +8,12 @@ per token of context (unquantized fp16/bf16).
 
 Usage:
     from mlx_model_info import model_info
-    info = model_info("mlx-community/Qwen3-1.7B-4bit")
-    info.max_context_tokens   # 40960
-    info.kv_bytes_per_token   # ~114688 (fp16)
+    info = model_info("mlx-community/Qwen3-1.7B-4bit")  # any model id works
+    info.max_context_tokens   # e.g. 40960 for this example model
+    info.kv_bytes_per_token   # e.g. ~114688 (fp16) for this example model
+
+The actual cluster model lives in cluster/cluster.env (MLX_MODEL) - this
+module doesn't hardcode which one is "current"; callers pass the id in.
 """
 
 import json
@@ -101,7 +104,8 @@ def model_info(model: str) -> ModelInfo:
 if __name__ == "__main__":
     import sys
 
-    info = model_info(sys.argv[1] if len(sys.argv) > 1 else "mlx-community/Qwen3-1.7B-4bit")
+    _default_model = os.environ.get("MLX_MODEL", "mlx-community/Qwen3.5-4B-MLX-8bit")
+    info = model_info(sys.argv[1] if len(sys.argv) > 1 else _default_model)
     print(
         f"model={info.name} max_context={info.max_context_tokens} "
         f"layers={info.layers} kv_heads={info.kv_heads} head_dim={info.head_dim} "

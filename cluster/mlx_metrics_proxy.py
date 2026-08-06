@@ -62,7 +62,7 @@ from prometheus_client import (
     CONTENT_TYPE_LATEST,
 )
 
-MODEL_DEFAULT = "mlx-community/Qwen3-1.7B-4bit"
+MODEL_DEFAULT = os.environ.get("MLX_MODEL", "mlx-community/Qwen3.5-4B-MLX-8bit")
 _CTX_MAX_TOKENS = 0  # model max context, set at startup from config
 
 # Model context/KV metrics (best-effort; falls back to defaults if the model
@@ -854,11 +854,23 @@ def _health_watch(upstream):
 
 
 def main():
+    global _OTEL, _OPIK, _OPIK_OTLP, _NODE_NAME, _CTX_MAX_TOKENS, MODEL_DEFAULT
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--listen", default="0.0.0.0:8080", help="proxy bind address")
     ap.add_argument("--upstream", default="127.0.0.1:8081", help="mlx_lm server")
-    ap.add_argument("--default-temp", type=float, default=0.0)
+    ap.add_argument(
+        "--default-temp",
+        type=float,
+        default=float(os.environ.get("MLX_DEFAULT_TEMP", 0.0)),
+        help="fallback temperature when a request omits it (default: $MLX_DEFAULT_TEMP)",
+    )
     ap.add_argument("--metrics-path", default="/metrics")
+    ap.add_argument(
+        "--model",
+        default=MODEL_DEFAULT,
+        help="model id for context/KV gauges and the per-request fallback label "
+        "(default: $MLX_MODEL env var, or the last-known-good literal)",
+    )
     ap.add_argument(
         "--otlp-endpoint",
         default=os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
@@ -892,7 +904,7 @@ def main():
     Proxy.default_temp = args.default_temp
     Proxy.metrics_path = args.metrics_path
 
-    global _OTEL, _OPIK, _OPIK_OTLP, _NODE_NAME, _CTX_MAX_TOKENS
+    MODEL_DEFAULT = args.model
     _NODE_NAME = args.node_name
     _OTEL = _setup_otel(
         args.otlp_endpoint, args.node_name, opik_otlp_endpoint=args.opik_otlp_endpoint

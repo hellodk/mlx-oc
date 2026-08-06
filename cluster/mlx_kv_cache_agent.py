@@ -41,7 +41,7 @@ from mlx_model_info import model_info
 
 LISTEN = ("0.0.0.0", 9104)
 DEFAULT_LOG = str(Path(__file__).resolve().parent / "logs" / "server.log")
-DEFAULT_MODEL = "mlx-community/Qwen3-1.7B-4bit"
+DEFAULT_MODEL = os.environ.get("MLX_MODEL", "mlx-community/Qwen3.5-4B-MLX-8bit")
 
 CACHE_RE = re.compile(r"Prompt Cache:\s+(\d+)\s+sequences?,\s+([\d.]+)\s+GB")
 TYPE_RE = re.compile(r"-\s+(\w+):\s+(\d+)\s+sequences?,\s+([\d.]+)\s+GB")

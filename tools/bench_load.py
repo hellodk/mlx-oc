@@ -32,6 +32,7 @@ inspected per-request in the Opik UI.
 
 import argparse
 import json
+import os
 import statistics
 import threading
 import time
@@ -40,7 +41,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
-MODEL = "mlx-community/Qwen3.5-4B-MLX-8bit"
+MODEL = os.environ.get("MLX_MODEL", "mlx-community/Qwen3.5-4B-MLX-8bit")
 REPORT_DIR = Path(__file__).resolve().parent / "bench-reports"
 
 PROMPTS = {

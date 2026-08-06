@@ -196,7 +196,12 @@ def main():
     )
     ap.add_argument(
         "--model",
-        default=os.environ.get("JUDGE_MODEL", "mlx-community/Qwen3-1.7B-4bit"),
+        default=os.environ.get(
+            "JUDGE_MODEL",
+            os.environ.get("MLX_MODEL", "mlx-community/Qwen3.5-4B-MLX-8bit"),
+        ),
+        help="judge model id (default: $JUDGE_MODEL, then $MLX_MODEL, then "
+        "the last-known-good literal)",
     )
     ap.add_argument("--interval", type=int, default=10, help="seconds between passes")
     ap.add_argument("--limit", type=int, default=20, help="traces to scan per pass")

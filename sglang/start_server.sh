@@ -41,9 +41,9 @@
 DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(dirname "$DIR")"
 
-# HuggingFace model id sglang should load. There is no default — the MLX
-# model id used by cluster/ ("mlx-community/Qwen3-1.7B-4bit") is an
-# MLX-quantized artifact and is NOT loadable by sglang. Set this explicitly.
+# HuggingFace model id sglang should load. There is no default — whatever
+# model cluster/cluster.env points MLX at is an MLX-quantized artifact and is
+# NOT loadable by sglang. Set this explicitly.
 MODEL="${SGLANG_MODEL:-REPLACE_ME_HF_MODEL_ID}"
 if [[ "$MODEL" == "REPLACE_ME_HF_MODEL_ID" ]]; then
   echo "WARNING: MODEL is unset — set SGLANG_MODEL to a real HuggingFace model id before this will do anything useful." >&2

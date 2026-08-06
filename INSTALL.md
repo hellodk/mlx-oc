@@ -260,7 +260,10 @@ cp -R models--mlx-community--Qwen3.5-4B-MLX-8bit \
       ~/.cache/huggingface/hub/
 ```
 
-Keep `MODEL="mlx-community/Qwen3.5-4B-MLX-8bit"` in `start_server.sh`.
+Keep `MLX_MODEL=mlx-community/Qwen3.5-4B-MLX-8bit` in `cluster/cluster.env`
+(the single source of truth — `start_server.sh` sources it, no longer
+hardcodes the model itself). After changing it, re-run `./render-config.sh`
+to regenerate `opencode.json`.
 
 ### 6.1 Go fully offline
 

@@ -2,6 +2,7 @@ import argparse
 import ast
 import json
 import operator
+import os
 import re
 import time
 
@@ -9,7 +10,7 @@ import mlx.core as mx
 from mlx_lm.generate import generate
 from mlx_lm.utils import sharded_load
 
-DEFAULT_MODEL = "mlx-community/Qwen3-1.7B-4bit"
+DEFAULT_MODEL = os.environ.get("MLX_MODEL", "mlx-community/Qwen3.5-4B-MLX-8bit")
 
 TOOLS = [
     {

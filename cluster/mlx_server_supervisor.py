@@ -46,6 +46,7 @@ Usage (normally driven by start_server.sh):
 
 import argparse
 import json
+import os
 import re
 import shlex
 import signal
@@ -60,7 +61,7 @@ from prometheus_client import Gauge, Counter, generate_latest, CONTENT_TYPE_LATE
 
 LISTEN = ("0.0.0.0", 9105)
 HEALTH_URL = "http://127.0.0.1:8081/v1/models"
-DEFAULT_MODEL = "mlx-community/Qwen3-1.7B-4bit"
+DEFAULT_MODEL = os.environ.get("MLX_MODEL", "mlx-community/Qwen3.5-4B-MLX-8bit")
 
 CRASH_REASONS = [
     (re.compile(r"\[METAL\].*(Command buffer execution failed|GPU errors)", re.I),

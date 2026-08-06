@@ -29,7 +29,14 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(dirname "$DIR")"
 VENV="$REPO/.venv"                       # py3.14: proxy / hw / kv / supervisor
 MLX_VENV="$HOME/venvs/mlx"               # py3.12: mlx.launch + mlx_lm.server
-MODEL="mlx-community/Qwen3.5-4B-MLX-8bit"
+
+# Single source of truth for the model id: cluster/cluster.env. Exported so
+# every child process below (and anything invoked in this shell afterward)
+# inherits it without needing its own --model flag.
+source "$DIR/cluster.env"
+export MLX_MODEL MLX_DEFAULT_TEMP
+MODEL="$MLX_MODEL"
+
 LOG="$DIR/logs"
 RANK1="192.168.1.5"
 
@@ -119,8 +126,8 @@ start_server() {
 start_proxy() {
   info "starting mlx_metrics_proxy -> logs/proxy.log"
   local proxy_args=(--listen 0.0.0.0:8080 --upstream 127.0.0.1:8081
-                    --default-temp 0.0 --node-name rank0 --otlp-endpoint "$OTLP"
-                    --opik-otlp-endpoint "$OPIK_OTLP")
+                    --default-temp "$MLX_DEFAULT_TEMP" --node-name rank0 --otlp-endpoint "$OTLP"
+                    --opik-otlp-endpoint "$OPIK_OTLP" --model "$MODEL")
   if [[ -n "${OPIK_ENDPOINT:-}" ]]; then proxy_args+=(--opik-endpoint "$OPIK_ENDPOINT"); fi
   nohup "$VENV/bin/python" "$DIR/mlx_metrics_proxy.py" "${proxy_args[@]}" \
     > "$LOG/proxy.log" 2>&1 &

@@ -31,13 +31,20 @@ mlx_hw_telemetry.py :9102  per-node CPU / RAM / disk / GPU / power (both nodes)
 | `observability/compose.yaml` | podman (rank 0) | 8428 / 4317 / 4318 / 3000 / 8880 / 9093 | VictoriaMetrics + otel-collector + Grafana + vmalert + Alertmanager |
 | `sglang/start_server.sh` / `stop_server.sh` **(experimental, unverified device backend)** | both nodes, independent replicas | 0.0.0.0:30000 | scaffolding to launch two standalone SGLang servers (no ring/TP); Apple Silicon GPU support is unconfirmed |
 
-Model: `mlx-community/Qwen3-1.7B-4bit` (change `MODEL` in `start_server.sh`).
+Model: set once in `cluster/cluster.env` (`MLX_MODEL=...`) — every script under
+`cluster/` and `tools/` reads it from there (via the `MLX_MODEL` env var), so
+changing the model means editing that one file, not grepping the repo.
 
 ## Quick start
 
 Air-gapped / offline install (wheelhouse + model transfer): see [INSTALL.md](INSTALL.md).
 
+To change the model, edit `cluster/cluster.env` (`MLX_MODEL=...`), then
+re-run `./render-config.sh` to regenerate `opencode.json` from it before
+restarting the stack:
+
 ```bash
+./render-config.sh               # regenerate opencode.json from cluster.env
 ./cluster/start_server.sh        # launches server (both nodes), proxy, hw agents
 curl -s http://127.0.0.1:8080/v1/models
 curl -s http://127.0.0.1:8080/metrics | head
@@ -49,6 +56,12 @@ Any OpenAI-compatible client works against `http://<rank0-ip>:8080/v1` —
 e.g. `opencode` pointed at `http://192.168.1.64:8080/v1/chat/completions`.
 
 ## Benchmarks
+
+> **Snapshot, not current**: the numbers below were measured against
+> `mlx-community/Qwen3-1.7B-4bit` specifically. The cluster's actual model
+> (`cluster/cluster.env`, `MLX_MODEL`) has since changed — re-run
+> `tools/bench.py` against whatever's configured now for current numbers
+> rather than assuming these still hold.
 
 Measured with `tools/bench.py` against `Qwen3-1.7B-4bit` (temp 0.0, 3 iters).
 The 2-node ring is `~3×` slower than a single Mac for this tiny model — the
@@ -240,10 +253,12 @@ summary whenever a generation starts. `cluster/mlx_kv_cache_agent.py` tails
 `mlx_kv_bytes_per_token` and `mlx_kv_est_bytes_max_context`. The proxy adds
 per-request context gauges (`mlx_context_used_tokens`,
 `mlx_context_utilization`, `mlx_context_length_max_tokens`). Both read the
-model's `config.json` through the shared `cluster/mlx_model_info.py` helper:
-Qwen3-1.7B-4bit is 40,960 tokens and 114,688 KV bytes/token (fp16), so one
-full-length sequence is 4.70 GB and the 10-sequence LRU cache ceilings at
-~47 GB.
+model's `config.json` through the shared `cluster/mlx_model_info.py` helper.
+As a worked example (not necessarily today's model — see `cluster/cluster.env`
+for what's actually configured): Qwen3-1.7B-4bit is 40,960 tokens and 114,688
+KV bytes/token (fp16), so one full-length sequence is 4.70 GB and the
+10-sequence LRU cache ceilings at ~47 GB. Recompute for the current model with
+`python3 cluster/mlx_model_info.py "$MLX_MODEL"`.
 
 ## OpenTelemetry
 
@@ -333,7 +348,7 @@ trace (see [blog post 6](blog/6-opik-feedback-loop.html)):
 |---|---|---|---|
 | proxy (in-band) | `hallucination_quality` | quality | `1 - hallucination_risk` |
 | proxy (in-band) | `hallucination_flagged` | safety | `1.0` if not flagged |
-| `opik_evaluator.py` | `correctness` | judge | LLM-as-judge (Qwen3-1.7B, temp 0) |
+| `opik_evaluator.py` | `correctness` | judge | LLM-as-judge (`$MLX_MODEL`, temp 0) |
 | `opik_evaluator.py` | `helpfulness` | judge | LLM-as-judge |
 | `opik_evaluator.py` | `hallucination_free` | judge | LLM-as-judge |
 
@@ -407,6 +422,10 @@ Per-section field notes on the observability layer, with animated pastel SVGs
 ## Layout
 
 ```
+cluster/cluster.env             single source of truth: MLX_MODEL, MLX_DEFAULT_TEMP
+tools/check_model_drift.py      fails if any hardcoded fallback drifts from cluster.env
+opencode.json.tmpl              template rendered into opencode.json by render-config.sh
+render-config.sh                regenerate opencode.json from cluster.env (gitignored output)
 cluster/mlx_metrics_proxy.py    metrics + OTel proxy in front of mlx_lm.server
 cluster/mlx_hw_telemetry.py     per-node hardware telemetry exporter
 cluster/mlx_kv_cache_agent.py   KV-cache / context-length exporter (:9104, tails server.log)
