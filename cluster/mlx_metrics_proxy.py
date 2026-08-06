@@ -217,6 +217,13 @@ TOOL_CALLS = Counter(
     "Function calls requested by the model",
     ["model"],
 )
+FINISH_REASON = Counter(
+    "mlx_finish_reason_total",
+    "Completions by finish_reason (stop/length/tool_calls/...). A rising "
+    "'length' share means responses are getting truncated before finishing "
+    "their thought - a first-order quality signal for agentic/coding use.",
+    ["model", "reason"],
+)
 TEMPERATURE = Gauge(
     "mlx_temperature",
     "Sampling temperature used for the most recent request",
@@ -594,16 +601,20 @@ class Proxy(BaseHTTPRequestHandler):
                 content = parser.content
                 tool_calls = parser.tool_calls
                 usage = parser.usage
+                finish_reason = parser.finish_reason
             else:
                 content = ""
                 tool_calls = 0
                 usage = None
+                finish_reason = None
                 try:
                     obj = json.loads(b"".join(content_bytes).decode("utf-8", "replace"))
-                    msg = (obj.get("choices") or [{}])[0].get("message") or {}
+                    choice = (obj.get("choices") or [{}])[0]
+                    msg = choice.get("message") or {}
                     content = msg.get("content") or ""
                     tool_calls = len(msg.get("tool_calls") or [])
                     usage = obj.get("usage")
+                    finish_reason = choice.get("finish_reason")
                 except json.JSONDecodeError:
                     pass
 
@@ -638,6 +649,7 @@ class Proxy(BaseHTTPRequestHandler):
                 TOKEN_RATE.labels(model).observe(comp_tokens / gen_time)
 
             REQUESTS.labels(model, "true" if streaming else "false").inc()
+            FINISH_REASON.labels(model, finish_reason or "unknown").inc()
             TOOL_CALLS.labels(model).inc(tool_calls)
             TEMPERATURE.labels(model).set(temperature)
 

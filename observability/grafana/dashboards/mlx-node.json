@@ -62,7 +62,14 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -111,7 +118,14 @@
               }
             ]
           },
-          "unit": "percent"
+          "unit": "percent",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -159,7 +173,14 @@
               }
             ]
           },
-          "unit": "bytes"
+          "unit": "bytes",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -208,7 +229,14 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -270,7 +298,14 @@
               }
             ]
           },
-          "unit": "percent"
+          "unit": "percent",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -311,7 +346,14 @@
               }
             ]
           },
-          "unit": "watt"
+          "unit": "watt",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -349,10 +391,25 @@
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "orange",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 65
               }
             ]
           },
-          "unit": "watt"
+          "unit": "watt",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -401,7 +458,14 @@
               }
             ]
           },
-          "unit": "percentunit"
+          "unit": "percentunit",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -441,11 +505,22 @@
                 "value": null
               },
               {
-                "color": "#e24d42",
-                "value": 1
+                "color": "orange",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
               }
             ]
-          }
+          },
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -502,11 +577,22 @@
                 "value": null
               },
               {
-                "color": "green",
-                "value": 1
+                "color": "orange",
+                "value": 8
+              },
+              {
+                "color": "red",
+                "value": 9.6
               }
             ]
-          }
+          },
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -561,13 +647,16 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
               }
             ]
-          }
+          },
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -622,13 +711,16 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
               }
             ]
-          }
+          },
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -849,7 +941,14 @@
       "fieldConfig": {
         "defaults": {
           "min": 0,
-          "unit": "short"
+          "unit": "short",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -1204,7 +1303,8 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "fixed",
+            "fixedColor": "red"
           },
           "unit": "short"
         },
@@ -1331,12 +1431,23 @@
                 "value": null
               },
               {
-                "color": "#e24d42",
+                "color": "orange",
                 "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "links": [
+            {
+              "title": "View firing alerts",
+              "url": "/alerting/list?search=state:firing",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },

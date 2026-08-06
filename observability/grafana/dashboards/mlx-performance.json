@@ -849,6 +849,207 @@
       ],
       "title": "Current hallucination risk",
       "type": "gauge"
+    },
+    {
+      "id": 134,
+      "type": "row",
+      "title": "Completion outcomes (finish_reason)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      }
+    },
+    {
+      "id": 135,
+      "type": "timeseries",
+      "title": "Finish reason breakdown (rate/min)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 37
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(mlx_finish_reason_total[5m])) by (reason) * 60",
+          "refId": "A",
+          "legendFormat": "{{reason}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "length"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "stop"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "A rising 'length' share means responses are getting cut off before finishing - likely broken code/edits for agentic use, not just a stats curiosity."
+    },
+    {
+      "id": 136,
+      "type": "gauge",
+      "title": "Truncated (finish_reason=length) %",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 37
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "targets": [
+        {
+          "expr": "100 * sum(rate(mlx_finish_reason_total{reason=\"length\"}[15m])) / clamp_min(sum(rate(mlx_finish_reason_total[15m])), 0.0001)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 15
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 137,
+      "type": "stat",
+      "title": "Truncated completions (5m)",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 37
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(mlx_finish_reason_total{reason=\"length\"}[5m]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto"
+      }
     }
   ],
   "refresh": "10s",

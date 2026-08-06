@@ -80,7 +80,14 @@
             "scaleDistribution": {
               "type": "linear"
             }
-          }
+          },
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -149,7 +156,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent"
+          "unit": "percent",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -192,7 +206,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent"
+          "unit": "percent",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -235,7 +256,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "hertz"
+          "unit": "hertz",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -278,7 +306,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "decibytes"
+          "unit": "decibytes",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -330,7 +365,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent"
+          "unit": "percent",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -385,7 +427,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "watt"
+          "unit": "watt",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -428,7 +477,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "watt"
+          "unit": "watt",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -471,7 +527,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "watt"
+          "unit": "watt",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -514,7 +577,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "watt"
+          "unit": "watt",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -557,7 +627,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit"
+          "unit": "percentunit",
+          "links": [
+            {
+              "title": "Back to MLX Cluster overview",
+              "url": "/d/mlx-cluster/mlx-cluster",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -624,11 +701,22 @@
                 "value": null
               },
               {
-                "color": "#e24d42",
+                "color": "orange",
                 "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
               }
             ]
-          }
+          },
+          "links": [
+            {
+              "title": "View firing alerts",
+              "url": "/alerting/list?search=state:firing",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -682,12 +770,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "red",
                 "value": null
               },
               {
-                "color": "#e24d42",
-                "value": 0
+                "color": "green",
+                "value": 2
               }
             ]
           }
@@ -748,8 +836,12 @@
                 "value": null
               },
               {
-                "color": "#e24d42",
-                "value": 0
+                "color": "orange",
+                "value": 12
+              },
+              {
+                "color": "red",
+                "value": 16
               }
             ]
           }

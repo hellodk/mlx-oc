@@ -70,7 +70,14 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "links": [
+            {
+              "title": "View firing alerts",
+              "url": "/alerting/list?search=state:firing",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -141,7 +148,14 @@
                 "value": 3
               }
             ]
-          }
+          },
+          "links": [
+            {
+              "title": "View firing alerts",
+              "url": "/alerting/list?search=state:firing",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -187,7 +201,8 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "fixed",
+            "fixedColor": "red"
           },
           "custom": {
             "fillOpacity": 10,
@@ -203,7 +218,14 @@
                 "value": null
               }
             ]
-          }
+          },
+          "links": [
+            {
+              "title": "View firing alerts",
+              "url": "/alerting/list?search=state:firing",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -452,7 +474,8 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "fixed",
+            "fixedColor": "red"
           },
           "custom": {
             "fillOpacity": 30,
@@ -723,7 +746,38 @@
           },
           "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ok"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "fail"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -792,7 +846,14 @@
                 "value": 5
               }
             ]
-          }
+          },
+          "links": [
+            {
+              "title": "View firing alerts",
+              "url": "/alerting/list?search=state:firing",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -1021,7 +1082,38 @@
           },
           "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^shipped.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^dropped.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -1490,7 +1582,8 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "fixed",
+            "fixedColor": "red"
           },
           "custom": {
             "drawStyle": "bars",
