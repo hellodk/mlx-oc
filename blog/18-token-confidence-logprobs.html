@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>18 — The Sampler Doesn't Lie: Entropy, Perplexity and Confidence from Logprobs</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#4f46e5;--accent-soft:#eef0ff;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(79,70,229,.10), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(15,118,110,.10), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #dfe1ff;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  .pill{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 9px;margin-right:4px}
+  .p0{background:#fde8f1;color:#9d174d;border:1px solid #fbcfe8}
+  .p1{background:#fef3d7;color:#92400e;border:1px solid #fde68a}
+  .p2{background:#e6f6f4;color:#065f46;border:1px solid #a7f3d0}
+  .todo{background:#eef0ff;color:#3730a3;border:1px solid #c7d2fe}
+  .diagram{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin:20px 0;overflow:hidden}
+  .diagram .cap{font-size:11.5px;letter-spacing:.10em;text-transform:uppercase;font-weight:700;color:var(--muted);padding:12px 18px;border-bottom:1px solid var(--line);background:#fbfbfe}
+  .diagram > svg{display:block;width:100%;height:auto;padding:8px 0}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+  <a href="5-opik-llm-tracing.html">Opik</a>
+  <a href="6-opik-feedback-loop.html">Feedback</a>
+  <a href="7-mlx-inference-performance.html">Performance</a>
+  <a href="8-hydra-vs-mlx-oc.html">Hydra vs mlx-oc</a>
+  <a href="9-model-serving-resilience.html">Serving health</a>
+  <a href="10-opik-log-streaming.html">Server logs</a>
+  <a href="11-agentic-edge-cases.html">Edge cases</a>
+  <a href="12-fault-error-restart-analysis.html">Fault ledger</a>
+  <a href="13-agentic-forensics.html">Agentic forensics</a>
+  <a href="14-recommendations-decision.html">Decision ledger</a>
+  <a href="15-sglang-on-two-mac-minis.html">SGLang</a>
+  <a href="16-mlx-distributed-options-tuning.html">Distributed MLX</a>
+  <a href="17-opik-dashboards.html">Opik dashboards</a>
+  <a href="18-token-confidence-logprobs.html" style="color:var(--accent);font-weight:700">Token confidence</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">18 of 18 &middot; closing the quality gap</span>
+    <h1>The Sampler Doesn&rsquo;t Lie: Entropy, Perplexity and Confidence from Logprobs</h1>
+    <p class="sub">Every quality signal in this stack so far reads the model&rsquo;s <em>text</em> &mdash; repetition, hedge words, refusal patterns. Those fire after the model has already written something wrong. Logprobs read the <em>sampler</em>, and the sampler goes flat first. This post closes the last gap in the post&nbsp;8 comparison against Hydra: eight new metrics, five new alerts, one dashboard row &mdash; and one awkward constraint that made all of it harder than it should have been.</p>
+    <div class="meta">
+      <span><b>New metrics</b> 8</span>
+      <span><b>New alerts</b> 5 (41 total)</span>
+      <span><b>Tests</b> 37 passing</span>
+      <span><b>Blocker</b> streams carry no logprobs</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section>
+<h2><span class="num">1</span>What the text-based heuristics cannot see</h2>
+<p>Post&nbsp;6 gave the proxy four heuristics &mdash; repetition, refusal, hedging, ungrounded claims &mdash; folded into a single <code>mlx_hallucination_risk</code>. They work, and they are cheap. They also share one structural weakness: <strong>they only have an opinion once the model has produced text.</strong> A model that confidently states a fabricated function signature scores zero on all four. There is no repetition, no hedging, no refusal, and if it was a coding question there were no tools to be ungrounded about.</p>
+<p>The sampler knew. At the moment it emitted that fabricated identifier, the probability distribution over the next token was flat &mdash; several candidates, none dominant &mdash; and it picked one. That flatness is measurable, it is available for free as a byproduct of generation, and it does not care what the text looks like.</p>
+<div class="callout info"><span class="ic">&#9432;</span><span>Post&nbsp;8 compared this repo against Hydra and listed exactly one capability Hydra had that mlx-oc did not: logprob-derived entropy, perplexity and confidence. That was the last open item. This is it.</span></div>
+</section>
+
+<section>
+<h2><span class="num">2</span>The blocker: streams carry no logprobs</h2>
+<p>The plan was two lines of code &mdash; read <code>choices[0].logprobs</code>, compute. Then the actual server was probed rather than assumed:</p>
+<pre><code>$ curl -s $BASE/v1/chat/completions -d '{... "logprobs":true, "top_logprobs":3, "stream":false}'
+{"choices":[{"logprobs":{"content":[
+  {"token":"Hello","logprob":-0.25,"top_logprobs":[
+     {"token":"Hello","logprob":-0.25},
+     {"token":"Hi","logprob":-1.5},
+     {"token":"Hey","logprob":-4.75}]},
+  ...</code></pre>
+<p>Exactly the OpenAI shape. Then the same request with <code>"stream":true</code>:</p>
+<pre><code>$ curl -s -N $BASE/v1/chat/completions -d '{... "logprobs":true, "stream":true}' | grep -c logprob
+0</code></pre>
+<p><strong>Zero.</strong> <code>mlx_lm.server</code> accepts the parameter on a streaming request and silently drops it from every SSE chunk. And every real client in this stack streams &mdash; opencode streams, <code>tools/bench.py</code> streams, <code>bench_load.py</code> and <code>bench_agentic.py</code> stream. A passive &ldquo;read the logprobs if they happen to be there&rdquo; implementation would have scored precisely nothing, forever, while the dashboard sat at a confident-looking zero.</p>
+<div class="callout warn"><span class="ic">&#9888;</span><span>This is the failure mode worth naming: a quality panel that is empty because nothing is <em>wrong</em> looks identical to a quality panel that is empty because nothing is <em>measured</em>. That is why <code>mlx_confidence_scored_total</code> exists and why the dashboard leads with a coverage stat that goes <b>red at zero</b>.</span></div>
+</section>
+
+<section>
+<h2><span class="num">3</span>The design: inject, strip, and de-stream a sample</h2>
+<p>Three request classes, three behaviours:</p>
+<table>
+  <tr><th>Request</th><th>What the proxy does</th><th><code>source</code> label</th></tr>
+  <tr><td>Client asked for logprobs</td><td>Nothing. Forward as-is, read the reply.</td><td><code>client</code></td></tr>
+  <tr><td>Non-streaming, no logprobs asked</td><td>Inject <code>logprobs</code>/<code>top_logprobs</code> upstream, score the reply, <b>strip the field back out</b> before the client sees it.</td><td><code>injected</code></td></tr>
+  <tr><td>Streaming, no logprobs asked</td><td>For a sampled fraction: send upstream with <code>stream:false</code>, score it, re-emit to the client as synthetic SSE frames.</td><td><code>destreamed</code></td></tr>
+</table>
+
+<div class="diagram">
+  <div class="cap">De-streamed request &mdash; one generation, scored, re-emitted as a stream</div>
+  <svg viewBox="0 0 900 300" role="img" aria-label="A streaming request is de-streamed by the proxy, generated once upstream, scored, and re-emitted to the client as SSE frames">
+    <defs>
+      <marker id="ar18" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#444CE7"/>
+      </marker>
+      <path id="f18a" d="M 214 122 L 244 122"/>
+      <path id="f18b" d="M 434 122 L 464 122"/>
+      <path id="f18c" d="M 654 122 L 684 122"/>
+    </defs>
+
+    <text x="30"  y="46" font-size="12" font-weight="600" fill="#4B5563" font-family="system-ui, sans-serif">1 &middot; CLIENT</text>
+    <text x="250" y="46" font-size="12" font-weight="600" fill="#4B5563" font-family="system-ui, sans-serif">2 &middot; PROXY</text>
+    <text x="470" y="46" font-size="12" font-weight="600" fill="#4B5563" font-family="system-ui, sans-serif">3 &middot; SERVER</text>
+    <text x="690" y="46" font-size="12" font-weight="600" fill="#4B5563" font-family="system-ui, sans-serif">4 &middot; PROXY</text>
+
+    <rect x="30" y="76" width="184" height="92" rx="12" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+    <text x="122" y="112" font-size="14" font-weight="700" fill="#111827" text-anchor="middle" font-family="system-ui, sans-serif">Streaming Request</text>
+    <text x="122" y="134" font-size="12" fill="#4B5563" text-anchor="middle" font-family="system-ui, sans-serif">stream: true</text>
+    <text x="122" y="152" font-size="12" fill="#4B5563" text-anchor="middle" font-family="system-ui, sans-serif">No Logprobs Asked</text>
+
+    <rect x="250" y="76" width="184" height="92" rx="12" fill="#1a1a3e" stroke="#444CE7" stroke-width="2"/>
+    <circle cx="342" cy="122" r="30" fill="none" stroke="#444CE7" stroke-width="2" opacity="0.55">
+      <animate attributeName="r" values="30;54;30" dur="3.2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.55;0;0.55" dur="3.2s" repeatCount="indefinite"/>
+    </circle>
+    <text x="342" y="112" font-size="14" font-weight="700" fill="#F9FAFB" text-anchor="middle" font-family="system-ui, sans-serif">Rewrite Request</text>
+    <text x="342" y="134" font-size="12" fill="#CBD5E1" text-anchor="middle" font-family="system-ui, sans-serif">stream &rarr; false</text>
+    <text x="342" y="152" font-size="12" fill="#CBD5E1" text-anchor="middle" font-family="system-ui, sans-serif">top_logprobs: 3</text>
+
+    <rect x="470" y="76" width="184" height="92" rx="12" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+    <text x="562" y="112" font-size="14" font-weight="700" fill="#111827" text-anchor="middle" font-family="system-ui, sans-serif">mlx_lm.server</text>
+    <text x="562" y="134" font-size="12" fill="#4B5563" text-anchor="middle" font-family="system-ui, sans-serif">One Generation</text>
+    <text x="562" y="152" font-size="12" fill="#4B5563" text-anchor="middle" font-family="system-ui, sans-serif">Returns Top-K Logprobs</text>
+
+    <rect x="690" y="76" width="184" height="92" rx="12" fill="#1a1a3e" stroke="#444CE7" stroke-width="2"/>
+    <circle cx="782" cy="122" r="30" fill="none" stroke="#444CE7" stroke-width="2" opacity="0.55">
+      <animate attributeName="r" values="30;54;30" dur="3.2s" begin="1.6s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.55;0;0.55" dur="3.2s" begin="1.6s" repeatCount="indefinite"/>
+    </circle>
+    <text x="782" y="112" font-size="14" font-weight="700" fill="#F9FAFB" text-anchor="middle" font-family="system-ui, sans-serif">Score, Strip, Re-emit</text>
+    <text x="782" y="134" font-size="12" fill="#CBD5E1" text-anchor="middle" font-family="system-ui, sans-serif">Perplexity &middot; Entropy</text>
+    <text x="782" y="152" font-size="12" fill="#CBD5E1" text-anchor="middle" font-family="system-ui, sans-serif">SSE Frames Out</text>
+
+    <line x1="214" y1="122" x2="244" y2="122" stroke="#444CE7" stroke-width="2" marker-end="url(#ar18)"/>
+    <line x1="434" y1="122" x2="464" y2="122" stroke="#444CE7" stroke-width="2" marker-end="url(#ar18)"/>
+    <line x1="654" y1="122" x2="684" y2="122" stroke="#444CE7" stroke-width="2" marker-end="url(#ar18)"/>
+
+    <circle r="4" fill="#444CE7">
+      <animateMotion dur="2.4s" repeatCount="indefinite"><mpath href="#f18a"/></animateMotion>
+    </circle>
+    <circle r="4" fill="#444CE7">
+      <animateMotion dur="2.4s" begin="0.8s" repeatCount="indefinite"><mpath href="#f18b"/></animateMotion>
+    </circle>
+    <circle r="4" fill="#444CE7">
+      <animateMotion dur="2.4s" begin="1.6s" repeatCount="indefinite"><mpath href="#f18c"/></animateMotion>
+    </circle>
+
+    <text x="122" y="208" font-size="12" fill="#4B5563" text-anchor="middle" font-family="system-ui, sans-serif">Sampled At 5%</text>
+    <text x="342" y="208" font-size="12" fill="#4B5563" text-anchor="middle" font-family="system-ui, sans-serif">No Extra GPU Cost</text>
+    <text x="562" y="208" font-size="12" fill="#4B5563" text-anchor="middle" font-family="system-ui, sans-serif">Logprobs Only Here</text>
+    <text x="782" y="208" font-size="12" fill="#4B5563" text-anchor="middle" font-family="system-ui, sans-serif">Client Sees A Stream</text>
+
+    <rect x="30" y="238" width="844" height="42" rx="10" fill="#eef0ff" stroke="#c7d2fe" stroke-width="1.5"/>
+    <text x="452" y="264" font-size="13" font-weight="600" fill="#111827" text-anchor="middle" font-family="system-ui, sans-serif">The Cost Is Latency Shape, Not Tokens &mdash; That One Response Arrives At Once Instead Of Token By Token</text>
+  </svg>
+</div>
+
+<p>The de-streaming trade is the honest part. It does <strong>not</strong> cost a second generation &mdash; it is the same single forward pass, the same GPU time, the same tokens. What it costs is the incremental delivery of that one response: the caller waits and then receives everything at once. At <code>MLX_LOGPROBS_STREAM_SAMPLE=0.05</code> that is one request in twenty. Set it to <code>0</code> and the behaviour disappears entirely.</p>
+<p>It also means that request has no meaningful time-to-first-token, so the proxy deliberately records none. Recording the full generation time as a TTFT would have quietly poisoned the p95 that <code>MLXHighTTFTP95</code> fires on &mdash; a monitoring change causing a monitoring alert is the worst kind of self-inflicted page.</p>
+<pre><code>if t_first_token is not None:
+    TTFT.labels(model).observe(t_first_token - t_send)
+elif not synth_sse:
+    TTFT.labels(model).observe(gen_time)
+# A de-streamed request has no meaningful TTFT - the whole
+# completion lands at once. Recording gen_time there would poison
+# the TTFT percentiles the latency alerts fire on.</code></pre>
+</section>
+
+<section>
+<h2><span class="num">4</span>The maths, and one caveat that matters</h2>
+<p>Each token entry carries the natural log of the probability the sampler assigned to the token it picked, plus the top-k candidates it considered.</p>
+<table>
+  <tr><th>Quantity</th><th>Definition</th><th>Reads as</th></tr>
+  <tr><td><b>Confidence</b></td><td><code>exp(logprob)</code> per token</td><td>1.0 = certain. The <em>minimum</em> across a completion is where a fabricated identifier enters.</td></tr>
+  <tr><td><b>Perplexity</b></td><td><code>exp(-mean(log p))</code></td><td>1.0 = certain of every token. Step changes mean the <em>model</em> changed.</td></tr>
+  <tr><td><b>Entropy</b></td><td><code>-&Sigma; q log q</code> over the renormalised top-k, averaged per token</td><td>0 = one candidate held all the mass. Rising = the distribution is flattening.</td></tr>
+  <tr><td><b>Margin</b></td><td><code>p&#8321; &minus; p&#8322;</code>, averaged</td><td>Near zero = the model is coin-flipping between two tokens.</td></tr>
+</table>
+<div class="callout warn"><span class="ic">&#9888;</span><span><b>The entropy caveat.</b> <code>top_logprobs</code> is a <em>truncated</em> distribution &mdash; the tail is missing. The implementation renormalises over the returned candidates, which makes the result a <b>lower bound</b> on the true entropy, not the true entropy. It is honest to trend it and to threshold it. It is not honest to quote it as an absolute value, and the metric help text says so.</span></div>
+<p>Perplexity and margin have no such caveat &mdash; both are computed from the chosen token&rsquo;s own probability, which is exact.</p>
+</section>
+
+<section>
+<h2><span class="num">5</span>Eight metrics, and why each one earns its place</h2>
+<pre><code>mlx_output_perplexity{model}                  + _histogram_bucket
+mlx_token_entropy_nats{model}                 + _histogram_bucket
+mlx_token_confidence_mean{model}
+mlx_token_confidence_min{model}
+mlx_token_confidence_std{model}
+mlx_token_margin_mean{model}
+mlx_low_confidence_token_ratio{model}
+mlx_confidence_scored_total{model,source}
+mlx_low_confidence_response_total{model}</code></pre>
+<p>Three of these are worth arguing for specifically:</p>
+<ul>
+  <li><b><code>confidence_min</code>, not just the mean.</b> A 400-token answer that is 0.95-confident throughout and contains one token at 0.06 has a fine mean. The minimum is the interesting number, and the shape &mdash; high mean, collapsing minimum &mdash; is the signature of a confident answer with one invented detail in it.</li>
+  <li><b><code>margin_mean</code> separates two different failures.</b> High entropy on hard prompts is normal. A margin that collapses across an entire window is not a prompt problem &mdash; it points at a corrupt or mis-quantised weight load. That distinction is why <code>MLXConfidenceCollapse</code> is the only <span class="pill p0">critical</span> alert in the new group.</li>
+  <li><b><code>scored_total{source}</code> is the anti-lie metric.</b> Divided by <code>mlx_requests_total</code> it gives coverage. Without it, every other panel on the row is unfalsifiable.</li>
+</ul>
+<p>Deliberately <em>not</em> done: folding confidence into <code>mlx_hallucination_risk</code>. Only a subset of requests carry logprobs, so a blended score would silently mean two different things depending on whether that request happened to be sampled. The heuristics stay text-only; confidence is its own axis.</p>
+</section>
+
+<section>
+<h2><span class="num">6</span>Does it actually discriminate? Three prompts, measured</h2>
+<p>A quality metric that does not move is decoration. Three prompts through the real cluster against <code>Qwen3.5-4B-MLX-8bit</code>, 60-token cap:</p>
+<table>
+  <tr><th>Prompt</th><th>Perplexity</th><th>Entropy</th><th>Conf. mean</th><th>Conf. min</th><th>Margin</th></tr>
+  <tr><td>&ldquo;What is 2+2?&rdquo; &mdash; temp 0.0</td><td>1.00</td><td>0.087</td><td>1.000</td><td>1.000</td><td>0.980</td></tr>
+  <tr><td>&ldquo;Invent a name for a new colour&rdquo; &mdash; temp 1.0</td><td>1.46</td><td>0.465</td><td>0.748</td><td>0.135</td><td>0.635</td></tr>
+  <tr><td>&ldquo;Ada Lovelace&rsquo;s exact birthplace street address?&rdquo; &mdash; temp 0.0</td><td>1.41</td><td>0.412</td><td>0.763</td><td><b>0.119</b></td><td>0.675</td></tr>
+</table>
+<p>The arithmetic answer pins every metric &mdash; perplexity exactly 1.00, minimum confidence 1.00, margin 0.98. The invented colour sits where creative generation at temperature 1.0 should sit.</p>
+<p>The third row is the one that matters. It is a <b>factual</b> question at temperature 0.0 &mdash; the same settings as the arithmetic row &mdash; asking for a specific detail the model does not reliably have. It lands almost exactly where the deliberately creative prompt landed. And note which number moved most: <code>confidence_mean</code> is a respectable 0.763, while <code>confidence_min</code> drops to <b>0.119</b>. The sentence reads fluently and confidently; one token in it was a near coin-flip. That is the shape the text heuristics cannot see, and it is why the minimum is on the dashboard next to the mean rather than hidden behind it.</p>
+</section>
+
+<section>
+<h2><span class="num">7</span>Five new alerts &mdash; including one that watches the watcher</h2>
+<table>
+  <tr><th>Alert</th><th>Fires when</th><th>Severity</th></tr>
+  <tr><td><code>MLXLowTokenConfidence</code></td><td>mean sampled-token probability &lt; 0.5 for 15m</td><td><span class="pill p1">warning</span></td></tr>
+  <tr><td><code>MLXHighPerplexity</code></td><td>perplexity &gt; 8 for 15m</td><td><span class="pill p1">warning</span></td></tr>
+  <tr><td><code>MLXHighTokenEntropy</code></td><td>mean per-token entropy &gt; 1.5 nats for 15m</td><td><span class="pill p1">warning</span></td></tr>
+  <tr><td><code>MLXConfidenceCollapse</code></td><td>top-1 vs top-2 margin &lt; 0.15 for 10m</td><td><span class="pill p0">critical</span></td></tr>
+  <tr><td><code>MLXConfidenceScoringStopped</code></td><td>traffic flowing, nothing scored for 30m</td><td><span class="pill p2">info</span></td></tr>
+</table>
+<p>Every one of the first four is gated on <code>sum(rate(mlx_confidence_scored_total[...])) &gt; 0</code>, so an idle or unscored cluster cannot page anyone. The fifth exists because the other four are only as good as their input: if <code>MLX_LOGPROBS</code> gets set to 0, or the upstream stops returning logprobs after an upgrade, the confidence alerts go quiet &mdash; and quiet is indistinguishable from healthy unless something says otherwise.</p>
+<p>That takes <code>observability/vmalert/rules.yml</code> from 36 to 41 rules.</p>
+</section>
+
+<section>
+<h2><span class="num">8</span>Proving the rewrite does not break anything</h2>
+<p>Injecting a field into a request body and rewriting the response body is the riskiest kind of proxy change: the failure mode is a coding agent that silently loses tool calls. So the tests cover the rewrite path with a stub upstream that mirrors the real server&rsquo;s behaviour &mdash; including its refusal to put logprobs in SSE chunks.</p>
+<pre><code>$ python3 -m pytest tests/ -q
+.....................................                          [100%]
+37 passed in 1.10s</code></pre>
+<p>The ones that matter:</p>
+<ul>
+  <li><code>test_non_streaming_request_gets_logprobs_injected_and_stripped</code> &mdash; upstream received <code>logprobs: true</code>, the client&rsquo;s response has no <code>logprobs</code> key, and <code>Content-Length</code> matches the <em>rewritten</em> body rather than the upstream one.</li>
+  <li><code>test_destreamed_tool_calls_reach_the_client</code> &mdash; synthesised SSE frames are fed back through the proxy&rsquo;s own <code>_StreamParser</code>; tool calls and <code>finish_reason: tool_calls</code> survive the round trip.</li>
+  <li><code>test_destreaming_does_not_record_a_ttft</code> &mdash; asserts the TTFT histogram count does <b>not</b> move.</li>
+  <li><code>test_upstream_error_is_passed_through_untouched</code> &mdash; a 503 from upstream reaches the client as a 503 with its original body.</li>
+  <li><code>test_score_confidence_returns_empty_when_nothing_is_scorable</code> and <code>..._degrades_when_only_top_logprobs_are_broken</code> &mdash; eleven shapes of malformed logprobs payload. None raise; a usable <code>logprob</code> with a broken <code>top_logprobs</code> still yields confidence and perplexity, with entropy and margin correctly falling to zero rather than to a wrong number.</li>
+</ul>
+<p>That last pair started as one test with a wrong assertion &mdash; it expected a broken <code>top_logprobs</code> to invalidate the whole entry. The code was right and the test was wrong: partial data should degrade, not vanish. Splitting it into two named tests made the contract explicit instead of accidental.</p>
+</section>
+
+<section>
+<h2><span class="num">9</span>Configuration, in one file as usual</h2>
+<p>Three knobs join <code>MLX_MODEL</code> and <code>MLX_DEFAULT_TEMP</code> in <code>cluster/cluster.env</code>, the single source of truth <code>start_server.sh</code> sources and exports:</p>
+<pre><code>MLX_LOGPROBS=3                  # top-k asked upstream; 0 disables the layer
+MLX_LOGPROBS_STREAM_SAMPLE=0.05 # fraction of streams de-streamed for scoring
+MLX_LOW_CONFIDENCE=0.5          # token probability below which it counts as low</code></pre>
+<p>3 candidates is enough for entropy and for a top-1 vs top-2 margin without bloating the upstream response. The proxy prints its scoring configuration at startup, so the log says what the dashboard is measuring:</p>
+<pre><code>[proxy] confidence scoring: top_logprobs=3 stream_sample=0.05 low_conf&lt;0.5</code></pre>
+</section>
+
+<section>
+<h2><span class="num">10</span>Where this leaves the stack</h2>
+<ul>
+  <li><b>Grafana</b> gets a new <em>Answer confidence (token logprobs)</em> row on MLX Performance &mdash; coverage stat first, then confidence, perplexity, entropy, margin and low-confidence ratio.</li>
+  <li><b>Opik</b> gets the same numbers as span attributes and trace metadata, plus a <code>token_confidence</code> feedback score alongside the post-6 heuristic scores.</li>
+  <li><b>The post-8 gap against Hydra is closed</b>, and closed differently: Hydra&rsquo;s telemetry SDK expects the calling application to hand it token probabilities. Here the proxy sources them itself, from a server that will not give them up during a stream.</li>
+</ul>
+<p class="callout ok"><span class="ic">&#10003;</span><span>Text heuristics tell you the answer looked wrong. Logprobs tell you the model was guessing. The second one arrives first &mdash; and now both are on the same dashboard.</span></p>
+</section>
+
+</main>
+
+<footer class="wrap">
+  mlx-oc &middot; a two-Mac-mini distributed MLX inference cluster with full observability &middot; <a href="../README.md">repo README</a>
+</footer>
+</body>
+</html>

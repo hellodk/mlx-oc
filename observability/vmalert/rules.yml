@@ -432,3 +432,74 @@ groups:
         annotations:
           summary: "Possible ungrounded content for {{ $labels.model }}"
           description: "Ungrounded/unsupported claims heuristic averaged {{ $value | printf \"%.2f\" }} over 10 minutes."
+
+  - name: mlx-confidence
+    interval: 30s
+    rules:
+      # These fire on the sampler's own logprobs, not on the text. They lead
+      # the text-based heuristics above: a model starts guessing before it
+      # starts writing things that look wrong.
+      - alert: MLXLowTokenConfidence
+        expr: |
+          avg_over_time(mlx_token_confidence_mean[15m]) < 0.5
+          and sum(rate(mlx_confidence_scored_total[15m])) by (model) > 0
+        for: 10m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: confidence
+        annotations:
+          summary: "Low token confidence for {{ $labels.model }}"
+          description: "Mean sampled-token probability averaged {{ $value | printf \"%.2f\" }} over 15 minutes. The model is picking tokens it is not sure about."
+
+      - alert: MLXHighPerplexity
+        expr: |
+          avg_over_time(mlx_output_perplexity[15m]) > 8
+          and sum(rate(mlx_confidence_scored_total[15m])) by (model) > 0
+        for: 10m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: confidence
+        annotations:
+          summary: "High output perplexity for {{ $labels.model }}"
+          description: "Perplexity averaged {{ $value | printf \"%.1f\" }} over 15 minutes. Sustained jumps here usually mean a changed model, a changed quantisation, or prompts far outside what the model was trained for."
+
+      - alert: MLXHighTokenEntropy
+        expr: |
+          avg_over_time(mlx_token_entropy_nats[15m]) > 1.5
+          and sum(rate(mlx_confidence_scored_total[15m])) by (model) > 0
+        for: 10m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: confidence
+        annotations:
+          summary: "High token entropy for {{ $labels.model }}"
+          description: "Mean per-token entropy averaged {{ $value | printf \"%.2f\" }} nats over 15 minutes — the token distribution is flat, so sampling is close to a coin flip."
+
+      - alert: MLXConfidenceCollapse
+        expr: |
+          avg_over_time(mlx_token_margin_mean[10m]) < 0.15
+          and sum(rate(mlx_confidence_scored_total[10m])) by (model) > 0
+        for: 10m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: confidence
+        annotations:
+          summary: "Token margin collapsed for {{ $labels.model }}"
+          description: "The gap between the top-1 and top-2 candidates averaged {{ $value | printf \"%.2f\" }}. A margin this small across a whole window points at a corrupt or mis-quantised weight load, not at hard prompts."
+
+      - alert: MLXConfidenceScoringStopped
+        expr: |
+          sum(rate(mlx_confidence_scored_total[30m])) by (model) == 0
+          and sum(rate(mlx_requests_total{job="mlx-proxy"}[30m])) by (model) > 0
+        for: 30m
+        labels:
+          severity: info
+          team: ml-platform
+          category: confidence
+        annotations:
+          summary: "No completions scored for {{ $labels.model }}"
+          description: "Traffic is flowing but nothing has been scored for 30 minutes — MLX_LOGPROBS is 0, MLX_LOGPROBS_STREAM_SAMPLE is 0, or the upstream stopped returning logprobs. The confidence alerts above are blind until this clears."

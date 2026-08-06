@@ -84,11 +84,12 @@
   <a href="15-sglang-on-two-mac-minis.html">SGLang</a>
   <a href="16-mlx-distributed-options-tuning.html">Distributed MLX</a>
   <a href="17-opik-dashboards.html">Opik dashboards</a>
+  <a href="18-token-confidence-logprobs.html">Token confidence</a>
 </div></nav>
 
 <header class="hero">
   <div class="wrap">
-    <span class="kicker">Post 7 of 17 &middot; Context &amp; KV cache</span>
+    <span class="kicker">Post 7 of 18 &middot; Context &amp; KV cache</span>
     <h1>The Performance Dashboard: KV Cache and Context, Finally Visible</h1>
     <p class="sub">The cluster already exported hardware, request and quality metrics. The one thing nobody could see was the thing that decides how much of a 40,960-token window a request actually uses &mdash; the prompt (KV) cache and the context length. This week a log-tailing agent on :9104 plus a handful of proxy gauges put both in VictoriaMetrics, and a fourth Grafana dashboard renders them.</p>
     <div class="meta">

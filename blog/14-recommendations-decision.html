@@ -75,11 +75,12 @@
   <a href="16-mlx-distributed-options-tuning.html">Distributed MLX</a>
   <a href="15-sglang-on-two-mac-minis.html">SGLang</a>
   <a href="17-opik-dashboards.html">Opik dashboards</a>
+  <a href="18-token-confidence-logprobs.html">Token confidence</a>
 </div></nav>
 
 <header class="hero">
   <div class="wrap">
-    <span class="kicker">14 of 17 &middot; the decision</span>
+    <span class="kicker">14 of 18 &middot; the decision</span>
     <h1>The Decision Ledger</h1>
     <p class="sub">Post 13 gave us the root cause: a heterogeneous ring whose remote M4 faults and then poisons the GPU, with a readiness check that cannot see it. This post is everything the cluster has learned, consolidated into the three artifacts we now choose from &mdash; a tuning guide for edge scenarios, a handling plan for <code>metal_gpu_error</code>, and the complete recommendation ledger. The first decision is recorded here: <strong>the ring stays &mdash; no single-node serving</strong> &mdash; so the plan leans on recovery hardening, containment and load-shaping instead.</p>
     <div class="meta">

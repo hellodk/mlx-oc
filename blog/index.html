@@ -42,6 +42,7 @@
   .n15{background:linear-gradient(135deg,#ea580c,#0f766e)}
   .n16{background:linear-gradient(135deg,#b45309,#4f46e5)}
   .n17{background:linear-gradient(135deg,#4f46e5,#0f766e)}
+  .n18{background:linear-gradient(135deg,#1a1a3e,#444CE7)}
   .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
   .post p{margin:0;color:var(--muted);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
@@ -196,6 +197,14 @@
       <h2>Opik Custom Dashboards: The mlx Project Gets a Live Health &amp; Quality View</h2>
       <p>Can Opik itself turn the traces and judge scores into a dashboard we keep and version &mdash; no Grafana import needed? Yes. A 120-line idempotent script (<code>tools/opik_dashboards.py</code>) provisions a project-scoped dashboard for <code>mlx</code> &mdash; an Overview of latency p50/p90/p99, errors, tokens, cost and the feedback-score cards, plus six Trends time series including LLM spans broken down by model &mdash; with the two gotchas that only running it reveals: the self-hosted base URL needs an <code>/api</code> suffix (or nginx answers with the SPA&rsquo;s index.html), and every widget id must appear in its section&rsquo;s layout.</p>
       <span class="tag">Opik</span><span class="tag">dashboards</span><span class="tag">feedback scores</span><span class="tag">create_dashboard</span><span class="tag">idempotent</span>
+    </div>
+  </a>
+  <a class="post" href="18-token-confidence-logprobs.html">
+    <div class="num n18">18</div>
+    <div>
+      <h2>The Sampler Doesn&rsquo;t Lie: Entropy, Perplexity and Confidence from Logprobs</h2>
+      <p>Every quality signal so far read the model&rsquo;s <em>text</em>, which means it fires after the model has already written something wrong. Logprobs read the <em>sampler</em>, and the sampler goes flat first. The blocker: <code>mlx_lm.server</code> returns logprobs on non-streaming responses only &mdash; and everything real here streams &mdash; so the proxy injects them upstream and strips them back out, and de-streams a sampled 5% of streaming requests to score real traffic at no extra GPU cost. Eight metrics, five alerts (including one that fires when scoring itself stops), a Grafana row that leads with coverage, and 37 tests proving tool calls survive the rewrite.</p>
+      <span class="tag">logprobs</span><span class="tag">perplexity</span><span class="tag">entropy</span><span class="tag">confidence</span><span class="tag">37 tests</span>
     </div>
   </a>
 </main>

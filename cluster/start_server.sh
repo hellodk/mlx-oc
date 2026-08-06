@@ -35,6 +35,7 @@ MLX_VENV="$HOME/venvs/mlx"               # py3.12: mlx.launch + mlx_lm.server
 # inherits it without needing its own --model flag.
 source "$DIR/cluster.env"
 export MLX_MODEL MLX_DEFAULT_TEMP
+export MLX_LOGPROBS MLX_LOGPROBS_STREAM_SAMPLE MLX_LOW_CONFIDENCE
 MODEL="$MLX_MODEL"
 
 LOG="$DIR/logs"
@@ -125,7 +126,10 @@ start_proxy() {
   info "starting mlx_metrics_proxy -> logs/proxy.log"
   local proxy_args=(--listen 0.0.0.0:8080 --upstream 127.0.0.1:8081
                     --default-temp "$MLX_DEFAULT_TEMP" --node-name rank0 --otlp-endpoint "$OTLP"
-                    --opik-otlp-endpoint "$OPIK_OTLP" --model "$MODEL")
+                    --opik-otlp-endpoint "$OPIK_OTLP" --model "$MODEL"
+                    --logprobs "$MLX_LOGPROBS"
+                    --logprobs-stream-sample "$MLX_LOGPROBS_STREAM_SAMPLE"
+                    --low-confidence-threshold "$MLX_LOW_CONFIDENCE")
   if [[ -n "${OPIK_ENDPOINT:-}" ]]; then proxy_args+=(--opik-endpoint "$OPIK_ENDPOINT"); fi
   nohup "$VENV/bin/python" "$DIR/mlx_metrics_proxy.py" "${proxy_args[@]}" \
     > "$LOG/proxy.log" 2>&1 &

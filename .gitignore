@@ -11,3 +11,5 @@ opencode.json
 .DS_Store
 graphify-out/
 sglang/logs/*.log
+test-reports/
+.pytest_cache/

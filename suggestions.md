@@ -204,6 +204,36 @@ LiteLLM gateway, RDMA tensor-parallel pools) is mostly spec with many
 | No cross-engine dashboard | `hydra-llm-normalization.yml` pattern | Medium — do once ≥2 engines are live |
 | vLLM-MLX untested here | Already broken + diagnosed at `192.168.1.5` | Fix before writing new deployment steps |
 | SGLang device support on Apple Silicon | **Unverified** — see `sglang/` scaffold notes | Confirm before relying on it for benchmarking |
+| ~~No logprob-derived quality signals~~ | ~~`detection.py` entropy/perplexity/confidence~~ | **Closed** — see below |
+
+### Closed: token-confidence layer
+
+Hydra's `llm_telemetry/detection.py` computes entropy, perplexity and
+confidence stats from token probabilities the *calling application* hands it.
+mlx-oc now sources them in the proxy instead, because `mlx_lm.server` returns
+`choices[].logprobs.content[]` on **non-streaming responses only** — verified
+by probe, not assumed — and every real client here streams.
+
+`cluster/mlx_metrics_proxy.py` therefore injects `logprobs`/`top_logprobs`
+into non-streaming upstream requests and strips the field back out of the
+reply, and de-streams a sampled fraction of streaming requests
+(`MLX_LOGPROBS_STREAM_SAMPLE`, default 0.05) so real traffic gets scored at no
+extra GPU cost. Eight metrics (`mlx_output_perplexity`,
+`mlx_token_entropy_nats`, `mlx_token_confidence_{mean,min,std}`,
+`mlx_token_margin_mean`, `mlx_low_confidence_token_ratio`,
+`mlx_confidence_scored_total{source}`), five alerts in the `mlx-confidence`
+group, and a Grafana row on MLX Performance that leads with scoring coverage.
+
+Two deliberate divergences from Hydra:
+
+* **Entropy is computed over the renormalised top-k slice** and documented as a
+  lower bound on true entropy. Hydra's `compute_entropy` sums `-p·log p` over
+  the chosen-token probabilities, which is not a distribution and grows with
+  completion length.
+* **Confidence is not folded into `mlx_hallucination_risk`.** Only a sampled
+  subset of requests carry logprobs; blending would make the composite score
+  mean different things for different requests. Hydra's `_risk()` blends them
+  because its callers always supply probabilities.
 
 ## 6. Open question flagged during SGLang scaffolding
 

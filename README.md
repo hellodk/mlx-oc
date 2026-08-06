@@ -16,7 +16,7 @@ mlx_metrics_proxy.py :8080 ──► mlx_lm.server :8081 (ring: rank0 + rank1)
 mlx_hw_telemetry.py :9102  per-node CPU / RAM / disk / GPU / power (both nodes)
         │   scraped every 15s
         ▼
-      VictoriaMetrics ──► vmalert :8880 (28 rules) ──► Alertmanager :9093
+      VictoriaMetrics ──► vmalert :8880 (41 rules) ──► Alertmanager :9093
                      └──► Grafana :3000 (3 dashboards)
 ```
 
@@ -140,7 +140,27 @@ Proxy `/metrics` (`--metrics-path`):
 * `mlx_tokens_prompt_total`, `mlx_tokens_completion_total`
 * `mlx_temperature`, `mlx_tool_calls_total`
 * `mlx_hallucination_risk{model}` gauge + `mlx_hallucination_risk_histogram_bucket`
+* `mlx_finish_reason_total{model,reason}`
 * `mlx_upstream_up`
+
+Token confidence (from the sampler's logprobs, not from the text):
+
+* `mlx_output_perplexity{model}` + `mlx_output_perplexity_histogram_bucket`
+* `mlx_token_entropy_nats{model}` + `mlx_token_entropy_histogram_bucket`
+* `mlx_token_confidence_mean{model}`, `..._min`, `..._std`
+* `mlx_token_margin_mean{model}` — top-1 minus top-2 probability
+* `mlx_low_confidence_token_ratio{model}`
+* `mlx_confidence_scored_total{model,source}` — `source` is `client`,
+  `injected` or `destreamed`; divide by `mlx_requests_total` for coverage
+* `mlx_low_confidence_response_total{model}`
+
+`mlx_lm.server` only returns logprobs on **non-streaming** responses, so the
+proxy injects `logprobs`/`top_logprobs` into non-streaming upstream requests
+(and strips them back out of the reply — the client sees an untouched
+response), and de-streams a sampled fraction of streaming requests so real
+traffic gets scored too. All three knobs live in `cluster/cluster.env`:
+`MLX_LOGPROBS`, `MLX_LOGPROBS_STREAM_SAMPLE`, `MLX_LOW_CONFIDENCE`. Set
+`MLX_LOGPROBS=0` to turn the whole layer off.
 
 Hardware agent `/metrics` (each node, `--node-name`):
 
@@ -168,7 +188,7 @@ Proxy `/metrics` runtime gauges:
 | `victoria-metrics` | :8428 | TSDB + scraping; Prometheus-compatible API (`/vmui`) |
 | `otel-collector` | :4317 gRPC / :4318 HTTP | OTLP receiver (traces/logs) → debug output |
 | `grafana` | :3000 | dashboards, auto-provisioned (login `admin` / `admin`) |
-| `vmalert` | :8880 | evaluates the 28 alert rules in `observability/vmalert/rules.yml` |
+| `vmalert` | :8880 | evaluates the 41 alert rules in `observability/vmalert/rules.yml` |
 | `alertmanager` | :9093 | dedupes/inhibits alerts, routes to `oncall` + `default` webhooks |
 
 Start it (once — generates `vm-scrape.yml` from the template with your IPs):
@@ -419,6 +439,7 @@ Per-section field notes on the observability layer, with animated pastel SVGs
 15. [SGLang on Two Mac Minis: A Scaffold, Not a Benchmark](blog/15-sglang-on-two-mac-minis.html)
 16. [Distributed MLX Tuning: The Lever Table, Applied and Measured](blog/16-mlx-distributed-options-tuning.html)
 17. [Opik Custom Dashboards: The mlx Project Gets a Live Health & Quality View](blog/17-opik-dashboards.html)
+18. [The Sampler Doesn't Lie: Entropy, Perplexity and Confidence from Logprobs](blog/18-token-confidence-logprobs.html)
 
 ## Known platform quirks
 
@@ -456,12 +477,14 @@ cluster/hosts_rev.json          ring hostfile (rank 1 side)
 cluster/logs/                   runtime logs (server, proxy, hw agents)
 tools/bench.py                  streaming TTFT / token-rate / concurrency bench
 tools/agent.py, smoke.py        distributed tool-loop demo, ring connectivity test
+tests/test_confidence.py        entropy / perplexity / margin math + SSE synthesis
+tests/test_proxy_rewrite.py     proxy logprobs injection + response rewriting (stub upstream)
 observability/compose.yaml      victoria-metrics + otel-collector + grafana + vmalert + alertmanager (podman)
 observability/setup.sh          generate vm-scrape.yml (scrape targets from your IPs)
 observability/otelcol-config.yaml   OTLP traces/logs receiver (metrics are scrape-only)
 observability/vm-scrape.yml     scrape config: mlx-proxy, mlx-hw (x2), mlx-kv, stack self-scrape
 observability/grafana/dashboards/   four provisioned dashboards (incl. mlx-performance.json)
-observability/vmalert/rules.yml 28 alert rules (hardware / inference / quality / stack down)
+observability/vmalert/rules.yml 41 alert rules (hardware / inference / quality / confidence / stack down)
 observability/alertmanager/alertmanager.yml   receivers + inhibit_rules
 observability/grafana/          auto-provisioned datasource + 3 dashboards (MLX Cluster / MLX Node / MLX GPU & Power)
 sglang/start_server.sh          launch two independent sglang replicas (experimental, unverified device backend)
