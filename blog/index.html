@@ -180,6 +180,14 @@
       <span class="tag">SGLang</span><span class="tag">experimental</span><span class="tag">unverified backend</span><span class="tag">independent replicas</span>
     </div>
   </a>
+  <a class="post" href="16-mlx-distributed-options-tuning.html">
+    <div class="num n16">16</div>
+    <div>
+      <h2>Distributed MLX Tuning: The Lever Table, Applied and Measured</h2>
+      <p>Before any tuning, the network premise died: the ring was already on dedicated Gigabit Ethernet (<code>10.0.0.0/24</code> on <code>en0</code>, 0.48&nbsp;ms RTT) &mdash; there was no WireGuard to remove. Then the lever table went from theory to implementation: decode/prefill concurrency, prefill step size, and prompt cache + a decode cap, each restarted and measured. Four levers, five restarts, zero errors and zero new <code>metal_gpu_error</code> crashes &mdash; with the structural options (pipeline, Thunderbolt, homogeneous pair) still deferred.</p>
+      <span class="tag">tuning</span><span class="tag">decode-concurrency</span><span class="tag">ring</span><span class="tag">Gigabit Ethernet</span><span class="tag">benchmarked</span>
+    </div>
+  </a>
 </main>
 <footer class="wrap">
   mlx-oc &middot; a two-Mac-mini distributed MLX inference cluster with full observability &middot; <a href="../README.md">repo README</a>

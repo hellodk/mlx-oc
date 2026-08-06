@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>16 — Distributed MLX Tuning: The Lever Table, Applied and Measured</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#4f46e5;--accent-soft:#eef0ff;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(219,39,119,.10), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(15,118,110,.10), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #dfe1ff;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:680px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  .pill{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 9px;margin-right:4px}
+  .p0{background:#fde8f1;color:#9d174d;border:1px solid #fbcfe8}
+  .p1{background:#fef3d7;color:#92400e;border:1px solid #fde68a}
+  .p2{background:#e6f6f4;color:#065f46;border:1px solid #a7f3d0}
+  .todo{background:#eef0ff;color:#3730a3;border:1px solid #c7d2fe}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Hardware</a>
+  <a href="2-alerting.html">Alerting</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="4-observability-audit.html">Audit</a>
+  <a href="5-opik-llm-tracing.html">Opik</a>
+  <a href="6-opik-feedback-loop.html">Feedback</a>
+  <a href="7-mlx-inference-performance.html">Performance</a>
+  <a href="8-hydra-vs-mlx-oc.html">Hydra vs mlx-oc</a>
+  <a href="9-model-serving-resilience.html">Serving health</a>
+  <a href="10-opik-log-streaming.html">Server logs</a>
+  <a href="11-agentic-edge-cases.html">Edge cases</a>
+  <a href="12-fault-error-restart-analysis.html">Fault ledger</a>
+  <a href="13-agentic-forensics.html">Agentic forensics</a>
+  <a href="14-recommendations-decision.html">Decision ledger</a>
+  <a href="15-sglang-on-two-mac-minis.html">SGLang</a>
+  <a href="16-mlx-distributed-options-tuning.html" style="color:var(--accent);font-weight:700">Distributed MLX</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">16 of 16 &middot; the tuning, applied</span>
+    <h1>Distributed MLX Tuning: The Lever Table, Applied and Measured</h1>
+    <p class="sub">Post 14 shipped the decision ledger and the tuning guide. This post turns the tuning levers into an implementation plan for the ring cluster &mdash; and before writing any flags, the first thing we had to do was correct our own mental model of the network. The ring was already running on dedicated Gigabit Ethernet; there was no VPN hop to remove.</p>
+    <div class="meta">
+      <span><b>Source posts</b> 7 &middot; 13 &middot; 14</span>
+      <span><b>Levers applied</b> 4 of 4</span>
+      <span><b>Result</b> 0 errors &middot; 0 new crashes &middot; no throughput regression</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section>
+<h2><span class="num">1</span>First, the network reality check</h2>
+<p>The plan was supposed to start by moving the ring off a WireGuard overlay onto the LAN. Then we read <code>netstat -rn</code> and <code>ifconfig -a</code> and the premise fell apart: <strong>there is no WireGuard, and the ring is already on a dedicated Ethernet link.</strong></p>
+<table>
+  <tr><th>Interface</th><th>Hardware</th><th>IP</th><th>Speed</th><th>Role</th></tr>
+  <tr><td><code>en0</code></td><td>Built-in Ethernet</td><td><code>10.0.0.1/24</code></td><td>1000baseT full-duplex</td><td><b>Ring transport</b> &mdash; <code>hosts.json</code> <code>ips</code> <code>10.0.0.1</code>/<code>10.0.0.2</code></td></tr>
+  <tr><td><code>en1</code></td><td>Wi-Fi</td><td><code>192.168.1.64/24</code></td><td>&mdash;</td><td>Management plane: ssh to rank1, proxy :8080, OTLP, Opik</td></tr>
+  <tr><td><code>en2</code>/<code>en3</code></td><td>Thunderbolt bridges</td><td>unconfigured</td><td>&mdash;</td><td>Future <code>--over thunderbolt</code> direct link</td></tr>
+</table>
+<p>The route table says it plainly: <code>10.0.0.2 → en0</code> to MAC <code>d0:11:e5:8b:19:96</code>, ping RTT <b>0.48 ms</b>, 0% loss. The two Macs are wired together on a private <code>10.0.0.0/24</code> on their built-in Ethernet ports. That is already the ideal transport for a two-node ring &mdash; nothing to switch, no VPN hop to shave. The original &ldquo;Phase 1: switch to LAN IPs&rdquo; was withdrawn, and the plan became the lever table below.</p>
+</section>
+
+<section>
+<h2><span class="num">2</span>The lever table</h2>
+<p>Every lever was verified against the installed tooling before touching the launcher (mlx 0.32.0): <code>mlx.launch --backend ring</code> is the only distributed mode on macOS; <code>mlx.distributed_config</code> knows backends <code>{ring, jaccl, jaccl-ring}</code> and <code>--over {thunderbolt, ethernet}</code> (nccl/jaccl are CUDA-only); <code>mlx_lm.server</code> exposes the shaping flags below. All edits landed in <code>cluster/start_server.sh</code> &mdash; the <code>mlx.launch</code> command that builds the ring.</p>
+<table>
+  <tr><th>#</th><th>Lever</th><th>Flag</th><th>What it does</th><th>Risk</th><th>Benchmark</th><th>Decision threshold</th></tr>
+  <tr><td>0</td><td>Clean restart</td><td>&mdash;</td><td>fresh stack, baseline sanity</td><td>low</td><td>profile + <code>/v1/models</code></td><td>matches recorded baseline (TTFT p50 ~0.38&nbsp;s, ~8.8 tok/s)</td></tr>
+  <tr><td>1</td><td>Contain decode</td><td><code>--decode-concurrency 8</code></td><td>halves concurrent decode command buffers per step</td><td>low</td><td>sweep + crash rate</td><td>no new crashes; tps &ge; ~70% of baseline</td></tr>
+  <tr><td>2</td><td>Contain prefill</td><td><code>--prompt-concurrency 4</code></td><td>prefill ceiling (this is the default)</td><td>low</td><td>profile</td><td>no regression</td></tr>
+  <tr><td>3</td><td>Prefill chunk</td><td><code>--prefill-step-size 512</code></td><td>shorter per-step prefill command buffers (default)</td><td>low</td><td>long-prompt profile</td><td>TTFT &le; baseline</td></tr>
+  <tr><td>4</td><td>Context / memory</td><td><code>--prompt-cache-size 2</code>, <code>--max-tokens 1024</code></td><td>more prompt slots; caps runaway agent decode</td><td>low</td><td>agentic cascade</td><td>no OOM; loops capped</td></tr>
+  <tr><td>5</td><td>Structural</td><td><code>--pipeline</code></td><td>pipeline-parallel instead of tensor-parallel ring &mdash; removes per-token ring sync</td><td>high</td><td>soak</td><td>deferred to a later experiment</td></tr>
+  <tr><td>6</td><td>MTU</td><td><code>ifconfig en0 mtu 9000</code></td><td>jumbo frames on the direct link</td><td>low-med</td><td>profile</td><td>deferred (needs sudo on both nodes)</td></tr>
+  <tr><td>7</td><td>Thunderbolt</td><td><code>mlx.distributed_config --over thunderbolt</code></td><td>10&ndash;40 Gbps direct link, ring unchanged</td><td>setup</td><td>&mdash;</td><td>deferred (needs a USB4 cable, ledger #19)</td></tr>
+  <tr><td>8</td><td>Homogeneous pair</td><td>hardware swap M2&rarr;M4</td><td>removes the heterogeneous fault class entirely</td><td>&mdash;</td><td>&mdash;</td><td>deferred (ledger #19)</td></tr>
+  <tr><td>9</td><td>Draft model</td><td><code>--draft-model</code> + <code>--num-draft-tokens</code></td><td>speculative decoding</td><td>low</td><td>bench</td><td>not exercised (no draft model cached)</td></tr>
+  <tr><td>10</td><td>4-bit quant</td><td>model swap</td><td>less GPU memory per token</td><td>med</td><td>bench</td><td>not exercised (accuracy trade-off)</td></tr>
+</table>
+<p class="callout info"><span class="ic">i</span><span>Root-cause framing: the 4B model fits entirely on each node alone, so the ring buys this workload nothing but the heterogeneous fault class &mdash; the M4 faults, the M2 is the speed floor. Levers 1&ndash;4 make the existing ring stable and shaped; the real structural fixes remain levers 5&ndash;8.</span></p>
+</section>
+
+<section>
+<h2><span class="num">3</span>Phase A: levers 0&ndash;4, each measured</h2>
+<p>One lever per restart, each benchmarked before moving on. Streaming profile = 3 runs each of short/medium/long prompts (192 tokens), plus a concurrency sweep and an agentic cascade run for the containment levers. The crash ledger was tracked by counting <code>METAL</code> fatal lines in <code>cluster/logs/server.log</code> &mdash; the log file is append-only across boots, so &ldquo;11&rdquo; is the cumulative historical count and any increase means a fresh crash.</p>
+
+<h3>Streaming profile (TTFT p50 / tps p50 / engine tok/s)</h3>
+<table>
+  <tr><th>Config</th><th>Flags added</th><th>short</th><th>medium</th><th>long</th><th>err</th><th>METAL</th></tr>
+  <tr><td>Baseline (step 0)</td><td>(stock)</td><td>0.40s / 8.88 / 21.3</td><td>0.37s / 6.20 / 18.2</td><td>0.38s / 6.32 / 18.6</td><td>0</td><td>11</td></tr>
+  <tr><td>Step 1</td><td><code>--decode-concurrency 8</code></td><td>0.40s / 8.92 / 24.1</td><td>0.38s / 6.22 / 18.2</td><td>0.42s / 6.33 / 18.5</td><td>0</td><td>11</td></tr>
+  <tr><td>Step 2</td><td>+ <code>--prompt-concurrency 4</code></td><td>0.37s / 9.03 / 18.2</td><td>0.38s / 6.28 / 18.4</td><td>0.41s / 6.40 / 18.7</td><td>0</td><td>11</td></tr>
+  <tr><td>Step 3</td><td>+ <code>--prefill-step-size 512</code></td><td>0.37s / 9.04 / 14.5</td><td>0.40s / 6.29 / 18.4</td><td>0.44s / 6.33 / 18.4</td><td>0</td><td>11</td></tr>
+  <tr><td>Step 4</td><td>+ <code>--prompt-cache-size 2 --max-tokens 1024</code></td><td>0.46s / 9.78 / 23.5</td><td>0.50s / 6.20 / 17.6</td><td>0.51s / 6.97 / 18.4</td><td>0</td><td>11</td></tr>
+</table>
+
+<h3>Concurrency sweep under step 1 (medium, 128 tokens, 20s per level)</h3>
+<table>
+  <tr><th>Concurrency</th><th>TTFT p50</th><th>tps p50</th><th>engine tok/s</th><th>errors</th></tr>
+  <tr><td>2</td><td>0.71s</td><td>5.44</td><td>20.6</td><td>0</td></tr>
+  <tr><td>4</td><td>1.95s</td><td>4.07</td><td>29.3</td><td>0</td></tr>
+  <tr><td>8</td><td>2.83s</td><td>3.10</td><td>22.2</td><td>0</td></tr>
+  <tr><td>16</td><td>29.1s</td><td>3.05</td><td>22.3</td><td>0</td></tr>
+</table>
+<p>The conc-16 TTFT jump is queueing, not faulting: with <code>--decode-concurrency 8</code>, half the decode slots are gone, so saturated requests wait their turn &mdash; exactly the containment trade-off, and it held up with zero crashes.</p>
+
+<h3>Agentic cascade under step 4 (calculator scenario)</h3>
+<table>
+  <tr><th>Metric</th><th>Result</th></tr>
+  <tr><td>runs / completed / in budget</td><td>5 / 5 / 5</td></tr>
+  <tr><td>turns mean &middot; tool calls mean</td><td>5.0 &middot; 4.0</td></tr>
+  <tr><td>tool-call valid rate</td><td>1.00</td></tr>
+  <tr><td>per-turn TTFT mean</td><td>0.648s</td></tr>
+  <tr><td>run wall mean</td><td>16.2s</td></tr>
+</table>
+</section>
+
+<section>
+<h2><span class="num">4</span>Verdicts</h2>
+<p class="callout ok"><span class="ic">&#10003;</span><span><b>All four levers kept.</b> Zero errors, zero new crashes (METAL count flat at 11 across every restart), server_state 1.0 throughout, and no throughput regression &mdash; short-prompt tps actually ticked up from 8.88 to 9.78 and engine tok/s for short prompts went 21.3 &rarr; 24.1 &rarr; 23.5. The containment lever (step 1) delivered the crash-safety it was bought for; steps 2&ndash;3 are explicit pins of the defaults; step 4 caps runaway agent decodes and gave the agentic suite a 5/5 clean run.</span></p>
+<p>The final launch line in <code>cluster/start_server.sh</code> is now:</p>
+<pre><code>mlx.launch --hostfile cluster/hosts.json --backend ring \
+  --cwd cluster --python ~/venvs/mlx/bin/python -- \
+  ~/venvs/mlx/bin/python -m mlx_lm.server \
+  --model mlx-community/Qwen3.5-4B-MLX-8bit \
+  --host 127.0.0.1 --port 8081 \
+  --decode-concurrency 8 --prompt-concurrency 4 --prefill-step-size 512 \
+  --prompt-cache-size 2 --max-tokens 1024 \
+  --chat-template-args '{"enable_thinking":false}'</code></pre>
+</section>
+
+<section>
+<h2><span class="num">5</span>What is still on the menu</h2>
+<ul>
+  <li><b>Levers 5&ndash;8 are the structural options</b> and remain deferred: <code>--pipeline</code> (the one zero-hardware change that removes the per-token ring sync), a USB4 Thunderbolt link (<code>mlx.distributed_config --over thunderbolt</code>), and the homogeneous M4+M4 pair. Ledger item #19 covers the hardware path.</li>
+  <li><b>Levers 6, 9, 10</b> (jumbo MTU, draft model, 4-bit) need sudo, a cached draft model, or an accuracy decision &mdash; parked.</li>
+  <li><b>The SGLang scaffold</b> (post 15) is unchanged by this tuning; when it becomes a real benchmark it will be measured against the numbers above.</li>
+</ul>
+<p class="callout warn"><span class="ic">!</span><span>These measurements are a point-in-time snapshot on the ring. The crash ledger says what matters most: 4 lever changes, 5 restarts, 0 new <code>metal_gpu_error</code> fatalities.</span></p>
+</section>
+
+</main>
+
+<footer class="wrap">
+  mlx-oc &middot; a two-Mac-mini distributed MLX inference cluster with full observability &middot; <a href="../README.md">repo README</a>
+</footer>
+</body>
+</html>

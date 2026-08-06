@@ -381,6 +381,8 @@ Per-section field notes on the observability layer, with animated pastel SVGs
 12. [The Fault Ledger: Detailed Restart & Error Analysis in Grafana](blog/12-fault-error-restart-analysis.html)
 13. [The Fault Is Remote: Why rank1 Dies First](blog/13-agentic-forensics.html)
 14. [The Decision Ledger: Tuning, metal_gpu_error, and Every Recommendation](blog/14-recommendations-decision.html)
+15. [SGLang on Two Mac Minis: A Scaffold, Not a Benchmark](blog/15-sglang-on-two-mac-minis.html)
+16. [Distributed MLX Tuning: The Lever Table, Applied and Measured](blog/16-mlx-distributed-options-tuning.html)
 
 ## Known platform quirks
 

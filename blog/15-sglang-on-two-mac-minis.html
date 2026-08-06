@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>9 — SGLang on Two Mac Minis: A Scaffold, Not a Benchmark</title>
+<title>15 — SGLang on Two Mac Minis: A Scaffold, Not a Benchmark</title>
 <meta name="description" content="SGLang joins the MLX vs vllm-metal comparison on two Mac Minis as an experimental scaffold — two independent replicas, native Prometheus metrics, and an unverified Apple Silicon device backend stated plainly, not glossed over.">
 <meta name="keywords" content="SGLang, MLX, vllm-metal, Apple Silicon, Mac Mini, LLM inference, Prometheus metrics, observability, CUDA, Metal backend, inference benchmarking">
 <meta name="author" content="hellodk">
@@ -91,11 +91,12 @@
   <a href="14-recommendations-decision.html">Decision ledger</a>
   <a href="../vllm-metal/index.html">vllm-metal plan</a>
   <a href="15-sglang-on-two-mac-minis.html" style="color:var(--accent);font-weight:700">SGLang</a>
+  <a href="16-mlx-distributed-options-tuning.html">Distributed MLX</a>
 </div></nav>
 
 <header class="hero">
   <div class="wrap">
-    <span class="kicker">15 of 15 &middot; Experimental scaffold</span>
+    <span class="kicker">15 of 16 &middot; Experimental scaffold</span>
     <h1>SGLang on Two Mac Minis:<br>A Scaffold, Not a Benchmark</h1>
     <p class="sub">A third engine joins the MLX-vs-vllm-metal comparison in <code>sglang/</code> &mdash; but SGLang's primary backend is CUDA, and nobody has confirmed it runs on Apple Silicon GPUs at all. Here is the independent-replica architecture, the native <code>sglang:*</code> metrics already wired into VictoriaMetrics, and the unverified device backend that has to be resolved before any of this produces a real number.</p>
     <div class="meta">
