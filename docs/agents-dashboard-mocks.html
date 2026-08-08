@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Fleet Dashboard — Mocks</title>
+<style>
+:root{
+  --bg:#F9FAFB; --card:#FFFFFF; --text:#111827; --muted:#4B5563;
+  --border:#E5E7EB; --accent:#444CE7; --ink:#1a1a3e;
+  --up:#16A34A; --degraded:#D97706; --down:#B91C1C; --unknown:#6B7280;
+  --up-bg:#DCFCE7; --degraded-bg:#FEF3C7; --down-bg:#FEE2E2; --unknown-bg:#F3F4F6;
+  --r:10px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:400 14px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px 64px}
+.head{display:flex;align-items:center;gap:16px;padding:32px 0 20px}
+.chip{width:40px;height:40px;border-radius:var(--r);background:var(--ink);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.chip svg{width:20px;height:20px;flex-shrink:0}
+h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.2px}
+.sub{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+
+.tabs{position:sticky;top:0;z-index:20;background:var(--bg);
+  border-bottom:1px solid var(--border);display:flex;gap:4px;padding-top:4px;flex-wrap:wrap}
+.tab{appearance:none;border:0;background:none;cursor:pointer;font:inherit;
+  padding:12px 16px;color:var(--muted);border-bottom:2px solid transparent;
+  display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-num{width:20px;height:20px;border-radius:999px;background:var(--border);
+  color:var(--muted);font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tab.on .tab-num{background:var(--accent);color:#fff}
+.panel{display:none;animation:fadeUp .25s ease both}
+.panel.on{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+h2{font-size:17px;font-weight:700;margin:28px 0 4px}
+p.desc{margin:0 0 16px;color:var(--muted);font-size:13.5px;max-width:78ch}
+h3{font-size:14.5px;font-weight:700;margin:24px 0 8px}
+
+/* mock frame */
+.mock{background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  overflow:hidden;margin:16px 0 8px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.mock-bar{padding:12px 16px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#FCFCFD}
+.mock-title{font-size:13.5px;font-weight:700;margin-right:auto}
+.ctl{font-size:12.5px;color:var(--muted);border:1px solid var(--border);
+  background:#fff;border-radius:6px;padding:4px 10px;font-weight:600}
+.mock-body{padding:16px}
+
+/* KPI row */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi{border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:#fff}
+.kpi .lab{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.02em}
+.kpi .val{font-size:26px;font-weight:700;line-height:1.15;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .foot{font-size:12px;color:var(--muted);margin-top:2px}
+.kpi.ok .val{color:var(--up)} .kpi.warn .val{color:var(--degraded)} .kpi.bad .val{color:var(--down)}
+
+/* status grid */
+.node-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.node-name{width:78px;flex-shrink:0;font-size:12.5px;font-weight:700;color:var(--text);
+  font-variant-numeric:tabular-nums}
+.node-up{width:62px;flex-shrink:0;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cells{display:flex;gap:4px;flex-wrap:wrap}
+.cell{width:30px;height:26px;border-radius:5px;display:flex;align-items:center;
+  justify-content:center;font-size:11.5px;font-weight:700;cursor:default;
+  border:1px solid transparent;position:relative}
+.cell.up{background:var(--up-bg);color:#14532D;border-color:#86EFAC}
+.cell.degraded{background:var(--degraded-bg);color:#78350F;border-color:#FCD34D}
+.cell.down{background:var(--down-bg);color:#7F1D1D;border-color:#FCA5A5}
+.cell.unknown{background:var(--unknown-bg);color:#374151;border-color:#D1D5DB}
+.cell:hover{outline:2px solid var(--accent);outline-offset:1px;z-index:5}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;padding-top:12px;
+  border-top:1px solid var(--border)}
+.lg{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);font-weight:600}
+.sw{width:14px;height:14px;border-radius:4px;border:1px solid}
+.sw.up{background:var(--up-bg);border-color:#86EFAC}
+.sw.degraded{background:var(--degraded-bg);border-color:#FCD34D}
+.sw.down{background:var(--down-bg);border-color:#FCA5A5}
+.sw.unknown{background:var(--unknown-bg);border-color:#D1D5DB}
+.sw.solid-up{background:var(--up);border-color:var(--up)}
+.sw.solid-degraded{background:var(--degraded);border-color:var(--degraded)}
+.sw.solid-down{background:var(--down);border-color:var(--down)}
+.sw.solid-nodata{background:#E5E7EB;border-color:#D1D5DB;
+  background-image:repeating-linear-gradient(45deg,transparent,transparent 2px,#6B7280 2px,#6B7280 3px)}
+
+/* node heat map: rows = nodes, columns = time */
+.hm{display:flex;flex-direction:column;gap:3px}
+.hm-row{display:flex;align-items:center;gap:8px}
+.hm-lab{width:74px;flex-shrink:0;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.hm-cells{display:flex;gap:2px;flex:1;min-width:0}
+.hm-c{flex:1;height:18px;border-radius:2px;min-width:4px}
+.hm-c.up{background:var(--up)}
+.hm-c.degraded{background:var(--degraded)}
+.hm-c.down{background:var(--down)}
+.hm-c.nodata{background:#E5E7EB;
+  background-image:repeating-linear-gradient(45deg,transparent,transparent 2px,#6B7280 2px,#6B7280 3px)}
+.hm-c:hover{outline:2px solid var(--accent);outline-offset:1px;position:relative;z-index:5}
+.hm-meta{width:104px;flex-shrink:0;font-size:11.5px;color:var(--muted);
+  text-align:right;font-variant-numeric:tabular-nums}
+.hm-axis{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);
+  margin:6px 112px 0 82px;font-weight:600}
+
+/* role matrix: rows = observer role, columns = node */
+.rm{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:10px}
+.rm-row{display:flex;align-items:stretch;border-bottom:1px solid var(--border)}
+.rm-row:last-child{border-bottom:0}
+.rm-role{width:132px;flex-shrink:0;padding:9px 12px;font-size:12.5px;font-weight:700;
+  background:#F9FAFB;border-right:1px solid var(--border);display:flex;
+  align-items:center;justify-content:space-between;gap:6px}
+.rm-role .cnt{font-size:11.5px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.rm-cells{display:flex;gap:3px;padding:7px 12px;flex-wrap:wrap;align-items:center}
+.rm-c{width:26px;height:22px;border-radius:4px;font-size:11px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;border:1px solid}
+.rm-c.up{background:var(--up-bg);color:#14532D;border-color:#86EFAC}
+.rm-c.degraded{background:var(--degraded-bg);color:#78350F;border-color:#FCD34D}
+.rm-c.down{background:var(--down-bg);color:#7F1D1D;border-color:#FCA5A5}
+.rm-c.unknown{background:var(--unknown-bg);color:#374151;border-color:#D1D5DB}
+.rm-c:hover{outline:2px solid var(--accent);outline-offset:1px}
+
+/* tooltip */
+#tip{position:fixed;z-index:100;pointer-events:none;background:#111827;color:#F9FAFB;
+  border-radius:8px;padding:9px 11px;font-size:12px;line-height:1.5;display:none;
+  box-shadow:0 6px 20px rgba(0,0,0,.28);max-width:280px}
+#tip b{color:#fff;display:block;margin-bottom:3px;font-size:12.5px}
+#tip .k{color:#9CA3AF}
+
+/* table */
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;padding:9px 10px;background:#F3F4F6;font-weight:700;
+  border-bottom:1px solid var(--border);font-size:12px;white-space:nowrap;
+  position:sticky;top:0}
+td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--muted);white-space:nowrap}
+td strong{color:var(--text);font-weight:600}
+tbody tr:hover{background:#F9FAFB}
+.tbl-scroll{max-height:420px;overflow:auto;border:1px solid var(--border);border-radius:8px}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;
+  font-size:11.5px;font-weight:700;border:1px solid}
+.badge.up{background:var(--up-bg);color:#14532D;border-color:#86EFAC}
+.badge.degraded{background:var(--degraded-bg);color:#78350F;border-color:#FCD34D}
+.badge.down{background:var(--down-bg);color:#7F1D1D;border-color:#FCA5A5}
+.badge.unknown{background:var(--unknown-bg);color:#374151;border-color:#D1D5DB}
+.dot{width:7px;height:7px;border-radius:999px;flex-shrink:0}
+.dot.up{background:var(--up)} .dot.degraded{background:var(--degraded)}
+.dot.down{background:var(--down)} .dot.unknown{background:var(--unknown)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;
+  background:#F3F4F6;padding:1px 5px;border-radius:4px;color:#1F2937}
+.path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:#4B5563}
+
+/* exception list */
+.exc{border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.exc-row{display:flex;align-items:center;gap:12px;padding:11px 14px;
+  border-bottom:1px solid var(--border);font-size:13px}
+.exc-row:last-child{border-bottom:0}
+.exc-row .who{font-weight:700;color:var(--text);width:190px;flex-shrink:0}
+.exc-row .what{color:var(--muted);flex:1}
+.exc-row .when{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.bar-track{height:8px;background:#F3F4F6;border-radius:999px;overflow:hidden;flex:1;min-width:80px}
+.bar-fill{height:100%;border-radius:999px;background:var(--up)}
+
+.alert{border-radius:var(--r);padding:14px 16px;margin:16px 0;font-size:13px;
+  border-left:4px solid;background:var(--card);border-top:1px solid var(--border);
+  border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
+.alert b{display:block;margin-bottom:4px;font-size:13.5px;color:var(--text)}
+.alert p{margin:0;color:var(--muted)}
+.alert.warn{border-left-color:var(--degraded)}
+.alert.err{border-left-color:var(--down)}
+.alert.ok{border-left-color:var(--up)}
+pre{background:#111827;color:#E5E7EB;padding:14px 16px;border-radius:var(--r);
+  overflow-x:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:12.5px;line-height:1.55;margin:12px 0}
+pre .k{color:#93C5FD} pre .s{color:#86EFAC} pre .c{color:#9CA3AF;font-style:italic}
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin:16px 0}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px}
+.card h4{margin:0 0 6px;font-size:13.5px;font-weight:700}
+.card p{margin:0;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div id="tip"></div>
+<div class="wrap">
+
+<div class="head">
+  <div class="chip">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#A5B4FC" stroke-width="2" stroke-linecap="round">
+      <rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="4" width="7" height="7" rx="1.5"/>
+      <rect x="3" y="15" width="7" height="5" rx="1.5"/><rect x="14" y="15" width="7" height="5" rx="1.5"/>
+    </svg>
+  </div>
+  <div>
+    <h1>Agent Fleet Dashboard — Three Mocks</h1>
+    <p class="sub">100 agents across 20 nodes. Which are up, what they run, and where the model lives. Hover any cell or row.</p>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab on" onclick="sw(0,this)"><span class="tab-num">A</span>Status Grid</button>
+  <button class="tab" onclick="sw(1,this)"><span class="tab-num">B</span>Fleet Inventory</button>
+  <button class="tab" onclick="sw(2,this)"><span class="tab-num">C</span>Exceptions First</button>
+  <button class="tab" onclick="sw(3,this)"><span class="tab-num">!</span>What's Missing</button>
+</div>
+
+<!-- ===================== MOCK A ===================== -->
+<div class="panel on">
+  <h2>Mock A — Status grid</h2>
+  <p class="desc">One cell per agent, one row per node. The whole fleet fits on a laptop screen without scrolling, and a dead node reads as a broken row rather than five separate incidents. This is the "is anything wrong" view.</p>
+
+  <div class="mock">
+    <div class="mock-bar">
+      <span class="mock-title">MLX Fleet — Agent Status</span>
+      <span class="ctl">node = All</span>
+      <span class="ctl">role = All</span>
+      <span class="ctl">Last 5m</span>
+      <span class="ctl">↻ 30s</span>
+    </div>
+    <div class="mock-body">
+      <div class="kpis" style="margin-bottom:18px">
+        <div class="kpi ok"><div class="lab">AGENTS UP</div><div class="val" id="kUp">—</div><div class="foot">of 100 expected</div></div>
+        <div class="kpi warn"><div class="lab">DEGRADED</div><div class="val" id="kDeg">—</div><div class="foot">responding, unhealthy</div></div>
+        <div class="kpi bad"><div class="lab">DOWN</div><div class="val" id="kDown">—</div><div class="foot">no data 3m</div></div>
+        <div class="kpi"><div class="lab">NODES ONLINE</div><div class="val" id="kNodes">—</div><div class="foot">of 20</div></div>
+        <div class="kpi"><div class="lab">MODELS SERVING</div><div class="val" id="kModels">—</div><div class="foot">distinct</div></div>
+      </div>
+
+      <h3 style="margin-top:0">Node health — last 30 minutes</h3>
+      <p class="desc" style="margin-bottom:12px">One row per node, one column per minute. Current state is the rightmost column; everything left of it is history, so a node that is flapping looks different from one that has been down for 40 minutes.</p>
+      <div class="hm" id="heat"></div>
+      <div class="hm-axis"><span>−30m</span><span>−20m</span><span>−10m</span><span>now</span></div>
+
+      <div class="legend">
+        <span class="lg"><span class="sw solid-up"></span>Up</span>
+        <span class="lg"><span class="sw solid-degraded"></span>Degraded</span>
+        <span class="lg"><span class="sw solid-down"></span>Down</span>
+        <span class="lg"><span class="sw solid-nodata"></span>No Data (hatched)</span>
+        <span class="lg" style="margin-left:auto">Hover any cell for the sample behind it</span>
+      </div>
+
+      <h3>Observer agents by role</h3>
+      <p class="desc" style="margin-bottom:6px">Transposed on purpose: one row per role, one cell per node. A whole row going amber means the role is broken everywhere — a different incident from one node going dark, which reads as a vertical streak.</p>
+      <div class="rm" id="roles"></div>
+
+      <div class="legend">
+        <span class="lg"><span class="sw up"></span>Up</span>
+        <span class="lg"><span class="sw degraded"></span>Degraded</span>
+        <span class="lg"><span class="sw down"></span>Down</span>
+        <span class="lg"><span class="sw unknown"></span>No Data</span>
+        <span class="lg" style="margin-left:auto">Cell number = node · hover for detail</span>
+      </div>
+    </div>
+  </div>
+  <p class="desc">Two different questions, two different orientations. The heat map answers "which nodes are healthy and for how long"; the role matrix answers "is one agent type failing across the fleet". Neither rests on colour alone — no-data is hatched, and every cell has a tooltip.</p>
+</div>
+
+<!-- ===================== MOCK B ===================== -->
+<div class="panel">
+  <h2>Mock B — Fleet inventory</h2>
+  <p class="desc">The detail view. This is the one that answers "which model is running, where, and from what path" — the grid can't, because that data is text, not state.</p>
+
+  <div class="mock">
+    <div class="mock-bar">
+      <span class="mock-title">MLX Fleet — Agent Inventory</span>
+      <span class="ctl">status = All</span>
+      <span class="ctl">model = All</span>
+      <span class="ctl">sort: status ↓</span>
+    </div>
+    <div class="mock-body">
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr>
+            <th>Agent</th><th>Node</th><th>Role</th><th>Port</th><th>Status</th>
+            <th>Agent Uptime</th><th>Node Uptime</th><th>Version</th><th>Model</th><th>Model Path</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <p class="desc">Sorted worst-first by default. At 100 rows a table is still workable; past ~300 it needs the grid as the entry point and this as the drilldown.</p>
+</div>
+
+<!-- ===================== MOCK C ===================== -->
+<div class="panel">
+  <h2>Mock C — Exceptions first</h2>
+  <p class="desc">Inverts the question. Instead of rendering 100 healthy things, it renders only what is broken. On a good day this dashboard is nearly empty — which is the point.</p>
+
+  <div class="mock">
+    <div class="mock-bar">
+      <span class="mock-title">MLX Fleet — Attention Required</span>
+      <span class="ctl">severity ≥ warning</span>
+      <span class="ctl">Last 1h</span>
+    </div>
+    <div class="mock-body">
+      <div class="kpis" style="margin-bottom:18px">
+        <div class="kpi ok"><div class="lab">FLEET HEALTH</div><div class="val" id="cPct">—</div><div class="foot">agents reporting</div></div>
+        <div class="kpi bad"><div class="lab">NEEDS ACTION</div><div class="val" id="cAct">—</div><div class="foot">down + degraded</div></div>
+        <div class="kpi"><div class="lab">RESTARTS 1H</div><div class="val">7</div><div class="foot">across 3 nodes</div></div>
+        <div class="kpi"><div class="lab">OLDEST OUTAGE</div><div class="val">42m</div><div class="foot">node-07 supervisor</div></div>
+      </div>
+
+      <h3 style="margin-top:0">Open problems</h3>
+      <div class="exc" id="excList"></div>
+
+      <h3>Node uptime — lowest 8</h3>
+      <div class="exc" id="uptimeList"></div>
+    </div>
+  </div>
+  <p class="desc">The restart counter is the tell that a plain up/down view misses: an agent that crashes and is restarted by launchd every 40 seconds reads as "up" on every scrape.</p>
+</div>
+
+<!-- ===================== TAB 4 ===================== -->
+<div class="panel">
+  <h2>None of these can be built today</h2>
+  <p class="desc">I checked the live endpoints before drawing these. The metric contract does not currently support a fleet view — five gaps, all of which the Go binary should fix by construction.</p>
+
+  <div class="alert err">
+    <b>1. Five different liveness metric names</b>
+    <p><code>mlx_up</code>, <code>mlx_hw_up</code>, <code>mlx_kv_agent_up</code>, <code>mlx_server_up</code>, <code>mlx_log_tailer_up</code>. With five agents you can write five queries. With 100 you cannot — the grid above needs <strong>one</strong> series, <code>mlx_agent_up{role,node}</code>, or every panel becomes a hand-maintained union.</p>
+  </div>
+
+  <div class="alert err">
+    <b>2. Only one agent self-reports its node</b>
+    <p><code>mlx_hw_up</code> carries <code>node="rank0"</code>. The other four carry no node label at all — it is injected by the VictoriaMetrics scrape config. That works for two hand-written targets and collapses at twenty. <strong>The agent must label itself.</strong></p>
+  </div>
+
+  <div class="alert err">
+    <b>3. Model path does not exist anywhere</b>
+    <p><code>model="mlx-community/Qwen3.5-4B-MLX-8bit"</code> is a Hugging Face repo id, not a location on disk. Nothing emits where the weights actually live. Mock B's last column is currently unfillable.</p>
+  </div>
+
+  <div class="alert warn">
+    <b>4. No version or build info</b>
+    <p>No agent reports its own version. "Is node-14 running the old binary?" has no answer today — and it is the first question you ask when one node behaves differently.</p>
+  </div>
+
+  <div class="alert warn">
+    <b>5. Uptime is partial</b>
+    <p><code>mlx_hw_uptime_seconds</code> (node) and <code>mlx_server_uptime_seconds</code> exist. The proxy, kv and log agents report no uptime, so "restarted 40 seconds ago" is invisible for three of five roles.</p>
+  </div>
+
+  <h3>The contract these mocks assume</h3>
+  <p class="desc">Two series carry every panel above. Everything else is a join onto them.</p>
+<pre><span class="c"># one liveness series for every agent, whatever its role</span>
+mlx_agent_up{role=<span class="s">"proxy"</span>, node=<span class="s">"rank0"</span>, instance=<span class="s">"192.168.1.64:8080"</span>} <span class="s">1</span>
+
+<span class="c"># one info series carrying the text: model identity, location, build</span>
+mlx_agent_info{
+  role=<span class="s">"supervisor"</span>, node=<span class="s">"rank0"</span>,
+  version=<span class="s">"1.4.0"</span>, commit=<span class="s">"a7aeb08"</span>,
+  model=<span class="s">"mlx-community/Qwen3.5-4B-MLX-8bit"</span>,
+  model_path=<span class="s">"/Users/dk/.cache/huggingface/hub/models--mlx-community--Qwen3.5-4B-MLX-8bit"</span>
+} <span class="s">1</span>
+
+<span class="c"># plus, per agent, uniformly:</span>
+mlx_agent_uptime_seconds{role, node}
+mlx_agent_restarts_total{role, node}</pre>
+
+  <div class="grid-2">
+    <div class="card"><h4>Why info-metric, not labels on everything</h4>
+      <p>Putting <code>model_path</code> on every counter multiplies cardinality across hundreds of series. One <code>_info</code> gauge at value 1, joined with <code>* on(instance) group_left(model_path)</code>, keeps it to one series per agent.</p></div>
+    <div class="card"><h4>Why <code>role</code> as a label, not a name</h4>
+      <p>Roles change — a merged kv+log agent becomes one role. A label absorbs that; five metric names require editing every dashboard and alert.</p></div>
+    <div class="card"><h4>Down vs no-data</h4>
+      <p>These mocks separate them. Push-based delivery makes the distinction sharper: <code>absent_over_time</code> means "nothing arrived", which is not the same as an agent reporting itself unhealthy.</p></div>
+    <div class="card"><h4>Restart counter is load-bearing</h4>
+      <p>With <code>KeepAlive</code> in the plist, a crash-looping agent looks up on most scrapes. Without <code>mlx_agent_restarts_total</code> the fleet view lies.</p></div>
+  </div>
+</div>
+
+</div>
+<script>
+// ---- deterministic mock fleet: 20 nodes x 5 roles -------------------------
+const ROLES=[{k:'P',r:'proxy',port:8080},{k:'H',r:'hw',port:9102},
+             {k:'K',r:'kv',port:9104},{k:'S',r:'supervisor',port:9105},
+             {k:'L',r:'logtailer',port:9106}];
+const MODELS=['mlx-community/Qwen3.5-4B-MLX-8bit','mlx-community/Llama-3.3-8B-MLX-4bit',
+              'mlx-community/Mistral-7B-MLX-8bit'];
+const BASE='/Users/dk/.cache/huggingface/hub/models--';
+let seed=42; const rnd=()=>((seed=seed*1103515245+12345&0x7fffffff)/0x7fffffff);
+
+const nodes=[];
+for(let n=1;n<=20;n++){
+  const id='node-'+String(n).padStart(2,'0');
+  const model=MODELS[n%3];
+  const nodeDown = (n===7);            // whole node dark
+  const nodeUpS = nodeDown?0:(3600*(2+Math.floor(rnd()*180)));
+  const agents=ROLES.map(R=>{
+    let st='up';
+    if(nodeDown) st='unknown';
+    else if(n===4&&R.r==='kv') st='degraded';
+    else if(n===11&&R.r==='logtailer') st='down';
+    else if(n===16&&R.r==='proxy') st='degraded';
+    else if(n===19&&R.r==='supervisor') st='down';
+    return {...R,node:id,status:st,model,
+      uptime: st==='unknown'?0:Math.floor(rnd()*260000)+900,
+      ver: n===14?'1.3.2':'1.4.0',
+      path: BASE+model.split('/')[1].toLowerCase()};
+  });
+  nodes.push({id,agents,uptime:nodeUpS,down:nodeDown,model});
+}
+const all=nodes.flatMap(n=>n.agents);
+const fmt=s=>{if(!s)return'—';const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
+  return d?`${d}d ${h}h`:h?`${h}h ${m}m`:`${m}m`;};
+const LBL={up:'Up',degraded:'Degraded',down:'Down',unknown:'No Data'};
+
+// ---- KPIs ----
+const c=s=>all.filter(a=>a.status===s).length;
+kUp.textContent=c('up'); kDeg.textContent=c('degraded'); kDown.textContent=c('down');
+kNodes.textContent=nodes.filter(n=>!n.down).length;
+kModels.textContent=new Set(nodes.filter(n=>!n.down).map(n=>n.model)).size;
+cPct.textContent=Math.round(c('up')/all.length*100)+'%';
+cAct.textContent=c('down')+c('degraded')+c('unknown');
+
+// ---- Mock A.1: node heat map (30 one-minute buckets) ----
+const BUCKETS=30;
+function history(n){
+  const out=[];
+  for(let t=0;t<BUCKETS;t++){
+    const minsAgo=BUCKETS-1-t;
+    let s='up';
+    if(n.id==='node-07') s = minsAgo<42 ? 'nodata':'up';          // sustained outage
+    else if(n.id==='node-11') s = minsAgo<8 ? 'down':'up';         // recent failure
+    else if(n.id==='node-04') s = minsAgo<14 ? 'degraded':'up';
+    else if(n.id==='node-16') s = (minsAgo%4<2 && minsAgo<20)?'degraded':'up'; // flapping
+    else if(n.id==='node-19') s = minsAgo<6 ? 'down':(minsAgo<11?'degraded':'up');
+    out.push({s,minsAgo});
+  }
+  return out;
+}
+const HLBL={up:'Up',degraded:'Degraded',down:'Down',nodata:'No Data'};
+heat.innerHTML=nodes.map(n=>{
+  const h=history(n), cur=h[h.length-1].s;
+  const bad=h.filter(x=>x.s!=='up').length;
+  return `<div class="hm-row">
+    <span class="hm-lab">${n.id}</span>
+    <span class="hm-cells">${h.map(x=>`<span class="hm-c ${x.s}"
+       data-t="${n.id} — ${x.minsAgo===0?'now':x.minsAgo+'m ago'}|State: ${HLBL[x.s]}|Model: ${n.model.split('/')[1]}|Node uptime: ${n.down?'offline':fmt(n.uptime)}"></span>`).join('')}</span>
+    <span class="hm-meta">${cur==='up'?fmt(n.uptime):bad+'m impacted'}</span>
+  </div>`;}).join('');
+
+// ---- Mock A.2: role matrix (rows = role, cols = node) ----
+roles.innerHTML=ROLES.map(R=>{
+  const cells=nodes.map(n=>n.agents.find(a=>a.r===R.r));
+  const ok=cells.filter(a=>a.status==='up').length;
+  return `<div class="rm-row">
+    <span class="rm-role"><span>${R.r}</span><span class="cnt">${ok}/${nodes.length}</span></span>
+    <span class="rm-cells">${cells.map((a,i)=>`<span class="rm-c ${a.status}"
+      data-t="${a.node} · ${a.r}|Status: ${LBL[a.status]}|Port: ${a.port}|Uptime: ${fmt(a.uptime)}|Version: ${a.ver}|Model: ${a.model.split('/')[1]}">${i+1}</span>`).join('')}</span>
+  </div>`;}).join('');
+
+// ---- Mock B table ----
+const ord={down:0,unknown:1,degraded:2,up:3};
+tbody.innerHTML=[...all].sort((a,b)=>ord[a.status]-ord[b.status]||a.node.localeCompare(b.node))
+ .map(a=>`<tr>
+   <td><strong>${a.node}-${a.r}</strong></td><td>${a.node}</td><td>${a.r}</td><td>${a.port}</td>
+   <td><span class="badge ${a.status}"><span class="dot ${a.status}"></span>${LBL[a.status]}</span></td>
+   <td>${fmt(a.uptime)}</td><td>${fmt(nodes.find(n=>n.id===a.node).uptime)}</td>
+   <td>${a.ver==='1.3.2'?'<strong style="color:#B45309">'+a.ver+'</strong>':a.ver}</td>
+   <td>${a.model.split('/')[1]}</td><td class="path">${a.path}</td></tr>`).join('');
+
+// ---- Mock C ----
+const probs=all.filter(a=>a.status!=='up');
+excList.innerHTML=probs.slice(0,9).map(a=>`<div class="exc-row">
+  <span class="badge ${a.status}"><span class="dot ${a.status}"></span>${LBL[a.status]}</span>
+  <span class="who">${a.node} · ${a.r}</span>
+  <span class="what">${a.status==='unknown'?'No scrape data — whole node silent':
+    a.status==='down'?'Agent reporting unhealthy, port '+a.port:
+    'Responding slowly, last sample stale'}</span>
+  <span class="when">${a.status==='unknown'?'42m':'8m'}</span></div>`).join('');
+
+uptimeList.innerHTML=[...nodes].sort((a,b)=>a.uptime-b.uptime).slice(0,8).map(n=>{
+  const pct=Math.min(100,n.uptime/(86400*7)*100);
+  return `<div class="exc-row"><span class="who">${n.id}</span>
+    <span class="bar-track"><span class="bar-fill" style="width:${pct}%;${n.down?'background:#B91C1C':''}"></span></span>
+    <span class="when">${n.down?'offline':fmt(n.uptime)}</span></div>`;}).join('');
+
+// ---- tooltip ----
+const tip=document.getElementById('tip');
+document.addEventListener('mouseover',e=>{
+  const t=e.target.closest('[data-t]'); if(!t)return;
+  const p=t.dataset.t.split('|');
+  tip.innerHTML='<b>'+p[0]+'</b>'+p.slice(1).map(x=>{
+    const i=x.indexOf(':');return '<span class="k">'+x.slice(0,i+1)+'</span>'+x.slice(i+1);}).join('<br>');
+  tip.style.display='block';});
+document.addEventListener('mousemove',e=>{
+  if(tip.style.display!=='block')return;
+  let x=e.clientX+14,y=e.clientY+14;
+  if(x+tip.offsetWidth>innerWidth-12)x=e.clientX-tip.offsetWidth-14;
+  if(y+tip.offsetHeight>innerHeight-12)y=e.clientY-tip.offsetHeight-14;
+  tip.style.left=x+'px';tip.style.top=y+'px';});
+document.addEventListener('mouseout',e=>{if(e.target.closest('[data-t]'))tip.style.display='none';});
+
+function sw(i,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');
+  document.querySelectorAll('.panel').forEach((p,n)=>p.classList.toggle('on',n===i));
+  scrollTo({top:0,behavior:'smooth'});}
+</script>
+</body>
+</html>

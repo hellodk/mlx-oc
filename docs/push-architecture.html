@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Push-Based Metrics from the Mac Minis — Design</title>
+<style>
+:root{
+  --bg:#F9FAFB; --card:#FFFFFF; --text:#111827; --muted:#4B5563;
+  --border:#E5E7EB; --ok:#16A34A; --warn:#D97706; --err:#DC2626;
+  --accent:#444CE7; --ink:#1a1a3e;
+  --r:10px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:400 14px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px 64px}
+
+/* header */
+.head{display:flex;align-items:center;gap:16px;padding:32px 0 24px}
+.chip{width:40px;height:40px;border-radius:var(--r);background:var(--ink);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.chip svg{width:20px;height:20px;flex-shrink:0}
+h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.2px}
+.sub{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+
+/* tabs */
+.tabs{position:sticky;top:0;z-index:10;background:var(--bg);
+  border-bottom:1px solid var(--border);display:flex;gap:4px;padding-top:4px}
+.tab{appearance:none;border:0;background:none;cursor:pointer;font:inherit;
+  padding:12px 16px;color:var(--muted);border-bottom:2px solid transparent;
+  display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-num{width:20px;height:20px;border-radius:999px;background:var(--border);
+  color:var(--muted);font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tab.on .tab-num{background:var(--accent);color:#fff}
+
+.panel{display:none;animation:fadeUp .25s ease both}
+.panel.on{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+h2.section-title{font-size:17px;font-weight:700;margin:32px 0 4px}
+p.section-desc{margin:0 0 16px;color:var(--muted);font-size:13.5px;max-width:76ch}
+h3{font-size:14.5px;font-weight:700;margin:24px 0 8px}
+
+/* diagram */
+.diagram{background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  margin:16px 0 24px;overflow:hidden}
+.diagram .cap{padding:10px 16px;border-bottom:1px solid var(--border);
+  font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.diagram .body{padding:16px;overflow-x:auto}
+.diagram > .body > svg{width:100%;height:auto;min-width:640px;display:block}
+
+/* cards + tables */
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin:16px 0}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card h4{margin:0 0 6px;font-size:13.5px;font-weight:700}
+.card p{margin:0;color:var(--muted);font-size:13px}
+
+table{width:100%;border-collapse:collapse;background:var(--card);
+  border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin:16px 0;font-size:13px}
+th{text-align:left;padding:10px 12px;background:#F3F4F6;font-weight:700;
+  border-bottom:1px solid var(--border);font-size:12.5px}
+td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--muted)}
+td strong{color:var(--text);font-weight:600}
+tr:last-child td{border-bottom:0}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
+  background:#F3F4F6;padding:1px 5px;border-radius:4px;color:#1F2937}
+
+pre{background:#111827;color:#E5E7EB;padding:14px 16px;border-radius:var(--r);
+  overflow-x:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:12.5px;line-height:1.55;margin:12px 0}
+pre .k{color:#93C5FD}
+pre .s{color:#86EFAC}
+pre .c{color:#9CA3AF;font-style:italic}
+pre .n{color:#FCD34D}
+
+.alert{border-radius:var(--r);padding:14px 16px;margin:16px 0;font-size:13px;
+  border-left:4px solid;background:var(--card);border-top:1px solid var(--border);
+  border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
+.alert b{display:block;margin-bottom:4px;font-size:13.5px;color:var(--text)}
+.alert.warn{border-left-color:var(--warn)}
+.alert.err{border-left-color:var(--err)}
+.alert.ok{border-left-color:var(--ok)}
+.alert p{margin:0;color:var(--muted)}
+
+ol.steps{counter-reset:s;list-style:none;padding:0;margin:16px 0}
+ol.steps li{counter-increment:s;position:relative;padding:0 0 16px 40px;
+  border-left:1px solid var(--border);margin-left:12px}
+ol.steps li:last-child{border-left-color:transparent;padding-bottom:0}
+ol.steps li::before{content:counter(s);position:absolute;left:-12px;top:-2px;
+  width:24px;height:24px;border-radius:999px;background:var(--accent);color:#fff;
+  font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+ol.steps b{display:block;font-size:13.5px;color:var(--text);margin-bottom:2px}
+ol.steps span{color:var(--muted);font-size:13px}
+
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11.5px;
+  font-weight:700;letter-spacing:.02em}
+.pill.rec{background:#DCFCE7;color:#166534}
+.pill.alt{background:#F3F4F6;color:#4B5563}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="head">
+  <div class="chip">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#A5B4FC" stroke-width="2" stroke-linecap="round">
+      <path d="M4 12h6M14 12h6"/><circle cx="12" cy="12" r="2.5" fill="#A5B4FC" stroke="none"/>
+      <path d="M12 5v3M12 16v3"/>
+    </svg>
+  </div>
+  <div>
+    <h1>Push-Based Metrics from the Mac Minis</h1>
+    <p class="sub">Moving <code>mlx_*</code> off central pull and onto an OTLP push path into the k0s cluster — design, risks, cutover.</p>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab on" onclick="switchTab(0,this)"><span class="tab-num">1</span>Today</button>
+  <button class="tab" onclick="switchTab(1,this)"><span class="tab-num">2</span>The Design</button>
+  <button class="tab" onclick="switchTab(2,this)"><span class="tab-num">3</span>Cutover &amp; Risk</button>
+</div>
+
+<!-- ============================ TAB 1 ============================ -->
+<div class="panel on">
+  <h2 class="section-title">What actually runs right now</h2>
+  <p class="section-desc">Everything below was read off the live cluster and the repo, not assumed. The starting point matters because two properties of the current design are load-bearing for alerting, and push changes both.</p>
+
+  <div class="diagram">
+    <div class="cap">Current — Central Pull</div>
+    <div class="body">
+    <svg viewBox="0 0 820 326" role="img" aria-label="VictoriaMetrics scrapes five Prometheus endpoints on the Macs">
+      <defs>
+        <marker id="a1" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#4B5563"/>
+        </marker>
+        <path id="p1" d="M250 165 H330"/>
+        <path id="p2" d="M520 165 H560"/>
+      </defs>
+
+      <text x="32" y="30" font-size="12" font-weight="700" fill="#4B5563" letter-spacing="0.06em">MAC MINIS — PROMETHEUS ENDPOINTS</text>
+
+      <g font-size="12.5" fill="#111827">
+        <rect x="32" y="46" width="150" height="32" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+        <text x="44" y="66">Proxy :8080</text>
+        <rect x="32" y="90" width="150" height="32" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+        <text x="44" y="110">HW Agent :9102</text>
+        <rect x="32" y="134" width="150" height="32" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+        <text x="44" y="154">KV Agent :9104</text>
+        <rect x="32" y="178" width="150" height="32" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+        <text x="44" y="198">Supervisor :9105</text>
+        <rect x="32" y="222" width="150" height="32" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+        <text x="44" y="242">Log Tailer :9106</text>
+      </g>
+
+      <!-- horizontal stubs to the bus -->
+      <g stroke="#9CA3AF" stroke-width="1.5" fill="none">
+        <line x1="182" y1="62" x2="250" y2="62"/>
+        <line x1="182" y1="106" x2="250" y2="106"/>
+        <line x1="182" y1="150" x2="250" y2="150"/>
+        <line x1="182" y1="194" x2="250" y2="194"/>
+        <line x1="182" y1="238" x2="250" y2="238"/>
+        <line x1="250" y1="62" x2="250" y2="238"/>
+      </g>
+
+      <line x1="250" y1="165" x2="330" y2="165" stroke="#4B5563" stroke-width="2" marker-end="url(#a1)"/>
+      <text x="256" y="157" font-size="12" fill="#4B5563" font-weight="600">Scrape 10s</text>
+
+      <rect x="330" y="130" width="190" height="70" rx="8" fill="#1a1a3e" stroke="#444CE7" stroke-width="1.5"/>
+      <text x="425" y="158" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">VictoriaMetrics</text>
+      <text x="425" y="178" font-size="12" fill="#C7D2FE" text-anchor="middle">compose · 192.168.1.64:8428</text>
+      <circle cx="425" cy="165" r="40" fill="none" stroke="#444CE7" stroke-width="1.5" opacity="0">
+        <animate attributeName="r" values="36;62" dur="2.6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.5;0" dur="2.6s" repeatCount="indefinite"/>
+      </circle>
+
+      <line x1="520" y1="165" x2="560" y2="165" stroke="#4B5563" stroke-width="2"/>
+      <line x1="560" y1="131" x2="560" y2="199" stroke="#4B5563" stroke-width="2"/>
+      <line x1="560" y1="131" x2="600" y2="131" stroke="#4B5563" stroke-width="2" marker-end="url(#a1)"/>
+      <line x1="560" y1="199" x2="600" y2="199" stroke="#4B5563" stroke-width="2" marker-end="url(#a1)"/>
+
+      <g font-size="12.5">
+        <rect x="608" y="107" width="180" height="48" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+        <text x="698" y="130" fill="#111827" text-anchor="middle" font-weight="600">Grafana</text>
+        <text x="698" y="146" fill="#4B5563" text-anchor="middle" font-size="12">Compose · :3000</text>
+        <rect x="608" y="175" width="180" height="48" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+        <text x="698" y="198" fill="#111827" text-anchor="middle" font-weight="600">vmalert</text>
+        <text x="698" y="214" fill="#4B5563" text-anchor="middle" font-size="12">41 Rules · 6 Groups</text>
+      </g>
+
+      <circle r="4" fill="#444CE7"><animateMotion dur="2s" repeatCount="indefinite"><mpath href="#p1"/></animateMotion></circle>
+      <circle r="4" fill="#444CE7"><animateMotion dur="2s" begin="0.7s" repeatCount="indefinite"><mpath href="#p2"/></animateMotion></circle>
+
+      <text x="32" y="290" font-size="12" fill="#4B5563">Pull gives two things free: a synthesized <tspan font-weight="700">up</tspan> per target, and stable <tspan font-weight="700">job</tspan> / <tspan font-weight="700">instance</tspan> labels.</text>
+    </svg>
+    </div>
+  </div>
+
+  <table>
+    <tr><th style="width:30%">Fact</th><th>Verified state</th></tr>
+    <tr><td><strong>OTLP metrics from the Macs</strong></td><td>None. All five agents are <code>prometheus_client</code> pull endpoints — zero <code>MeterProvider</code> / <code>OTLPMetricExporter</code> in any of them. OTel there carries <strong>traces and logs only</strong>.</td></tr>
+    <tr><td><strong>Why</strong></td><td>Deliberate. The proxy docstring: <em>“the proxy does NOT export OTLP metrics so that <code>mlx_*</code> series exist exactly once.”</em></td></tr>
+    <tr><td><strong>Collectors scrape?</strong></td><td>No. Neither the compose collector nor the k8s gateway has a <code>prometheus</code> receiver — both are OTLP-receive-only.</td></tr>
+    <tr><td><strong>k8s gateway metrics pipeline</strong></td><td><code>otlp → prometheus exporter :8889</code>. That re-exposes metrics for something else to scrape, and the cluster vmagent scrapes exactly one target: <code>otel-collector.monitoring.svc:8888</code>. Metrics pushed there today land nowhere.</td></tr>
+    <tr><td><strong>Alerting</strong></td><td>41 rules in 6 groups. <strong>5 of them key off <code>up{job=…}</code></strong>, which only a scraper synthesizes.</td></tr>
+  </table>
+
+  <div class="alert warn">
+    <b>The idea is sound, but it is three new pieces — not zero</b>
+    <p>“OTel scrapes all metrics and pushes to the gateway” describes a target state, not the current one. It needs: a collector on the Mac with a <code>prometheus</code> receiver, a metrics path out of the gateway into the cluster VictoriaMetrics, and a rewrite of the five <code>up</code>-based alerts. None of it is exotic — it is the standard agent/gateway pattern — but it is a data-plane migration with alerting consequences, not a config tweak.</p>
+  </div>
+</div>
+
+<!-- ============================ TAB 2 ============================ -->
+<div class="panel">
+  <h2 class="section-title">Target architecture</h2>
+  <p class="section-desc">One collector on rank0 does the scraping locally — the pull loop stays, it just moves from across the LAN to inside the box. Everything leaving the Mac is a push.</p>
+
+  <div class="diagram">
+    <div class="cap">Target — Agent on the Mac, Gateway in the Cluster</div>
+    <div class="body">
+    <svg viewBox="0 0 820 484" role="img" aria-label="Collector on rank0 pushes OTLP to the cluster gateway, which remote-writes to VictoriaMetrics">
+      <defs>
+        <marker id="a2" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#4B5563"/>
+        </marker>
+        <path id="q1" d="M250 140 H330"/>
+        <path id="q2" d="M430 176 V250"/>
+        <path id="q3" d="M520 310 H580"/>
+      </defs>
+
+      <text x="32" y="26" font-size="12" font-weight="700" fill="#4B5563" letter-spacing="0.06em">MAC MINI RANK 0 — SCRAPE STAYS LOCAL</text>
+
+      <g font-size="12.5" fill="#111827">
+        <rect x="32" y="44" width="150" height="32" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+        <text x="44" y="64">Proxy :8080</text>
+        <rect x="32" y="84" width="150" height="32" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+        <text x="44" y="104">HW Agent :9102</text>
+        <rect x="32" y="124" width="150" height="32" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+        <text x="44" y="144">KV Agent :9104</text>
+        <rect x="32" y="164" width="150" height="32" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+        <text x="44" y="184">Supervisor :9105</text>
+        <rect x="32" y="204" width="150" height="32" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+        <text x="44" y="224">Log Tailer :9106</text>
+      </g>
+
+      <g stroke="#9CA3AF" stroke-width="1.5" fill="none">
+        <line x1="182" y1="60" x2="250" y2="60"/>
+        <line x1="182" y1="100" x2="250" y2="100"/>
+        <line x1="182" y1="140" x2="250" y2="140"/>
+        <line x1="182" y1="180" x2="250" y2="180"/>
+        <line x1="182" y1="220" x2="250" y2="220"/>
+        <line x1="250" y1="60" x2="250" y2="220"/>
+      </g>
+
+      <line x1="250" y1="140" x2="330" y2="140" stroke="#4B5563" stroke-width="2" marker-end="url(#a2)"/>
+
+      <rect x="330" y="104" width="200" height="72" rx="8" fill="#1a1a3e" stroke="#444CE7" stroke-width="1.5"/>
+      <text x="430" y="130" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">OTel Collector</text>
+      <text x="430" y="150" font-size="12" fill="#C7D2FE" text-anchor="middle">prometheus receiver</text>
+      <text x="430" y="166" font-size="12" fill="#C7D2FE" text-anchor="middle">otlphttp exporter</text>
+      <circle cx="430" cy="140" r="44" fill="none" stroke="#444CE7" stroke-width="1.5" opacity="0">
+        <animate attributeName="r" values="42;70" dur="2.6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.5;0" dur="2.6s" repeatCount="indefinite"/>
+      </circle>
+
+      <line x1="430" y1="176" x2="430" y2="250" stroke="#4B5563" stroke-width="2" marker-end="url(#a2)"/>
+      <text x="444" y="206" font-size="12" fill="#4B5563" font-weight="600">OTLP/HTTP</text>
+      <text x="444" y="222" font-size="12" fill="#4B5563">192.168.1.10:30318</text>
+
+      <line x1="20" y1="245" x2="800" y2="245" stroke="#E5E7EB" stroke-width="1.5" stroke-dasharray="5 5"/>
+      <text x="32" y="264" font-size="12" font-weight="700" fill="#4B5563" letter-spacing="0.06em">K0S CLUSTER</text>
+
+      <rect x="340" y="278" width="180" height="64" rx="8" fill="#FFFFFF" stroke="#E5E7EB"/>
+      <text x="430" y="302" font-size="12.5" font-weight="600" fill="#111827" text-anchor="middle">otel-gateway</text>
+      <text x="430" y="322" font-size="12" fill="#4B5563" text-anchor="middle">Existing · NodePort</text>
+
+      <line x1="520" y1="310" x2="580" y2="310" stroke="#4B5563" stroke-width="2" marker-end="url(#a2)"/>
+      <text x="528" y="302" font-size="12" fill="#4B5563" font-weight="600">Remote Write</text>
+
+      <rect x="588" y="278" width="180" height="64" rx="8" fill="#FFFFFF" stroke="#E5E7EB"/>
+      <text x="678" y="302" font-size="12.5" font-weight="600" fill="#111827" text-anchor="middle">VictoriaMetrics</text>
+      <text x="678" y="322" font-size="12" fill="#4B5563" text-anchor="middle">vmsingle-monitoring</text>
+
+      <line x1="678" y1="342" x2="678" y2="378" stroke="#4B5563" stroke-width="2"/>
+      <line x1="430" y1="378" x2="678" y2="378" stroke="#4B5563" stroke-width="2"/>
+      <line x1="430" y1="378" x2="430" y2="404" stroke="#4B5563" stroke-width="2" marker-end="url(#a2)"/>
+      <line x1="678" y1="378" x2="678" y2="404" stroke="#4B5563" stroke-width="2" marker-end="url(#a2)"/>
+
+      <rect x="340" y="410" width="180" height="46" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+      <text x="430" y="432" font-size="12.5" font-weight="600" fill="#111827" text-anchor="middle">vmalert</text>
+      <text x="430" y="448" font-size="12" fill="#4B5563" text-anchor="middle">VMRule · hydra-mlx</text>
+
+      <rect x="588" y="410" width="180" height="46" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+      <text x="678" y="432" font-size="12.5" font-weight="600" fill="#111827" text-anchor="middle">Grafana</text>
+      <text x="678" y="448" font-size="12" fill="#4B5563" text-anchor="middle">Datasource mlx-vm</text>
+
+      <circle r="4" fill="#444CE7"><animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#q1"/></animateMotion></circle>
+      <circle r="4" fill="#444CE7"><animateMotion dur="1.8s" begin="0.6s" repeatCount="indefinite"><mpath href="#q2"/></animateMotion></circle>
+      <circle r="4" fill="#444CE7"><animateMotion dur="1.8s" begin="1.2s" repeatCount="indefinite"><mpath href="#q3"/></animateMotion></circle>
+    </svg>
+    </div>
+  </div>
+
+  <h3>Collector on rank0</h3>
+  <p class="section-desc">The scrape config already exists — <code>observability/vm-scrape.tmpl.yml</code> ports over almost verbatim, which is the point: the same target list, the same labels, just executed locally.</p>
+<pre><span class="c"># cluster/otelcol-mac.yaml</span>
+<span class="k">receivers:</span>
+  <span class="k">prometheus:</span>
+    <span class="k">config:</span>
+      <span class="k">scrape_configs:</span>        <span class="c"># lifted from vm-scrape.tmpl.yml, unchanged</span>
+        - <span class="k">job_name:</span> <span class="s">mlx-proxy</span>
+          <span class="k">static_configs:</span>
+            - <span class="k">targets:</span> [<span class="s">"127.0.0.1:8080"</span>]
+              <span class="k">labels:</span> {<span class="k">service:</span> <span class="s">mlx-proxy</span>, <span class="k">node:</span> <span class="s">rank0</span>}
+        - <span class="k">job_name:</span> <span class="s">mlx-hw</span>
+          <span class="k">static_configs:</span>
+            - <span class="k">targets:</span> [<span class="s">"127.0.0.1:9102"</span>]
+              <span class="k">labels:</span> {<span class="k">service:</span> <span class="s">mlx-hw</span>, <span class="k">node:</span> <span class="s">rank0</span>}
+            - <span class="k">targets:</span> [<span class="s">"10.0.0.2:9102"</span>]   <span class="c"># rank1 over the direct link</span>
+              <span class="k">labels:</span> {<span class="k">service:</span> <span class="s">mlx-hw</span>, <span class="k">node:</span> <span class="s">rank1</span>}
+        <span class="c"># ... mlx-kv, mlx-supervisor, mlx-logtailer, sglang</span>
+
+<span class="k">exporters:</span>
+  <span class="k">otlphttp:</span>
+    <span class="k">endpoint:</span> <span class="s">http://192.168.1.10:30318</span>   <span class="c"># LAN, never the 100.x address</span>
+    <span class="k">retry_on_failure:</span> {<span class="k">enabled:</span> <span class="n">true</span>}
+    <span class="k">sending_queue:</span>                        <span class="c"># survives a cluster restart</span>
+      <span class="k">enabled:</span> <span class="n">true</span>
+      <span class="k">storage:</span> <span class="s">file_storage</span>
+
+<span class="k">extensions:</span>
+  <span class="k">file_storage:</span> {<span class="k">directory:</span> <span class="s">/opt/mlx/otelcol-queue</span>}
+
+<span class="k">service:</span>
+  <span class="k">extensions:</span> [<span class="s">file_storage</span>]
+  <span class="k">pipelines:</span>
+    <span class="k">metrics:</span> {<span class="k">receivers:</span> [<span class="s">prometheus</span>], <span class="k">processors:</span> [<span class="s">batch</span>], <span class="k">exporters:</span> [<span class="s">otlphttp</span>]}</pre>
+
+  <div class="alert ok">
+    <b>The disk-backed queue is the one thing pull gives you for free</b>
+    <p>A scraper that cannot reach a target simply records <code>up 0</code> and moves on; nothing is lost on the target side because there is nothing buffered. A pusher that cannot reach the gateway drops data unless it has somewhere to put it. <code>file_storage</code> + <code>sending_queue</code> turns a cluster restart into a gap-free backfill instead of a hole in the graphs.</p>
+  </div>
+
+  <h3>Gateway → VictoriaMetrics</h3>
+  <p class="section-desc">The gateway's metrics pipeline currently ends at a <code>prometheus</code> exporter on :8889 that nothing scrapes. Add a second exporter rather than changing the first — other consumers may rely on it.</p>
+<pre><span class="c"># charts/victoria-metrics-k8s-stack — otel-gateway config</span>
+<span class="k">exporters:</span>
+  <span class="k">prometheusremotewrite/vm:</span>
+    <span class="k">endpoint:</span> <span class="s">http://vmsingle-monitoring.monitoring.svc:8428/api/v1/write</span>
+    <span class="k">resource_to_telemetry_conversion:</span>
+      <span class="k">enabled:</span> <span class="n">true</span>     <span class="c"># node / service / provider survive as labels</span>
+
+<span class="k">service:</span>
+  <span class="k">pipelines:</span>
+    <span class="k">metrics:</span>
+      <span class="k">exporters:</span> [<span class="s">prometheus</span>, <span class="s">prometheusremotewrite/vm</span>]</pre>
+
+  <h3>Decisions</h3>
+  <table>
+    <tr><th style="width:22%">Decision</th><th>Recommendation</th><th style="width:34%">Why</th></tr>
+    <tr><td><strong>Collector placement</strong></td><td><span class="pill rec">One agent on rank0</span> scraping both nodes over <code>10.0.0.2</code></td><td>rank1 runs only the HW agent and sglang. A second collector doubles the failure surface for two targets.</td></tr>
+    <tr><td><strong>Gateway → storage</strong></td><td><span class="pill rec">prometheusremotewrite</span> straight to vmsingle</td><td>The alternative — vmagent scrapes <code>otel-gateway:8889</code> — re-introduces a scrape hop, and the exporter's cache means counters age at the scrape interval rather than the source interval.</td></tr>
+    <tr><td><strong>Compose VictoriaMetrics</strong></td><td><span class="pill rec">Dual-run, then decommission</span></td><td>Keeping both permanently violates the “<code>mlx_*</code> exists exactly once” rule the proxy was designed around.</td></tr>
+    <tr><td><strong>vmalert</strong></td><td><span class="pill rec">VMRule CRs in <code>hydra-mlx</code></span></td><td>Rules must live next to the data. Also satisfies the per-app-namespace rule.</td></tr>
+    <tr><td><strong>Liveness</strong></td><td><span class="pill rec"><code>absent_over_time</code></span> + collector self-telemetry</td><td>See tab 3 — this is the part that silently breaks.</td></tr>
+  </table>
+</div>
+
+<!-- ============================ TAB 3 ============================ -->
+<div class="panel">
+  <h2 class="section-title">What breaks, and the order to do it in</h2>
+  <p class="section-desc">Two failure modes are worth more attention than the rest of the migration combined, because both fail quietly — the dashboards keep drawing and the alerts stay green.</p>
+
+  <div class="alert err">
+    <b>Risk 1 — the five <code>up</code> alerts stop meaning what they meant</b>
+    <p><code>up</code> is synthesized by whoever scrapes. Move the scrape onto the Mac and <code>up{job="mlx-proxy"}</code> still exists, but it now answers <em>“can the collector reach the proxy?”</em> — a question that has no answer at all when the Mac is off, because the thing that would have reported the failure went down with it. <strong>MLXProxyDown and MLXHardwareExporterDown would go permanently green on a powered-off Mac.</strong> That is strictly worse than today.</p>
+  </div>
+
+  <p class="section-desc">The push-native replacement is a data-absence check, which fires precisely when the whole path — Mac, collector, LAN, gateway — stops delivering:</p>
+<pre><span class="c"># before — needs a central scraper</span>
+<span class="k">expr:</span> up{job=<span class="s">"mlx-proxy"</span>} == <span class="n">0</span>
+
+<span class="c"># after — fires when the series stops arriving, whatever the cause</span>
+<span class="k">expr:</span> absent_over_time(mlx_up{service=<span class="s">"mlx-proxy"</span>}[<span class="n">3m</span>])
+
+<span class="c"># and keep one genuine pull target as a heartbeat: the collector's own
+# self-telemetry, scraped by the cluster vmagent over the LAN. If this is
+# the only thing you pull, you still get a real up{} for "is rank0 alive".</span>
+<span class="k">expr:</span> up{job=<span class="s">"mlx-otelcol"</span>} == <span class="n">0</span></pre>
+
+  <div class="alert warn">
+    <b>Risk 2 — label translation is not lossless by default</b>
+    <p>The Prometheus receiver converts scrape targets into OTel resource attributes; the remote-write exporter converts them back. <code>job</code> and <code>instance</code> survive the round trip via the OTel↔Prometheus compatibility mapping (<code>service.name</code> / <code>service.instance.id</code>). Your <em>custom</em> target labels — <code>service</code>, <code>node</code>, <code>provider</code> — do not, unless <code>resource_to_telemetry_conversion</code> is on; without it they are demoted into a separate <code>target_info</code> series and <strong>every dashboard query and alert that groups by <code>node</code> silently returns nothing</strong>.</p>
+  </div>
+
+  <p class="section-desc">Do not take that on trust — including from me. Diff the label sets across both stores during the dual-run window:</p>
+<pre><span class="c"># old path</span>
+curl -s <span class="s">'http://192.168.1.64:8428/api/v1/series?match[]=mlx_up'</span> | jq -S <span class="s">'.data'</span> &gt; /tmp/old.json
+<span class="c"># new path</span>
+curl -s <span class="s">'http://&lt;vmsingle&gt;:8428/api/v1/series?match[]=mlx_up'</span>   | jq -S <span class="s">'.data'</span> &gt; /tmp/new.json
+diff /tmp/old.json /tmp/new.json   <span class="c"># must be empty before you cut over</span></pre>
+
+  <h3>Cutover</h3>
+  <ol class="steps">
+    <li><b>Land the folder fix first</b><span>A PR to <code>thecylon-helm-charts</code> setting <code>sidecar.dashboards.folderAnnotation</code> and <code>provider.foldersFromFilesStructure</code>. Unrelated to push, but it is the one thing already blocking the dashboards that are now in <code>hydra-mlx</code>.</span></li>
+    <li><b>Run the collector on rank0 alongside the existing scrape</b><span>Nothing is removed. The compose VictoriaMetrics keeps scraping; the collector pushes the same series into the cluster. Both stores now hold <code>mlx_*</code> — acceptable temporarily, not permanently.</span></li>
+    <li><b>Add the remote-write exporter on the gateway</b><span>Second exporter on the existing metrics pipeline; the <code>:8889</code> prometheus exporter stays for whatever else uses it.</span></li>
+    <li><b>Diff the label sets</b><span>The command above. An empty diff is the gate — if <code>node</code> or <code>service</code> is missing, fix <code>resource_to_telemetry_conversion</code> before going further.</span></li>
+    <li><b>Rewrite the five <code>up</code> rules</b><span><code>absent_over_time</code> for the push path, plus one real pull target for the collector itself. Verify by powering down rank1 and confirming the alert actually fires.</span></li>
+    <li><b>Move the 41 rules into <code>hydra-mlx</code> as VMRule CRs</b><span>Portable <code>rules.yml</code> stays the source of truth per the multi-mode rule; the CR is a thin wrapper.</span></li>
+    <li><b>Flip the datasource</b><span>One line: <code>url</code> in <code>infra/hydra-mlx/datasource.yaml</code> moves from <code>192.168.1.64:8428</code> to the in-cluster vmsingle. Dashboards reference uid <code>mlx-vm</code> and need no edits — that is what the uid rewrite bought.</span></li>
+    <li><b>Stop the compose scrape, then the compose stack</b><span>Only after the cluster path has held through a Mac reboot and a cluster restart. This is the step that restores “exactly once”.</span></li>
+  </ol>
+
+  <div class="alert warn">
+    <b>Sequencing that matters</b>
+    <p>Step 7 before step 5 leaves you looking at cluster data with alerts still evaluating against a store you are about to turn off. Step 8 before step 4 makes the label diff unrecoverable — the old series are gone and there is nothing to compare against.</p>
+  </div>
+
+  <h3>What this does not change</h3>
+  <div class="grid-2">
+    <div class="card"><h4>Traces and logs</h4><p>Already push, already OTLP, already going to a gateway. Nothing in this design touches them.</p></div>
+    <div class="card"><h4>The <code>/metrics</code> endpoints</h4><p>All five stay exactly as they are. No code change on any agent — the collector scrapes what already exists.</p></div>
+    <div class="card"><h4>The dashboards</h4><p>Fifteen ConfigMaps in <code>hydra-mlx</code>, referencing uid <code>mlx-vm</code>. The cutover is a url change on one datasource.</p></div>
+    <div class="card"><h4>The proxy's design rule</h4><p>“<code>mlx_*</code> exists exactly once” holds again after step 8 — the collector scrapes the same endpoint the proxy always exposed, it does not add a second emission path.</p></div>
+  </div>
+</div>
+
+</div>
+<script>
+function switchTab(i, el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');
+  document.querySelectorAll('.panel').forEach((p,n)=>p.classList.toggle('on', n===i));
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+</script>
+</body>
+</html>
