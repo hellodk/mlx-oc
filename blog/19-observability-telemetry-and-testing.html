@@ -58,6 +58,21 @@
   .tabpane{display:none;padding-top:6px}
   .tabpane.active{display:block;animation:fade .25s ease}
   @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  /* --- animated flow diagrams --- */
+  .diagram{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin:20px 0;overflow:hidden}
+  .diagram .cap{font-size:11.5px;letter-spacing:.10em;text-transform:uppercase;font-weight:700;color:var(--muted);padding:12px 18px;border-bottom:1px solid var(--line);background:#fbfbfe}
+  .diagram svg{display:block;width:100%;height:auto;padding:6px 0}
+  .dbox{fill:#fff;stroke:#c7d2fe;stroke-width:1.5;rx:10}
+  .dbox span,.dbox tspan{fill:#1d1f2b}
+  .dbox .port{fill:#4f46e5}
+  .dflow{fill:none;stroke:#818cf8;stroke-width:2}
+  .dflow.idle{stroke:#c7cbd9;stroke-dasharray:5 4}
+  .dot{fill:#db2777}
+  .dot2{fill:#0f766e}
+  .label{font-size:11.5px;fill:#5b6072;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif}
+  .bigname{font-size:12.5px;fill:#1d1f2b;font-weight:700;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif}
+  .portbadge{fill:#eef0ff;stroke:#c7d2fe;stroke-width:1}
+  .porttext{font-size:10px;fill:#4f46e5;font-weight:700;font-family:ui-monospace,Menlo,monospace}
   footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
 </style>
 </head>
@@ -109,6 +124,7 @@
   <button class="tab" data-tab="alerts">Alerts &amp; Dashboards</button>
   <button class="tab" data-tab="load">Load tests</button>
   <button class="tab" data-tab="tests">Unit tests</button>
+  <button class="tab" data-tab="flow">Flow &amp; ports</button>
   <button class="tab" data-tab="files">Files &amp; configs</button>
 </div>
 
@@ -247,6 +263,209 @@
     <tr><td><code>tests/test_proxy_rewrite.py</code></td><td>10 e2e</td><td>against a <code>StubUpstream</code> that mirrors <code>mlx_lm.server</code> (logprobs on non-streaming only, SSE + <code>[DONE]</code> + connection-close framing, optional tool calls, configurable error status). The proxy runs <b>in-process</b> on an ephemeral port; real HTTP drives it. Verifies: logprobs injected upstream but stripped for the client with matching Content-Length, client-requested logprobs pass through, injection disable, tool calls survive the strip, upstream 503 passthrough, streaming untouched when sampling off, de-streamed requests still parse as SSE, de-streamed tool calls reach the client, and de-streamed requests record <b>no TTFT</b>. Metrics are read back from the in-process proxy&rsquo;s <code>/metrics</code>.</td></tr>
   </table>
   <div class="callout info"><span class="ic">&#9432;</span><span>The bench tools themselves are not unit-tested &mdash; only the proxy&rsquo;s confidence/rewrite layer is. The stub upstream is the trick that makes the whole injection/de-streaming path testable without a GPU.</span></div>
+</section>
+
+<!-- ============================ FLOW & PORTS ============================ -->
+<section id="flow" class="tabpane">
+  <h2><span class="num">7</span>Flow &amp; ports: how it all moves</h2>
+  <p>The four data paths in pictures. Moving dots are live traffic; dashed lines are idle by design.</p>
+
+  <div class="diagram">
+    <div class="cap">Metrics &mdash; five exporters scraped by VictoriaMetrics every 10&nbsp;s</div>
+    <svg viewBox="0 0 760 330" role="img" aria-label="Metrics scrape flow">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#818cf8"/></marker>
+      </defs>
+      <g font-family="inherit">
+        <rect class="dbox" x="20" y="28" width="250" height="42"/>
+        <text class="bigname" x="30" y="45">mlx_metrics_proxy</text>
+        <text class="label" x="30" y="61">34 mlx_* families &middot; hallucination + confidence</text>
+        <rect class="portbadge" x="225" y="34" width="36" height="16" rx="8"/><text class="porttext" x="231" y="46">8080</text>
+
+        <rect class="dbox" x="20" y="88" width="250" height="42"/>
+        <text class="bigname" x="30" y="105">mlx_hw_telemetry</text>
+        <text class="label" x="30" y="121">GPU / CPU / mem / power &mdash; rank0 + rank1</text>
+        <rect class="portbadge" x="225" y="94" width="36" height="16" rx="8"/><text class="porttext" x="231" y="106">9102</text>
+
+        <rect class="dbox" x="20" y="148" width="250" height="42"/>
+        <text class="bigname" x="30" y="165">mlx_kv_cache_agent</text>
+        <text class="label" x="30" y="181">KV cache + context-window gauges</text>
+        <rect class="portbadge" x="225" y="154" width="36" height="16" rx="8"/><text class="porttext" x="231" y="166">9104</text>
+
+        <rect class="dbox" x="20" y="208" width="250" height="42"/>
+        <text class="bigname" x="30" y="225">mlx_server_supervisor</text>
+        <text class="label" x="30" y="241">serving state / restarts / crash reasons</text>
+        <rect class="portbadge" x="225" y="214" width="36" height="16" rx="8"/><text class="porttext" x="231" y="226">9105</text>
+
+        <rect class="dbox" x="20" y="268" width="250" height="42"/>
+        <text class="bigname" x="30" y="285">mlx_server_log_tailer</text>
+        <text class="label" x="30" y="301">log-pipeline health counters</text>
+        <rect class="portbadge" x="225" y="274" width="36" height="16" rx="8"/><text class="porttext" x="231" y="286">9106</text>
+
+        <rect class="dbox" x="520" y="135" width="215" height="60" stroke="#0f766e"/>
+        <text class="bigname" x="530" y="158">VictoriaMetrics</text>
+        <text class="label" x="530" y="174">scrape every 10&nbsp;s &rarr; TSDB (30&nbsp;d)</text>
+        <rect class="portbadge" x="678" y="142" width="48" height="16" rx="8" stroke="#0f766e"/><text class="porttext" x="681" y="154" fill="#0f766e">8428</text>
+      </g>
+      <path class="dflow" id="p1" d="M270,49 C390,49 400,165 515,165"/>
+      <path class="dflow" id="p2" d="M270,109 C390,109 400,165 515,165"/>
+      <path class="dflow" id="p3" d="M270,169 C390,169 400,165 515,165"/>
+      <path class="dflow" id="p4" d="M270,229 C390,229 400,165 515,165"/>
+      <path class="dflow" id="p5" d="M270,289 C390,289 400,165 515,165"/>
+      <g><circle class="dot" r="5"><animateMotion dur="3s" repeatCount="indefinite"><mpath href="#p1"/></animateMotion></circle></g>
+      <g><circle class="dot" r="5"><animateMotion dur="3s" begin=".6s" repeatCount="indefinite"><mpath href="#p2"/></animateMotion></circle></g>
+      <g><circle class="dot" r="5"><animateMotion dur="3s" begin="1.2s" repeatCount="indefinite"><mpath href="#p3"/></animateMotion></circle></g>
+      <g><circle class="dot" r="5"><animateMotion dur="3s" begin="1.8s" repeatCount="indefinite"><mpath href="#p4"/></animateMotion></circle></g>
+      <g><circle class="dot" r="5"><animateMotion dur="3s" begin="2.4s" repeatCount="indefinite"><mpath href="#p5"/></animateMotion></circle></g>
+    </svg>
+  </div>
+
+  <div class="diagram">
+    <div class="cap">Logs &mdash; OTLP HTTP push to the collector, then a durable JSONL tail</div>
+    <svg viewBox="0 0 760 300" role="img" aria-label="Log flow">
+      <defs>
+        <marker id="ar2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#818cf8"/></marker>
+      </defs>
+      <g font-family="inherit">
+        <rect class="dbox" x="20" y="50" width="260" height="44"/>
+        <text class="bigname" x="30" y="68">mlx_server_log_tailer</text>
+        <text class="label" x="30" y="84">server.log &rarr; classified lines, 50/s</text>
+        <rect class="portbadge" x="232" y="58" width="36" height="16" rx="8"/><text class="porttext" x="238" y="70">9106</text>
+
+        <rect class="dbox" x="20" y="150" width="260" height="44"/>
+        <text class="bigname" x="30" y="168">mlx_metrics_proxy</text>
+        <text class="label" x="30" y="184">one access-log line per request</text>
+        <rect class="portbadge" x="232" y="158" width="36" height="16" rx="8"/><text class="porttext" x="238" y="170">8080</text>
+
+        <rect class="dbox" x="430" y="95" width="210" height="54" stroke="#0f766e"/>
+        <text class="bigname" x="440" y="114">otel-collector</text>
+        <text class="label" x="440" y="130">OTLP HTTP :4318 / gRPC :4317</text>
+        <rect class="portbadge" x="596" y="102" width="36" height="16" rx="8" stroke="#0f766e"/><text class="porttext" x="602" y="114" fill="#0f766e">4318</text>
+
+        <rect class="dbox" x="430" y="210" width="250" height="50"/>
+        <text class="bigname" x="440" y="230">durable JSONL</text>
+        <text class="label" x="440" y="246">/var/log/otelcol/mlx-server-logs.jsonl</text>
+        <text class="label" x="440" y="258">50 MB &times; 5 rotations</text>
+
+        <rect class="dbox" x="430" y="20" width="210" height="44"/>
+        <text class="bigname" x="440" y="38">VictoriaMetrics</text>
+        <text class="label" x="440" y="54">metrics remote-write (idle)</text>
+        <rect class="portbadge" x="596" y="28" width="36" height="16" rx="8"/><text class="porttext" x="602" y="40">8428</text>
+      </g>
+      <path class="dflow" id="l1" d="M280,72 C350,72 360,118 425,122"/>
+      <path class="dflow" id="l2" d="M280,172 C350,172 360,148 425,132"/>
+      <path class="dflow" id="l3" d="M545,149 C545,170 545,182 545,205"/>
+      <path class="dflow idle" id="l4" d="M540,95 C540,72 540,62 540,52"/>
+      <g><circle class="dot" r="5"><animateMotion dur="3s" repeatCount="indefinite"><mpath href="#l1"/></animateMotion></circle></g>
+      <g><circle class="dot" r="5"><animateMotion dur="3.4s" begin=".5s" repeatCount="indefinite"><mpath href="#l2"/></animateMotion></circle></g>
+      <g><circle class="dot" r="5"><animateMotion dur="2.6s" begin="1s" repeatCount="indefinite"><mpath href="#l3"/></animateMotion></circle></g>
+      <text class="label" x="600" y="160">logs pipeline</text>
+      <text class="label" x="560" y="90">metrics pipeline</text>
+    </svg>
+  </div>
+
+  <div class="diagram">
+    <div class="cap">Traces &amp; Opik &mdash; one span, three sinks, and the judge loop</div>
+    <svg viewBox="0 0 760 380" role="img" aria-label="Trace and Opik flow">
+      <defs>
+        <marker id="ar3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#818cf8"/></marker>
+      </defs>
+      <g font-family="inherit">
+        <rect class="dbox" x="20" y="140" width="260" height="52"/>
+        <text class="bigname" x="30" y="158">mlx_metrics_proxy</text>
+        <text class="label" x="30" y="174">span mlx.chat.completions</text>
+        <text class="label" x="30" y="186">+ 3 in-band feedback scores</text>
+        <rect class="portbadge" x="232" y="146" width="36" height="16" rx="8"/><text class="porttext" x="238" y="158">8080</text>
+
+        <rect class="dbox" x="520" y="20" width="215" height="44"/>
+        <text class="bigname" x="530" y="38">otel-collector</text>
+        <text class="label" x="530" y="54">traces &rarr; debug stdout</text>
+        <rect class="portbadge" x="678" y="28" width="36" height="16" rx="8"/><text class="porttext" x="684" y="40">4318</text>
+
+        <rect class="dbox" x="520" y="110" width="215" height="56"/>
+        <text class="bigname" x="530" y="128">Opik &middot; OTLP ingestion</text>
+        <text class="label" x="530" y="144">/api/v1/private/otel/v1/traces</text>
+        <text class="label" x="530" y="158">project &ldquo;mlx&rdquo; (OpenInference attrs)</text>
+        <rect class="portbadge" x="678" y="118" width="48" height="16" rx="8"/><text class="porttext" x="681" y="130">32173</text>
+
+        <rect class="dbox" x="520" y="220" width="215" height="56"/>
+        <text class="bigname" x="530" y="238">Opik &middot; SDK</text>
+        <text class="label" x="530" y="254">/api &mdash; trace + LLM span</text>
+        <text class="label" x="530" y="268">feedback scores flush here</text>
+        <rect class="portbadge" x="678" y="228" width="48" height="16" rx="8"/><text class="porttext" x="681" y="240">32173</text>
+
+        <rect class="dbox" x="270" y="322" width="250" height="46"/>
+        <text class="bigname" x="280" y="340">cluster/opik_evaluator.py</text>
+        <text class="label" x="280" y="356">judge = the proxy itself</text>
+      </g>
+      <path class="dflow" id="t1" d="M280,155 C380,155 430,42 515,42"/>
+      <path class="dflow" id="t2" d="M280,168 C380,168 430,138 515,138"/>
+      <path class="dflow" id="t3" d="M280,181 C380,181 430,248 515,248"/>
+      <path class="dflow" id="t4" d="M270,345 C140,345 120,170 20,170"/>
+      <path class="dflow" id="t5" d="M520,345 C640,345 650,280 520,268"/>
+      <path class="dflow" id="t6" d="M520,330 C650,330 660,168 520,166"/>
+      <g><circle class="dot" r="5"><animateMotion dur="3s" repeatCount="indefinite"><mpath href="#t1"/></animateMotion></circle></g>
+      <g><circle class="dot" r="5"><animateMotion dur="3.2s" begin=".4s" repeatCount="indefinite"><mpath href="#t2"/></animateMotion></circle></g>
+      <g><circle class="dot" r="5"><animateMotion dur="3.4s" begin=".8s" repeatCount="indefinite"><mpath href="#t3"/></animateMotion></circle></g>
+      <g><circle class="dot2" r="5"><animateMotion dur="4s" begin="1.2s" repeatCount="indefinite"><mpath href="#t4"/></animateMotion></circle></g>
+      <g><circle class="dot2" r="5"><animateMotion dur="4s" begin="1.6s" repeatCount="indefinite"><mpath href="#t5"/></animateMotion></circle></g>
+      <g><circle class="dot2" r="5"><animateMotion dur="4s" begin="2s" repeatCount="indefinite"><mpath href="#t6"/></animateMotion></circle></g>
+      <text class="label" x="300" y="115">spans</text>
+      <text class="label" x="350" y="300">read traces / write correctness &middot; helpfulness &middot; hallucination_free</text>
+      <text class="label" x="140" y="230">judge calls</text>
+    </svg>
+  </div>
+
+  <div class="diagram">
+    <div class="cap">Alerts &amp; dashboards &mdash; 41 rules to a webhook, five dashboards to Grafana</div>
+    <svg viewBox="0 0 760 300" role="img" aria-label="Alert and dashboard flow">
+      <defs>
+        <marker id="ar4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#818cf8"/></marker>
+      </defs>
+      <g font-family="inherit">
+        <rect class="dbox" x="20" y="25" width="200" height="44"/>
+        <text class="bigname" x="30" y="43">Grafana</text>
+        <text class="label" x="30" y="59">5 dashboards &middot; 156 panels</text>
+        <rect class="portbadge" x="176" y="33" width="36" height="16" rx="8"/><text class="porttext" x="182" y="45">3000</text>
+
+        <rect class="dbox" x="300" y="100" width="190" height="50" stroke="#0f766e"/>
+        <text class="bigname" x="310" y="120">VictoriaMetrics</text>
+        <text class="label" x="310" y="136">query + ALERTS store</text>
+        <rect class="portbadge" x="436" y="108" width="48" height="16" rx="8" stroke="#0f766e"/><text class="porttext" x="439" y="120" fill="#0f766e">8428</text>
+
+        <rect class="dbox" x="20" y="185" width="200" height="44"/>
+        <text class="bigname" x="30" y="203">vmalert</text>
+        <text class="label" x="30" y="219">41 rules &middot; 5 groups</text>
+        <rect class="portbadge" x="176" y="193" width="36" height="16" rx="8"/><text class="porttext" x="182" y="205">8880</text>
+
+        <rect class="dbox" x="520" y="185" width="215" height="44"/>
+        <text class="bigname" x="530" y="203">Alertmanager</text>
+        <text class="label" x="530" y="219">inhibit rules &middot; routing</text>
+        <rect class="portbadge" x="678" y="193" width="36" height="16" rx="8"/><text class="porttext" x="684" y="205">9093</text>
+
+        <rect class="dbox" x="520" y="25" width="215" height="50"/>
+        <text class="bigname" x="530" y="43">webhook target</text>
+        <text class="label" x="530" y="59">host.containers.internal:9000</text>
+        <text class="label" x="530" y="71">/hooks/oncall (critical) &middot; /hooks/alert</text>
+        <rect class="portbadge" x="678" y="33" width="48" height="16" rx="8"/><text class="porttext" x="681" y="45">9000</text>
+      </g>
+      <path class="dflow" id="a1" d="M220,47 C260,47 270,115 295,125"/>
+      <path class="dflow" id="a2" d="M220,207 C260,207 270,150 295,138"/>
+      <path class="dflow idle" id="a3" d="M495,150 C430,150 320,205 225,205"/>
+      <path class="dflow" id="a4" d="M220,207 C300,207 400,207 515,207"/>
+      <path class="dflow" id="a5" d="M520,185 C520,140 520,115 520,80"/>
+      <g><circle class="dot" r="5"><animateMotion dur="3s" repeatCount="indefinite"><mpath href="#a1"/></animateMotion></circle></g>
+      <g><circle class="dot" r="5"><animateMotion dur="3.4s" begin=".5s" repeatCount="indefinite"><mpath href="#a2"/></animateMotion></circle></g>
+      <g><circle class="dot2" r="5"><animateMotion dur="4s" begin="1s" repeatCount="indefinite"><mpath href="#a3"/></animateMotion></circle></g>
+      <g><circle class="dot" r="5"><animateMotion dur="3s" begin="1.4s" repeatCount="indefinite"><mpath href="#a4"/></animateMotion></circle></g>
+      <g><circle class="dot" r="5"><animateMotion dur="2.8s" begin="1.9s" repeatCount="indefinite"><mpath href="#a5"/></animateMotion></circle></g>
+      <text class="label" x="330" y="95">queries</text>
+      <text class="label" x="420" y="125">ALERTS</text>
+      <text class="label" x="360" y="200">fired alerts</text>
+    </svg>
+  </div>
+
+  <div class="callout info"><span class="ic">&#9432;</span><span>Pink dots are forward traffic (scrape, push, fire); teal dots are loopback/return (judge calls, ALERTS remote-write). Dashed gray = deliberately idle: the collector&rsquo;s metrics remote-write is unused because the proxy exports no OTLP metrics (post&nbsp;4 audit).</span></div>
 </section>
 
 <!-- ============================ FILES & CONFIGS ============================ -->
