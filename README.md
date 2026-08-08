@@ -17,7 +17,7 @@ mlx_hw_telemetry.py :9102  per-node CPU / RAM / disk / GPU / power (both nodes)
         │   scraped every 15s
         ▼
       VictoriaMetrics ──► vmalert :8880 (46 rules) ──► Alertmanager :9093
-                     └──► Grafana :3000 (9 dashboards)
+                      └──► Grafana :3000 (10 dashboards)
 ```
 
 ## Stack
@@ -238,7 +238,7 @@ alerts. Every alert is visible in Grafana via the `Alerts` annotation and the
 
 ### Dashboards
 
-Grafana auto-provisions nine dashboards from `observability/grafana/dashboards/`:
+Grafana auto-provisions ten dashboards from `observability/grafana/dashboards/`:
 
 * **MLX Cluster** — cluster-wide inference + hardware rows: GPU utilization
   heatmap (RdYlGn, per-node y-buckets), GPU memory used/allocated, CPU / ANE /
@@ -267,8 +267,14 @@ Grafana auto-provisions nine dashboards from `observability/grafana/dashboards/`
   (`mlx_model_info{attr=...}`): layers, KV heads, head dim, hidden size,
   attention heads, vocab, FFN intermediate, quant bits/group size, plus the
   context-length and KV-cache math and runtime context-utilization.
+* **MLX Tool Calls** — dynamic tool-usage view driven by
+  `mlx_tool_calls_total{tool, type}`: every tool the model has ever called
+  appears automatically (no manual list), with totals, live rate per tool and
+  per call type, a sortable "all tools called" table, and a 30-day share bar.
+  The `$tool` dropdown is populated from the label values, so unknown/new
+  tools show up the moment they are first called.
 
-All nine are file-provisioned (no UI drift), readable anonymously for kiosk
+All ten are file-provisioned (no UI drift), readable anonymously for kiosk
 display, and carry the `ALERTS{firing}` annotation.
 
 ![MLX Cluster dashboard](docs/screenshots/mlx-cluster.png)
@@ -499,7 +505,7 @@ observability/compose.yaml      victoria-metrics + otel-collector + grafana + vm
 observability/setup.sh          generate vm-scrape.yml (scrape targets from your IPs)
 observability/otelcol-config.yaml   OTLP traces/logs receiver (metrics are scrape-only)
 observability/vm-scrape.yml     scrape config: mlx-proxy, mlx-hw (x2), mlx-kv, stack self-scrape
-observability/grafana/dashboards/   nine provisioned dashboards (Cluster/Node/GPU&Power/Perf/Alerts + SRE/HTTP/Call Types/Model)
+observability/grafana/dashboards/   ten provisioned dashboards (Cluster/Node/GPU&Power/Perf/Alerts + SRE/HTTP/Call Types/Model/Tools)
 observability/vmalert/rules.yml 46 alert rules (hardware / inference / quality / confidence / stack down / SLO burn)
 observability/alertmanager/alertmanager.yml   receivers + inhibit_rules
 observability/grafana/          auto-provisioned datasource + 3 dashboards (MLX Cluster / MLX Node / MLX GPU & Power)

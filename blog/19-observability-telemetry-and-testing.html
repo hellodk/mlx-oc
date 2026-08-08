@@ -214,13 +214,13 @@
 
 <!-- ============================ ALERTS & DASHBOARDS ============================ -->
 <section id="alerts" class="tabpane">
-  <h2><span class="num">4</span>Alerts &amp; Dashboards: 46 rules to a webhook, nine dashboards to Grafana</h2>
+  <h2><span class="num">4</span>Alerts &amp; Dashboards: 46 rules to a webhook, ten dashboards to Grafana</h2>
   <table>
     <tr><th>Stage</th><th>Component</th><th>How</th></tr>
     <tr><td>Rules</td><td>vmalert (<code>:8880</code>)</td><td>46 rules in 6 groups &mdash; <code>mlx-hardware</code> (15), <code>mlx-serving</code> (8), <code>mlx-inference</code> (7), <code>mlx-quality</code> (6), <code>mlx-confidence</code> (5, post&nbsp;18), <code>mlx-slo</code> (5: burn-rate + budget alerts for the SLOs on the SRE dashboard)</td></tr>
     <tr><td>Evaluation</td><td>vmalert &rarr; VM</td><td>queries <code>victoria-metrics:8428</code>, writes <code>ALERTS</code> series back via remote-write</td></tr>
     <tr><td>Routing</td><td>Alertmanager (<code>:9093</code>)</td><td><code>critical</code> &rarr; <code>host.containers.internal:9000/hooks/oncall</code>; everything else &rarr; <code>.../hooks/alert</code>; inhibit rules (e.g. ProxyDown silences UpstreamDown)</td></tr>
-    <tr><td>Dashboards</td><td>Grafana (<code>:3000</code>)</td><td>9 provisioned: MLX Cluster (50 panels), MLX Performance (29), MLX GPU &amp; Power (17), MLX Node (33), MLX Alerts &amp; Serving Health (28), + MLX SRE (SLI/SLA/SLO/error budget), MLX HTTP Requests (20), MLX Call Types (21, reasoning vs chat incl. tool breakdown), MLX Model (25, architecture dims); datasource <code>victoria-metrics:8428</code></td></tr>
+    <tr><td>Dashboards</td><td>Grafana (<code>:3000</code>)</td><td>10 provisioned: MLX Cluster (50 panels), MLX Performance (29), MLX GPU &amp; Power (17), MLX Node (33), MLX Alerts &amp; Serving Health (28), + MLX SRE (SLI/SLA/SLO/error budget), MLX HTTP Requests (20), MLX Call Types (21, reasoning vs chat incl. tool breakdown), MLX Model (25, architecture dims), MLX Tool Calls (14, dynamic tool usage); datasource <code>victoria-metrics:8428</code></td></tr>
   </table>
   <div class="callout ok"><span class="ic">&#10003;</span><span>Every confidence alert is gated on <code>mlx_confidence_scored_total &gt; 0</code>, and <code>MLXConfidenceScoringStopped</code> fires when traffic flows but nothing is scored &mdash; so &ldquo;blind&rdquo; and &ldquo;healthy&rdquo; never look identical (post&nbsp;18).</span></div>
 </section>
@@ -418,7 +418,7 @@
   </div>
 
   <div class="diagram">
-    <div class="cap">Alerts &amp; dashboards &mdash; 46 rules to a webhook, nine dashboards to Grafana</div>
+    <div class="cap">Alerts &amp; dashboards &mdash; 46 rules to a webhook, ten dashboards to Grafana</div>
     <svg viewBox="0 0 760 300" role="img" aria-label="Alert and dashboard flow">
       <defs>
         <marker id="ar4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#818cf8"/></marker>
@@ -426,7 +426,7 @@
       <g font-family="inherit">
         <rect class="dbox" x="20" y="25" width="200" height="44"/>
         <text class="bigname" x="30" y="43">Grafana</text>
-        <text class="label" x="30" y="59">9 dashboards &middot; 241 panels</text>
+        <text class="label" x="30" y="59">10 dashboards &middot; 255 panels</text>
         <rect class="portbadge" x="176" y="33" width="36" height="16" rx="8"/><text class="porttext" x="182" y="45">3000</text>
 
         <rect class="dbox" x="300" y="100" width="190" height="50" stroke="#0f766e"/>

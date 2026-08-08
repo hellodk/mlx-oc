@@ -59,7 +59,7 @@
     <div class="meta">
       <span><b>Stack</b> VictoriaMetrics + vmalert + Alertmanager + Grafana</span>
       <span><b>Agents</b> mlx_metrics_proxy :8080 &middot; mlx_hw_telemetry :9102 &middot; mlx_kv_cache_agent :9104</span>
-      <span><b>Rules</b> 46 &middot; <b>Dashboards</b> 9</span>
+      <span><b>Rules</b> 46 &middot; <b>Dashboards</b> 10</span>
     </div>
   </div>
 </header>
@@ -212,7 +212,7 @@
     <div class="num n19">19</div>
     <div>
       <h2>Every Signal, One Map: Telemetry and Test Tooling in Tables</h2>
-      <p>The reference atlas &mdash; tabbed, so each concern gets its own panel. Metrics: five Prometheus exporters scraped by VictoriaMetrics every 10s (36 families on the proxy alone, from TTFT to the post-18 confidence set). Logs: two producers pushing OTLP to one collector and a durable JSONL tail. Traces: one span fanned out to the collector and Opik, with three in-band feedback scores plus a three-score judge loop. Alerts: 46 rules to Alertmanager and webhooks, nine Grafana dashboards (including the new SRE, HTTP, call-type and model dashboards). Tests: the four load-test rigs against the proxy, the 40 unit tests behind the stub-upstream rewrite path &mdash; and every file with the configuration value that makes it run.</p>
+      <p>The reference atlas &mdash; tabbed, so each concern gets its own panel. Metrics: five Prometheus exporters scraped by VictoriaMetrics every 10s (36 families on the proxy alone, from TTFT to the post-18 confidence set). Logs: two producers pushing OTLP to one collector and a durable JSONL tail. Traces: one span fanned out to the collector and Opik, with three in-band feedback scores plus a three-score judge loop. Alerts: 46 rules to Alertmanager and webhooks, ten Grafana dashboards (including the new SRE, HTTP, call-type, model and tool-call dashboards). Tests: the four load-test rigs against the proxy, the 40 unit tests behind the stub-upstream rewrite path &mdash; and every file with the configuration value that makes it run.</p>
       <span class="tag">telemetry map</span><span class="tag">tabs</span><span class="tag">metrics</span><span class="tag">logs</span><span class="tag">traces</span><span class="tag">load tests</span><span class="tag">configs</span>
     </div>
   </a>
