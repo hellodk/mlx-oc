@@ -39,7 +39,7 @@ export MLX_LOGPROBS MLX_LOGPROBS_STREAM_SAMPLE MLX_LOW_CONFIDENCE
 MODEL="$MLX_MODEL"
 
 LOG="$DIR/logs"
-RANK1="192.168.1.5"
+RANK1="10.0.0.2"
 
 # Opik OTLP ingestion for traces (proxy) + logs (logtailer). On by default so
 # one trace per request lands in the "mlx" project; override to disable.

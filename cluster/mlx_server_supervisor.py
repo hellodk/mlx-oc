@@ -202,7 +202,7 @@ class Supervisor:
     def _kill_remote_rank(self):
         try:
             subprocess.run(
-                ["ssh", "-o", "ConnectTimeout=5", "192.168.1.5",
+                ["ssh", "-o", "ConnectTimeout=5", "10.0.0.2",
                  "pkill -f 'mlx_lm.server'; pkill -f 'mlx.launch'"],
                 capture_output=True, timeout=15,
             )

@@ -1,6 +1,8 @@
 # VictoriaMetrics single-node scrape config.
 # Generated from vm-scrape.tmpl.yml by ./setup.sh (substitutes __MLX_IP__ /
-# __RANK1_IP__ with your Mac LAN addresses). Targets:
+# __RANK1_IP__ with your Mac addresses). Ring/rank1 talk runs over the direct
+# Ethernet link (RANK1_IP=10.0.0.2); the proxy stays on the LAN/Wi-Fi IP for
+# external clients. Targets:
 #   - proxy      <MLX_IP>:8080/metrics   (inference + hallucination metrics)
 #   - hw agents  <MLX_IP>:9102 (rank0) and <RANK1_IP>:9102 (rank1)
 #   - kv agent   <MLX_IP>:9104           (KV cache + context-length gauges)
