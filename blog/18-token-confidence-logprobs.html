@@ -90,7 +90,7 @@
     <div class="meta">
       <span><b>New metrics</b> 8</span>
       <span><b>New alerts</b> 5 (41 total)</span>
-      <span><b>Tests</b> 37 passing</span>
+      <span><b>Tests</b> 39 passing</span>
       <span><b>Blocker</b> streams carry no logprobs</span>
     </div>
   </div>
@@ -243,6 +243,7 @@ mlx_low_confidence_response_total{model}</code></pre>
   <li><b><code>margin_mean</code> separates two different failures.</b> High entropy on hard prompts is normal. A margin that collapses across an entire window is not a prompt problem &mdash; it points at a corrupt or mis-quantised weight load. That distinction is why <code>MLXConfidenceCollapse</code> is the only <span class="pill p0">critical</span> alert in the new group.</li>
   <li><b><code>scored_total{source}</code> is the anti-lie metric.</b> Divided by <code>mlx_requests_total</code> it gives coverage. Without it, every other panel on the row is unfalsifiable.</li>
 </ul>
+<div class="callout warn"><span class="ic">&#9888;</span><span><b>Building the coverage stat found an older bug.</b> Reading the live counters after deploy showed <code>mlx_finish_reason_total{reason="unknown"}</code> climbing on its own. A two-command check &mdash; scrape, <code>GET /v1/models</code>, scrape again &mdash; confirmed it: <b>every model-list poll was being counted as a chat completion.</b> It incremented <code>mlx_requests_total</code>, added an <code>unknown</code> finish_reason, and pushed a near-zero sample into the TTFT and generation histograms that <code>MLXHighTTFTP95</code> reads percentiles from. A client polling <code>/v1/models</code> every few seconds was quietly making p95 latency look better than it was. Non-completion requests are now excluded from the completion metrics; <code>mlx_up</code> and <code>mlx_error_total</code> still count, because reachability and errors are real for any request. Expect the affected series to <em>drop</em> after the fix &mdash; that is the polling traffic leaving, not a regression.</span></div>
 <p>Deliberately <em>not</em> done: folding confidence into <code>mlx_hallucination_risk</code>. Only a subset of requests carry logprobs, so a blended score would silently mean two different things depending on whether that request happened to be sampled. The heuristics stay text-only; confidence is its own axis.</p>
 </section>
 
@@ -278,7 +279,7 @@ mlx_low_confidence_response_total{model}</code></pre>
 <p>Injecting a field into a request body and rewriting the response body is the riskiest kind of proxy change: the failure mode is a coding agent that silently loses tool calls. So the tests cover the rewrite path with a stub upstream that mirrors the real server&rsquo;s behaviour &mdash; including its refusal to put logprobs in SSE chunks.</p>
 <pre><code>$ python3 -m pytest tests/ -q
 .....................................                          [100%]
-37 passed in 1.10s</code></pre>
+39 passed in 1.12s</code></pre>
 <p>The ones that matter:</p>
 <ul>
   <li><code>test_non_streaming_request_gets_logprobs_injected_and_stripped</code> &mdash; upstream received <code>logprobs: true</code>, the client&rsquo;s response has no <code>logprobs</code> key, and <code>Content-Length</code> matches the <em>rewritten</em> body rather than the upstream one.</li>

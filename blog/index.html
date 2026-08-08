@@ -204,8 +204,8 @@
     <div class="num n18">18</div>
     <div>
       <h2>The Sampler Doesn&rsquo;t Lie: Entropy, Perplexity and Confidence from Logprobs</h2>
-      <p>Every quality signal so far read the model&rsquo;s <em>text</em>, which means it fires after the model has already written something wrong. Logprobs read the <em>sampler</em>, and the sampler goes flat first. The blocker: <code>mlx_lm.server</code> returns logprobs on non-streaming responses only &mdash; and everything real here streams &mdash; so the proxy injects them upstream and strips them back out, and de-streams a sampled 5% of streaming requests to score real traffic at no extra GPU cost. Eight metrics, five alerts (including one that fires when scoring itself stops), a Grafana row that leads with coverage, and 37 tests proving tool calls survive the rewrite.</p>
-      <span class="tag">logprobs</span><span class="tag">perplexity</span><span class="tag">entropy</span><span class="tag">confidence</span><span class="tag">37 tests</span>
+      <p>Every quality signal so far read the model&rsquo;s <em>text</em>, which means it fires after the model has already written something wrong. Logprobs read the <em>sampler</em>, and the sampler goes flat first. The blocker: <code>mlx_lm.server</code> returns logprobs on non-streaming responses only &mdash; and everything real here streams &mdash; so the proxy injects them upstream and strips them back out, and de-streams a sampled 5% of streaming requests to score real traffic at no extra GPU cost. Eight metrics, five alerts (including one that fires when scoring itself stops), a Grafana row that leads with coverage, and 39 tests proving tool calls survive the rewrite.</p>
+      <span class="tag">logprobs</span><span class="tag">perplexity</span><span class="tag">entropy</span><span class="tag">confidence</span><span class="tag">39 tests</span>
     </div>
   </a>
   <a class="post" href="19-observability-telemetry-and-testing.html">
