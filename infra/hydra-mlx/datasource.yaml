@@ -1,0 +1,33 @@
+# Grafana datasource for the mlx_* series, picked up by the grafana-sc-datasources
+# sidecar (label grafana_datasource: "1", searchNamespace: ALL).
+#
+# uid `mlx-vm` is deliberate and is the seam for the push-based cutover: the
+# dashboards reference this uid and nothing else, so moving the data from the
+# compose VictoriaMetrics on the Mac to the in-cluster one is a one-line url
+# change here - no dashboard edits.
+#
+# It is NOT the in-cluster VictoriaMetrics (uid `VictoriaMetrics`, url
+# vmsingle-monitoring.monitoring.svc:8429). That instance has never scraped the
+# Macs; pointing mlx dashboards at it yields empty panels.
+#
+# LAN address per the networking rule - never the 100.x Tailscale address.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mlx-datasource
+  namespace: hydra-mlx
+  labels:
+    grafana_datasource: "1"
+    app.kubernetes.io/part-of: hydra-mlx
+data:
+  mlx-datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: MLX VictoriaMetrics
+        uid: mlx-vm
+        type: prometheus
+        access: proxy
+        url: http://192.168.1.64:8428
+        isDefault: false
+        jsonData:
+          timeInterval: 5s
