@@ -35,7 +35,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from prometheus_client import Gauge, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 NODE = "unknown"
 LISTEN = ("0.0.0.0", 9102)
@@ -69,6 +69,55 @@ G_GPU_MEM_USED = Gauge("mlx_hw_gpu_mem_used_bytes", "GPU memory in use (IOKit In
 G_GPU_MEM_ALLOC = Gauge("mlx_hw_gpu_mem_alloc_bytes", "GPU memory allocated (IOKit Alloc system memory)", ["node"])
 G_GPU_MEM_TOTAL = Gauge("mlx_hw_gpu_mem_total_bytes", "Total unified GPU memory (IORegistry VRAM,totalMB)", ["node"])
 G_GPU_UTIL_IOKIT = Gauge("mlx_hw_gpu_iokit_util_percent", "GPU activity from IOKit Device Utilization %", ["node"])
+G_PROC_CPU = Gauge(
+    "mlx_proc_cpu_percent",
+    "Per-stack-component CPU % (sum over matching PIDs)",
+    ["node", "component"],
+)
+G_PROC_RSS = Gauge(
+    "mlx_proc_rss_bytes",
+    "Per-stack-component resident set size (sum over matching PIDs)",
+    ["node", "component"],
+)
+C_NET_RX = Counter(
+    "mlx_net_rx_bytes_total",
+    "Cumulative bytes received on the ring interconnect interface",
+    ["node", "iface"],
+)
+C_NET_TX = Counter(
+    "mlx_net_tx_bytes_total",
+    "Cumulative bytes sent on the ring interconnect interface",
+    ["node", "iface"],
+)
+C_NET_RX_ERR = Counter(
+    "mlx_net_rx_errors_total",
+    "Cumulative receive errors on the ring interconnect interface",
+    ["node", "iface"],
+)
+C_NET_TX_ERR = Counter(
+    "mlx_net_tx_errors_total",
+    "Cumulative transmit errors on the ring interconnect interface",
+    ["node", "iface"],
+)
+
+# component name -> substring to match in the ps command line (host processes)
+_PROC_COMPONENTS = {
+    "mlx_lm_server": "mlx_lm.server",
+    "mlx_proxy": "mlx_metrics_proxy",
+    "kv_agent": "mlx_kv_cache_agent",
+    "log_tailer": "mlx_server_log_tailer",
+    "supervisor": "mlx_server_supervisor",
+}
+
+# component name -> podman container name (the rest of the stack is
+# containerized, so host ps cannot see it; podman stats can)
+_CONTAINER_COMPONENTS = {
+    "otel_collector": "otel-collector",
+    "victoria_metrics": "victoria-metrics",
+    "grafana": "grafana",
+    "alertmanager": "alertmanager",
+    "vmalert": "vmalert",
+}
 
 _PAGE_SIZE = 0
 _MEM_TOTAL = 0
@@ -281,6 +330,150 @@ def _worker_stats():
     return cpu, rss
 
 
+def _proc_stats():
+    """Per-stack-component (cpu%, rss) from one ps sweep, keyed by component."""
+    stats = {name: (0.0, 0) for name in _PROC_COMPONENTS}
+    try:
+        out = subprocess.run(
+            ["ps", "-axo", "pid=,pcpu=,rss=,command="], capture_output=True, text=True, timeout=5
+        ).stdout
+        for line in out.splitlines():
+            if "mlx_hw_telemetry" in line:
+                continue
+            parts = line.split(None, 3)
+            if len(parts) < 4:
+                continue
+            cmd = parts[3]
+            try:
+                cpu = float(parts[1])
+                rss = int(parts[2]) * 1024
+            except ValueError:
+                continue
+            for name, needle in _PROC_COMPONENTS.items():
+                if needle in cmd:
+                    c, r = stats[name]
+                    stats[name] = (c + cpu, r + rss)
+    except Exception:
+        pass
+    return stats
+
+
+def _container_stats():
+    """Per-container (cpu%, rss bytes) via `podman stats --no-stream`, keyed by
+    component name. Rootless podman on the same host; empty on failure."""
+    stats = {}
+    try:
+        out = subprocess.run(
+            ["podman", "stats", "--no-stream",
+             "--format", "{{.Name}} {{.CPUPerc}} {{.MemUsage}}"],
+            capture_output=True, text=True, timeout=8,
+        ).stdout
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) < 3:
+                continue
+            name, cpu_pct = parts[0], parts[1].rstrip("%")
+            for comp, ctn in _CONTAINER_COMPONENTS.items():
+                if ctn == name:
+                    stats[comp] = (float(cpu_pct), _mem_usage_bytes(parts[2]))
+                    break
+    except Exception:
+        pass
+    return stats
+
+
+def _mem_usage_bytes(usage):
+    """'505.6MB' / '1.23GiB' -> bytes."""
+    m = re.match(r"([\d.]+)([KMGTP]?)(i?B)", usage)
+    if not m:
+        return 0
+    num = float(m.group(1))
+    unit = m.group(2)
+    if unit == "K":
+        num *= 1024
+    elif unit == "M":
+        num *= 1024 ** 2
+    elif unit == "G":
+        num *= 1024 ** 3
+    elif unit == "T":
+        num *= 1024 ** 4
+    return int(num)
+
+
+def _ring_iface():
+    """Auto-detect the ring interconnect interface: first iface with an IPv4
+    in 10.0.0.0/24. Returns its name or None."""
+    try:
+        out = subprocess.run(
+            ["ifconfig"], capture_output=True, text=True, timeout=3
+        ).stdout
+        cur = None
+        for line in out.splitlines():
+            m = re.match(r"^(\S+):", line)
+            if m:
+                cur = m.group(1)
+                continue
+            m = re.search(r"inet\s+10\.0\.0\.\d+\s", line)
+            if m and cur:
+                return cur
+    except Exception:
+        pass
+    return None
+
+
+def _net_stats(iface):
+    """Cumulative (rx_bytes, tx_bytes, rx_err, tx_err) for iface from
+    `netstat -ib` (the link row). Returns None when unavailable."""
+    if not iface:
+        return None
+    try:
+        out = subprocess.run(
+            ["netstat", "-ib", "-I", iface], capture_output=True, text=True, timeout=3
+        ).stdout
+        for line in out.splitlines():
+            fields = line.split()
+            if len(fields) < 10 or fields[0] != iface:
+                continue
+            # link row: Name Mtu <Link#> Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll
+            if fields[2].startswith("<Link"):
+                try:
+                    return (
+                        int(fields[6]),  # Ibytes
+                        int(fields[9]),  # Obytes
+                        int(fields[5]),  # Ierrs
+                        int(fields[8]),  # Oerrs
+                    )
+                except (ValueError, IndexError):
+                    return None
+    except Exception:
+        pass
+    return None
+
+
+_NET_LAST = {}
+
+
+def _ring_net_since(counters):
+    """Delta-inc the ring net counters so VM can derive rate(); establishes a
+    baseline on the first sample so a fresh exporter doesn't fake a huge jump."""
+    iface = _ring_iface()
+    rx, tx, rx_err, tx_err = counters
+    prev = _NET_LAST.get(NODE, {}).get(iface)
+    if prev is None:
+        _NET_LAST.setdefault(NODE, {})[iface] = (rx, tx, rx_err, tx_err)
+        return
+    prx, ptx, perr, oerr = prev
+    if rx >= prx:
+        C_NET_RX.labels(NODE, iface).inc(rx - prx)
+    if tx >= ptx:
+        C_NET_TX.labels(NODE, iface).inc(tx - ptx)
+    if rx_err >= perr:
+        C_NET_RX_ERR.labels(NODE, iface).inc(rx_err - perr)
+    if tx_err >= oerr:
+        C_NET_TX_ERR.labels(NODE, iface).inc(tx_err - oerr)
+    _NET_LAST[NODE][iface] = (rx, tx, rx_err, tx_err)
+
+
 def _sample():
     load1, load5, load15 = os.getloadavg()
     used, free_pages = _mem_info()
@@ -320,6 +513,18 @@ def _sample():
     wcpu, wrss = _worker_stats()
     G_WORKER_CPU.labels(NODE).set(wcpu)
     G_WORKER_RSS.labels(NODE).set(wrss)
+
+    for name, (cpu, rss) in _proc_stats().items():
+        G_PROC_CPU.labels(NODE, name).set(cpu)
+        G_PROC_RSS.labels(NODE, name).set(rss)
+
+    for name, (cpu, rss) in _container_stats().items():
+        G_PROC_CPU.labels(NODE, name).set(cpu)
+        G_PROC_RSS.labels(NODE, name).set(rss)
+
+    net = _net_stats(_ring_iface())
+    if net:
+        _ring_net_since(net)
 
 
 class Handler(BaseHTTPRequestHandler):
