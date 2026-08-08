@@ -81,11 +81,12 @@
   <a href="15-sglang-on-two-mac-minis.html">SGLang</a>
   <a href="17-opik-dashboards.html">Opik dashboards</a>
   <a href="18-token-confidence-logprobs.html">Token confidence</a>
+  <a href="19-observability-telemetry-and-testing.html">Telemetry &amp; tests</a>
 </div></nav>
 
 <header class="hero">
   <div class="wrap">
-    <span class="kicker">12 of 18 &middot; faults, errors &amp; restarts</span>
+    <span class="kicker">12 of 19 &middot; faults, errors &amp; restarts</span>
     <h1>The Fault Ledger</h1>
     <p class="sub">Post 9 typed the crash and counted restarts; post 11 measured the crash rate and wrote a plan. This post makes the analysis <em>visible</em>: a per-reason crash counter in the supervisor, and a Grafana row that answers &ldquo;how many restarts, of what kind, when, and how many requests died with them&rdquo; &mdash; plus the surprising discovery that the dashboard&rsquo;s file edits were not reaching the running Grafana at all.</p>
     <div class="meta">

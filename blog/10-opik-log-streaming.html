@@ -76,11 +76,12 @@
   <a href="15-sglang-on-two-mac-minis.html">SGLang</a>
   <a href="17-opik-dashboards.html">Opik dashboards</a>
   <a href="18-token-confidence-logprobs.html">Token confidence</a>
+  <a href="19-observability-telemetry-and-testing.html">Telemetry &amp; tests</a>
 </div></nav>
 
 <header class="hero">
   <div class="wrap">
-    <span class="kicker">10 of 18 &middot; streaming + correlation</span>
+    <span class="kicker">10 of 19 &middot; streaming + correlation</span>
     <h1>The Other Half of the Story</h1>
     <p class="sub">Every request produces a trace &mdash; and a stack of raw lines in <code>logs/server.log</code> that used to be thrown away. This post is what we built to ship the server&rsquo;s side of the story: tracing switched on, a filtered and flood-protected log tailer feeding the OTLP collector&rsquo;s durable JSONL file, and the crash that used to be invisible now landing next to the traces that caused it.</p>
     <div class="meta">

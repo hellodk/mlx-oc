@@ -43,6 +43,7 @@
   .n16{background:linear-gradient(135deg,#b45309,#4f46e5)}
   .n17{background:linear-gradient(135deg,#4f46e5,#0f766e)}
   .n18{background:linear-gradient(135deg,#1a1a3e,#444CE7)}
+  .n19{background:linear-gradient(135deg,#334155,#0f766e)}
   .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
   .post p{margin:0;color:var(--muted);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
@@ -54,11 +55,11 @@
   <div class="wrap">
     <span class="kicker">MLX Observability &middot; Field Notes</span>
     <h1>Making Two Mac minis<br>Actually Observable</h1>
-    <p class="sub">Seventeen deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 28 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, a performance dashboard that finally shows the KV cache and context window, a head-to-head with hydra&rsquo;s push-first fleet stack, how a real GPU crash exposed the missing process-level truth &mdash; now fixed with a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that stress the cluster like an agent &mdash; the streamed server runtime log that finally carries an incident&rsquo;s server-side context into Opik, a per-reason fault ledger in Grafana, the forensics that found the fault lives on the remote rank, and the consolidated decision ledger we now choose from &mdash; an experimental SGLang scaffold with an unverified Apple Silicon backend, the tuning lever table measured on the ring, and now the Opik-native dashboard that renders the mlx project&rsquo;s traces and judge scores in place.</p>
+    <p class="sub">Nineteen deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 41 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, a performance dashboard that finally shows the KV cache and context window, a head-to-head with hydra&rsquo;s push-first fleet stack, how a real GPU crash exposed the missing process-level truth &mdash; now fixed with a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that stress the cluster like an agent &mdash; the streamed server runtime log that finally carries an incident&rsquo;s server-side context into Opik, a per-reason fault ledger in Grafana, the forensics that found the fault lives on the remote rank, and the consolidated decision ledger we now choose from &mdash; an experimental SGLang scaffold with an unverified Apple Silicon backend, the tuning lever table measured on the ring, and now the Opik-native dashboard that renders the mlx project&rsquo;s traces and judge scores in place &mdash; and the reference map: every metric, log, trace, feedback score and alert in tables, with the files and configurations behind each, and how the four load-test rigs and forty unit tests drive the cluster.</p>
     <div class="meta">
       <span><b>Stack</b> VictoriaMetrics + vmalert + Alertmanager + Grafana</span>
       <span><b>Agents</b> mlx_metrics_proxy :8080 &middot; mlx_hw_telemetry :9102 &middot; mlx_kv_cache_agent :9104</span>
-      <span><b>Rules</b> 28 &middot; <b>Dashboards</b> 4</span>
+      <span><b>Rules</b> 41 &middot; <b>Dashboards</b> 5</span>
     </div>
   </div>
 </header>
@@ -205,6 +206,14 @@
       <h2>The Sampler Doesn&rsquo;t Lie: Entropy, Perplexity and Confidence from Logprobs</h2>
       <p>Every quality signal so far read the model&rsquo;s <em>text</em>, which means it fires after the model has already written something wrong. Logprobs read the <em>sampler</em>, and the sampler goes flat first. The blocker: <code>mlx_lm.server</code> returns logprobs on non-streaming responses only &mdash; and everything real here streams &mdash; so the proxy injects them upstream and strips them back out, and de-streams a sampled 5% of streaming requests to score real traffic at no extra GPU cost. Eight metrics, five alerts (including one that fires when scoring itself stops), a Grafana row that leads with coverage, and 37 tests proving tool calls survive the rewrite.</p>
       <span class="tag">logprobs</span><span class="tag">perplexity</span><span class="tag">entropy</span><span class="tag">confidence</span><span class="tag">37 tests</span>
+    </div>
+  </a>
+  <a class="post" href="19-observability-telemetry-and-testing.html">
+    <div class="num n19">19</div>
+    <div>
+      <h2>Every Signal, One Map: Telemetry and Test Tooling in Tables</h2>
+      <p>The reference atlas &mdash; tabbed, so each concern gets its own panel. Metrics: five Prometheus exporters scraped by VictoriaMetrics every 10s (34 families on the proxy alone, from TTFT to the post-18 confidence set). Logs: two producers pushing OTLP to one collector and a durable JSONL tail. Traces: one span fanned out to the collector and Opik, with three in-band feedback scores plus a three-score judge loop. Alerts: 41 rules to Alertmanager and webhooks, five Grafana dashboards. Tests: the four load-test rigs against the proxy, the 40 unit tests behind the stub-upstream rewrite path &mdash; and every file with the configuration value that makes it run.</p>
+      <span class="tag">telemetry map</span><span class="tag">tabs</span><span class="tag">metrics</span><span class="tag">logs</span><span class="tag">traces</span><span class="tag">load tests</span><span class="tag">configs</span>
     </div>
   </a>
 </main>
