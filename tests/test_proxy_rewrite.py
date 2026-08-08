@@ -321,3 +321,33 @@ def test_destreaming_does_not_record_a_ttft(stack):
     post(stack, {"model": MODEL, "stream": True,
                  "messages": [{"role": "user", "content": "hi"}]})
     assert series(metrics(stack), "mlx_ttft_seconds_count") == before
+
+
+# -- non-completion requests must not pollute completion metrics -----------
+def test_model_list_is_not_counted_as_a_completion(stack):
+    """
+    GET /v1/models is proxied, not generated. A client polling it must not
+    inflate the request counter, add an 'unknown' finish_reason, or push a
+    near-zero sample into the TTFT/generation histograms the latency alerts
+    read percentiles from.
+    """
+    before = metrics(stack)
+    watched = ("mlx_requests_total", "mlx_finish_reason_total",
+               "mlx_ttft_seconds_count", "mlx_generation_seconds_count",
+               "mlx_tokens_prompt_total", "mlx_tokens_completion_total")
+    baseline = {name: series(before, name) for name in watched}
+
+    with urllib.request.urlopen(stack + "/v1/models", timeout=10) as r:
+        assert r.status == 200
+
+    after = metrics(stack)
+    for name in watched:
+        assert series(after, name) == baseline[name], name
+
+
+def test_chat_completions_still_count(stack):
+    """The guard above must not have silenced real completions."""
+    before = series(metrics(stack), "mlx_requests_total")
+    post(stack, {"model": MODEL,
+                 "messages": [{"role": "user", "content": "hi"}]})
+    assert series(metrics(stack), "mlx_requests_total") == before + 1

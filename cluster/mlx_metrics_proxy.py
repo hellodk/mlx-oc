@@ -826,7 +826,10 @@ class Proxy(BaseHTTPRequestHandler):
         # logprob scoring plan for this request
         lp_source = ""      # "client" | "injected" | "destreamed" | ""
         synth_sse = False   # client asked to stream, upstream will not
-        if self.command == "POST" and req_path.endswith("/v1/chat/completions"):
+        is_chat = self.command == "POST" and req_path.endswith(
+            "/v1/chat/completions"
+        )
+        if is_chat:
             try:
                 req = json.loads(body or b"{}")
                 model = req.get("model", model)
@@ -948,7 +951,8 @@ class Proxy(BaseHTTPRequestHandler):
                         }
                     ),
                 )
-        IN_FLIGHT.labels(model).inc()
+        if is_chat:
+            IN_FLIGHT.labels(model).inc()
         try:
             conn.request(self.command, req_path, body=body, headers=headers)
             resp = conn.getresponse()
@@ -1037,6 +1041,17 @@ class Proxy(BaseHTTPRequestHandler):
                     status, resp_headers, resp_obj, content_bytes,
                     synth_sse, model,
                 )
+
+            if not is_chat:
+                # /v1/models and friends are proxied, not generated. They must
+                # not land in the completion counters - a client polling the
+                # model list every few seconds would otherwise inflate
+                # mlx_requests_total, add a "unknown" finish_reason for every
+                # poll, and (worst of all) push near-zero observations into the
+                # TTFT and generation histograms that the latency alerts read
+                # percentiles from. mlx_up and mlx_error_total still count:
+                # reachability and errors are real for any request.
+                return
 
             if usage:
                 prompt_tokens = int(usage.get("prompt_tokens", 0))
@@ -1290,7 +1305,8 @@ class Proxy(BaseHTTPRequestHandler):
             except Exception:
                 pass
         finally:
-            IN_FLIGHT.labels(model).dec()
+            if is_chat:
+                IN_FLIGHT.labels(model).dec()
             if span is not None:
                 try:
                     span.end()
