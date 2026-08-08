@@ -138,7 +138,7 @@ Proxy `/metrics` (`--metrics-path`):
 * `mlx_requests_total{model,streaming}`
 * `mlx_ttft_seconds` (histogram), `mlx_gen_seconds`, `mlx_token_rate_tokens_per_second`
 * `mlx_tokens_prompt_total`, `mlx_tokens_completion_total`
-* `mlx_temperature`, `mlx_tool_calls_total`
+* `mlx_temperature`, `mlx_tool_calls_total{model,kind,tool,type}` (tool = function name, type = OpenAI call type)
 * `mlx_hallucination_risk{model}` gauge + `mlx_hallucination_risk_histogram_bucket`
 * `mlx_finish_reason_total{model,reason}`
 * `mlx_upstream_up`
@@ -257,10 +257,12 @@ Grafana auto-provisions nine dashboards from `observability/grafana/dashboards/`
   and TTFT p95 vs target, and availability/latency burn rates.
 * **MLX HTTP Requests** — the raw HTTP view: requests/min by streaming and by
   call kind, in-flight queue depth, errors by status class and kind, TTFT /
-  generation / token-rate quantiles, tokens in/out and tool-call rate.
+  generation / token-rate quantiles, tokens in/out and tool-call rate (incl.
+  a per-tool breakdown).
 * **MLX Call Types** — reasoning vs chat breakdown (`enable_thinking` in the
-  request body): request mix, stream vs sync, tokens, tool calls, finish
-  reasons, hallucination risk and error ratio per call kind.
+  request body): request mix, stream vs sync, tokens, tool calls (by call
+  kind and by tool / call type), finish reasons, hallucination risk and error
+  ratio per call kind.
 * **MLX Model** — architecture facts from the model's `config.json`
   (`mlx_model_info{attr=...}`): layers, KV heads, head dim, hidden size,
   attention heads, vocab, FFN intermediate, quant bits/group size, plus the

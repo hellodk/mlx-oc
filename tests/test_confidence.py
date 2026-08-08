@@ -223,6 +223,48 @@ def test_sse_frames_round_trip_tool_calls():
     parser = _parse_frames(frames)
     assert parser.tool_calls == 2
     assert parser.finish_reason == "tool_calls"
+    assert parser.tools == [
+        {"type": "function", "name": "read_file"},
+        {"type": "function", "name": "list_dir"},
+    ]
+
+
+def test_stream_parser_reassembles_split_tool_names():
+    parser = p._StreamParser()
+    parser.feed(
+        (b"data: " + json.dumps({
+            "choices": [{"delta": {"tool_calls": [
+                {"id": "c1", "type": "function",
+                 "function": {"name": "read", "arguments": ""}},
+            ]}}],
+        }).encode() + b"\n\n").decode("utf-8")
+    )
+    parser.feed(
+        (b"data: " + json.dumps({
+            "choices": [{"delta": {"tool_calls": [
+                {"id": "c1", "function": {"name": "_file", "arguments": ""}},
+            ]}}],
+        }).encode() + b"\n\n").decode("utf-8")
+    )
+    parser.feed(
+        (b"data: " + json.dumps({
+            "choices": [{"delta": {"tool_calls": [
+                {"id": "c1", "function": {"name": "", "arguments": "{}"}},
+            ]}}],
+        }).encode() + b"\n\n").decode("utf-8")
+    )
+    assert parser.tool_calls == 1
+    assert parser.tools == [{"type": "function", "name": "read_file"}]
+
+
+def test_stream_parser_falls_back_when_name_missing():
+    parser = p._StreamParser()
+    parser.feed(
+        (b"data: " + json.dumps({
+            "choices": [{"delta": {"tool_calls": [{"id": "c1"}]}}],
+        }).encode() + b"\n\n").decode("utf-8")
+    )
+    assert parser.tools == [{"type": "unknown", "name": "unknown"}]
 
 
 def test_sse_frames_index_tool_calls_for_streaming_clients():

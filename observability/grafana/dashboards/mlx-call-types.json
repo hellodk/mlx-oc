@@ -449,7 +449,123 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 19
+      },
+      "id": 415,
+      "title": "Tool usage",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "drawStyle": "line",
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "type": "timeseries",
+      "id": 416,
+      "title": "Tool calls / min (tool)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(mlx_tool_calls_total{model=~\"$model\"}[5m])) by (tool) * 60",
+          "legendFormat": "{{tool}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          }
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "drawStyle": "line",
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "type": "timeseries",
+      "id": 417,
+      "title": "Tool calls / min (type)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(mlx_tool_calls_total{model=~\"$model\"}[5m])) by (type) * 60",
+          "legendFormat": "{{type}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          }
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
       },
       "id": 420,
       "title": "Efficiency & errors by kind",
@@ -479,7 +595,7 @@
         "h": 8,
         "w": 6,
         "x": 0,
-        "y": 19
+        "y": 28
       },
       "id": 421,
       "options": {
@@ -531,7 +647,7 @@
         "h": 8,
         "w": 6,
         "x": 6,
-        "y": 19
+        "y": 28
       },
       "id": 422,
       "options": {
@@ -600,7 +716,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 19
+        "y": 28
       },
       "id": 423,
       "options": {
@@ -652,7 +768,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 19
+        "y": 28
       },
       "id": 424,
       "options": {
@@ -686,7 +802,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 9
       },
       "id": 430,
       "title": "Quality by kind",
@@ -736,7 +852,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 28
+        "y": 37
       },
       "id": 431,
       "options": {
@@ -789,7 +905,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 28
+        "y": 37
       },
       "id": 432,
       "options": {
@@ -853,7 +969,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 28
+        "y": 37
       },
       "id": 433,
       "options": {

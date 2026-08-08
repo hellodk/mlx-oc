@@ -573,7 +573,7 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 8,
+        "w": 4,
         "x": 16,
         "y": 16
       },
@@ -1818,6 +1818,35 @@
       ],
       "title": "Active alerts",
       "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "calls/min"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 20,
+        "y": 16
+      },
+      "id": 50,
+      "targets": [
+        {
+          "expr": "sum(rate(mlx_tool_calls_total{job=\"mlx-proxy\", model=~\"$model\"}[1m])) by (tool) * 60",
+          "legendFormat": "{{tool}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Tool calls by tool",
+      "type": "timeseries"
     }
   ],
   "refresh": "10s",

@@ -743,7 +743,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 6,
+        "w": 4,
         "x": 0,
         "y": 28
       },
@@ -804,8 +804,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 6,
-        "x": 6,
+        "w": 4,
+        "x": 4,
         "y": 28
       },
       "id": 332,
@@ -856,8 +856,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 6,
-        "x": 12,
+        "w": 4,
+        "x": 8,
         "y": 28
       },
       "id": 333,
@@ -937,6 +937,58 @@
       ],
       "title": "Hallucination flags / min",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "drawStyle": "line",
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "type": "timeseries",
+      "id": 335,
+      "title": "Tool calls by tool",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 28
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(mlx_tool_calls_total{model=~\"$model\"}[5m])) by (tool) * 60",
+          "legendFormat": "{{tool}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          }
+        }
+      ]
     }
   ],
   "refresh": "10s",

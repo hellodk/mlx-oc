@@ -237,8 +237,9 @@ TOKEN_RATE = Histogram(
 )
 TOOL_CALLS = Counter(
     "mlx_tool_calls_total",
-    "Function calls requested by the model",
-    ["model", "kind"],
+    "Tool calls requested by the model, broken down by tool name and call "
+    "type (OpenAI call types: function / code_interpreter / ...).",
+    ["model", "kind", "tool", "type"],
 )
 FINISH_REASON = Counter(
     "mlx_finish_reason_total",
@@ -699,7 +700,7 @@ class _StreamParser:
     def __init__(self):
         self._buf = ""
         self.content_parts = []
-        self.tool_call_ids = set()
+        self._tool_calls = {}
         self.usage = None
         self.finish_reason = None
 
@@ -727,8 +728,15 @@ class _StreamParser:
             if delta.get("content"):
                 self.content_parts.append(delta["content"])
             for tc in delta.get("tool_calls") or []:
-                if tc.get("id"):
-                    self.tool_call_ids.add(tc["id"])
+                tid = tc.get("id")
+                if not tid:
+                    continue
+                entry = self._tool_calls.setdefault(tid, {"type": None, "name": ""})
+                if tc.get("type"):
+                    entry["type"] = tc["type"]
+                name_frag = (tc.get("function") or {}).get("name")
+                if name_frag:
+                    entry["name"] += name_frag
 
     @property
     def content(self) -> str:
@@ -736,7 +744,21 @@ class _StreamParser:
 
     @property
     def tool_calls(self) -> int:
-        return len(self.tool_call_ids)
+        return len(self._tool_calls)
+
+    @property
+    def tools(self) -> list:
+        """One entry per tool call id, with the accumulated type + name.
+
+        Streaming deltas split the function name across frames, so names are
+        reassembled from fragments. Falls back to the call type, then a
+        literal 'unknown', so the metric label set stays small and finite.
+        """
+        return [
+            {"type": entry["type"] or "unknown",
+             "name": entry["name"] or entry["type"] or "unknown"}
+            for entry in self._tool_calls.values()
+        ]
 
     def completion_tokens(self) -> int:
         if self.usage and self.usage.get("completion_tokens"):
@@ -1027,11 +1049,13 @@ class Proxy(BaseHTTPRequestHandler):
             if is_sse:
                 content = parser.content
                 tool_calls = parser.tool_calls
+                tools = parser.tools
                 usage = parser.usage
                 finish_reason = parser.finish_reason
             else:
                 content = ""
                 tool_calls = 0
+                tools = []
                 usage = None
                 finish_reason = None
                 try:
@@ -1040,7 +1064,17 @@ class Proxy(BaseHTTPRequestHandler):
                     choice = (obj.get("choices") or [{}])[0]
                     msg = choice.get("message") or {}
                     content = msg.get("content") or ""
-                    tool_calls = len(msg.get("tool_calls") or [])
+                    calls = msg.get("tool_calls") or []
+                    tool_calls = len(calls)
+                    tools = [
+                        {
+                            "type": tc.get("type") or "unknown",
+                            "name": (tc.get("function") or {}).get("name")
+                            or tc.get("type")
+                            or "unknown",
+                        }
+                        for tc in calls
+                    ]
                     usage = obj.get("usage")
                     finish_reason = choice.get("finish_reason")
                 except json.JSONDecodeError:
@@ -1091,7 +1125,8 @@ class Proxy(BaseHTTPRequestHandler):
 
             REQUESTS.labels(model, "true" if streaming else "false", kind).inc()
             FINISH_REASON.labels(model, finish_reason or "unknown", kind).inc()
-            TOOL_CALLS.labels(model, kind).inc(tool_calls)
+            for t in tools:
+                TOOL_CALLS.labels(model, kind, t["name"], t["type"]).inc()
             TEMPERATURE.labels(model, kind).set(temperature)
 
             risk, flagged = composite_risk(model, content, tools_provided, tool_calls)
@@ -1128,6 +1163,11 @@ class Proxy(BaseHTTPRequestHandler):
                 span.set_attribute("mlx.tokens_prompt", prompt_tokens)
                 span.set_attribute("mlx.tokens_completion", comp_tokens)
                 span.set_attribute("mlx.tool_calls", tool_calls)
+                if tools:
+                    span.set_attribute(
+                        "mlx.tool_names",
+                        ", ".join(t["name"] for t in tools),
+                    )
                 span.set_attribute("mlx.hallucination_risk", risk)
                 span.set_attribute("mlx.hallucination_flagged", flagged)
                 span.set_attribute("http.response.status_code", status)
