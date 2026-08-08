@@ -27,6 +27,12 @@ DEFAULTS = {
     "layers": 0,
     "kv_heads": 0,
     "head_dim": 0,
+    "hidden_size": 0,
+    "attention_heads": 0,
+    "vocab_size": 0,
+    "intermediate_size": 0,
+    "quant_bits": 0,
+    "quant_group_size": 0,
 }
 
 _BYTES = 2  # fp16/bf16
@@ -62,11 +68,32 @@ class ModelInfo:
     kv_heads: int
     head_dim: int
     kv_bytes_per_token: int
+    hidden_size: int = 0
+    attention_heads: int = 0
+    vocab_size: int = 0
+    intermediate_size: int = 0
+    quant_bits: int = 0
+    quant_group_size: int = 0
+    arch: str = ""
+    dtype: str = ""
 
     @property
     def kv_bytes_for_max_context(self) -> int:
         """Bytes the KV cache would use for a full-length single sequence."""
         return self.max_context_tokens * self.kv_bytes_per_token
+
+
+def _text_cfg(cfg: dict) -> dict:
+    """Qwen3.5-style configs nest the text-only dims under `text_config`."""
+    return cfg.get("text_config") or cfg
+
+
+def _quant(cfg: dict) -> dict:
+    return (
+        cfg.get("quantization")
+        or cfg.get("quantization_config")
+        or {}
+    )
 
 
 def model_info(model: str) -> ModelInfo:
@@ -79,12 +106,15 @@ def model_info(model: str) -> ModelInfo:
         except (OSError, ValueError):
             cfg = {}
 
+    text = _text_cfg(cfg)
+    quant = _quant(cfg)
+    archs = cfg.get("architectures") or []
     max_ctx = int(
-        cfg.get("max_position_embeddings") or DEFAULTS["max_context_tokens"]
+        text.get("max_position_embeddings") or DEFAULTS["max_context_tokens"]
     )
-    layers = int(cfg.get("num_hidden_layers") or 0)
-    kv_heads = int(cfg.get("num_key_value_heads") or 0)
-    head_dim = int(cfg.get("head_dim") or 0)
+    layers = int(text.get("num_hidden_layers") or 0)
+    kv_heads = int(text.get("num_key_value_heads") or 0)
+    head_dim = int(text.get("head_dim") or 0)
 
     kv_bytes = 0
     if layers and kv_heads and head_dim:
@@ -98,6 +128,14 @@ def model_info(model: str) -> ModelInfo:
         kv_heads=kv_heads,
         head_dim=head_dim,
         kv_bytes_per_token=kv_bytes,
+        hidden_size=int(text.get("hidden_size") or 0),
+        attention_heads=int(text.get("num_attention_heads") or 0),
+        vocab_size=int(text.get("vocab_size") or 0),
+        intermediate_size=int(text.get("intermediate_size") or 0),
+        quant_bits=int(quant.get("bits") or 0),
+        quant_group_size=int(quant.get("group_size") or 0),
+        arch=archs[0] if archs else "",
+        dtype=str(text.get("dtype") or ""),
     )
 
 
@@ -109,6 +147,10 @@ if __name__ == "__main__":
     print(
         f"model={info.name} max_context={info.max_context_tokens} "
         f"layers={info.layers} kv_heads={info.kv_heads} head_dim={info.head_dim} "
+        f"hidden={info.hidden_size} attn_heads={info.attention_heads} "
+        f"vocab={info.vocab_size} intermediate={info.intermediate_size} "
+        f"quant={info.quant_bits}bit/g{info.quant_group_size} arch={info.arch or '-'} "
+        f"dtype={info.dtype or '-'} "
         f"kv_bytes/token={info.kv_bytes_per_token} "
         f"kv_bytes@max_context={info.kv_bytes_for_max_context}"
     )

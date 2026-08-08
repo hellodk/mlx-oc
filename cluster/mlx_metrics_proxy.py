@@ -205,17 +205,17 @@ def _setup_otel(endpoint, node_name, service_name="mlx-metrics-proxy", opik_otlp
 REQUESTS = Counter(
     "mlx_requests_total",
     "Chat completion requests served",
-    ["model", "streaming"],
+    ["model", "streaming", "kind"],
 )
 TOKENS_PROMPT = Counter(
     "mlx_tokens_prompt_total",
     "Prompt tokens processed",
-    ["model"],
+    ["model", "kind"],
 )
 TOKENS_COMPLETION = Counter(
     "mlx_tokens_completion_total",
     "Completion tokens generated",
-    ["model"],
+    ["model", "kind"],
 )
 TTFT = Histogram(
     "mlx_ttft_seconds",
@@ -238,24 +238,24 @@ TOKEN_RATE = Histogram(
 TOOL_CALLS = Counter(
     "mlx_tool_calls_total",
     "Function calls requested by the model",
-    ["model"],
+    ["model", "kind"],
 )
 FINISH_REASON = Counter(
     "mlx_finish_reason_total",
     "Completions by finish_reason (stop/length/tool_calls/...). A rising "
     "'length' share means responses are getting truncated before finishing "
     "their thought - a first-order quality signal for agentic/coding use.",
-    ["model", "reason"],
+    ["model", "reason", "kind"],
 )
 TEMPERATURE = Gauge(
     "mlx_temperature",
     "Sampling temperature used for the most recent request",
-    ["model"],
+    ["model", "kind"],
 )
 RISK = Gauge(
     "mlx_hallucination_risk",
     "Composite heuristic hallucination risk (0..1) for the most recent request",
-    ["model"],
+    ["model", "kind"],
 )
 RISK_HIST = Histogram(
     "mlx_hallucination_risk_histogram",
@@ -288,7 +288,7 @@ IN_FLIGHT = Gauge(
 ERRORS = Counter(
     "mlx_error_total",
     "Requests by HTTP status class (4xx/5xx)",
-    ["model", "status"],
+    ["model", "status", "kind"],
 )
 CONTEXT_MAX = Gauge(
     "mlx_context_length_max_tokens",
@@ -309,6 +309,20 @@ KV_BYTES_PER_TOKEN = Gauge(
     "mlx_kv_bytes_per_token",
     "Approximate KV cache bytes per token (fp16, from model dims)",
     ["model"],
+)
+MODEL_INFO = Gauge(
+    "mlx_model_info",
+    "Static model configuration attributes (layers, heads, dims, "
+    "quantization). attr values: layer_count, kv_heads, head_dim, "
+    "hidden_size, attention_heads, vocab_size, intermediate_size, "
+    "quant_bits, quant_group_size.",
+    ["model", "attr"],
+)
+MODEL_ARCH = Gauge(
+    "mlx_model_arch",
+    "Model architecture info. Value is always 1; the arch/dtype live in the "
+    "labels so Grafana can render them as text.",
+    ["model", "arch", "dtype"],
 )
 
 # -- token-level confidence (only set when logprobs were available) ---------
@@ -826,6 +840,7 @@ class Proxy(BaseHTTPRequestHandler):
         # logprob scoring plan for this request
         lp_source = ""      # "client" | "injected" | "destreamed" | ""
         synth_sse = False   # client asked to stream, upstream will not
+        kind = "chat"       # "chat" | "reasoning" (from enable_thinking)
         if self.command == "POST" and req_path.endswith("/v1/chat/completions"):
             try:
                 req = json.loads(body or b"{}")
@@ -834,6 +849,8 @@ class Proxy(BaseHTTPRequestHandler):
                 temperature = req.get("temperature", self.default_temp)
                 tools_provided = bool(req.get("tools"))
                 messages = req.get("messages") or []
+                if bool(req.get("enable_thinking", False)):
+                    kind = "reasoning"
 
                 if req.get("logprobs"):
                     # The caller wants them: leave the request alone and read
@@ -915,6 +932,7 @@ class Proxy(BaseHTTPRequestHandler):
                     "url.path": req_path,
                     "mlx.model": model,
                     "mlx.streaming": streaming,
+                    "mlx.kind": kind,
                     "mlx.temperature": temperature,
                 },
             )
@@ -956,7 +974,7 @@ class Proxy(BaseHTTPRequestHandler):
 
             status = resp.status
             if status >= 400:
-                ERRORS.labels(model, f"{status // 100}xx").inc()
+                ERRORS.labels(model, f"{status // 100}xx", kind).inc()
             resp_headers = []
             for k, v in resp.getheaders():
                 if k.lower() in ("transfer-encoding", "connection", "keep-alive"):
@@ -1048,8 +1066,8 @@ class Proxy(BaseHTTPRequestHandler):
                     len(str(m.get("content", "")).split()) for m in messages
                 )
                 comp_tokens = len(content.split())
-            TOKENS_PROMPT.labels(model).inc(prompt_tokens)
-            TOKENS_COMPLETION.labels(model).inc(comp_tokens)
+            TOKENS_PROMPT.labels(model, kind).inc(prompt_tokens)
+            TOKENS_COMPLETION.labels(model, kind).inc(comp_tokens)
 
             context_used = prompt_tokens + comp_tokens
             CONTEXT_USED.labels(model=model).set(context_used)
@@ -1071,13 +1089,13 @@ class Proxy(BaseHTTPRequestHandler):
             if comp_tokens > 0 and gen_time > 0:
                 TOKEN_RATE.labels(model).observe(comp_tokens / gen_time)
 
-            REQUESTS.labels(model, "true" if streaming else "false").inc()
-            FINISH_REASON.labels(model, finish_reason or "unknown").inc()
-            TOOL_CALLS.labels(model).inc(tool_calls)
-            TEMPERATURE.labels(model).set(temperature)
+            REQUESTS.labels(model, "true" if streaming else "false", kind).inc()
+            FINISH_REASON.labels(model, finish_reason or "unknown", kind).inc()
+            TOOL_CALLS.labels(model, kind).inc(tool_calls)
+            TEMPERATURE.labels(model, kind).set(temperature)
 
             risk, flagged = composite_risk(model, content, tools_provided, tool_calls)
-            RISK.labels(model).set(risk)
+            RISK.labels(model, kind).set(risk)
             RISK_HIST.labels(model).observe(risk)
             if flagged:
                 FLAGS.labels(model).inc()
@@ -1254,7 +1272,7 @@ class Proxy(BaseHTTPRequestHandler):
 
         except (socket.error, http.client.HTTPException, ConnectionRefusedError) as exc:
             UPSTREAM_UP.set(0)
-            ERRORS.labels(model, "5xx").inc()
+            ERRORS.labels(model, "5xx", kind).inc()
             if span is not None:
                 span.set_attribute("error.type", type(exc).__name__)
                 span.set_attribute("http.response.status_code", 503)
@@ -1447,8 +1465,26 @@ def main():
             _CTX_MAX_TOKENS = info.max_context_tokens
             CONTEXT_MAX.labels(model=MODEL_DEFAULT).set(info.max_context_tokens)
             KV_BYTES_PER_TOKEN.labels(model=MODEL_DEFAULT).set(info.kv_bytes_per_token)
+            for attr, val in (
+                ("layer_count", info.layers),
+                ("kv_heads", info.kv_heads),
+                ("head_dim", info.head_dim),
+                ("hidden_size", info.hidden_size),
+                ("attention_heads", info.attention_heads),
+                ("vocab_size", info.vocab_size),
+                ("intermediate_size", info.intermediate_size),
+                ("quant_bits", info.quant_bits),
+                ("quant_group_size", info.quant_group_size),
+            ):
+                MODEL_INFO.labels(model=MODEL_DEFAULT, attr=attr).set(val)
+            if info.arch or info.dtype:
+                MODEL_ARCH.labels(
+                    model=MODEL_DEFAULT, arch=info.arch or "unknown",
+                    dtype=info.dtype or "unknown",
+                ).set(1)
             print(
-                f"[proxy] model ctx={info.max_context_tokens} kv={info.kv_bytes_per_token} B/tok",
+                f"[proxy] model ctx={info.max_context_tokens} kv={info.kv_bytes_per_token} B/tok "
+                f"layers={info.layers} hidden={info.hidden_size}",
                 flush=True,
             )
     except Exception as exc:

@@ -104,12 +104,12 @@
   <div class="wrap">
     <span class="kicker">19 of 19 &middot; the atlas</span>
     <h1>Every Signal, One Map: Telemetry and Test Tooling in Tables</h1>
-    <p class="sub">This stack generates a lot of artifacts &mdash; 34 metric families on the proxy alone, another 40-odd on four exporters, spans, log streams, feedback scores, and alerts. And it is tested with four different rigs. This post is the reference map: <em>what</em> is generated, <em>where</em> each thing goes, and <em>how</em> the load and unit tests run. Each section is a tab.</p>
+    <p class="sub">This stack generates a lot of artifacts &mdash; 36 metric families on the proxy alone, another 40-odd on four exporters, spans, log streams, feedback scores, and alerts. And it is tested with four different rigs. This post is the reference map: <em>what</em> is generated, <em>where</em> each thing goes, and <em>how</em> the load and unit tests run. Each section is a tab.</p>
     <div class="meta">
       <span><b>Exporters</b> 5 (Prometheus)</span>
       <span><b>OTLP pushes</b> 3</span>
       <span><b>Opik scores</b> 3 + 3 judge</span>
-      <span><b>Alerts</b> 41</span>
+      <span><b>Alerts</b> 46</span>
       <span><b>Test rigs</b> 4 + 40 unit tests</span>
     </div>
   </div>
@@ -134,7 +134,7 @@
   <p>Every <code>mlx_*</code> metric is served as a Prometheus text endpoint and <b>scraped</b> by VictoriaMetrics every 10&nbsp;s &mdash; nothing is pushed over OTLP. That split was an explicit audit decision (post&nbsp;4): the OTLP metrics path was removed from the proxy so each series exists exactly once.</p>
   <table>
     <tr><th>Exporter</th><th>Port</th><th>What it reports (families)</th><th>Scraped at</th></tr>
-    <tr><td><code>mlx_metrics_proxy.py</code> (the inference front door)</td><td><code>:8080</code></td><td>34 <code>mlx_*</code> families &mdash; volume (<code>mlx_requests_total</code>, tokens), latency (<code>mlx_ttft_seconds</code>, <code>mlx_generation_seconds</code>, <code>mlx_token_rate_*</code> histograms), tool calls, finish reasons, temperature, hallucination heuristics (<code>mlx_hallucination_risk</code>, <code>mlx_heuristic_*</code>), context/KV gauges, and the confidence set (<code>mlx_output_perplexity</code>, <code>mlx_token_entropy_nats</code>, <code>mlx_token_confidence_*</code>, <code>mlx_token_margin_mean</code>, <code>mlx_low_confidence_*</code>, <code>mlx_confidence_scored_total{source}</code>)</td><td><code>192.168.1.64:8080</code></td></tr>
+    <tr><td><code>mlx_metrics_proxy.py</code> (the inference front door)</td><td><code>:8080</code></td><td>36 <code>mlx_*</code> families &mdash; volume (<code>mlx_requests_total</code>, tokens), latency (<code>mlx_ttft_seconds</code>, <code>mlx_generation_seconds</code>, <code>mlx_token_rate_*</code> histograms), tool calls, finish reasons, temperature, hallucination heuristics (<code>mlx_hallucination_risk</code>, <code>mlx_heuristic_*</code>), context/KV gauges, model info (<code>mlx_model_info{attr}</code>, <code>mlx_model_arch</code>), and the confidence set (<code>mlx_output_perplexity</code>, <code>mlx_token_entropy_nats</code>, <code>mlx_token_confidence_*</code>, <code>mlx_token_margin_mean</code>, <code>mlx_low_confidence_*</code>, <code>mlx_confidence_scored_total{source}</code>); volume/errors/tokens/calls/finish/temperature/risk carry a <code>kind</code> label (<code>reasoning</code> when <code>enable_thinking</code> is set, else <code>chat</code>)</td><td><code>192.168.1.64:8080</code></td></tr>
     <tr><td><code>mlx_hw_telemetry.py</code> (both nodes)</td><td><code>:9102</code></td><td>24 gauges &mdash; CPU/mem/disk/temp, GPU util/freq/power/mem, ANE &amp; package power, thermal, per-worker CPU/RSS</td><td><code>192.168.1.64:9102</code> (rank0), <code>10.0.0.2:9102</code> (rank1, over Ethernet)</td></tr>
     <tr><td><code>mlx_kv_cache_agent.py</code></td><td><code>:9104</code></td><td><code>mlx_kv_cache_sequences/bytes{type}</code>, <code>mlx_kv_cache_utilization</code>, <code>mlx_context_*</code>, <code>mlx_kv_bytes_per_token</code>, <code>mlx_kv_est_bytes_max_context</code></td><td><code>192.168.1.64:9104</code></td></tr>
     <tr><td><code>mlx_server_supervisor.py</code></td><td><code>:9105</code></td><td>Serving truth &mdash; <code>mlx_server_state/up/ready</code>, <code>mlx_model_loaded</code>, <code>mlx_server_restarts_total</code>, <code>mlx_server_crashes_total{reason}</code>, <code>mlx_server_uptime_seconds</code>, <code>mlx_server_health_checks_total{result}</code></td><td><code>192.168.1.64:9105</code></td></tr>
@@ -142,17 +142,18 @@
   </table>
   <div class="callout info"><span class="ic">&#9432;</span><span>VM runs on this Mac (<code>victoria-metrics:8428</code> in compose). The rank1 scrape target was repointed to <code>10.0.0.2:9102</code> so node B is reachable over the direct Ethernet link even when the Wi-Fi segments are split.</span></div>
   <h3>The proxy family detail</h3>
-  <p>The full 34-family set on <code>:8080/metrics</code> (labels in parentheses):</p>
+  <p>The full 36-family set on <code>:8080/metrics</code> (labels in parentheses):</p>
   <table>
     <tr><th>Metric</th><th>Type</th><th>Meaning</th></tr>
-    <tr><td><code>mlx_requests_total</code> <span class="pill p2">model, streaming</span></td><td>Counter</td><td>Completion requests</td></tr>
-    <tr><td><code>mlx_tokens_prompt_total</code> / <code>mlx_tokens_completion_total</code></td><td>Counter</td><td>Token volume</td></tr>
+    <tr><td><code>mlx_requests_total</code> <span class="pill p2">model, streaming, kind</span></td><td>Counter</td><td>Completion requests (<code>kind</code> = <code>reasoning</code> when the caller sets <code>enable_thinking</code>, else <code>chat</code>)</td></tr>
+    <tr><td><code>mlx_tokens_prompt_total</code> / <code>mlx_tokens_completion_total</code> <span class="pill p2">kind</span></td><td>Counter</td><td>Token volume by call kind</td></tr>
     <tr><td><code>mlx_ttft_seconds</code>, <code>mlx_generation_seconds</code>, <code>mlx_token_rate_tokens_per_second</code></td><td>Histogram</td><td>Latency + throughput</td></tr>
-    <tr><td><code>mlx_tool_calls_total</code>, <code>mlx_finish_reason_total{reason}</code></td><td>Counter</td><td>Agentic behaviour</td></tr>
-    <tr><td><code>mlx_temperature</code>, <code>mlx_hallucination_risk</code>, <code>mlx_hallucination_risk_histogram</code>, <code>mlx_hallucination_flag_total</code></td><td>Gauge/Hist/Counter</td><td>Sampling + text heuristics</td></tr>
+    <tr><td><code>mlx_tool_calls_total</code> <span class="pill p2">kind</span>, <code>mlx_finish_reason_total{reason, kind}</code></td><td>Counter</td><td>Agentic behaviour by call kind</td></tr>
+    <tr><td><code>mlx_temperature</code> <span class="pill p2">kind</span>, <code>mlx_hallucination_risk</code> <span class="pill p2">kind</span>, <code>mlx_hallucination_risk_histogram</code>, <code>mlx_hallucination_flag_total</code></td><td>Gauge/Hist/Counter</td><td>Sampling + text heuristics</td></tr>
     <tr><td><code>mlx_heuristic_repetition/_refusal/_hedging/_ungrounded</code></td><td>Gauge</td><td>Individual heuristic scores</td></tr>
-    <tr><td><code>mlx_up</code>, <code>mlx_in_flight</code>, <code>mlx_error_total{status}</code></td><td>Gauge/Counter</td><td>Liveness + errors</td></tr>
+    <tr><td><code>mlx_up</code>, <code>mlx_in_flight</code>, <code>mlx_error_total{status, kind}</code></td><td>Gauge/Counter</td><td>Liveness + errors by status class and call kind</td></tr>
     <tr><td><code>mlx_context_length_max_tokens</code>, <code>mlx_context_used_tokens</code>, <code>mlx_context_utilization</code>, <code>mlx_kv_bytes_per_token</code></td><td>Gauge</td><td>Context window + KV cache footprint</td></tr>
+    <tr><td><code>mlx_model_info{attr}</code>, <code>mlx_model_arch{arch, dtype}</code></td><td>Gauge</td><td>Static architecture facts from <code>config.json</code>: layers, KV heads, head dim, hidden size, attention heads, vocab, FFN intermediate, quant bits/group size (feeds the MLX Model dashboard)</td></tr>
     <tr><td><code>mlx_output_perplexity</code> <span class="pill p2">+histogram</span>, <code>mlx_token_entropy_nats</code> <span class="pill p2">+histogram</span></td><td>Gauge</td><td>Sampler-flatness signals</td></tr>
     <tr><td><code>mlx_token_confidence_mean/_min/_std</code>, <code>mlx_token_margin_mean</code>, <code>mlx_low_confidence_token_ratio</code></td><td>Gauge</td><td>Token confidence (post&nbsp;18)</td></tr>
     <tr><td><code>mlx_confidence_scored_total{source}</code>, <code>mlx_low_confidence_response_total</code></td><td>Counter</td><td>Scoring coverage + low-confidence responses</td></tr>
@@ -213,13 +214,13 @@
 
 <!-- ============================ ALERTS & DASHBOARDS ============================ -->
 <section id="alerts" class="tabpane">
-  <h2><span class="num">4</span>Alerts &amp; Dashboards: 41 rules to a webhook, five dashboards to Grafana</h2>
+  <h2><span class="num">4</span>Alerts &amp; Dashboards: 46 rules to a webhook, nine dashboards to Grafana</h2>
   <table>
     <tr><th>Stage</th><th>Component</th><th>How</th></tr>
-    <tr><td>Rules</td><td>vmalert (<code>:8880</code>)</td><td>41 rules in 5 groups &mdash; <code>mlx-hardware</code> (15), <code>mlx-serving</code> (8), <code>mlx-inference</code> (7), <code>mlx-quality</code> (6), <code>mlx-confidence</code> (5, post&nbsp;18)</td></tr>
+    <tr><td>Rules</td><td>vmalert (<code>:8880</code>)</td><td>46 rules in 6 groups &mdash; <code>mlx-hardware</code> (15), <code>mlx-serving</code> (8), <code>mlx-inference</code> (7), <code>mlx-quality</code> (6), <code>mlx-confidence</code> (5, post&nbsp;18), <code>mlx-slo</code> (5: burn-rate + budget alerts for the SLOs on the SRE dashboard)</td></tr>
     <tr><td>Evaluation</td><td>vmalert &rarr; VM</td><td>queries <code>victoria-metrics:8428</code>, writes <code>ALERTS</code> series back via remote-write</td></tr>
     <tr><td>Routing</td><td>Alertmanager (<code>:9093</code>)</td><td><code>critical</code> &rarr; <code>host.containers.internal:9000/hooks/oncall</code>; everything else &rarr; <code>.../hooks/alert</code>; inhibit rules (e.g. ProxyDown silences UpstreamDown)</td></tr>
-    <tr><td>Dashboards</td><td>Grafana (<code>:3000</code>)</td><td>5 provisioned: MLX Cluster (49 panels), MLX Performance (29), MLX GPU &amp; Power (17), MLX Node (33), MLX Alerts &amp; Serving Health (28); datasource <code>victoria-metrics:8428</code></td></tr>
+    <tr><td>Dashboards</td><td>Grafana (<code>:3000</code>)</td><td>9 provisioned: MLX Cluster (49 panels), MLX Performance (29), MLX GPU &amp; Power (17), MLX Node (33), MLX Alerts &amp; Serving Health (28), + MLX SRE (SLI/SLA/SLO/error budget), MLX HTTP Requests, MLX Call Types (reasoning vs chat), MLX Model (architecture dims); datasource <code>victoria-metrics:8428</code></td></tr>
   </table>
   <div class="callout ok"><span class="ic">&#10003;</span><span>Every confidence alert is gated on <code>mlx_confidence_scored_total &gt; 0</code>, and <code>MLXConfidenceScoringStopped</code> fires when traffic flows but nothing is scored &mdash; so &ldquo;blind&rdquo; and &ldquo;healthy&rdquo; never look identical (post&nbsp;18).</span></div>
 </section>
@@ -279,7 +280,7 @@
       <g font-family="inherit">
         <rect class="dbox" x="20" y="28" width="250" height="42"/>
         <text class="bigname" x="30" y="45">mlx_metrics_proxy</text>
-        <text class="label" x="30" y="61">34 mlx_* families &middot; hallucination + confidence</text>
+        <text class="label" x="30" y="61">36 mlx_* families &middot; hallucination + confidence</text>
         <rect class="portbadge" x="225" y="34" width="36" height="16" rx="8"/><text class="porttext" x="231" y="46">8080</text>
 
         <rect class="dbox" x="20" y="88" width="250" height="42"/>
@@ -417,7 +418,7 @@
   </div>
 
   <div class="diagram">
-    <div class="cap">Alerts &amp; dashboards &mdash; 41 rules to a webhook, five dashboards to Grafana</div>
+    <div class="cap">Alerts &amp; dashboards &mdash; 46 rules to a webhook, nine dashboards to Grafana</div>
     <svg viewBox="0 0 760 300" role="img" aria-label="Alert and dashboard flow">
       <defs>
         <marker id="ar4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#818cf8"/></marker>
@@ -425,7 +426,7 @@
       <g font-family="inherit">
         <rect class="dbox" x="20" y="25" width="200" height="44"/>
         <text class="bigname" x="30" y="43">Grafana</text>
-        <text class="label" x="30" y="59">5 dashboards &middot; 156 panels</text>
+        <text class="label" x="30" y="59">9 dashboards &middot; 236 panels</text>
         <rect class="portbadge" x="176" y="33" width="36" height="16" rx="8"/><text class="porttext" x="182" y="45">3000</text>
 
         <rect class="dbox" x="300" y="100" width="190" height="50" stroke="#0f766e"/>
@@ -435,7 +436,7 @@
 
         <rect class="dbox" x="20" y="185" width="200" height="44"/>
         <text class="bigname" x="30" y="203">vmalert</text>
-        <text class="label" x="30" y="219">41 rules &middot; 5 groups</text>
+        <text class="label" x="30" y="219">46 rules &middot; 6 groups</text>
         <rect class="portbadge" x="176" y="193" width="36" height="16" rx="8"/><text class="porttext" x="182" y="205">8880</text>
 
         <rect class="dbox" x="520" y="185" width="215" height="44"/>
@@ -476,15 +477,15 @@
     <tr><td><code>cluster/cluster.env</code></td><td>Single source of truth for the model + knobs</td><td><code>MLX_MODEL=mlx-community/Qwen3.5-4B-MLX-8bit</code>, <code>MLX_DEFAULT_TEMP=0.0</code>, <code>MLX_LOGPROBS=3</code>, <code>MLX_LOGPROBS_STREAM_SAMPLE=0.05</code>, <code>MLX_LOW_CONFIDENCE=0.5</code></td></tr>
     <tr><td><code>cluster/start_server.sh</code></td><td>Start/stop/status; wires flags + endpoints</td><td>Ports <code>:8081</code> server, <code>:8080</code> proxy, <code>:9102/9104/9105/9106</code> agents; <code>OTLP=192.168.1.64:4318</code>, <code>OPIK_OTLP=192.168.1.10:32173/api/v1/private/otel</code>, <code>RANK1=10.0.0.2</code> (Ethernet)</td></tr>
     <tr><td><code>cluster/hosts.json</code></td><td>Ring hostfile</td><td>rank0 <code>ssh 127.0.0.1</code> / <code>ips 10.0.0.1</code>; rank1 <code>ssh 10.0.0.2</code> / <code>ips 10.0.0.2</code></td></tr>
-    <tr><td><code>cluster/mlx_metrics_proxy.py</code></td><td>Public OpenAI API + metrics + spans + scores</td><td>34 metric families; span attrs; 3 in-band feedback scores; flags <code>--otlp-endpoint</code>/<code>--opik-otlp-endpoint</code>/<code>--opik-endpoint</code>/<code>--logprobs*</code></td></tr>
+    <tr><td><code>cluster/mlx_metrics_proxy.py</code></td><td>Public OpenAI API + metrics + spans + scores</td><td>36 metric families; <code>kind</code> label (reasoning vs chat); span attrs; 3 in-band feedback scores; flags <code>--otlp-endpoint</code>/<code>--opik-otlp-endpoint</code>/<code>--opik-endpoint</code>/<code>--logprobs*</code></td></tr>
     <tr><td><code>cluster/mlx_hw_telemetry.py</code> &middot; <code>mlx_kv_cache_agent.py</code> &middot; <code>mlx_server_supervisor.py</code> &middot; <code>mlx_server_log_tailer.py</code></td><td>Hardware / KV / serving / log exporters</td><td>Ports <code>:9102</code> / <code>:9104</code> / <code>:9105</code> / <code>:9106</code>; log tailer rate-limit 50/s, JSONL attrs</td></tr>
     <tr><td><code>cluster/opik_evaluator.py</code></td><td>LLM-as-judge feedback loop</td><td>judge = proxy <code>127.0.0.1:8080/v1</code>; reads/writes <code>192.168.1.10:32173/api</code></td></tr>
     <tr><td><code>observability/compose.yaml</code></td><td>The observability stack (podman)</td><td>victoria-metrics <code>:8428</code>, grafana <code>:3000</code>, otelcol <code>:4317/:4318</code>, vmalert <code>:8880</code>, alertmanager <code>:9093</code></td></tr>
     <tr><td><code>observability/vm-scrape.yml</code></td><td>Scrape targets (generated from <code>vm-scrape.tmpl.yml</code> by <code>setup.sh</code>)</td><td>interval 10s; proxy/hw/kv/supervisor/logtailer targets; rank1 hw at <code>10.0.0.2:9102</code></td></tr>
     <tr><td><code>observability/otelcol-config.yaml</code></td><td>Collector pipelines</td><td>receivers gRPC <code>:4317</code>/HTTP <code>:4318</code>; logs &rarr; JSONL <code>/var/log/otelcol/mlx-server-logs.jsonl</code> (50&nbsp;MB &times;5); traces &rarr; debug; metrics &rarr; VM remote-write (idle)</td></tr>
-    <tr><td><code>observability/vmalert/rules.yml</code></td><td>41 alert rules / 5 groups</td><td>hardware 15, serving 8, inference 7, quality 6, confidence 5</td></tr>
+    <tr><td><code>observability/vmalert/rules.yml</code></td><td>46 alert rules / 6 groups</td><td>hardware 15, serving 8, inference 7, quality 6, confidence 5, slo 5</td></tr>
     <tr><td><code>observability/alertmanager/alertmanager.yml</code></td><td>Notification routing + inhibit</td><td>critical &rarr; <code>.../hooks/oncall</code>, rest &rarr; <code>.../hooks/alert</code> at <code>host.containers.internal:9000</code></td></tr>
-    <tr><td><code>observability/grafana/dashboards/*.json</code></td><td>5 provisioned dashboards</td><td>datasource <code>victoria-metrics:8428</code></td></tr>
+    <tr><td><code>observability/grafana/dashboards/*.json</code></td><td>9 provisioned dashboards</td><td>datasource <code>victoria-metrics:8428</code>; + SRE / HTTP / Call Types / Model (this post)</td></tr>
     <tr><td><code>tools/bench.py</code> &middot; <code>tools/bench_load.py</code> &middot; <code>tools/bench_agentic.py</code> &middot; <code>tools/smoke.py</code></td><td>Test rigs</td><td>all against proxy <code>:8080/v1</code>; reports &rarr; <code>tools/bench-reports/</code> (git-ignored)</td></tr>
     <tr><td><code>tests/test_confidence.py</code> &middot; <code>tests/test_proxy_rewrite.py</code></td><td>Unit/integration tests</td><td>run: <code>.venv/bin/python -m pytest tests/ -q</code> (40 passing)</td></tr>
     <tr><td><code>tools/opik_dashboards.py</code></td><td>Opik dashboard provisioning</td><td>base <code>192.168.1.10:32173/api</code> (needs the <code>/api</code> suffix)</td></tr>

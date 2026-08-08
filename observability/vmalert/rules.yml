@@ -503,3 +503,109 @@ groups:
         annotations:
           summary: "No completions scored for {{ $labels.model }}"
           description: "Traffic is flowing but nothing has been scored for 30 minutes — MLX_LOGPROBS is 0, MLX_LOGPROBS_STREAM_SAMPLE is 0, or the upstream stopped returning logprobs. The confidence alerts above are blind until this clears."
+
+  - name: mlx-slo
+    interval: 30s
+    rules:
+      # Error-budget alerts for the two SLOs on the MLX SRE dashboard:
+      #   * availability  99.5% over 30d  -> allowed 5xx error budget 0.5%
+      #   * latency       p95 TTFT <= 10s  -> allowed budget for slow starts 5%
+      # Burn rate = observed bad fraction / allowed bad fraction. Fast burn
+      # (14.4x, one error burst that alone would eat the daily budget) is
+      # critical; slow burn (3x) is a warning. Fires only while there is real
+      # traffic so a quiet cluster doesn't page.
+      - alert: MLXSLOAvailabilityFastBurn
+        expr: |
+          (
+            sum(rate(mlx_error_total{status="5xx", job="mlx-proxy"}[1h]))
+            / clamp_min(sum(rate(mlx_requests_total{job="mlx-proxy"}[1h])), 0.0001)
+            / 0.005
+          ) > 14.4
+          and sum(rate(mlx_requests_total{job="mlx-proxy"}[1h])) > 0
+        for: 5m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: slo
+          slo: availability
+        annotations:
+          summary: "Availability SLO (99.5%) fast burn"
+          description: "5xx burn rate is {{ $value | printf \"%.1f\" }}x the allowed 0.5% budget over the last hour. At this pace the 30-day error budget is exhausted in ~1 day."
+
+      - alert: MLXSLOAvailabilitySlowBurn
+        expr: |
+          (
+            sum(rate(mlx_error_total{status="5xx", job="mlx-proxy"}[6h]))
+            / clamp_min(sum(rate(mlx_requests_total{job="mlx-proxy"}[6h])), 0.0001)
+            / 0.005
+          ) > 3
+          and sum(rate(mlx_requests_total{job="mlx-proxy"}[6h])) > 0
+        for: 15m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: slo
+          slo: availability
+        annotations:
+          summary: "Availability SLO (99.5%) slow burn"
+          description: "5xx burn rate is {{ $value | printf \"%.1f\" }}x the allowed 0.5% budget over 6 hours. The 30-day budget is on track to be exhausted early."
+
+      - alert: MLXSLOLatencyFastBurn
+        expr: |
+          (
+            1
+            - clamp_min(
+                sum(rate(mlx_ttft_seconds_bucket{le="10", job="mlx-proxy"}[1h]))
+                / clamp_min(sum(rate(mlx_ttft_seconds_count{job="mlx-proxy"}[1h])), 0.0001),
+                0
+              )
+          ) / 0.05 > 14.4
+          and sum(rate(mlx_requests_total{job="mlx-proxy"}[1h])) > 0
+        for: 5m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: slo
+          slo: latency
+        annotations:
+          summary: "Latency SLO (p95 TTFT <= 10s) fast burn"
+          description: "Share of slow first tokens is {{ $value | printf \"%.1f\" }}x the allowed 5% budget over the last hour. At this pace the 30-day latency budget is exhausted in ~1 day."
+
+      - alert: MLXSLOLatencySlowBurn
+        expr: |
+          (
+            1
+            - clamp_min(
+                sum(rate(mlx_ttft_seconds_bucket{le="10", job="mlx-proxy"}[6h]))
+                / clamp_min(sum(rate(mlx_ttft_seconds_count{job="mlx-proxy"}[6h])), 0.0001),
+                0
+              )
+          ) / 0.05 > 3
+          and sum(rate(mlx_requests_total{job="mlx-proxy"}[6h])) > 0
+        for: 15m
+        labels:
+          severity: warning
+          team: ml-platform
+          category: slo
+          slo: latency
+        annotations:
+          summary: "Latency SLO (p95 TTFT <= 10s) slow burn"
+          description: "Share of slow first tokens is {{ $value | printf \"%.1f\" }}x the allowed 5% budget over 6 hours. The 30-day budget is on track to be exhausted early."
+
+      - alert: MLXErrorBudgetExhausted
+        expr: |
+          (
+            sum(increase(mlx_error_total{status="5xx", job="mlx-proxy"}[30d]))
+            / clamp_min(sum(increase(mlx_requests_total{job="mlx-proxy"}[30d])), 0.0001)
+            / 0.005
+          ) >= 1
+          and sum(increase(mlx_requests_total{job="mlx-proxy"}[30d])) > 0
+        for: 5m
+        labels:
+          severity: critical
+          team: ml-platform
+          category: slo
+          slo: availability
+        annotations:
+          summary: "Availability error budget exhausted for the window"
+          description: "The 30-day 5xx error budget is fully consumed (burn rate {{ $value | printf \"%.2f\" }}). The service missed its 99.5% availability SLO for the current window."

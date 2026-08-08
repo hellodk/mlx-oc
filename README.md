@@ -16,8 +16,8 @@ mlx_metrics_proxy.py :8080 ──► mlx_lm.server :8081 (ring: rank0 + rank1)
 mlx_hw_telemetry.py :9102  per-node CPU / RAM / disk / GPU / power (both nodes)
         │   scraped every 15s
         ▼
-      VictoriaMetrics ──► vmalert :8880 (41 rules) ──► Alertmanager :9093
-                     └──► Grafana :3000 (3 dashboards)
+      VictoriaMetrics ──► vmalert :8880 (46 rules) ──► Alertmanager :9093
+                     └──► Grafana :3000 (9 dashboards)
 ```
 
 ## Stack
@@ -188,7 +188,7 @@ Proxy `/metrics` runtime gauges:
 | `victoria-metrics` | :8428 | TSDB + scraping; Prometheus-compatible API (`/vmui`) |
 | `otel-collector` | :4317 gRPC / :4318 HTTP | OTLP receiver (traces/logs) → debug output |
 | `grafana` | :3000 | dashboards, auto-provisioned (login `admin` / `admin`) |
-| `vmalert` | :8880 | evaluates the 41 alert rules in `observability/vmalert/rules.yml` |
+| `vmalert` | :8880 | evaluates the 46 alert rules in `observability/vmalert/rules.yml` |
 | `alertmanager` | :9093 | dedupes/inhibits alerts, routes to `oncall` + `default` webhooks |
 
 Start it (once — generates `vm-scrape.yml` from the template with your IPs):
@@ -238,7 +238,7 @@ alerts. Every alert is visible in Grafana via the `Alerts` annotation and the
 
 ### Dashboards
 
-Grafana auto-provisions four dashboards from `observability/grafana/dashboards/`:
+Grafana auto-provisions nine dashboards from `observability/grafana/dashboards/`:
 
 * **MLX Cluster** — cluster-wide inference + hardware rows: GPU utilization
   heatmap (RdYlGn, per-node y-buckets), GPU memory used/allocated, CPU / ANE /
@@ -251,8 +251,22 @@ Grafana auto-provisions four dashboards from `observability/grafana/dashboards/`
   utilization (`mlx_kv_cache_agent` :9104), per-request context length and
   utilization (proxy gauges), requests and tokens/min, TTFT and generation
   p50/p95 quantiles, and the hallucination-risk row.
+* **MLX SRE** — the SLI / SLA / SLO / error-budget view: availability
+  (good = non-5xx, SLO 99.5%/30d) and latency (TTFT ≤ 10 s, SLO p95/30d)
+  SLIs, remaining error budget for each, 30d request/error volume, 5xx ratio
+  and TTFT p95 vs target, and availability/latency burn rates.
+* **MLX HTTP Requests** — the raw HTTP view: requests/min by streaming and by
+  call kind, in-flight queue depth, errors by status class and kind, TTFT /
+  generation / token-rate quantiles, tokens in/out and tool-call rate.
+* **MLX Call Types** — reasoning vs chat breakdown (`enable_thinking` in the
+  request body): request mix, stream vs sync, tokens, tool calls, finish
+  reasons, hallucination risk and error ratio per call kind.
+* **MLX Model** — architecture facts from the model's `config.json`
+  (`mlx_model_info{attr=...}`): layers, KV heads, head dim, hidden size,
+  attention heads, vocab, FFN intermediate, quant bits/group size, plus the
+  context-length and KV-cache math and runtime context-utilization.
 
-All four are file-provisioned (no UI drift), readable anonymously for kiosk
+All nine are file-provisioned (no UI drift), readable anonymously for kiosk
 display, and carry the `ALERTS{firing}` annotation.
 
 ![MLX Cluster dashboard](docs/screenshots/mlx-cluster.png)
@@ -483,8 +497,8 @@ observability/compose.yaml      victoria-metrics + otel-collector + grafana + vm
 observability/setup.sh          generate vm-scrape.yml (scrape targets from your IPs)
 observability/otelcol-config.yaml   OTLP traces/logs receiver (metrics are scrape-only)
 observability/vm-scrape.yml     scrape config: mlx-proxy, mlx-hw (x2), mlx-kv, stack self-scrape
-observability/grafana/dashboards/   four provisioned dashboards (incl. mlx-performance.json)
-observability/vmalert/rules.yml 41 alert rules (hardware / inference / quality / confidence / stack down)
+observability/grafana/dashboards/   nine provisioned dashboards (Cluster/Node/GPU&Power/Perf/Alerts + SRE/HTTP/Call Types/Model)
+observability/vmalert/rules.yml 46 alert rules (hardware / inference / quality / confidence / stack down / SLO burn)
 observability/alertmanager/alertmanager.yml   receivers + inhibit_rules
 observability/grafana/          auto-provisioned datasource + 3 dashboards (MLX Cluster / MLX Node / MLX GPU & Power)
 sglang/start_server.sh          launch two independent sglang replicas (experimental, unverified device backend)
