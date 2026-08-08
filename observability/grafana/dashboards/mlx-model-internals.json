@@ -1,0 +1,1600 @@
+{
+ "annotations": {
+  "list": []
+ },
+ "editable": true,
+ "graphTooltip": 0,
+ "id": null,
+ "links": [
+  {
+   "asDropdown": false,
+   "icon": "external link",
+   "tags": [],
+   "targetBlank": false,
+   "tooltip": "",
+   "type": "link",
+   "title": "MLX Cluster",
+   "url": "/d/mlx-cluster"
+  },
+  {
+   "asDropdown": false,
+   "icon": "external link",
+   "tags": [],
+   "targetBlank": false,
+   "tooltip": "",
+   "type": "link",
+   "title": "MLX Model (architecture & runtime)",
+   "url": "/d/mlx-model"
+  },
+  {
+   "asDropdown": false,
+   "icon": "external link",
+   "tags": [],
+   "targetBlank": false,
+   "tooltip": "",
+   "type": "link",
+   "title": "MLX Node",
+   "url": "/d/mlx-node"
+  },
+  {
+   "asDropdown": false,
+   "icon": "external link",
+   "tags": [],
+   "targetBlank": false,
+   "tooltip": "",
+   "type": "link",
+   "title": "MLX GPU Power",
+   "url": "/d/mlx-gpu-power"
+  },
+  {
+   "asDropdown": false,
+   "icon": "external link",
+   "tags": [],
+   "targetBlank": false,
+   "tooltip": "",
+   "type": "link",
+   "title": "MLX Logs & Runtime",
+   "url": "/d/mlx-logs"
+  }
+ ],
+ "liveNow": true,
+ "panels": [
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 0
+   },
+   "id": 9048,
+   "panels": [],
+   "title": "Model facts",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 3,
+    "w": 4,
+    "x": 0,
+    "y": 1
+   },
+   "id": 9015,
+   "targets": [
+    {
+     "expr": "mlx_model_arch{model=~\"$model\"}",
+     "legendFormat": "{{arch}} \u00b7 {{dtype}}",
+     "refId": "A"
+    }
+   ],
+   "title": "Architecture",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 3,
+    "w": 4,
+    "x": 4,
+    "y": 1
+   },
+   "id": 9016,
+   "targets": [
+    {
+     "expr": "mlx_model_info{model=~\"$model\",attr=\"layer_count\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Layers",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 3,
+    "w": 4,
+    "x": 8,
+    "y": 1
+   },
+   "id": 9017,
+   "targets": [
+    {
+     "expr": "mlx_model_info{model=~\"$model\",attr=\"attention_heads\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Attention heads",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 3,
+    "w": 4,
+    "x": 12,
+    "y": 1
+   },
+   "id": 9018,
+   "targets": [
+    {
+     "expr": "mlx_model_info{model=~\"$model\",attr=\"kv_heads\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "KV heads",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 3,
+    "w": 4,
+    "x": 16,
+    "y": 1
+   },
+   "id": 9019,
+   "targets": [
+    {
+     "expr": "mlx_model_info{model=~\"$model\",attr=\"head_dim\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Head dim",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 3,
+    "w": 4,
+    "x": 20,
+    "y": 1
+   },
+   "id": 9020,
+   "targets": [
+    {
+     "expr": "mlx_model_info{model=~\"$model\",attr=\"hidden_size\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Hidden size",
+   "type": "stat"
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 4
+   },
+   "id": 9049,
+   "panels": [],
+   "title": "Linear attention",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 3,
+    "w": 4,
+    "x": 0,
+    "y": 5
+   },
+   "id": 9021,
+   "targets": [
+    {
+     "expr": "mlx_model_info{model=~\"$model\",attr=\"linear_key_heads\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Linear key heads",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 3,
+    "w": 4,
+    "x": 4,
+    "y": 5
+   },
+   "id": 9022,
+   "targets": [
+    {
+     "expr": "mlx_model_info{model=~\"$model\",attr=\"linear_value_heads\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Linear value heads",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 3,
+    "w": 4,
+    "x": 8,
+    "y": 5
+   },
+   "id": 9023,
+   "targets": [
+    {
+     "expr": "mlx_model_info{model=~\"$model\",attr=\"linear_key_head_dim\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Key head dim",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 3,
+    "w": 4,
+    "x": 12,
+    "y": 5
+   },
+   "id": 9024,
+   "targets": [
+    {
+     "expr": "mlx_model_info{model=~\"$model\",attr=\"linear_value_head_dim\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Value head dim",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 3,
+    "w": 4,
+    "x": 16,
+    "y": 5
+   },
+   "id": 9025,
+   "targets": [
+    {
+     "expr": "mlx_model_info{model=~\"$model\",attr=\"linear_conv_kernel_dim\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Conv kernel dim",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 3,
+    "w": 4,
+    "x": 20,
+    "y": 5
+   },
+   "id": 9026,
+   "targets": [
+    {
+     "expr": "mlx_model_info{model=~\"$model\",attr=\"mtp_layers\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "MTP layers",
+   "type": "stat"
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 8
+   },
+   "id": 9050,
+   "panels": [],
+   "title": "Weight footprint",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 3,
+    "w": 6,
+    "x": 0,
+    "y": 9
+   },
+   "id": 9027,
+   "targets": [
+    {
+     "expr": "mlx_model_info{model=~\"$model\",attr=\"quant_bits\"}",
+     "legendFormat": "bit / group {{value}}",
+     "refId": "A"
+    }
+   ],
+   "title": "Quantization",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 3,
+    "w": 6,
+    "x": 6,
+    "y": 9
+   },
+   "id": 9028,
+   "targets": [
+    {
+     "expr": "mlx_model_info{model=~\"$model\",attr=\"quant_group_size\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Quant group size",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 3,
+    "w": 6,
+    "x": 12,
+    "y": 9
+   },
+   "id": 9029,
+   "targets": [
+    {
+     "expr": "mlx_model_info{model=~\"$model\",attr=\"vocab_size\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Vocab size",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 3,
+    "w": 6,
+    "x": 18,
+    "y": 9
+   },
+   "id": 9030,
+   "targets": [
+    {
+     "expr": "mlx_model_info{model=~\"$model\",attr=\"intermediate_size\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Intermediate size",
+   "type": "stat"
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 12
+   },
+   "id": 9051,
+   "panels": [],
+   "title": "Runtime shards (per node)",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "bytes",
+     "custom": {
+      "fillOpacity": 20,
+      "lineWidth": 2,
+      "drawStyle": "line",
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 8,
+    "x": 0,
+    "y": 13
+   },
+   "id": 9031,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum(mlx_worker_rss_bytes) by (node)",
+     "legendFormat": "{{node}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "mlx_lm.server RSS per node",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "bytes",
+     "custom": {
+      "fillOpacity": 20,
+      "lineWidth": 2,
+      "drawStyle": "line",
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 8,
+    "x": 8,
+    "y": 13
+   },
+   "id": 9032,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum(mlx_hw_gpu_mem_used_bytes) by (node)",
+     "legendFormat": "{{node}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "GPU memory used per node",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "percent",
+     "custom": {
+      "fillOpacity": 20,
+      "lineWidth": 2,
+      "drawStyle": "line",
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 8,
+    "x": 16,
+    "y": 13
+   },
+   "id": 9033,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum(mlx_hw_gpu_utilization_percent) by (node)",
+     "legendFormat": "{{node}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "GPU utilization per node",
+   "type": "timeseries"
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 20
+   },
+   "id": 9052,
+   "panels": [],
+   "title": "Ring interconnect",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "Bps",
+     "custom": {
+      "fillOpacity": 20,
+      "lineWidth": 2,
+      "drawStyle": "line",
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 8,
+    "x": 0,
+    "y": 21
+   },
+   "id": 9034,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum(rate(mlx_net_rx_bytes_total[5m])) by (node)",
+     "legendFormat": "{{node}} rx",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Ring RX / TX (bytes/s)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "Bps",
+     "custom": {
+      "fillOpacity": 20,
+      "lineWidth": 2,
+      "drawStyle": "line",
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 8,
+    "x": 8,
+    "y": 21
+   },
+   "id": 9035,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum(rate(mlx_net_tx_bytes_total[5m])) by (node)",
+     "legendFormat": "{{node}} tx",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Ring TX (bytes/s)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "short",
+     "custom": {
+      "fillOpacity": 20,
+      "lineWidth": 2,
+      "drawStyle": "line",
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 8,
+    "x": 16,
+    "y": 21
+   },
+   "id": 9036,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum(rate(mlx_net_rx_errors_total[5m]) + rate(mlx_net_tx_errors_total[5m])) by (node)",
+     "legendFormat": "{{node}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Ring errors / s",
+   "type": "timeseries"
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 28
+   },
+   "id": 9053,
+   "panels": [],
+   "title": "KV cache agent",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "bytes",
+     "custom": {
+      "fillOpacity": 20,
+      "lineWidth": 2,
+      "drawStyle": "line",
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 8,
+    "x": 0,
+    "y": 29
+   },
+   "id": 9037,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum(mlx_kv_cache_bytes) by (type)",
+     "legendFormat": "{{type}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "KV cache bytes by type",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "percentunit"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 4,
+    "x": 8,
+    "y": 29
+   },
+   "id": 9038,
+   "targets": [
+    {
+     "expr": "mlx_kv_cache_utilization",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "KV cache utilization",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "short",
+     "custom": {
+      "fillOpacity": 20,
+      "lineWidth": 2,
+      "drawStyle": "line",
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 8,
+    "x": 12,
+    "y": 29
+   },
+   "id": 9039,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum(mlx_kv_cache_sequences) by (type)",
+     "legendFormat": "{{type}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "KV sequences by type",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "bytes"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 4,
+    "x": 20,
+    "y": 29
+   },
+   "id": 9040,
+   "targets": [
+    {
+     "expr": "mlx_kv_bytes_per_token",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "KV bytes / token",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "bytes"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 4,
+    "x": 0,
+    "y": 33
+   },
+   "id": 9041,
+   "targets": [
+    {
+     "expr": "mlx_kv_est_bytes_max_context",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Est. bytes @ max context",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 4,
+    "x": 4,
+    "y": 33
+   },
+   "id": 9042,
+   "targets": [
+    {
+     "expr": "mlx_kv_cache_max_sequences",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Max sequences",
+   "type": "stat"
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 37
+   },
+   "id": 9054,
+   "panels": [],
+   "title": "Context",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 0,
+    "y": 38
+   },
+   "id": 9043,
+   "targets": [
+    {
+     "expr": "mlx_context_length_max_tokens{model=~\"$model\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Max context tokens",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 6,
+    "y": 38
+   },
+   "id": 9044,
+   "targets": [
+    {
+     "expr": "mlx_context_used_tokens{model=~\"$model\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Context used (last request)",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "percentunit"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 12,
+    "y": 38
+   },
+   "id": 9045,
+   "targets": [
+    {
+     "expr": "mlx_context_utilization{model=~\"$model\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "Context utilization",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "bytes"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 18,
+    "y": 38
+   },
+   "id": 9046,
+   "targets": [
+    {
+     "expr": "mlx_kv_bytes_per_token{model=~\"$model\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "KV bytes / token (model)",
+   "type": "stat"
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 42
+   },
+   "id": 9055,
+   "panels": [],
+   "title": "Parallelism",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "gridPos": {
+    "h": 9,
+    "w": 24,
+    "x": 0,
+    "y": 43
+   },
+   "id": 9047,
+   "options": {
+    "content": "### Tensor-parallel ring sharding\n\nTwo Mac minis run **one distributed model**: `mlx.launch` splits every tensor-parallel dimension across both ranks and synchronizes with ring allreduce over the dedicated 10-GbE link (`10.0.0.1` \u2194 `10.0.0.2`).\n\n* **Attention heads** (16 KV-grouped / 32 linear-value) and the **MLP intermediate** (9216) are split ~50/50 across ranks.\n* **KV cache** lives per-rank (its own sequence/key-value storage) \u2014 the KV agent (`mlx_kv_*`) tracks the pooled view.\n* The **ring carries the allreduce traffic**: watch `mlx_net_*` \u2014 at ~75 MB/s during generation it is the pipeline's third busiest resource after the GPU and the KV cache.\n* **Linear attention** (Qwen3.5) reduces KV pressure: 128-d key/value heads with a 4-tap conv, plus 1 **MTP** layer for multi-token prediction.\n\nWeight shard per rank \u2248 `worker_rss / 2` (fp16) plus quantized intermediate buffers; GPU headroom is `mlx_hw_gpu_mem_alloc_bytes` vs `mlx_hw_gpu_mem_total_bytes`.",
+    "mode": "markdown"
+   },
+   "title": "",
+   "type": "text"
+  }
+ ],
+ "refresh": "1m",
+ "schemaVersion": 39,
+ "tags": [
+  "mlx",
+  "model"
+ ],
+ "templating": {
+  "list": [
+   {
+    "current": {},
+    "definition": "label_values(mlx_model_info, model)",
+    "hide": 0,
+    "includeAll": true,
+    "label": "model",
+    "multi": false,
+    "name": "model",
+    "options": [],
+    "query": {
+     "query": "label_values(mlx_model_info, model)",
+     "refId": "VictoriaMetrics-model-Variable-Query"
+    },
+    "refresh": 2,
+    "regex": "",
+    "skipUrlSync": false,
+    "sort": 1,
+    "type": "query"
+   }
+  ]
+ },
+ "time": {
+  "from": "now-6h",
+  "to": "now"
+ },
+ "timepicker": {},
+ "timezone": "browser",
+ "title": "MLX Model Sharding & Internals",
+ "uid": "mlx-model-internals",
+ "version": 1
+}

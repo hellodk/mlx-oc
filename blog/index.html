@@ -44,6 +44,7 @@
   .n17{background:linear-gradient(135deg,#4f46e5,#0f766e)}
   .n18{background:linear-gradient(135deg,#1a1a3e,#444CE7)}
   .n19{background:linear-gradient(135deg,#334155,#0f766e)}
+  .n20{background:linear-gradient(135deg,#b45309,#4f46e5)}
   .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
   .post p{margin:0;color:var(--muted);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
@@ -214,6 +215,14 @@
       <h2>Every Signal, One Map: Telemetry and Test Tooling in Tables</h2>
       <p>The reference atlas &mdash; tabbed, so each concern gets its own panel. Metrics: five Prometheus exporters scraped by VictoriaMetrics every 10s (36 families on the proxy alone, from TTFT to the post-18 confidence set). Logs: two producers pushing OTLP to one collector and a durable JSONL tail. Traces: one span fanned out to the collector and Opik, with three in-band feedback scores plus a three-score judge loop. Alerts: 46 rules to Alertmanager and webhooks, ten Grafana dashboards (including the new SRE, HTTP, call-type, model and tool-call dashboards). Tests: the four load-test rigs against the proxy, the 40 unit tests behind the stub-upstream rewrite path &mdash; and every file with the configuration value that makes it run.</p>
       <span class="tag">telemetry map</span><span class="tag">tabs</span><span class="tag">metrics</span><span class="tag">logs</span><span class="tag">traces</span><span class="tag">load tests</span><span class="tag">configs</span>
+    </div>
+  </a>
+  <a class="post" href="20-k8s-grafana-data-path.html">
+    <div class="num n20">20</div>
+    <div>
+      <h2>The Same Dashboards, Any Grafana: Shipping mlx-oc Data to the k8s Stack</h2>
+      <p>Three disjoint problems &mdash; metrics into a reachable VictoriaMetrics, dashboards as labeled ConfigMaps, and a matching datasource uid &mdash; and one SVG that shows all of them: the LAN exporters on the two Mac minis, VM as the only shared component, the kiwigrid sidecar that provisions the twelve dashboards from ConfigMaps in the monitoring namespace, and the vmalert &rarr; Alertmanager alert path that stays on the LAN. With the exact scrape config, the apply-dashboards.sh commands, and the six-things-must-be-true checklist.</p>
+      <span class="tag">k8s Grafana</span><span class="tag">sidecar</span><span class="tag">ConfigMap</span><span class="tag">SVG diagram</span><span class="tag">VictoriaMetrics</span>
     </div>
   </a>
 </main>

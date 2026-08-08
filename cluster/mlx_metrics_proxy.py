@@ -311,6 +311,24 @@ KV_BYTES_PER_TOKEN = Gauge(
     "Approximate KV cache bytes per token (fp16, from model dims)",
     ["model"],
 )
+PROMPT_CACHED = Counter(
+    "mlx_prompt_cached_tokens_total",
+    "Prompt tokens served from the prefix cache "
+    "(usage.prompt_tokens_details.cached_tokens), by call kind",
+    ["model", "kind"],
+)
+PROMPT_CACHE_RATIO = Gauge(
+    "mlx_prompt_cache_ratio",
+    "cached_tokens / prompt_tokens for the most recent completion (0..1)",
+    ["model"],
+)
+QUEUE_WAIT = Histogram(
+    "mlx_queue_wait_seconds",
+    "Time a completion request waited before forwarding upstream "
+    "(arrival at the proxy to connection send)",
+    ["model"],
+    buckets=(0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
+)
 MODEL_INFO = Gauge(
     "mlx_model_info",
     "Static model configuration attributes (layers, heads, dims, "
@@ -838,6 +856,7 @@ class Proxy(BaseHTTPRequestHandler):
 
     def _forward(self):
         """Forward the current request to upstream and stream the reply."""
+        t_arrival = time.monotonic()
         length = int(self.headers.get("Content-Length", 0) or 0)
         body = self.rfile.read(length) if length else b""
 
@@ -947,6 +966,8 @@ class Proxy(BaseHTTPRequestHandler):
                 continue
             headers[k] = v
         t_send = time.monotonic()
+        if is_chat:
+            QUEUE_WAIT.labels(model).observe(t_send - t_arrival)
         t_first_token = None
         span = None
         if _OTEL is not None:
@@ -1117,6 +1138,14 @@ class Proxy(BaseHTTPRequestHandler):
                 comp_tokens = len(content.split())
             TOKENS_PROMPT.labels(model, kind).inc(prompt_tokens)
             TOKENS_COMPLETION.labels(model, kind).inc(comp_tokens)
+            if usage:
+                cached = int((usage.get("prompt_tokens_details") or {}).get("cached_tokens", 0))
+                if cached > 0:
+                    PROMPT_CACHED.labels(model, kind).inc(cached)
+                if prompt_tokens > 0:
+                    PROMPT_CACHE_RATIO.labels(model=model).set(
+                        min(1.0, cached / float(prompt_tokens))
+                    )
 
             context_used = prompt_tokens + comp_tokens
             CONTEXT_USED.labels(model=model).set(context_used)
@@ -1531,6 +1560,13 @@ def main():
                 ("intermediate_size", info.intermediate_size),
                 ("quant_bits", info.quant_bits),
                 ("quant_group_size", info.quant_group_size),
+                ("linear_key_heads", info.linear_key_heads),
+                ("linear_value_heads", info.linear_value_heads),
+                ("linear_key_head_dim", info.linear_key_head_dim),
+                ("linear_value_head_dim", info.linear_value_head_dim),
+                ("linear_conv_kernel_dim", info.linear_conv_kernel_dim),
+                ("mtp_layers", info.mtp_layers),
+                ("tie_word_embeddings", int(info.tie_word_embeddings)),
             ):
                 MODEL_INFO.labels(model=MODEL_DEFAULT, attr=attr).set(val)
             if info.arch or info.dtype:

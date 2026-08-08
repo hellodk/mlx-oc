@@ -17,7 +17,7 @@ mlx_hw_telemetry.py :9102  per-node CPU / RAM / disk / GPU / power (both nodes)
         │   scraped every 15s
         ▼
       VictoriaMetrics ──► vmalert :8880 (46 rules) ──► Alertmanager :9093
-                      └──► Grafana :3000 (10 dashboards)
+                      └──► Grafana :3000 (12 dashboards)
 ```
 
 ## Stack
@@ -238,7 +238,8 @@ alerts. Every alert is visible in Grafana via the `Alerts` annotation and the
 
 ### Dashboards
 
-Grafana auto-provisions ten dashboards from `observability/grafana/dashboards/`:
+Grafana auto-provisions twelve dashboards from `observability/grafana/dashboards/`
+(all `refresh: 1m`, `timezone: browser`, with cross-links for drill-down):
 
 * **MLX Cluster** — cluster-wide inference + hardware rows: GPU utilization
   heatmap (RdYlGn, per-node y-buckets), GPU memory used/allocated, CPU / ANE /
@@ -273,9 +274,26 @@ Grafana auto-provisions ten dashboards from `observability/grafana/dashboards/`:
   per call type, a sortable "all tools called" table, and a 30-day share bar.
   The `$tool` dropdown is populated from the label values, so unknown/new
   tools show up the moment they are first called.
+* **MLX Model Sharding & Internals** — the distributed-model deep-dive:
+  architecture facts (incl. the Qwen3.5 linear-attention dims and MTP layers
+  from `mlx_model_info{attr=...}`), per-rank weight/GPU shards, the ring
+  interconnect (the `mlx_net_*` counters on the 10.0.0.0/24 link, ~75 MB/s
+  during generation), KV-cache agent math, context math and a parallel-sharding
+  explainer panel.
+* **MLX Logs & Runtime** — log-tailer pipeline (`mlx_log_tailer_*`): lines/min
+  by severity and category, shipped-to-Opik and dropped-by-reason rates, queue
+  depth, log file size, plus worker CPU/RSS per node and the supervisor state.
 
-All ten are file-provisioned (no UI drift), readable anonymously for kiosk
-display, and carry the `ALERTS{firing}` annotation.
+All twelve are file-provisioned (no UI drift), readable anonymously for kiosk
+display, and carry the `ALERTS{firing}` annotation. New in the HTTP and
+Performance dashboards: finish-reason / temperature / context panels, prompt
+cache-hit ratio and cached-tokens rate (`mlx_prompt_cached_tokens_total` /
+`mlx_prompt_cache_ratio`), proxy queue-wait percentiles
+(`mlx_queue_wait_seconds`), and the token-confidence row
+(`mlx_token_confidence_std`, `mlx_low_confidence_response_total`). The hw
+exporter now also reports per-stack-component CPU%/RSS (`mlx_proc_cpu_percent`
+/ `mlx_proc_rss_bytes`, host processes + podman containers) and the ring
+interconnect counters.
 
 ![MLX Cluster dashboard](docs/screenshots/mlx-cluster.png)
 
@@ -462,6 +480,8 @@ Per-section field notes on the observability layer, with animated pastel SVGs
 16. [Distributed MLX Tuning: The Lever Table, Applied and Measured](blog/16-mlx-distributed-options-tuning.html)
 17. [Opik Custom Dashboards: The mlx Project Gets a Live Health & Quality View](blog/17-opik-dashboards.html)
 18. [The Sampler Doesn't Lie: Entropy, Perplexity and Confidence from Logprobs](blog/18-token-confidence-logprobs.html)
+19. [Every Signal, One Map: Telemetry and Test Tooling in Tables](blog/19-observability-telemetry-and-testing.html)
+20. [The Same Dashboards, Any Grafana: Shipping Data to the k8s Stack](blog/20-k8s-grafana-data-path.html)
 
 ## Known platform quirks
 
@@ -505,7 +525,7 @@ observability/compose.yaml      victoria-metrics + otel-collector + grafana + vm
 observability/setup.sh          generate vm-scrape.yml (scrape targets from your IPs)
 observability/otelcol-config.yaml   OTLP traces/logs receiver (metrics are scrape-only)
 observability/vm-scrape.yml     scrape config: mlx-proxy, mlx-hw (x2), mlx-kv, stack self-scrape
-observability/grafana/dashboards/   ten provisioned dashboards (Cluster/Node/GPU&Power/Perf/Alerts + SRE/HTTP/Call Types/Model/Tools)
+observability/grafana/dashboards/   twelve provisioned dashboards (Cluster/Node/GPU&Power/Perf/Alerts + SRE/HTTP/Call Types/Model/Tools + Sharding & Internals/Logs)
 observability/vmalert/rules.yml 46 alert rules (hardware / inference / quality / confidence / stack down / SLO burn)
 observability/alertmanager/alertmanager.yml   receivers + inhibit_rules
 observability/grafana/          auto-provisioned datasource + 3 dashboards (MLX Cluster / MLX Node / MLX GPU & Power)
