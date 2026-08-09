@@ -1176,7 +1176,7 @@
    "description": "Share of requests scored with logprobs; blind below ~3%."
   }
  ],
- "refresh": "1m",
+ "refresh": "5m",
  "schemaVersion": 39,
  "style": "dark",
  "tags": [
@@ -1214,6 +1214,6 @@
  "timezone": "browser",
  "title": "MLX Model (architecture & runtime)",
  "uid": "mlx-model",
- "version": 1,
+ "version": 2,
  "weekStart": ""
 }

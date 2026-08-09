@@ -1040,7 +1040,7 @@
    "type": "stat"
   }
  ],
- "refresh": "1m",
+ "refresh": "5m",
  "schemaVersion": 39,
  "style": "dark",
  "tags": [
@@ -1078,6 +1078,6 @@
  "timezone": "browser",
  "title": "MLX Call Types (reasoning vs chat)",
  "uid": "mlx-call-types",
- "version": 1,
+ "version": 2,
  "weekStart": ""
 }

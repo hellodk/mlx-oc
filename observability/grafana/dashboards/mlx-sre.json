@@ -986,7 +986,7 @@
    "description": "Total firing vmalert alerts. SLO burn alerts carry label category=\"slo\"."
   }
  ],
- "refresh": "1m",
+ "refresh": "5m",
  "schemaVersion": 39,
  "style": "dark",
  "tags": [
@@ -1005,6 +1005,6 @@
  "timezone": "browser",
  "title": "MLX SRE - SLI / SLA / SLO",
  "uid": "mlx-sre",
- "version": 1,
+ "version": 2,
  "weekStart": ""
 }
