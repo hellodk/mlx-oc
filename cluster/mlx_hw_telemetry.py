@@ -402,7 +402,7 @@ def _mem_usage_bytes(usage):
 
 def _ring_iface():
     """Auto-detect the ring interconnect interface: first iface with an IPv4
-    in 10.0.0.0/24. Returns its name or None."""
+    in 192.168.2.0/24 (Thunderbolt ring). Returns its name or None."""
     try:
         out = subprocess.run(
             ["ifconfig"], capture_output=True, text=True, timeout=3
@@ -413,7 +413,7 @@ def _ring_iface():
             if m:
                 cur = m.group(1)
                 continue
-            m = re.search(r"inet\s+10\.0\.0\.\d+\s", line)
+            m = re.search(r"inet\s+192\.168\.2\.\d+\s", line)
             if m and cur:
                 return cur
     except Exception:
