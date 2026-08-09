@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>21 — LaunchDaemons Keep the Thunderbolt Ring Up: IP + MTU That Survive Link Flaps</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#4f46e5;--accent-soft:#eef0ff;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(79,70,229,.10), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(219,39,119,.09), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #dfe1ff;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:720px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13.5px}
+  th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  .pill{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 9px;margin-right:4px}
+  .p0{background:#fde8f1;color:#9d174d;border:1px solid #fbcfe8}
+  .p1{background:#fef3d7;color:#92400e;border:1px solid #fde68a}
+  .p2{background:#e6f6f4;color:#065f46;border:1px solid #a7f3d0}
+  .diagram{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin:20px 0;overflow:hidden}
+  .diagram .cap{font-size:11.5px;letter-spacing:.10em;text-transform:uppercase;font-weight:700;color:var(--muted);padding:12px 18px;border-bottom:1px solid var(--line);background:#fbfbfe}
+  .diagram svg{display:block;width:100%;height:auto;padding:6px 0}
+  .dbox{fill:#fff;stroke:#c7d2fe;stroke-width:1.5;rx:10}
+  .dbox span,.dbox tspan{fill:#1d1f2b}
+  .dbox .port{fill:#4f46e5}
+  .dflow{fill:none;stroke:#818cf8;stroke-width:2}
+  .dflow.amber{stroke:#d97706}
+  .dflow.green{stroke:#0f766e}
+  .dflow.dash{stroke:#c7cbd9;stroke-dasharray:5 4}
+  .dot{fill:#db2777}
+  .label{font-size:11.5px;fill:#5b6072;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif}
+  .bigname{font-size:12.5px;fill:#1d1f2b;font-weight:700;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif}
+  .portbadge{fill:#eef0ff;stroke:#c7d2fe;stroke-width:1}
+  .porttext{font-size:10px;fill:#4f46e5;font-weight:700;font-family:ui-monospace,Menlo,monospace}
+  footer{border-top:1px solid var(--line);padding:26px 0 48px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="16-mlx-distributed-options-tuning.html">Distributed options</a>
+  <a href="20-k8s-grafana-data-path.html">k8s data path</a>
+  <a href="21-thunderbolt-ring-launchdaemons.html" style="color:var(--accent);font-weight:700">TB4 launchd</a>
+</div></nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">21 of 21 &middot; network plumbing</span>
+    <h1>The Ring Kept Dropping. One LaunchDaemon Fixed It.</h1>
+    <p class="sub">Every Thunderbolt link re-negotiation &mdash; the peer Mac falling asleep, a cable event, an OS network reset &mdash; silently reverted <code>en2</code> to link-local addressing and MTU 1500. Traffic to the peer then leaked out the LAN gateway to a router, and the tensor-parallel ring died. Here is the idempotent LaunchDaemon that re-applies <code>192.168.2.1/.2</code> and the 8000-byte jumbo MTU every 20 seconds, the break-and-restore test that proved it, and why it matters for the numbers behind it.</p>
+    <div class="meta">
+      <span><b>Component</b> <code>com.hydra.tb4</code></span>
+      <span><b>Poll</b> 20s &middot; <code>StartInterval</code></span>
+      <span><b>Scope</b> both Mac minis</span>
+      <span><b>MTU</b> 1500 &rarr; 8000</span>
+      <span><b>Measured</b> +7.6% conc16 throughput</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ============================ THE PROBLEM ============================ -->
+<section>
+  <h2><span class="num">1</span>The symptom: a router answered our rank1 address</h2>
+  <p>The ring runs on 192.168.2.0/16 over a direct Thunderbolt cable. One afternoon the cluster went healthy &rarr; dead while nothing was being touched:</p>
+  <ul>
+    <li><code>ssh 192.168.2.2</code> suddenly said <b>REMOTE HOST IDENTIFICATION HAS CHANGED</b> &mdash; <code>ssh-keyscan</code> returned <code>dropbear_2020.81</code>: an OpenWrt router, not the Mac mini.</li>
+    <li><code>ping 192.168.2.2</code> worked but at <b>12&ndash;25 ms</b>, not the ~0.5 ms the cable gives.</li>
+    <li><code>route -n get 192.168.2.2</code> showed <code>interface: en1, gateway: 192.168.1.254</code> &mdash; the LAN default route had swallowed the Thunderbolt subnet.</li>
+    <li><code>ifconfig en2</code> showed only <code>169.254.x.x</code> (link-local). The manual <code>192.168.2.1</code> was gone.</li>
+  </ul>
+  <p>Diagnosis in one line: <b>the peer Mac slept, the Thunderbolt link re-negotiated, and macOS reverted <code>en2</code> to auto-configuration</b>, dropping the statically-assigned ring address and route. The rank1 IP that was supposed to be one hop across a cable was now being answered by whatever LAN device sat at <code>192.168.2.2</code>.</p>
+
+  <div class="callout warn"><span class="ic">!</span><div>Thunderbolt has <b>no Wake-on-LAN</b>. If a node sleeps, the cable stays dark. Apple&rsquo;s own RDMA-over-Thunderbolt guide explicitly tells you to disable idle sleep on cluster nodes &mdash; but even with sleep off, link events still occur and still reset the interface.</div></div>
+</section>
+
+<!-- ============================ ROOT CAUSE ============================ -->
+<section>
+  <h2><span class="num">2</span>Why a manual <code>ifconfig</code> is not enough</h2>
+  <p>The ring address and MTU were being applied by hand:</p>
+  <pre><code>sudo ifconfig en2 inet 192.168.2.1 netmask 255.255.0.0 alias
+sudo ifconfig en2 mtu 8000</code></pre>
+  <p>That works &mdash; until the next link event. The two classic persistence options each fall short here:</p>
+  <table>
+    <tr><th>Option</th><th>What it does</th><th>Why it&rsquo;s not enough</th></tr>
+    <tr><td><code>networksetup -setmanual</code></td><td>Writes the address into the network service config so it survives reboots.</td><td>Persists across reboots but not across <em>link re-negotiation mid-session</em>, which is exactly when we saw it drop; and the MTU path for Thunderbolt services is fiddly.</td></tr>
+    <tr><td>Manual <code>ifconfig</code></td><td>Applies address + MTU immediately.</td><td>Zero persistence; lost on the first flap.</td></tr>
+  </table>
+  <p>A LaunchDaemon is the intersection: it runs as root on every boot <em>and</em> on a short poll, so a dropped address is restored within seconds &mdash; no matter what caused the drop.</p>
+</section>
+
+<!-- ============================ THE FIX ============================ -->
+<section>
+  <h2><span class="num">3</span>The fix: one idempotent script, one plist</h2>
+  <p>The script only acts when the desired state is missing, so a 20-second poll costs nothing when everything is already correct.</p>
+
+  <h3>3.1 <code>/usr/local/bin/tb4-up.sh</code></h3>
+  <pre><code>#!/bin/zsh
+# tb4-up.sh — persist the Thunderbolt ring addressing + MTU across link flaps.
+#   rank0:  en2 192.168.2.1 255.255.0.0 8000
+#   rank1:  en2 192.168.2.2 255.255.0.0 8000
+IFACE="${1:-en2}"; IP="${2:-192.168.2.1}"; MASK="${3:-255.255.0.0}"; MTU="${4:-8000}"
+LOG=/var/log/tb4-up.log
+now() { /bin/date '+%Y-%m-%dT%H:%M:%S%z'; }
+
+# --- IP alias: add only if not already present ---
+if ! /sbin/ifconfig "$IFACE" 2>/dev/null | /usr/bin/grep -q "inet $IP "; then
+  /sbin/ifconfig "$IFACE" inet "$IP" netmask "$MASK" alias \
+    &amp;&amp; echo "$(now) added $IP/$MASK on $IFACE" &gt;&gt; "$LOG" \
+    || echo "$(now) FAILED to add $IP on $IFACE (link down?)" &gt;&gt; "$LOG"
+fi
+
+# --- MTU: set only if it differs ---
+cur=$(/sbin/ifconfig "$IFACE" 2>/dev/null | /usr/bin/awk '/^[a-zA-Z0-9]+: /{print $4}')
+if [ -n "$cur" ] &amp;&amp; [ "$cur" != "$MTU" ]; then
+  /sbin/ifconfig "$IFACE" mtu "$MTU" \
+    &amp;&amp; echo "$(now) set mtu $MTU on $IFACE (was $cur)" &gt;&gt; "$LOG" \
+    || echo "$(now) FAILED to set mtu $MTU on $IFACE" &gt;&gt; "$LOG"
+fi</code></pre>
+
+  <h3>3.2 <code>/Library/LaunchDaemons/com.hydra.tb4.plist</code></h3>
+  <pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"&gt;
+&lt;plist version="1.0"&gt;
+&lt;dict&gt;
+  &lt;key&gt;Label&lt;/key&gt;         &lt;string&gt;com.hydra.tb4&lt;/string&gt;
+  &lt;key&gt;ProgramArguments&lt;/key&gt;
+  &lt;array&gt;
+    &lt;string&gt;/usr/local/bin/tb4-up.sh&lt;/string&gt;
+    &lt;string&gt;en2&lt;/string&gt;                  &lt;!-- rank1 plist: 192.168.2.2 --&gt;
+    &lt;string&gt;192.168.2.1&lt;/string&gt;
+    &lt;string&gt;255.255.0.0&lt;/string&gt;
+    &lt;string&gt;8000&lt;/string&gt;
+  &lt;/array&gt;
+  &lt;key&gt;RunAtLoad&lt;/key&gt;    &lt;true/&gt;
+  &lt;key&gt;StartInterval&lt;/key&gt;&lt;integer&gt;20&lt;/integer&gt;
+  &lt;key&gt;StandardOutPath&lt;/key&gt;  &lt;string&gt;/var/log/tb4-up.log&lt;/string&gt;
+  &lt;key&gt;StandardErrorPath&lt;/key&gt;  &lt;string&gt;/var/log/tb4-up.log&lt;/string&gt;
+&lt;/dict&gt;
+&lt;/plist&gt;</code></pre>
+
+  <h3>3.3 Install &amp; load (rank0; rank1 uses <code>192.168.2.2</code>)</h3>
+  <pre><code>sudo cp cluster/tb4-up.sh /usr/local/bin/tb4-up.sh
+sudo chmod 755 /usr/local/bin/tb4-up.sh
+sudo cp com.hydra.tb4.plist /Library/LaunchDaemons/com.hydra.tb4.plist
+sudo chown root:wheel /Library/LaunchDaemons/com.hydra.tb4.plist
+sudo chmod 644 /Library/LaunchDaemons/com.hydra.tb4.plist
+sudo launchctl bootstrap system /Library/LaunchDaemons/com.hydra.tb4.plist
+sudo launchctl print system/com.hydra.tb4   # verify state = active</code></pre>
+</section>
+
+<!-- ============================ DIAGRAM ============================ -->
+<section>
+  <h2><span class="num">4</span>The restore loop, one picture</h2>
+  <p>LaunchDaemons run as root, so the script needs no <code>sudo</code>. Every 20 seconds it compares the live interface against the desired state and only writes when they differ.</p>
+  <div class="diagram">
+    <div class="cap">com.hydra.tb4 &middot; poll &rarr; diff &rarr; act &rarr; log &middot; 20s cadence</div>
+    <svg viewBox="0 0 820 300" role="img" aria-label="LaunchDaemon restore loop">
+      <g font-family="inherit">
+        <text class="label" x="18" y="22">launchd (system domain, root)</text>
+        <line x1="20" y1="28" x2="800" y2="28" stroke="#c7cbd9" stroke-width="1" stroke-dasharray="3 3"/>
+
+        <rect class="dbox" x="20" y="48" width="180" height="54"/>
+        <text class="bigname" x="30" y="68">tb4-up.sh</text>
+        <text class="label" x="30" y="84">StartInterval = 20s</text>
+        <text class="label" x="30" y="96">RunAtLoad</text>
+
+        <rect class="dbox" x="300" y="48" width="200" height="54"/>
+        <text class="bigname" x="310" y="68">diff vs desired</text>
+        <text class="label" x="310" y="84">inet 192.168.2.1 present?</text>
+        <text class="label" x="310" y="96">mtu == 8000?</text>
+
+        <rect class="dbox" x="600" y="48" width="200" height="54"/>
+        <text class="bigname" x="610" y="68">ifconfig en2</text>
+        <text class="label" x="610" y="84">add alias / set mtu</text>
+        <text class="label" x="610" y="96">only when state differs</text>
+
+        <path class="dflow" d="M200 75 H300" marker-end="url(#arrow)"/>
+        <path class="dflow" d="M500 75 H600" marker-end="url(#arrow)"/>
+        <path class="dflow green" d="M700 102 V150 H360 V102" marker-end="url(#arrowGreen)"/>
+        <text class="label" x="430" y="182">loop every 20s</text>
+
+        <rect class="dbox" x="20" y="210" width="400" height="60" stroke="#0f766e"/>
+        <text class="bigname" x="30" y="232">en2 (Thunderbolt ring)</text>
+        <text class="label" x="30" y="250">inet 192.168.2.1 + 169.254 link-local</text>
+        <text class="label" x="30" y="262">mtu 8000 &middot; route via en2, ~0.5 ms RTT</text>
+
+        <path class="dflow amber" d="M420 240 H600" marker-end="url(#arrowAmber)"/>
+        <text class="label" x="460" y="232">broken by link flap</text>
+
+        <rect class="dbox" x="20" y="150" width="180" height="46"/>
+        <text class="bigname" x="30" y="168">/var/log/tb4-up.log</text>
+        <text class="label" x="30" y="184">added IP / set mtu</text>
+        <path class="dflow dash" d="M620 102 V180 H200" marker-end="url(#arrow)"/>
+      </g>
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#818cf8"/></marker>
+        <marker id="arrowGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#0f766e"/></marker>
+        <marker id="arrowAmber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#d97706"/></marker>
+      </defs>
+    </svg>
+  </div>
+</section>
+
+<!-- ============================ VERIFICATION ============================ -->
+<section>
+  <h2><span class="num">5</span>Proof: break it, watch it heal</h2>
+  <p>Rather than trusting the config, we deliberately destroyed the state and let the daemon restore it. From the log file, unedited:</p>
+  <pre><code># rank0: removed the IP alias and dropped the MTU to 1500
+$ sudo ifconfig en2 inet 192.168.2.1 -alias &amp;&amp; sudo ifconfig en2 mtu 1500
+$ sleep 25   # one StartInterval + margin
+
+# 25 seconds later — both restored, and the log shows why
+en2: flags=8863&lt;UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST&gt; mtu 8000
+    inet 169.254.164.93 netmask 0xffff0000 broadcast 169.254.255.255
+    inet 192.168.2.1 netmask 0xffff0000 broadcast 192.168.255.255
+
+$ sudo cat /var/log/tb4-up.log
+2026-08-09T19:27:06+0530 added 192.168.2.1/255.255.0.0 on en2
+2026-08-09T19:27:06+0530 set mtu 8000 on en2 (was 1500)
+
+# rank1: same test, MTU only
+2026-08-09T19:28:06+0530 set mtu 8000 on en2 (was 1500)</code></pre>
+  <div class="callout ok"><span class="ic">&#10003;</span><div>Both nodes now self-heal within one 20-second interval. The route to <code>192.168.2.2</code> stays on <code>en2</code>, the LAN router never sees the ring traffic, and <code>hw1</code> telemetry stays green.</div></div>
+</section>
+
+<!-- ============================ WHY MTU 8000 ============================ -->
+<section>
+  <h2><span class="num">6</span>Why the MTU matters at all</h2>
+  <p>The 8000-byte MTU isn&rsquo;t decoration &mdash; it&rsquo;s the jumbo-frame setting from the TB4-vs-Ethernet benchmark. On the same ring, same workload, same day:</p>
+  <table>
+    <tr><th>concurrency</th><th>throughput MTU 1500</th><th>throughput MTU 8000</th><th>&Delta;</th><th>total p50</th></tr>
+    <tr><td>conc8</td><td>29.0 tok/s</td><td>29.7 tok/s</td><td>+2.4%</td><td>20.62 &rarr; 20.17s</td></tr>
+    <tr><td><b>conc16</b></td><td><b>43.2 tok/s</b></td><td><b>46.5 tok/s</b></td><td><b>+7.6%</b></td><td><b>28.43 &rarr; 26.83s</b></td></tr>
+  </table>
+  <p>Jumbo frames help where the ring is bandwidth-bound: fewer packets per all-reduce means less per-packet CPU and fewer interrupts. The gain is small at low concurrency and meaningful at the head of the curve.</p>
+  <div class="callout info"><span class="ic">i</span><div>The physical path MTU is ~8180 bytes, not 9000 &mdash; <code>mtu 9000</code> is accepted by <code>ifconfig</code> but silently drops 9000-byte frames. 8000 is a safe margin below the real ceiling.</div></div>
+</section>
+
+<!-- ============================ GOTCHAS ============================ -->
+<section>
+  <h2><span class="num">7</span>Operational notes and gotchas</h2>
+  <ul>
+    <li><b>Interface identity.</b> The script hardcodes <code>en2</code>. Confirm it matches <code>networksetup -listallhardwareports</code> on each box &mdash; if the cable moves to another Thunderbolt port, the interface (and plist argument) changes.</li>
+    <li><b>Primary vs alias.</b> On rank0 the ring IP is an <em>alias</em> beside the link-local address; the script re-adds it with <code>alias</code>. On rank1 the ring IP is the primary <code>inet</code>; the idempotency check skips it when present, so the same script works on both.</li>
+    <li><b>Wake-on-LAN is a myth on Thunderbolt.</b> The daemon cannot revive a sleeping peer &mdash; it only fixes the local side. Disable idle sleep on cluster nodes, or add wake scheduling.</li>
+    <li><b>Logs.</b> Every action is appended to <code>/var/log/tb4-up.log</code>; failures are logged too (e.g. when the link is genuinely down), which makes forensics trivial.</li>
+    <li><b>Reboot safety.</b> <code>RunAtLoad</code> re-applies the state on boot before the ring comes up, closing the gap the manual setup had.</li>
+  </ul>
+</section>
+
+</main>
+<footer class="wrap">
+  mlx-oc &middot; a two-Mac-mini distributed MLX inference cluster with full observability &middot; <a href="../README.md">repo README</a> &middot; next: <a href="20-k8s-grafana-data-path.html">the k8s Grafana bridge</a>
+</footer>
+</body>
+</html>

@@ -1866,7 +1866,7 @@
    "type": "stat"
   }
  ],
- "refresh": "1m",
+ "refresh": "5m",
  "schemaVersion": 39,
  "tags": [
   "mlx",
@@ -1883,6 +1883,6 @@
  "timezone": "browser",
  "title": "MLX Alerts & Serving Health",
  "uid": "mlx-alerts",
- "version": 1,
+ "version": 2,
  "weekStart": ""
 }

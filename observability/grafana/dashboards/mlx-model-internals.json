@@ -1557,9 +1557,117 @@
    },
    "title": "",
    "type": "text"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "short",
+     "custom": {
+      "fillOpacity": 20,
+      "lineWidth": 2,
+      "drawStyle": "line",
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 12,
+    "x": 0,
+    "y": 52
+   },
+   "id": 9048,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "sum(mlx_worker_cpu_percent) by (node)",
+     "legendFormat": "{{node}}",
+     "refId": "A"
+    }
+   ],
+   "title": "Worker CPU % per node",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 12,
+    "x": 12,
+    "y": 52
+   },
+   "id": 9049,
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "orientation": "auto",
+    "showThresholdLabels": false,
+    "showThresholdMarkers": true
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "count(mlx_worker_rss_bytes) by (node)",
+     "legendFormat": "{{node}}",
+     "refId": "A"
+    }
+   ],
+   "title": "Shards (workers) per node",
+   "type": "gauge"
   }
  ],
- "refresh": "1m",
+ "refresh": "5m",
  "schemaVersion": 39,
  "tags": [
   "mlx",
@@ -1596,5 +1704,5 @@
  "timezone": "browser",
  "title": "MLX Model Sharding & Internals",
  "uid": "mlx-model-internals",
- "version": 1
+ "version": 3
 }

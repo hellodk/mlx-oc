@@ -223,7 +223,15 @@
     }
    ],
    "title": "Requests / min (kind)",
-   "type": "timeseries"
+   "type": "timeseries",
+   "links": [
+    {
+     "title": "Drill-down: call types",
+     "url": "/d/mlx-call-types?var-model=${__field.labels.model}",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -387,7 +395,15 @@
     }
    ],
    "title": "Errors / min (status class)",
-   "type": "timeseries"
+   "type": "timeseries",
+   "links": [
+    {
+     "title": "Drill-down: logs",
+     "url": "/d/mlx-logs",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -439,7 +455,15 @@
     }
    ],
    "title": "Errors / min (kind)",
-   "type": "timeseries"
+   "type": "timeseries",
+   "links": [
+    {
+     "title": "Drill-down: logs",
+     "url": "/d/mlx-logs",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -498,7 +522,7 @@
    },
    "targets": [
     {
-     "expr": "100 * sum(rate(mlx_error_total{model=~\"$model\"}[5m])) / clamp_min(sum(rate(mlx_requests_total{model=~\"$model\"}[5m])), 0.0001)",
+     "expr": "100 * sum(rate(mlx_error_total{model=~\"$model\"}[5m])) / clamp_min(sum(rate(mlx_requests_total{model=~\"$model\"}[5m])), 0.0001) or on() vector(0)",
      "legendFormat": "4xx+5xx",
      "refId": "A",
      "datasource": {
@@ -508,7 +532,15 @@
     }
    ],
    "title": "Error ratio %",
-   "type": "timeseries"
+   "type": "timeseries",
+   "links": [
+    {
+     "title": "Drill-down: logs",
+     "url": "/d/mlx-logs",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -656,7 +688,15 @@
    ],
    "title": "Time to first token (p50 / p95 / p99)",
    "type": "timeseries",
-   "description": "Streamed requests only; de-streamed ones are excluded by design."
+   "description": "Streamed requests only; de-streamed ones are excluded by design.",
+   "links": [
+    {
+     "title": "Drill-down: performance",
+     "url": "/d/mlx-performance",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -717,7 +757,15 @@
     }
    ],
    "title": "Generation time (p50 / p95)",
-   "type": "timeseries"
+   "type": "timeseries",
+   "links": [
+    {
+     "title": "Drill-down: performance",
+     "url": "/d/mlx-performance",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -778,7 +826,15 @@
     }
    ],
    "title": "Token rate (p50 / p95)",
-   "type": "timeseries"
+   "type": "timeseries",
+   "links": [
+    {
+     "title": "Drill-down: performance",
+     "url": "/d/mlx-performance",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "collapsed": false,
@@ -955,7 +1011,15 @@
     }
    ],
    "title": "Tool calls / min",
-   "type": "timeseries"
+   "type": "timeseries",
+   "links": [
+    {
+     "title": "Drill-down: tool calls",
+     "url": "/d/mlx-tools?var-model=${__field.labels.model}",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -1007,7 +1071,15 @@
     }
    ],
    "title": "Hallucination flags / min",
-   "type": "timeseries"
+   "type": "timeseries",
+   "links": [
+    {
+     "title": "Drill-down: performance",
+     "url": "/d/mlx-performance",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -1058,6 +1130,14 @@
       "type": "prometheus",
       "uid": "VictoriaMetrics"
      }
+    }
+   ],
+   "links": [
+    {
+     "title": "Drill-down: tool calls",
+     "url": "/d/mlx-tools?var-model=${__field.labels.model}",
+     "targetBlank": false,
+     "type": "link"
     }
    ]
   },
@@ -1474,7 +1554,15 @@
     }
    ],
    "title": "Queue wait (p50 / p95)",
-   "type": "timeseries"
+   "type": "timeseries",
+   "links": [
+    {
+     "title": "Drill-down: performance",
+     "url": "/d/mlx-performance",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -1527,9 +1615,422 @@
    ],
    "title": "Low-confidence responses / min",
    "type": "timeseries"
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 59
+   },
+   "id": 9070,
+   "panels": [],
+   "title": "Distributions & aggregates",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "scaleDistribution": {
+       "type": "linear"
+      }
+     },
+     "unit": "s"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 0,
+    "y": 60
+   },
+   "id": 9071,
+   "options": {
+    "calculate": false,
+    "cellGap": 1,
+    "cellValues": {
+     "unit": "short"
+    },
+    "color": {
+     "exponent": 0.5,
+     "fill": "dark-orange",
+     "mode": "scheme",
+     "reverse": false,
+     "scale": "exponential",
+     "scheme": "RdYlGn",
+     "steps": 64
+    },
+    "dataFormat": "tsbuckets",
+    "exemplars": {
+     "color": "rgba(255,0,255,0.7)"
+    },
+    "legend": {
+     "show": true
+    },
+    "tooltip": {
+     "show": true,
+     "yHistogram": false
+    },
+    "yAxis": {
+     "axisPlacement": "left",
+     "reverse": false
+    }
+   },
+   "pluginVersion": "10.0.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "sum(rate(mlx_ttft_seconds_bucket{model=~\"$model\"}[30m])) by (le)",
+     "legendFormat": "{{le}}",
+     "refId": "A",
+     "format": "time_series"
+    }
+   ],
+   "title": "TTFT distribution",
+   "type": "heatmap"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "scaleDistribution": {
+       "type": "linear"
+      }
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 0,
+    "y": 60
+   },
+   "id": 9072,
+   "options": {
+    "calculate": false,
+    "cellGap": 1,
+    "cellValues": {
+     "unit": "short"
+    },
+    "color": {
+     "exponent": 0.5,
+     "fill": "dark-orange",
+     "mode": "scheme",
+     "reverse": false,
+     "scale": "exponential",
+     "scheme": "RdYlGn",
+     "steps": 64
+    },
+    "dataFormat": "tsbuckets",
+    "exemplars": {
+     "color": "rgba(255,0,255,0.7)"
+    },
+    "legend": {
+     "show": true
+    },
+    "tooltip": {
+     "show": true,
+     "yHistogram": false
+    },
+    "yAxis": {
+     "axisPlacement": "left",
+     "reverse": false
+    }
+   },
+   "pluginVersion": "10.0.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "sum(rate(mlx_token_entropy_histogram_bucket{model=~\"$model\"}[30m])) by (le)",
+     "legendFormat": "{{le}}",
+     "refId": "A",
+     "format": "time_series"
+    }
+   ],
+   "title": "Token entropy distribution",
+   "type": "heatmap"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "scaleDistribution": {
+       "type": "linear"
+      }
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 0,
+    "y": 60
+   },
+   "id": 9073,
+   "options": {
+    "calculate": false,
+    "cellGap": 1,
+    "cellValues": {
+     "unit": "short"
+    },
+    "color": {
+     "exponent": 0.5,
+     "fill": "dark-orange",
+     "mode": "scheme",
+     "reverse": false,
+     "scale": "exponential",
+     "scheme": "RdYlGn",
+     "steps": 64
+    },
+    "dataFormat": "tsbuckets",
+    "exemplars": {
+     "color": "rgba(255,0,255,0.7)"
+    },
+    "legend": {
+     "show": true
+    },
+    "tooltip": {
+     "show": true,
+     "yHistogram": false
+    },
+    "yAxis": {
+     "axisPlacement": "left",
+     "reverse": false
+    }
+   },
+   "pluginVersion": "10.0.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "sum(rate(mlx_hallucination_risk_histogram_bucket{model=~\"$model\"}[30m])) by (le)",
+     "legendFormat": "{{le}}",
+     "refId": "A",
+     "format": "time_series"
+    }
+   ],
+   "title": "Hallucination risk distribution",
+   "type": "heatmap"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "short",
+     "custom": {
+      "fillOpacity": 80,
+      "lineWidth": 1
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 0,
+    "y": 68
+   },
+   "id": 9074,
+   "options": {
+    "orientation": "auto",
+    "showValue": "auto",
+    "legend": {
+     "showLegend": false
+    },
+    "xField": "status",
+    "tooltip": {
+     "mode": "single"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "sort_desc(sum by (status) (increase(mlx_error_total{model=~\"$model\"}[24h])))",
+     "legendFormat": "{{status}}",
+     "refId": "A",
+     "format": "time_series"
+    }
+   ],
+   "title": "Errors by status (24 h)",
+   "type": "barchart",
+   "links": [
+    {
+     "title": "Drill-down: logs",
+     "url": "/d/mlx-logs",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 8,
+    "y": 68
+   },
+   "id": 9075,
+   "options": {
+    "showHeader": true,
+    "sortBy": [
+     {
+      "displayName": "Requests",
+      "desc": true
+     }
+    ]
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "sort_desc(sum by (kind, streaming) (increase(mlx_requests_total{model=~\"$model\"}[$__range])))",
+     "legendFormat": "",
+     "refId": "A",
+     "format": "table",
+     "instant": true
+    }
+   ],
+   "title": "Requests by kind",
+   "type": "table",
+   "links": [
+    {
+     "title": "Drill-down: call types",
+     "url": "/d/mlx-call-types?var-model=${__field.labels.model}",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 5
+       },
+       {
+        "color": "red",
+        "value": 20
+       }
+      ]
+     },
+     "max": 100,
+     "min": 0,
+     "unit": "percent"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 16,
+    "y": 68
+   },
+   "id": 9076,
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "orientation": "auto",
+    "showThresholdLabels": false,
+    "showThresholdMarkers": true
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "100 * sum(rate(mlx_error_total{model=~\"$model\"}[5m])) / clamp_min(sum(rate(mlx_requests_total{model=~\"$model\"}[5m])), 0.0001) or on() vector(0)",
+     "legendFormat": "error ratio",
+     "refId": "A",
+     "format": "time_series"
+    }
+   ],
+   "title": "Error ratio %",
+   "type": "gauge"
   }
  ],
- "refresh": "1m",
+ "refresh": "5m",
  "schemaVersion": 39,
  "style": "dark",
  "tags": [
@@ -1567,6 +2068,6 @@
  "timezone": "browser",
  "title": "MLX HTTP Requests",
  "uid": "mlx-http",
- "version": 1,
+ "version": 4,
  "weekStart": ""
 }

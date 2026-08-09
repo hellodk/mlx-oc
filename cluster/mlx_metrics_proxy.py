@@ -1517,6 +1517,11 @@ def main():
     Proxy.low_conf_threshold = args.low_confidence_threshold
 
     MODEL_DEFAULT = args.model
+    # Seed zero-valued series for counters that only fire on real events, so
+    # the series always exists in VictoriaMetrics and dashboards render 0
+    # instead of "No data" until the first tool call / hallucination flag.
+    TOOL_CALLS.labels(model=MODEL_DEFAULT, kind="", tool="", type="").inc(0)
+    FLAGS.labels(model=MODEL_DEFAULT).inc(0)
     _NODE_NAME = args.node_name
     _OTEL = _setup_otel(
         args.otlp_endpoint, args.node_name, opik_otlp_endpoint=args.opik_otlp_endpoint

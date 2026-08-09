@@ -198,7 +198,15 @@
     }
    ],
    "title": "Worker RSS",
-   "type": "gauge"
+   "type": "gauge",
+   "links": [
+    {
+     "title": "Drill-down: model sharding",
+     "url": "/d/mlx-model-internals",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -323,7 +331,15 @@
     }
    ],
    "title": "GPU utilization",
-   "type": "gauge"
+   "type": "gauge",
+   "links": [
+    {
+     "title": "Drill-down: GPU & power",
+     "url": "/d/mlx-gpu-power?var-node=${__field.labels.node}",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -371,7 +387,15 @@
     }
    ],
    "title": "GPU power",
-   "type": "gauge"
+   "type": "gauge",
+   "links": [
+    {
+     "title": "Drill-down: GPU & power",
+     "url": "/d/mlx-gpu-power?var-node=${__field.labels.node}",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -427,7 +451,15 @@
     }
    ],
    "title": "Package power",
-   "type": "gauge"
+   "type": "gauge",
+   "links": [
+    {
+     "title": "Drill-down: GPU & power",
+     "url": "/d/mlx-gpu-power?var-node=${__field.labels.node}",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -483,7 +515,15 @@
     }
    ],
    "title": "Thermal pressure",
-   "type": "gauge"
+   "type": "gauge",
+   "links": [
+    {
+     "title": "Drill-down: GPU & power",
+     "url": "/d/mlx-gpu-power?var-node=${__field.labels.node}",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -555,7 +595,15 @@
     }
    ],
    "title": "GPU memory used %",
-   "type": "gauge"
+   "type": "gauge",
+   "links": [
+    {
+     "title": "Drill-down: GPU & power",
+     "url": "/d/mlx-gpu-power?var-node=${__field.labels.node}",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -627,7 +675,15 @@
     }
    ],
    "title": "GPU memory used (GiB)",
-   "type": "gauge"
+   "type": "gauge",
+   "links": [
+    {
+     "title": "Drill-down: GPU & power",
+     "url": "/d/mlx-gpu-power?var-node=${__field.labels.node}",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -691,7 +747,15 @@
     }
    ],
    "title": "CPU power",
-   "type": "gauge"
+   "type": "gauge",
+   "links": [
+    {
+     "title": "Drill-down: GPU & power",
+     "url": "/d/mlx-gpu-power?var-node=${__field.labels.node}",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -755,7 +819,15 @@
     }
    ],
    "title": "ANE power",
-   "type": "gauge"
+   "type": "gauge",
+   "links": [
+    {
+     "title": "Drill-down: GPU & power",
+     "url": "/d/mlx-gpu-power?var-node=${__field.labels.node}",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "collapsed": false,
@@ -1040,7 +1112,15 @@
     }
    ],
    "title": "GPU utilization heatmap",
-   "type": "heatmap"
+   "type": "heatmap",
+   "links": [
+    {
+     "title": "Drill-down: GPU & power",
+     "url": "/d/mlx-gpu-power?var-node=${__field.labels.node}",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -1092,7 +1172,15 @@
     }
    ],
    "title": "GPU memory used / alloc",
-   "type": "timeseries"
+   "type": "timeseries",
+   "links": [
+    {
+     "title": "Drill-down: GPU & power",
+     "url": "/d/mlx-gpu-power?var-node=${__field.labels.node}",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -1144,7 +1232,15 @@
     }
    ],
    "title": "CPU & ANE power",
-   "type": "timeseries"
+   "type": "timeseries",
+   "links": [
+    {
+     "title": "Drill-down: GPU & power",
+     "url": "/d/mlx-gpu-power?var-node=${__field.labels.node}",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "collapsed": false,
@@ -1185,7 +1281,15 @@
     }
    ],
    "title": "Requests / min (proxy on rank0)",
-   "type": "timeseries"
+   "type": "timeseries",
+   "links": [
+    {
+     "title": "Drill-down: requests",
+     "url": "/d/mlx-http",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -1219,7 +1323,15 @@
     }
    ],
    "title": "TTFT (p50 / p95)",
-   "type": "timeseries"
+   "type": "timeseries",
+   "links": [
+    {
+     "title": "Drill-down: requests",
+     "url": "/d/mlx-http",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -1253,7 +1365,15 @@
     }
    ],
    "title": "Token rate (p50 / p95)",
-   "type": "timeseries"
+   "type": "timeseries",
+   "links": [
+    {
+     "title": "Drill-down: requests",
+     "url": "/d/mlx-http",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -1293,7 +1413,15 @@
     }
    ],
    "title": "In-flight (proxy)",
-   "type": "stat"
+   "type": "stat",
+   "links": [
+    {
+     "title": "Drill-down: requests",
+     "url": "/d/mlx-http",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -1325,7 +1453,15 @@
     }
    ],
    "title": "Errors / min (proxy)",
-   "type": "timeseries"
+   "type": "timeseries",
+   "links": [
+    {
+     "title": "Drill-down: requests",
+     "url": "/d/mlx-http",
+     "targetBlank": false,
+     "type": "link"
+    }
+   ]
   },
   {
    "datasource": {
@@ -1487,7 +1623,7 @@
    "type": "stat"
   }
  ],
- "refresh": "1m",
+ "refresh": "5m",
  "schemaVersion": 39,
  "tags": [
   "mlx",
@@ -1560,5 +1696,6 @@
    "title": "MLX Logs & Runtime",
    "url": "/d/mlx-logs"
   }
- ]
+ ],
+ "version": 2
 }

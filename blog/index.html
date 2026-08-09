@@ -45,6 +45,7 @@
   .n18{background:linear-gradient(135deg,#1a1a3e,#444CE7)}
   .n19{background:linear-gradient(135deg,#334155,#0f766e)}
   .n20{background:linear-gradient(135deg,#b45309,#4f46e5)}
+  .n21{background:linear-gradient(135deg,#0f766e,#db2777)}
   .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
   .post p{margin:0;color:var(--muted);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
@@ -223,6 +224,14 @@
       <h2>The Same Dashboards, Any Grafana: Shipping mlx-oc Data to the k8s Stack</h2>
       <p>Three disjoint problems &mdash; metrics into a reachable VictoriaMetrics, dashboards as labeled ConfigMaps, and a matching datasource uid &mdash; and one SVG that shows all of them: the LAN exporters on the two Mac minis, VM as the only shared component, the kiwigrid sidecar that provisions the twelve dashboards from ConfigMaps in the monitoring namespace, and the vmalert &rarr; Alertmanager alert path that stays on the LAN. With the exact scrape config, the apply-dashboards.sh commands, and the six-things-must-be-true checklist.</p>
       <span class="tag">k8s Grafana</span><span class="tag">sidecar</span><span class="tag">ConfigMap</span><span class="tag">SVG diagram</span><span class="tag">VictoriaMetrics</span>
+    </div>
+  </a>
+  <a class="post" href="21-thunderbolt-ring-launchdaemons.html">
+    <div class="num n21">21</div>
+    <div>
+      <h2>The Ring Kept Dropping. One LaunchDaemon Fixed It.</h2>
+      <p>Thunderbolt link re-negotiations silently reverted the ring interface to link-local addressing and MTU 1500 &mdash; so traffic to rank1 leaked out the LAN gateway to a router (a 12&ndash;25 ms detour, and an OpenWrt dropbear answering our SSH). An idempotent LaunchDaemon now re-applies <code>192.168.2.1/.2</code> and the 8000-byte jumbo MTU every 20 seconds on both nodes: the full script and plist, the break-and-restore test with unedited logs, and why the MTU is worth persisting (+7.6% conc16 throughput in the TB4-vs-Ethernet benchmark).</p>
+      <span class="tag">LaunchDaemon</span><span class="tag">Thunderbolt</span><span class="tag">MTU</span><span class="tag">jumbo frames</span><span class="tag">self-healing</span>
     </div>
   </a>
 </main>

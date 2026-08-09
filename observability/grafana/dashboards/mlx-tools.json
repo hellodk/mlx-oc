@@ -68,7 +68,7 @@
   }
  ],
  "liveNow": false,
- "refresh": "1m",
+ "refresh": "5m",
  "schemaVersion": 39,
  "style": "dark",
  "tags": [
@@ -77,7 +77,7 @@
  ],
  "title": "MLX Tool Calls",
  "uid": "mlx-tools",
- "version": 1,
+ "version": 2,
  "weekStart": "",
  "time": {
   "from": "now-6h",

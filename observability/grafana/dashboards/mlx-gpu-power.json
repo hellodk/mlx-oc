@@ -20,7 +20,7 @@
   ]
  },
  "editable": true,
- "refresh": "1m",
+ "refresh": "5m",
  "schemaVersion": 39,
  "tags": [
   "mlx",
@@ -55,7 +55,7 @@
  "timezone": "browser",
  "title": "MLX GPU & Power",
  "uid": "mlx-gpu-power",
- "version": 1,
+ "version": 2,
  "panels": [
   {
    "collapsed": false,

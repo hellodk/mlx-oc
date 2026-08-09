@@ -268,6 +268,8 @@ curl -u admin:admin http://&lt;grafana&gt;/api/dashboards/uid/mlx-logs</pre>
     <tr><td>6</td><td>Alerts: 46 rules / 6 groups copied to the k8s vmalert</td><td><code>observability/vmalert/rules.yml</code></td></tr>
   </table>
   <div class="callout ok"><span class="ic">&#10003;</span><span>After 1&ndash;4 the twelve dashboards render in the cluster Grafana with live data; 5&ndash;6 are the optional extras that make the new post-19/20 panels and the alerting story complete.</span></div>
+
+  <div class="callout info"><span class="ic">&#9432;</span><span><b>Compatibility verification (post&nbsp;21):</b> the twelve dashboards use only core Grafana plugins (<code>timeseries</code>, <code>stat</code>, <code>heatmap</code>, <code>barchart</code>, <code>table</code>, <code>gauge</code>, <code>bargauge</code>, <code>text</code>, <code>row</code>) and one fixed datasource uid <code>VictoriaMetrics</code> &mdash; no absolute URLs, no instance-specific values. The same files <code>apply-dashboards.sh</code> pushes to the k8s Grafana render unchanged. Post-21 state: refresh <code>5m</code>, browser timezone, 43 panels with drill-down links, and <code>mlx_tool_calls_total</code> / <code>mlx_hallucination_flag_total</code> seeded at 0 so their panels never show &ldquo;no data&rdquo;.</span></div>
 </section>
 
 </main>
