@@ -13,3 +13,4 @@ graphify-out/
 sglang/logs/*.log
 test-reports/
 .pytest_cache/
+opencode-session

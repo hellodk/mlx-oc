@@ -1,969 +1,1010 @@
 {
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      },
-      {
-        "datasource": {
-          "type": "prometheus",
-          "uid": "VictoriaMetrics"
-        },
-        "enable": true,
-        "expr": "ALERTS{alertstate=\"firing\"}",
-        "hide": false,
-        "iconColor": "#e24d42",
-        "name": "Alerts",
-        "showIn": 0,
-        "step": "60s",
-        "textFormat": "{{labels.node}} {{labels.severity}}",
-        "titleFormat": "ALERT: {{alertname}}",
-        "type": "prometheus"
-      }
-    ]
+ "annotations": {
+  "list": [
+   {
+    "builtIn": 1,
+    "datasource": {
+     "type": "grafana",
+     "uid": "-- Grafana --"
+    },
+    "enable": true,
+    "hide": true,
+    "iconColor": "rgba(0, 211, 255, 1)",
+    "name": "Annotations & Alerts",
+    "type": "dashboard"
+   },
+   {
+    "datasource": {
+     "type": "prometheus",
+     "uid": "VictoriaMetrics"
+    },
+    "enable": true,
+    "expr": "ALERTS{alertstate=\"firing\"}",
+    "hide": false,
+    "iconColor": "#e24d42",
+    "name": "Alerts",
+    "showIn": 0,
+    "step": "60s",
+    "textFormat": "{{labels.node}} {{labels.severity}}",
+    "titleFormat": "ALERT: {{alertname}}",
+    "type": "prometheus"
+   }
+  ]
+ },
+ "editable": true,
+ "fiscalYearStartMonth": 0,
+ "graphTooltip": 1,
+ "id": null,
+ "links": [
+  {
+   "asDropdown": false,
+   "icon": "external link",
+   "tags": [],
+   "targetBlank": false,
+   "tooltip": "",
+   "type": "link",
+   "title": "MLX HTTP Requests",
+   "url": "/d/mlx-http"
   },
-  "editable": true,
-  "fiscalYearStartMonth": 0,
-  "graphTooltip": 1,
-  "id": null,
-  "links": [],
-  "liveNow": false,
-  "panels": [
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": "### SLO contract\n| SLI | Definition | SLO | Window |\n|---|---|---|---|\n| **Availability** | good = requests that are **not 5xx** (4xx client errors excluded) | **99.5%** (allowed 5xx = 0.5%) | 30 d |\n| **Latency** | good = **TTFT \u2264 10 s** | **p95 \u2264 10 s** (allowed slow = 5%) | 30 d |\n\n**SLA (external promise, more generous than the internal SLO):** availability \u2265 99.0% per month, p95 TTFT \u2264 30 s.\n\nError budget = allowed bad fraction \u2212 observed bad fraction over the window. Burn rate = observed / allowed; 1x = budget being spent at break-even.",
-        "x": 0,
-        "y": 0
-      },
-      "id": 200,
-      "options": {
-        "mode": "markdown",
-        "content": 0
-      },
-      "title": "",
-      "type": "text"
+  {
+   "asDropdown": false,
+   "icon": "external link",
+   "tags": [],
+   "targetBlank": false,
+   "tooltip": "",
+   "type": "link",
+   "title": "MLX Alerts",
+   "url": "/d/mlx-alerts"
+  },
+  {
+   "asDropdown": false,
+   "icon": "external link",
+   "tags": [],
+   "targetBlank": false,
+   "tooltip": "",
+   "type": "link",
+   "title": "MLX Performance",
+   "url": "/d/mlx-performance"
+  },
+  {
+   "asDropdown": false,
+   "icon": "external link",
+   "tags": [],
+   "targetBlank": false,
+   "tooltip": "",
+   "type": "link",
+   "title": "MLX Cluster",
+   "url": "/d/mlx-cluster"
+  }
+ ],
+ "liveNow": false,
+ "panels": [
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "gridPos": {
+    "h": 4,
+    "w": "### SLO contract\n| SLI | Definition | SLO | Window |\n|---|---|---|---|\n| **Availability** | good = requests that are **not 5xx** (4xx client errors excluded) | **99.5%** (allowed 5xx = 0.5%) | 30 d |\n| **Latency** | good = **TTFT \u2264 10 s** | **p95 \u2264 10 s** (allowed slow = 5%) | 30 d |\n\n**SLA (external promise, more generous than the internal SLO):** availability \u2265 99.0% per month, p95 TTFT \u2264 30 s.\n\nError budget = allowed bad fraction \u2212 observed bad fraction over the window. Burn rate = observed / allowed; 1x = budget being spent at break-even.",
+    "x": 0,
+    "y": 0
+   },
+   "id": 200,
+   "options": {
+    "mode": "markdown",
+    "content": 0
+   },
+   "title": "",
+   "type": "text"
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 0
+   },
+   "id": 201,
+   "title": "SLO status",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "unit": "percent",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 99.5
+       },
+       {
+        "color": "red",
+        "value": 99.0
+       }
+      ]
+     },
+     "min": 0,
+     "max": 100,
+     "decimals": 1,
+     "description": "good / total over 30 d. 4xx is excluded (client error). Shows 100% when there is no traffic in the window."
     },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 201,
-      "title": "SLO status",
-      "type": "row"
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 6,
+    "x": 0,
+    "y": 6
+   },
+   "id": 202,
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
     },
+    "orientation": "auto",
+    "showThresholdLabels": false,
+    "showThresholdMarkers": true
+   },
+   "targets": [
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 99.5
-              },
-              {
-                "color": "red",
-                "value": 99.0
-              }
-            ]
-          },
-          "min": 0,
-          "max": 100,
-          "decimals": 1,
-          "description": "good / total over 30 d. 4xx is excluded (client error). Shows 100% when there is no traffic in the window."
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 0,
-        "y": 6
-      },
-      "id": 202,
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "expr": "100 * clamp_min(1 - sum(increase(mlx_error_total{status=\"5xx\"}[30d])) / clamp_min(sum(increase(mlx_requests_total[30d])), 1), 0) or on() vector(100)",
-          "legendFormat": "sli",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Availability SLI (30 d)",
-      "type": "gauge",
-      "description": "good / total over 30 d. 4xx is excluded (client error). Shows 100% when there is no traffic in the window."
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 30
-              },
-              {
-                "color": "red",
-                "value": 0
-              }
-            ]
-          },
-          "min": 0,
-          "max": 100,
-          "decimals": 1,
-          "description": "Remaining availability budget over 30 d (SLO 99.5%, allowed 5xx = 0.5%). Red = exhausted."
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 6,
-        "y": 6
-      },
-      "id": 203,
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "expr": "100 * clamp_min(1 - (sum(increase(mlx_error_total{status=\"5xx\"}[30d])) / clamp_min(sum(increase(mlx_requests_total[30d])), 1)) / 0.005, 0) or on() vector(100)",
-          "legendFormat": "sli",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Availability error budget left",
-      "type": "gauge",
-      "description": "Remaining availability budget over 30 d (SLO 99.5%, allowed 5xx = 0.5%). Red = exhausted."
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 95
-              },
-              {
-                "color": "red",
-                "value": 90
-              }
-            ]
-          },
-          "min": 0,
-          "max": 100,
-          "decimals": 1,
-          "description": "Share of first tokens arriving within 10 s over 30 d. SLO target is 95%."
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 12,
-        "y": 6
-      },
-      "id": 204,
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "expr": "100 * clamp_min(sum(increase(mlx_ttft_seconds_bucket{le=\"10\"}[30d])) / clamp_min(sum(increase(mlx_ttft_seconds_count[30d])), 1), 0) or on() vector(100)",
-          "legendFormat": "sli",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Latency SLI (30 d, TTFT<=10s)",
-      "type": "gauge",
-      "description": "Share of first tokens arriving within 10 s over 30 d. SLO target is 95%."
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 30
-              },
-              {
-                "color": "red",
-                "value": 0
-              }
-            ]
-          },
-          "min": 0,
-          "max": 100,
-          "decimals": 1,
-          "description": "Remaining latency budget over 30 d (p95 TTFT <= 10 s, allowed slow = 5%). Red = exhausted."
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 18,
-        "y": 6
-      },
-      "id": 205,
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "auto",
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "expr": "100 * clamp_min(1 - (1 - clamp_min(sum(increase(mlx_ttft_seconds_bucket{le=\"10\"}[30d])) / clamp_min(sum(increase(mlx_ttft_seconds_count[30d])), 1), 0)) / 0.05, 0) or on() vector(100)",
-          "legendFormat": "sli",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Latency error budget left",
-      "type": "gauge",
-      "description": "Remaining latency budget over 30 d (p95 TTFT <= 10 s, allowed slow = 5%). Red = exhausted."
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 220,
-      "title": "Volume basis",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "short",
-          "decimals": 0
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 0,
-        "y": 15
-      },
-      "id": 221,
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "expr": "sum(increase(mlx_requests_total[30d]))",
-          "legendFormat": "{{model}}",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Requests (30 d)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          },
-          "decimals": 0
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 6,
-        "y": 15
-      },
-      "id": 222,
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "expr": "sum(increase(mlx_error_total{status=\"5xx\"}[30d]))",
-          "legendFormat": "{{model}}",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "5xx (30 d)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "short",
-          "decimals": 0
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 12,
-        "y": 15
-      },
-      "id": 223,
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "expr": "sum(increase(mlx_error_total{status=\"4xx\"}[30d]))",
-          "legendFormat": "{{model}}",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "4xx (30 d)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "s",
-          "decimals": 0
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 18,
-        "y": 15
-      },
-      "id": 224,
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "expr": "mlx_server_uptime_seconds",
-          "legendFormat": "{{model}}",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Serving uptime",
-      "type": "stat"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 230,
-      "title": "Trends",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 0.5
-              },
-              {
-                "color": "red",
-                "value": 2
-              }
-            ]
-          },
-          "description": "Allowed 5xx ratio is 0.5% (the SLO budget); the 1h alert fires at a 14.4x burn.",
-          "custom": {
-            "fillOpacity": 0,
-            "lineWidth": 2,
-            "drawStyle": "line",
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 24
-      },
-      "id": 231,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "expr": "100 * sum(rate(mlx_error_total{status=\"5xx\"}[5m])) / clamp_min(sum(rate(mlx_requests_total[5m])), 0.0001)",
-          "legendFormat": "error ratio",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "5xx error ratio %",
-      "type": "timeseries",
-      "description": "Allowed 5xx ratio is 0.5% (the SLO budget); the 1h alert fires at a 14.4x burn."
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "s",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 10
-              },
-              {
-                "color": "red",
-                "value": 30
-              }
-            ]
-          },
-          "description": "Latency SLO: p95 TTFT <= 10 s. Orange = over budget for the window.",
-          "custom": {
-            "fillOpacity": 0,
-            "lineWidth": 2,
-            "drawStyle": "line",
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 24
-      },
-      "id": 232,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket[30m])) by (le))",
-          "legendFormat": "p95",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "TTFT p95 vs SLO (10 s)",
-      "type": "timeseries",
-      "description": "Latency SLO: p95 TTFT <= 10 s. Orange = over budget for the window."
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 240,
-      "title": "Burn rate (1x = break-even)",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              },
-              {
-                "color": "orange",
-                "value": 3
-              },
-              {
-                "color": "red",
-                "value": 14.4
-              }
-            ]
-          },
-          "description": "observed 5xx ratio / allowed 0.5%. >1 = burning the 30 d budget faster than allowed; 14.4x over 1h triggers the critical alert.",
-          "custom": {
-            "fillOpacity": 0,
-            "lineWidth": 2,
-            "drawStyle": "line",
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 33
-      },
-      "id": 241,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(mlx_error_total{status=\"5xx\"}[5m])) / clamp_min(sum(rate(mlx_requests_total[5m])), 0.0001) / 0.005",
-          "legendFormat": "burn",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Availability burn rate",
-      "type": "timeseries",
-      "description": "observed 5xx ratio / allowed 0.5%. >1 = burning the 30 d budget faster than allowed; 14.4x over 1h triggers the critical alert."
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              },
-              {
-                "color": "orange",
-                "value": 3
-              },
-              {
-                "color": "red",
-                "value": 14.4
-              }
-            ]
-          },
-          "description": "observed slow-first-token ratio / allowed 5%.",
-          "custom": {
-            "fillOpacity": 0,
-            "lineWidth": 2,
-            "drawStyle": "line",
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 33
-      },
-      "id": 242,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "expr": "(1 - clamp_min(sum(rate(mlx_ttft_seconds_bucket{le=\"10\"}[5m])) / clamp_min(sum(rate(mlx_ttft_seconds_count[5m])), 0.0001), 0)) / 0.05",
-          "legendFormat": "burn",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Latency burn rate",
-      "type": "timeseries",
-      "description": "observed slow-first-token ratio / allowed 5%."
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 3
-              }
-            ]
-          },
-          "description": "Total firing vmalert alerts. SLO burn alerts carry label category=\"slo\"."
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 41
-      },
-      "id": 243,
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "expr": "count(ALERTS{alertstate=\"firing\"}) or on() vector(0)",
-          "legendFormat": "firing",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Firing alerts (all categories)",
-      "type": "stat",
-      "description": "Total firing vmalert alerts. SLO burn alerts carry label category=\"slo\"."
+     "expr": "100 * clamp_min(1 - sum(increase(mlx_error_total{status=\"5xx\"}[30d])) / clamp_min(sum(increase(mlx_requests_total[30d])), 1), 0) or on() vector(100)",
+     "legendFormat": "sli",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
     }
-  ],
-  "refresh": "10s",
-  "schemaVersion": 39,
-  "style": "dark",
-  "tags": [
-    "mlx",
-    "sre",
-    "slo"
-  ],
-  "templating": {
-    "list": []
+   ],
+   "title": "Availability SLI (30 d)",
+   "type": "gauge",
+   "description": "good / total over 30 d. 4xx is excluded (client error). Shows 100% when there is no traffic in the window."
   },
-  "time": {
-    "from": "now-6h",
-    "to": "now"
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "unit": "percent",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 30
+       },
+       {
+        "color": "red",
+        "value": 0
+       }
+      ]
+     },
+     "min": 0,
+     "max": 100,
+     "decimals": 1,
+     "description": "Remaining availability budget over 30 d (SLO 99.5%, allowed 5xx = 0.5%). Red = exhausted."
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 6,
+    "x": 6,
+    "y": 6
+   },
+   "id": 203,
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "orientation": "auto",
+    "showThresholdLabels": false,
+    "showThresholdMarkers": true
+   },
+   "targets": [
+    {
+     "expr": "100 * clamp_min(1 - (sum(increase(mlx_error_total{status=\"5xx\"}[30d])) / clamp_min(sum(increase(mlx_requests_total[30d])), 1)) / 0.005, 0) or on() vector(100)",
+     "legendFormat": "sli",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Availability error budget left",
+   "type": "gauge",
+   "description": "Remaining availability budget over 30 d (SLO 99.5%, allowed 5xx = 0.5%). Red = exhausted."
   },
-  "timepicker": {},
-  "timezone": "",
-  "title": "MLX SRE - SLI / SLA / SLO",
-  "uid": "mlx-sre",
-  "version": 1,
-  "weekStart": ""
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "unit": "percent",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 95
+       },
+       {
+        "color": "red",
+        "value": 90
+       }
+      ]
+     },
+     "min": 0,
+     "max": 100,
+     "decimals": 1,
+     "description": "Share of first tokens arriving within 10 s over 30 d. SLO target is 95%."
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 6,
+    "x": 12,
+    "y": 6
+   },
+   "id": 204,
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "orientation": "auto",
+    "showThresholdLabels": false,
+    "showThresholdMarkers": true
+   },
+   "targets": [
+    {
+     "expr": "100 * clamp_min(sum(increase(mlx_ttft_seconds_bucket{le=\"10\"}[30d])) / clamp_min(sum(increase(mlx_ttft_seconds_count[30d])), 1), 0) or on() vector(100)",
+     "legendFormat": "sli",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Latency SLI (30 d, TTFT<=10s)",
+   "type": "gauge",
+   "description": "Share of first tokens arriving within 10 s over 30 d. SLO target is 95%."
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "unit": "percent",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 30
+       },
+       {
+        "color": "red",
+        "value": 0
+       }
+      ]
+     },
+     "min": 0,
+     "max": 100,
+     "decimals": 1,
+     "description": "Remaining latency budget over 30 d (p95 TTFT <= 10 s, allowed slow = 5%). Red = exhausted."
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 6,
+    "x": 18,
+    "y": 6
+   },
+   "id": 205,
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "orientation": "auto",
+    "showThresholdLabels": false,
+    "showThresholdMarkers": true
+   },
+   "targets": [
+    {
+     "expr": "100 * clamp_min(1 - (1 - clamp_min(sum(increase(mlx_ttft_seconds_bucket{le=\"10\"}[30d])) / clamp_min(sum(increase(mlx_ttft_seconds_count[30d])), 1), 0)) / 0.05, 0) or on() vector(100)",
+     "legendFormat": "sli",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Latency error budget left",
+   "type": "gauge",
+   "description": "Remaining latency budget over 30 d (p95 TTFT <= 10 s, allowed slow = 5%). Red = exhausted."
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 0
+   },
+   "id": 220,
+   "title": "Volume basis",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "short",
+     "decimals": 0
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 6,
+    "x": 0,
+    "y": 15
+   },
+   "id": 221,
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "auto"
+   },
+   "targets": [
+    {
+     "expr": "sum(increase(mlx_requests_total[30d]))",
+     "legendFormat": "{{model}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Requests (30 d)",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "unit": "short",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 1
+       }
+      ]
+     },
+     "decimals": 0
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 6,
+    "x": 6,
+    "y": 15
+   },
+   "id": 222,
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "auto"
+   },
+   "targets": [
+    {
+     "expr": "sum(increase(mlx_error_total{status=\"5xx\"}[30d]))",
+     "legendFormat": "{{model}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "5xx (30 d)",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "short",
+     "decimals": 0
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 6,
+    "x": 12,
+    "y": 15
+   },
+   "id": 223,
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "auto"
+   },
+   "targets": [
+    {
+     "expr": "sum(increase(mlx_error_total{status=\"4xx\"}[30d]))",
+     "legendFormat": "{{model}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "4xx (30 d)",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "s",
+     "decimals": 0
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 6,
+    "x": 18,
+    "y": 15
+   },
+   "id": 224,
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "auto"
+   },
+   "targets": [
+    {
+     "expr": "mlx_server_uptime_seconds",
+     "legendFormat": "{{model}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Serving uptime",
+   "type": "stat"
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 0
+   },
+   "id": 230,
+   "title": "Trends",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "unit": "percent",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.5
+       },
+       {
+        "color": "red",
+        "value": 2
+       }
+      ]
+     },
+     "description": "Allowed 5xx ratio is 0.5% (the SLO budget); the 1h alert fires at a 14.4x burn.",
+     "custom": {
+      "fillOpacity": 0,
+      "lineWidth": 2,
+      "drawStyle": "line",
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 24
+   },
+   "id": 231,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "expr": "100 * sum(rate(mlx_error_total{status=\"5xx\"}[5m])) / clamp_min(sum(rate(mlx_requests_total[5m])), 0.0001)",
+     "legendFormat": "error ratio",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "5xx error ratio %",
+   "type": "timeseries",
+   "description": "Allowed 5xx ratio is 0.5% (the SLO budget); the 1h alert fires at a 14.4x burn."
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "unit": "s",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 10
+       },
+       {
+        "color": "red",
+        "value": 30
+       }
+      ]
+     },
+     "description": "Latency SLO: p95 TTFT <= 10 s. Orange = over budget for the window.",
+     "custom": {
+      "fillOpacity": 0,
+      "lineWidth": 2,
+      "drawStyle": "line",
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 24
+   },
+   "id": 232,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "expr": "histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket[30m])) by (le))",
+     "legendFormat": "p95",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "TTFT p95 vs SLO (10 s)",
+   "type": "timeseries",
+   "description": "Latency SLO: p95 TTFT <= 10 s. Orange = over budget for the window."
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 0
+   },
+   "id": 240,
+   "title": "Burn rate (1x = break-even)",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "unit": "short",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "green",
+        "value": 1
+       },
+       {
+        "color": "orange",
+        "value": 3
+       },
+       {
+        "color": "red",
+        "value": 14.4
+       }
+      ]
+     },
+     "description": "observed 5xx ratio / allowed 0.5%. >1 = burning the 30 d budget faster than allowed; 14.4x over 1h triggers the critical alert.",
+     "custom": {
+      "fillOpacity": 0,
+      "lineWidth": 2,
+      "drawStyle": "line",
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 33
+   },
+   "id": 241,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum(rate(mlx_error_total{status=\"5xx\"}[5m])) / clamp_min(sum(rate(mlx_requests_total[5m])), 0.0001) / 0.005",
+     "legendFormat": "burn",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Availability burn rate",
+   "type": "timeseries",
+   "description": "observed 5xx ratio / allowed 0.5%. >1 = burning the 30 d budget faster than allowed; 14.4x over 1h triggers the critical alert."
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "unit": "short",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "green",
+        "value": 1
+       },
+       {
+        "color": "orange",
+        "value": 3
+       },
+       {
+        "color": "red",
+        "value": 14.4
+       }
+      ]
+     },
+     "description": "observed slow-first-token ratio / allowed 5%.",
+     "custom": {
+      "fillOpacity": 0,
+      "lineWidth": 2,
+      "drawStyle": "line",
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 33
+   },
+   "id": 242,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "expr": "(1 - clamp_min(sum(rate(mlx_ttft_seconds_bucket{le=\"10\"}[5m])) / clamp_min(sum(rate(mlx_ttft_seconds_count[5m])), 0.0001), 0)) / 0.05",
+     "legendFormat": "burn",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Latency burn rate",
+   "type": "timeseries",
+   "description": "observed slow-first-token ratio / allowed 5%."
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "unit": "short",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       },
+       {
+        "color": "red",
+        "value": 3
+       }
+      ]
+     },
+     "description": "Total firing vmalert alerts. SLO burn alerts carry label category=\"slo\"."
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 24,
+    "x": 0,
+    "y": 41
+   },
+   "id": 243,
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "auto"
+   },
+   "targets": [
+    {
+     "expr": "count(ALERTS{alertstate=\"firing\"}) or on() vector(0)",
+     "legendFormat": "firing",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Firing alerts (all categories)",
+   "type": "stat",
+   "description": "Total firing vmalert alerts. SLO burn alerts carry label category=\"slo\"."
+  }
+ ],
+ "refresh": "1m",
+ "schemaVersion": 39,
+ "style": "dark",
+ "tags": [
+  "mlx",
+  "sre",
+  "slo"
+ ],
+ "templating": {
+  "list": []
+ },
+ "time": {
+  "from": "now-6h",
+  "to": "now"
+ },
+ "timepicker": {},
+ "timezone": "browser",
+ "title": "MLX SRE - SLI / SLA / SLO",
+ "uid": "mlx-sre",
+ "version": 1,
+ "weekStart": ""
 }

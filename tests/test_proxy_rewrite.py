@@ -126,12 +126,15 @@ class StubUpstream(BaseHTTPRequestHandler):
         choice = {"index": 0, "finish_reason": finish, "message": msg}
         if req.get("logprobs"):
             choice["logprobs"] = _logprobs_block(req.get("top_logprobs") or 1)
+        usage = {"prompt_tokens": 5, "completion_tokens": 2,
+                 "total_tokens": 7}
+        if UPSTREAM_MODE.get("cached"):
+            usage["prompt_tokens_details"] = {"cached_tokens": UPSTREAM_MODE["cached"]}
         body = json.dumps({
             "id": "chatcmpl-stub", "object": "chat.completion", "created": 1,
             "model": MODEL, "system_fingerprint": "stub",
             "choices": [choice],
-            "usage": {"prompt_tokens": 5, "completion_tokens": 2,
-                      "total_tokens": 7},
+            "usage": usage,
         }).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -190,7 +193,7 @@ def series(text, name):
 @pytest.fixture(autouse=True)
 def reset():
     UPSTREAM_SEEN.clear()
-    UPSTREAM_MODE.update(tool_calls=False, status=200)
+    UPSTREAM_MODE.update(tool_calls=False, status=200, cached=0)
     p.Proxy.stream_sample = 0.0
     p.Proxy.logprobs_top = 2
 
@@ -351,3 +354,32 @@ def test_chat_completions_still_count(stack):
     post(stack, {"model": MODEL,
                  "messages": [{"role": "user", "content": "hi"}]})
     assert series(metrics(stack), "mlx_requests_total") == before + 1
+
+
+def test_cached_tokens_are_counted(stack):
+    """usage.prompt_tokens_details.cached_tokens drives mlx_prompt_cached_tokens_total."""
+    before = series(metrics(stack), "mlx_prompt_cached_tokens_total")
+    UPSTREAM_SEEN.clear()
+    UPSTREAM_MODE["cached"] = 42
+    post(stack, {"model": MODEL,
+                 "messages": [{"role": "user", "content": "cache me"}]})
+    after = series(metrics(stack), "mlx_prompt_cached_tokens_total")
+    assert after == before + 42
+
+
+def test_queue_wait_histogram_is_recorded_for_chat(stack):
+    """Chat completions advance mlx_queue_wait_seconds (count + sum present)."""
+    before = series(metrics(stack), "mlx_queue_wait_seconds_count")
+    post(stack, {"model": MODEL,
+                 "messages": [{"role": "user", "content": "queue me"}]})
+    text = metrics(stack)
+    assert series(text, "mlx_queue_wait_seconds_count") == before + 1
+    assert series(text, "mlx_queue_wait_seconds_sum") >= 0
+
+
+def test_queue_wait_histogram_ignores_model_list(stack):
+    """Non-completion requests must not advance the queue-wait histogram."""
+    before = series(metrics(stack), "mlx_queue_wait_seconds_count")
+    with urllib.request.urlopen(stack + "/v1/models", timeout=10) as r:
+        assert r.status == 200
+    assert series(metrics(stack), "mlx_queue_wait_seconds_count") == before

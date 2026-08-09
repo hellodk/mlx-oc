@@ -1,1522 +1,1564 @@
 {
-  "annotations": {
-    "list": [
-      {
-        "name": "Alerts",
-        "type": "prometheus",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "VictoriaMetrics"
-        },
-        "expr": "ALERTS{alertstate=\"firing\", node=\"$node\"}",
-        "step": "60s",
-        "iconColor": "#e24d42",
-        "enable": true,
-        "hide": false,
-        "showIn": 0,
-        "titleFormat": "ALERT: {{alertname}}",
-        "textFormat": "{{labels.severity}}"
-      }
-    ]
+ "annotations": {
+  "list": [
+   {
+    "name": "Alerts",
+    "type": "prometheus",
+    "datasource": {
+     "type": "prometheus",
+     "uid": "VictoriaMetrics"
+    },
+    "expr": "ALERTS{alertstate=\"firing\", node=\"$node\"}",
+    "step": "60s",
+    "iconColor": "#e24d42",
+    "enable": true,
+    "hide": false,
+    "showIn": 0,
+    "titleFormat": "ALERT: {{alertname}}",
+    "textFormat": "{{labels.severity}}"
+   }
+  ]
+ },
+ "editable": true,
+ "panels": [
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 0
+   },
+   "id": 1,
+   "title": "Hardware gauges",
+   "type": "row"
   },
-  "editable": true,
-  "panels": [
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 1,
-      "title": "Hardware gauges",
-      "type": "row"
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "max": 16,
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 8
+       },
+       {
+        "color": "red",
+        "value": 12
+       }
+      ]
+     },
+     "unit": "short",
+     "links": [
+      {
+       "title": "Back to MLX Cluster overview",
+       "url": "/d/mlx-cluster/mlx-cluster",
+       "targetBlank": false
+      }
+     ]
     },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 5,
+    "w": 6,
+    "x": 0,
+    "y": 1
+   },
+   "id": 2,
+   "targets": [
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "max": 16,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 8
-              },
-              {
-                "color": "red",
-                "value": 12
-              }
-            ]
-          },
-          "unit": "short",
-          "links": [
-            {
-              "title": "Back to MLX Cluster overview",
-              "url": "/d/mlx-cluster/mlx-cluster",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 0,
-        "y": 1
-      },
-      "id": 2,
-      "targets": [
-        {
-          "expr": "mlx_hw_load1{node=\"$node\"}",
-          "refId": "A"
-        }
-      ],
-      "title": "Load (1m)",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "max": 100,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 75
-              },
-              {
-                "color": "red",
-                "value": 90
-              }
-            ]
-          },
-          "unit": "percent",
-          "links": [
-            {
-              "title": "Back to MLX Cluster overview",
-              "url": "/d/mlx-cluster/mlx-cluster",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 6,
-        "y": 1
-      },
-      "id": 3,
-      "targets": [
-        {
-          "expr": "mlx_hw_mem_used_bytes{node=\"$node\"} / mlx_hw_mem_total_bytes{node=\"$node\"} * 100",
-          "refId": "A"
-        }
-      ],
-      "title": "Memory used %",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 8000000000
-              },
-              {
-                "color": "red",
-                "value": 12000000000
-              }
-            ]
-          },
-          "unit": "bytes",
-          "links": [
-            {
-              "title": "Back to MLX Cluster overview",
-              "url": "/d/mlx-cluster/mlx-cluster",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 12,
-        "y": 1
-      },
-      "id": 4,
-      "targets": [
-        {
-          "expr": "mlx_worker_rss_bytes{node=\"$node\"}",
-          "refId": "A"
-        }
-      ],
-      "title": "Worker RSS",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "max": 1600,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 80
-              },
-              {
-                "color": "red",
-                "value": 95
-              }
-            ]
-          },
-          "unit": "short",
-          "links": [
-            {
-              "title": "Back to MLX Cluster overview",
-              "url": "/d/mlx-cluster/mlx-cluster",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 18,
-        "y": 1
-      },
-      "id": 5,
-      "targets": [
-        {
-          "expr": "mlx_hw_gpu_frequency_mhz{node=\"$node\"}",
-          "refId": "A"
-        }
-      ],
-      "title": "GPU frequency",
-      "type": "gauge"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 6
-      },
-      "id": 19,
-      "panels": [],
-      "title": "GPU & power",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "max": 100,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 70
-              },
-              {
-                "color": "red",
-                "value": 90
-              }
-            ]
-          },
-          "unit": "percent",
-          "links": [
-            {
-              "title": "Back to MLX Cluster overview",
-              "url": "/d/mlx-cluster/mlx-cluster",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 0,
-        "y": 7
-      },
-      "id": 20,
-      "targets": [
-        {
-          "expr": "mlx_hw_gpu_utilization_percent{node=\"$node\"}",
-          "refId": "A"
-        }
-      ],
-      "title": "GPU utilization",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "max": 20,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "watt",
-          "links": [
-            {
-              "title": "Back to MLX Cluster overview",
-              "url": "/d/mlx-cluster/mlx-cluster",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 6,
-        "y": 7
-      },
-      "id": 21,
-      "targets": [
-        {
-          "expr": "mlx_hw_gpu_power_milliwatts{node=\"$node\"}",
-          "refId": "A"
-        }
-      ],
-      "title": "GPU power",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "max": 60,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 50
-              },
-              {
-                "color": "red",
-                "value": 65
-              }
-            ]
-          },
-          "unit": "watt",
-          "links": [
-            {
-              "title": "Back to MLX Cluster overview",
-              "url": "/d/mlx-cluster/mlx-cluster",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 12,
-        "y": 7
-      },
-      "id": 22,
-      "targets": [
-        {
-          "expr": "mlx_hw_package_power_milliwatts{node=\"$node\"}",
-          "refId": "A"
-        }
-      ],
-      "title": "Package power",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "max": 1,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 0.5
-              },
-              {
-                "color": "red",
-                "value": 0.8
-              }
-            ]
-          },
-          "unit": "percentunit",
-          "links": [
-            {
-              "title": "Back to MLX Cluster overview",
-              "url": "/d/mlx-cluster/mlx-cluster",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 18,
-        "y": 7
-      },
-      "id": 23,
-      "targets": [
-        {
-          "expr": "mlx_hw_thermal_pressure{node=\"$node\"}",
-          "refId": "A"
-        }
-      ],
-      "title": "Thermal pressure",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 70
-              },
-              {
-                "color": "red",
-                "value": 90
-              }
-            ]
-          },
-          "links": [
-            {
-              "title": "Back to MLX Cluster overview",
-              "url": "/d/mlx-cluster/mlx-cluster",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 0,
-        "y": 12
-      },
-      "id": 26,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "expr": "mlx_hw_gpu_mem_used_bytes{node=\"$node\"} / mlx_hw_gpu_mem_total_bytes{node=\"$node\"} * 100",
-          "legendFormat": "GPU memory used %",
-          "refId": "A"
-        }
-      ],
-      "title": "GPU memory used %",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "decibytes",
-          "min": 0,
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 8
-              },
-              {
-                "color": "red",
-                "value": 9.6
-              }
-            ]
-          },
-          "links": [
-            {
-              "title": "Back to MLX Cluster overview",
-              "url": "/d/mlx-cluster/mlx-cluster",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 6,
-        "y": 12
-      },
-      "id": 27,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "expr": "mlx_hw_gpu_mem_used_bytes{node=\"$node\"} / 1073741824",
-          "legendFormat": "GPU memory used (GiB)",
-          "refId": "A"
-        }
-      ],
-      "title": "GPU memory used (GiB)",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "watt",
-          "min": 0,
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "links": [
-            {
-              "title": "Back to MLX Cluster overview",
-              "url": "/d/mlx-cluster/mlx-cluster",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 12,
-        "y": 12
-      },
-      "id": 28,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "expr": "mlx_hw_cpu_power_milliwatts{node=\"$node\"} / 1000",
-          "legendFormat": "CPU power",
-          "refId": "A"
-        }
-      ],
-      "title": "CPU power",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "watt",
-          "min": 0,
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "links": [
-            {
-              "title": "Back to MLX Cluster overview",
-              "url": "/d/mlx-cluster/mlx-cluster",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 18,
-        "y": 12
-      },
-      "id": 29,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "expr": "mlx_hw_ane_power_milliwatts{node=\"$node\"} / 1000",
-          "legendFormat": "ANE power",
-          "refId": "A"
-        }
-      ],
-      "title": "ANE power",
-      "type": "gauge"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 17
-      },
-      "id": 6,
-      "title": "Over time",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "min": 0
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 8,
-        "x": 0,
-        "y": 18
-      },
-      "id": 7,
-      "targets": [
-        {
-          "expr": "mlx_hw_load1{node=\"$node\"}",
-          "legendFormat": "load1",
-          "refId": "A"
-        },
-        {
-          "expr": "mlx_hw_load5{node=\"$node\"}",
-          "legendFormat": "load5",
-          "refId": "B"
-        },
-        {
-          "expr": "mlx_hw_load15{node=\"$node\"}",
-          "legendFormat": "load15",
-          "refId": "C"
-        }
-      ],
-      "title": "Load 1/5/15",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "min": 0,
-          "unit": "bytes"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 8,
-        "x": 8,
-        "y": 18
-      },
-      "id": 8,
-      "targets": [
-        {
-          "expr": "mlx_hw_mem_used_bytes{node=\"$node\"}",
-          "legendFormat": "used",
-          "refId": "A"
-        },
-        {
-          "expr": "mlx_hw_mem_total_bytes{node=\"$node\"}",
-          "legendFormat": "total",
-          "refId": "B"
-        }
-      ],
-      "title": "Memory used",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "max": 100,
-          "min": 0
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 8,
-        "x": 16,
-        "y": 18
-      },
-      "id": 9,
-      "targets": [
-        {
-          "expr": "mlx_hw_mem_pressure{node=\"$node\"}",
-          "legendFormat": "pressure",
-          "refId": "A"
-        }
-      ],
-      "title": "Memory pressure",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "min": 0
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 8,
-        "x": 0,
-        "y": 24
-      },
-      "id": 10,
-      "targets": [
-        {
-          "expr": "mlx_worker_rss_bytes{node=\"$node\"}",
-          "legendFormat": "rss bytes",
-          "refId": "A"
-        },
-        {
-          "expr": "mlx_worker_cpu_percent{node=\"$node\"}",
-          "legendFormat": "cpu %",
-          "refId": "B"
-        }
-      ],
-      "title": "Worker RSS + CPU",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "max": 100,
-          "min": 0,
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 8,
-        "x": 8,
-        "y": 24
-      },
-      "id": 11,
-      "targets": [
-        {
-          "expr": "mlx_hw_disk_used_bytes{node=\"$node\"} / mlx_hw_disk_total_bytes{node=\"$node\"} * 100",
-          "legendFormat": "disk %",
-          "refId": "A"
-        }
-      ],
-      "title": "Disk used %",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "min": 0,
-          "unit": "short",
-          "links": [
-            {
-              "title": "Back to MLX Cluster overview",
-              "url": "/d/mlx-cluster/mlx-cluster",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 8,
-        "x": 16,
-        "y": 24
-      },
-      "id": 12,
-      "targets": [
-        {
-          "expr": "mlx_hw_gpu_frequency_mhz{node=\"$node\"}",
-          "legendFormat": "temp",
-          "refId": "A"
-        }
-      ],
-      "title": "GPU frequency",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "scaleDistribution": {
-              "type": "linear"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 24,
-        "x": 0,
-        "y": 30
-      },
-      "id": 30,
-      "options": {
-        "calculate": true,
-        "cellGap": 1,
-        "cellValues": {
-          "unit": "short"
-        },
-        "color": {
-          "exponent": 0.5,
-          "fill": "dark-orange",
-          "mode": "scheme",
-          "reverse": false,
-          "scale": "exponential",
-          "scheme": "RdYlGn",
-          "steps": 64
-        },
-        "exemplars": {
-          "color": "rgba(255,0,255,0.7)"
-        },
-        "legend": {
-          "show": true
-        },
-        "rowsFrame": {
-          "layout": "auto"
-        },
-        "tooltip": {
-          "show": true,
-          "yHistogram": false
-        },
-        "yAxis": {
-          "axisPlacement": "left",
-          "reverse": false
-        },
-        "yBucketBoundAuto": true,
-        "yBucketNumber": 24
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "expr": "mlx_hw_gpu_utilization_percent{node=\"$node\"}",
-          "format": "time_series",
-          "legendFormat": "GPU util",
-          "refId": "A"
-        }
-      ],
-      "title": "GPU utilization heatmap",
-      "type": "heatmap"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "decibytes"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 12,
-        "x": 0,
-        "y": 36
-      },
-      "id": 31,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "expr": "mlx_hw_gpu_mem_used_bytes{node=\"$node\"} / 1073741824",
-          "legendFormat": "used",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "expr": "mlx_hw_gpu_mem_alloc_bytes{node=\"$node\"} / 1073741824",
-          "legendFormat": "alloc",
-          "refId": "B"
-        }
-      ],
-      "title": "GPU memory used / alloc",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "watt"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 12,
-        "x": 12,
-        "y": 36
-      },
-      "id": 32,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "expr": "mlx_hw_cpu_power_milliwatts{node=\"$node\"} / 1000",
-          "legendFormat": "CPU",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "expr": "mlx_hw_ane_power_milliwatts{node=\"$node\"} / 1000",
-          "legendFormat": "ANE",
-          "refId": "B"
-        }
-      ],
-      "title": "CPU & ANE power",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 42
-      },
-      "id": 13,
-      "title": "LLM on this node",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "min": 0,
-          "unit": "req/min"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 8,
-        "x": 0,
-        "y": 43
-      },
-      "id": 14,
-      "targets": [
-        {
-          "expr": "sum(rate(mlx_requests_total{job=\"mlx-proxy\", node=\"$node\"}[1m])) by (model) * 60",
-          "legendFormat": "{{model}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Requests / min (proxy on rank0)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "min": 0,
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 8,
-        "x": 8,
-        "y": 43
-      },
-      "id": 15,
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.5, sum(rate(mlx_ttft_seconds_bucket{job=\"mlx-proxy\", node=\"$node\"}[5m])) by (le))",
-          "legendFormat": "p50",
-          "refId": "A"
-        },
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{job=\"mlx-proxy\", node=\"$node\"}[5m])) by (le))",
-          "legendFormat": "p95",
-          "refId": "B"
-        }
-      ],
-      "title": "TTFT (p50 / p95)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "min": 0,
-          "unit": "tok/s"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 8,
-        "x": 16,
-        "y": 43
-      },
-      "id": 16,
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.5, sum(rate(mlx_token_rate_tokens_per_second_bucket{job=\"mlx-proxy\", node=\"$node\"}[5m])) by (le))",
-          "legendFormat": "p50",
-          "refId": "A"
-        },
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(mlx_token_rate_tokens_per_second_bucket{job=\"mlx-proxy\", node=\"$node\"}[5m])) by (le))",
-          "legendFormat": "p95",
-          "refId": "B"
-        }
-      ],
-      "title": "Token rate (p50 / p95)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 0,
-        "y": 49
-      },
-      "id": 24,
-      "targets": [
-        {
-          "expr": "mlx_in_flight{model=~\".*\"}",
-          "legendFormat": "__auto",
-          "refId": "A"
-        }
-      ],
-      "title": "In-flight (proxy)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "red"
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 16,
-        "x": 8,
-        "y": 49
-      },
-      "id": 25,
-      "targets": [
-        {
-          "expr": "sum(rate(mlx_error_total[1m])) by (status)",
-          "legendFormat": "{{status}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Errors / min (proxy)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 0,
-        "y": 53
-      },
-      "id": 17,
-      "targets": [
-        {
-          "expr": "mlx_hw_cpu_count{node=\"$node\"}",
-          "legendFormat": "cpu cores",
-          "refId": "A"
-        },
-        {
-          "expr": "mlx_hw_uptime_seconds{node=\"$node\"}",
-          "legendFormat": "uptime s",
-          "refId": "B"
-        },
-        {
-          "expr": "mlx_hw_mem_total_bytes{node=\"$node\"}",
-          "legendFormat": "mem total",
-          "refId": "C"
-        }
-      ],
-      "title": "Node info",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 16,
-        "x": 8,
-        "y": 53
-      },
-      "id": 18,
-      "targets": [
-        {
-          "expr": "up{node=\"$node\"}",
-          "legendFormat": "{{job}}",
-          "refId": "A"
-        },
-        {
-          "expr": "mlx_hw_up{node=\"$node\"}",
-          "legendFormat": "hw agent",
-          "refId": "B"
-        }
-      ],
-      "title": "Telemetry up",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 3
-              }
-            ]
-          },
-          "unit": "short",
-          "links": [
-            {
-              "title": "View firing alerts",
-              "url": "/alerting/list?search=state:firing",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 0,
-        "y": 57
-      },
-      "id": 33,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "expr": "count(ALERTS{alertstate=\"firing\", node=\"$node\"})",
-          "legendFormat": "firing",
-          "refId": "A"
-        }
-      ],
-      "title": "Active alerts",
-      "type": "stat"
+     "expr": "mlx_hw_load1{node=\"$node\"}",
+     "refId": "A"
     }
-  ],
-  "refresh": "10s",
-  "schemaVersion": 39,
-  "tags": [
-    "mlx",
-    "node"
-  ],
-  "templating": {
-    "list": [
+   ],
+   "title": "Load (1m)",
+   "type": "gauge"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "max": 100,
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 75
+       },
+       {
+        "color": "red",
+        "value": 90
+       }
+      ]
+     },
+     "unit": "percent",
+     "links": [
       {
-        "current": {
-          "text": "rank0",
-          "value": "rank0"
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "VictoriaMetrics"
-        },
-        "label": "Node",
-        "name": "node",
-        "query": "label_values(mlx_hw_load1, node)",
-        "refresh": 1,
-        "type": "query"
+       "title": "Back to MLX Cluster overview",
+       "url": "/d/mlx-cluster/mlx-cluster",
+       "targetBlank": false
       }
-    ]
+     ]
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 5,
+    "w": 6,
+    "x": 6,
+    "y": 1
+   },
+   "id": 3,
+   "targets": [
+    {
+     "expr": "mlx_hw_mem_used_bytes{node=\"$node\"} / mlx_hw_mem_total_bytes{node=\"$node\"} * 100",
+     "refId": "A"
+    }
+   ],
+   "title": "Memory used %",
+   "type": "gauge"
   },
-  "time": {
-    "from": "now-1h",
-    "to": "now"
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 8000000000
+       },
+       {
+        "color": "red",
+        "value": 12000000000
+       }
+      ]
+     },
+     "unit": "bytes",
+     "links": [
+      {
+       "title": "Back to MLX Cluster overview",
+       "url": "/d/mlx-cluster/mlx-cluster",
+       "targetBlank": false
+      }
+     ]
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 5,
+    "w": 6,
+    "x": 12,
+    "y": 1
+   },
+   "id": 4,
+   "targets": [
+    {
+     "expr": "mlx_worker_rss_bytes{node=\"$node\"}",
+     "refId": "A"
+    }
+   ],
+   "title": "Worker RSS",
+   "type": "gauge"
   },
-  "timezone": "browser",
-  "title": "MLX Node",
-  "uid": "mlx-node"
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "max": 1600,
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 80
+       },
+       {
+        "color": "red",
+        "value": 95
+       }
+      ]
+     },
+     "unit": "short",
+     "links": [
+      {
+       "title": "Back to MLX Cluster overview",
+       "url": "/d/mlx-cluster/mlx-cluster",
+       "targetBlank": false
+      }
+     ]
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 5,
+    "w": 6,
+    "x": 18,
+    "y": 1
+   },
+   "id": 5,
+   "targets": [
+    {
+     "expr": "mlx_hw_gpu_frequency_mhz{node=\"$node\"}",
+     "refId": "A"
+    }
+   ],
+   "title": "GPU frequency",
+   "type": "gauge"
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 6
+   },
+   "id": 19,
+   "panels": [],
+   "title": "GPU & power",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "max": 100,
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 70
+       },
+       {
+        "color": "red",
+        "value": 90
+       }
+      ]
+     },
+     "unit": "percent",
+     "links": [
+      {
+       "title": "Back to MLX Cluster overview",
+       "url": "/d/mlx-cluster/mlx-cluster",
+       "targetBlank": false
+      }
+     ]
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 5,
+    "w": 6,
+    "x": 0,
+    "y": 7
+   },
+   "id": 20,
+   "targets": [
+    {
+     "expr": "mlx_hw_gpu_utilization_percent{node=\"$node\"}",
+     "refId": "A"
+    }
+   ],
+   "title": "GPU utilization",
+   "type": "gauge"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "max": 20,
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "watt",
+     "links": [
+      {
+       "title": "Back to MLX Cluster overview",
+       "url": "/d/mlx-cluster/mlx-cluster",
+       "targetBlank": false
+      }
+     ]
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 5,
+    "w": 6,
+    "x": 6,
+    "y": 7
+   },
+   "id": 21,
+   "targets": [
+    {
+     "expr": "mlx_hw_gpu_power_milliwatts{node=\"$node\"}",
+     "refId": "A"
+    }
+   ],
+   "title": "GPU power",
+   "type": "gauge"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "max": 60,
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 50
+       },
+       {
+        "color": "red",
+        "value": 65
+       }
+      ]
+     },
+     "unit": "watt",
+     "links": [
+      {
+       "title": "Back to MLX Cluster overview",
+       "url": "/d/mlx-cluster/mlx-cluster",
+       "targetBlank": false
+      }
+     ]
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 5,
+    "w": 6,
+    "x": 12,
+    "y": 7
+   },
+   "id": 22,
+   "targets": [
+    {
+     "expr": "mlx_hw_package_power_milliwatts{node=\"$node\"}",
+     "refId": "A"
+    }
+   ],
+   "title": "Package power",
+   "type": "gauge"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "max": 1,
+     "min": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.5
+       },
+       {
+        "color": "red",
+        "value": 0.8
+       }
+      ]
+     },
+     "unit": "percentunit",
+     "links": [
+      {
+       "title": "Back to MLX Cluster overview",
+       "url": "/d/mlx-cluster/mlx-cluster",
+       "targetBlank": false
+      }
+     ]
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 5,
+    "w": 6,
+    "x": 18,
+    "y": 7
+   },
+   "id": 23,
+   "targets": [
+    {
+     "expr": "mlx_hw_thermal_pressure{node=\"$node\"}",
+     "refId": "A"
+    }
+   ],
+   "title": "Thermal pressure",
+   "type": "gauge"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "min": 0,
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 70
+       },
+       {
+        "color": "red",
+        "value": 90
+       }
+      ]
+     },
+     "links": [
+      {
+       "title": "Back to MLX Cluster overview",
+       "url": "/d/mlx-cluster/mlx-cluster",
+       "targetBlank": false
+      }
+     ]
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 5,
+    "w": 6,
+    "x": 0,
+    "y": 12
+   },
+   "id": 26,
+   "options": {
+    "orientation": "auto",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "showThresholdLabels": false,
+    "showThresholdMarkers": true
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "mlx_hw_gpu_mem_used_bytes{node=\"$node\"} / mlx_hw_gpu_mem_total_bytes{node=\"$node\"} * 100",
+     "legendFormat": "GPU memory used %",
+     "refId": "A"
+    }
+   ],
+   "title": "GPU memory used %",
+   "type": "gauge"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "decibytes",
+     "min": 0,
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 8
+       },
+       {
+        "color": "red",
+        "value": 9.6
+       }
+      ]
+     },
+     "links": [
+      {
+       "title": "Back to MLX Cluster overview",
+       "url": "/d/mlx-cluster/mlx-cluster",
+       "targetBlank": false
+      }
+     ]
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 5,
+    "w": 6,
+    "x": 6,
+    "y": 12
+   },
+   "id": 27,
+   "options": {
+    "orientation": "auto",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "showThresholdLabels": false,
+    "showThresholdMarkers": true
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "mlx_hw_gpu_mem_used_bytes{node=\"$node\"} / 1073741824",
+     "legendFormat": "GPU memory used (GiB)",
+     "refId": "A"
+    }
+   ],
+   "title": "GPU memory used (GiB)",
+   "type": "gauge"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "watt",
+     "min": 0,
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "links": [
+      {
+       "title": "Back to MLX Cluster overview",
+       "url": "/d/mlx-cluster/mlx-cluster",
+       "targetBlank": false
+      }
+     ]
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 5,
+    "w": 6,
+    "x": 12,
+    "y": 12
+   },
+   "id": 28,
+   "options": {
+    "orientation": "auto",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "showThresholdLabels": false,
+    "showThresholdMarkers": true
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "mlx_hw_cpu_power_milliwatts{node=\"$node\"} / 1000",
+     "legendFormat": "CPU power",
+     "refId": "A"
+    }
+   ],
+   "title": "CPU power",
+   "type": "gauge"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "watt",
+     "min": 0,
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "links": [
+      {
+       "title": "Back to MLX Cluster overview",
+       "url": "/d/mlx-cluster/mlx-cluster",
+       "targetBlank": false
+      }
+     ]
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 5,
+    "w": 6,
+    "x": 18,
+    "y": 12
+   },
+   "id": 29,
+   "options": {
+    "orientation": "auto",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "showThresholdLabels": false,
+    "showThresholdMarkers": true
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "mlx_hw_ane_power_milliwatts{node=\"$node\"} / 1000",
+     "legendFormat": "ANE power",
+     "refId": "A"
+    }
+   ],
+   "title": "ANE power",
+   "type": "gauge"
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 17
+   },
+   "id": 6,
+   "title": "Over time",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "min": 0
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 8,
+    "x": 0,
+    "y": 18
+   },
+   "id": 7,
+   "targets": [
+    {
+     "expr": "mlx_hw_load1{node=\"$node\"}",
+     "legendFormat": "load1",
+     "refId": "A"
+    },
+    {
+     "expr": "mlx_hw_load5{node=\"$node\"}",
+     "legendFormat": "load5",
+     "refId": "B"
+    },
+    {
+     "expr": "mlx_hw_load15{node=\"$node\"}",
+     "legendFormat": "load15",
+     "refId": "C"
+    }
+   ],
+   "title": "Load 1/5/15",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "min": 0,
+     "unit": "bytes"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 8,
+    "x": 8,
+    "y": 18
+   },
+   "id": 8,
+   "targets": [
+    {
+     "expr": "mlx_hw_mem_used_bytes{node=\"$node\"}",
+     "legendFormat": "used",
+     "refId": "A"
+    },
+    {
+     "expr": "mlx_hw_mem_total_bytes{node=\"$node\"}",
+     "legendFormat": "total",
+     "refId": "B"
+    }
+   ],
+   "title": "Memory used",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "max": 100,
+     "min": 0
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 8,
+    "x": 16,
+    "y": 18
+   },
+   "id": 9,
+   "targets": [
+    {
+     "expr": "mlx_hw_mem_pressure{node=\"$node\"}",
+     "legendFormat": "pressure",
+     "refId": "A"
+    }
+   ],
+   "title": "Memory pressure",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "min": 0
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 8,
+    "x": 0,
+    "y": 24
+   },
+   "id": 10,
+   "targets": [
+    {
+     "expr": "mlx_worker_rss_bytes{node=\"$node\"}",
+     "legendFormat": "rss bytes",
+     "refId": "A"
+    },
+    {
+     "expr": "mlx_worker_cpu_percent{node=\"$node\"}",
+     "legendFormat": "cpu %",
+     "refId": "B"
+    }
+   ],
+   "title": "Worker RSS + CPU",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "max": 100,
+     "min": 0,
+     "unit": "percent"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 8,
+    "x": 8,
+    "y": 24
+   },
+   "id": 11,
+   "targets": [
+    {
+     "expr": "mlx_hw_disk_used_bytes{node=\"$node\"} / mlx_hw_disk_total_bytes{node=\"$node\"} * 100",
+     "legendFormat": "disk %",
+     "refId": "A"
+    }
+   ],
+   "title": "Disk used %",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "min": 0,
+     "unit": "short",
+     "links": [
+      {
+       "title": "Back to MLX Cluster overview",
+       "url": "/d/mlx-cluster/mlx-cluster",
+       "targetBlank": false
+      }
+     ]
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 8,
+    "x": 16,
+    "y": 24
+   },
+   "id": 12,
+   "targets": [
+    {
+     "expr": "mlx_hw_gpu_frequency_mhz{node=\"$node\"}",
+     "legendFormat": "temp",
+     "refId": "A"
+    }
+   ],
+   "title": "GPU frequency",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "scaleDistribution": {
+       "type": "linear"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 24,
+    "x": 0,
+    "y": 30
+   },
+   "id": 30,
+   "options": {
+    "calculate": true,
+    "cellGap": 1,
+    "cellValues": {
+     "unit": "short"
+    },
+    "color": {
+     "exponent": 0.5,
+     "fill": "dark-orange",
+     "mode": "scheme",
+     "reverse": false,
+     "scale": "exponential",
+     "scheme": "RdYlGn",
+     "steps": 64
+    },
+    "exemplars": {
+     "color": "rgba(255,0,255,0.7)"
+    },
+    "legend": {
+     "show": true
+    },
+    "rowsFrame": {
+     "layout": "auto"
+    },
+    "tooltip": {
+     "show": true,
+     "yHistogram": false
+    },
+    "yAxis": {
+     "axisPlacement": "left",
+     "reverse": false
+    },
+    "yBucketBoundAuto": true,
+    "yBucketNumber": 24
+   },
+   "pluginVersion": "10.0.0",
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "mlx_hw_gpu_utilization_percent{node=\"$node\"}",
+     "format": "time_series",
+     "legendFormat": "GPU util",
+     "refId": "A"
+    }
+   ],
+   "title": "GPU utilization heatmap",
+   "type": "heatmap"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "decibytes"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 12,
+    "x": 0,
+    "y": 36
+   },
+   "id": 31,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "mlx_hw_gpu_mem_used_bytes{node=\"$node\"} / 1073741824",
+     "legendFormat": "used",
+     "refId": "A"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "mlx_hw_gpu_mem_alloc_bytes{node=\"$node\"} / 1073741824",
+     "legendFormat": "alloc",
+     "refId": "B"
+    }
+   ],
+   "title": "GPU memory used / alloc",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "watt"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 12,
+    "x": 12,
+    "y": 36
+   },
+   "id": 32,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "mlx_hw_cpu_power_milliwatts{node=\"$node\"} / 1000",
+     "legendFormat": "CPU",
+     "refId": "A"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "mlx_hw_ane_power_milliwatts{node=\"$node\"} / 1000",
+     "legendFormat": "ANE",
+     "refId": "B"
+    }
+   ],
+   "title": "CPU & ANE power",
+   "type": "timeseries"
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 42
+   },
+   "id": 13,
+   "title": "LLM on this node",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "min": 0,
+     "unit": "req/min"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 8,
+    "x": 0,
+    "y": 43
+   },
+   "id": 14,
+   "targets": [
+    {
+     "expr": "sum(rate(mlx_requests_total{job=\"mlx-proxy\", node=\"$node\"}[1m])) by (model) * 60",
+     "legendFormat": "{{model}}",
+     "refId": "A"
+    }
+   ],
+   "title": "Requests / min (proxy on rank0)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "min": 0,
+     "unit": "s"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 8,
+    "x": 8,
+    "y": 43
+   },
+   "id": 15,
+   "targets": [
+    {
+     "expr": "histogram_quantile(0.5, sum(rate(mlx_ttft_seconds_bucket{job=\"mlx-proxy\", node=\"$node\"}[5m])) by (le))",
+     "legendFormat": "p50",
+     "refId": "A"
+    },
+    {
+     "expr": "histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{job=\"mlx-proxy\", node=\"$node\"}[5m])) by (le))",
+     "legendFormat": "p95",
+     "refId": "B"
+    }
+   ],
+   "title": "TTFT (p50 / p95)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "min": 0,
+     "unit": "tok/s"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 8,
+    "x": 16,
+    "y": 43
+   },
+   "id": 16,
+   "targets": [
+    {
+     "expr": "histogram_quantile(0.5, sum(rate(mlx_token_rate_tokens_per_second_bucket{job=\"mlx-proxy\", node=\"$node\"}[5m])) by (le))",
+     "legendFormat": "p50",
+     "refId": "A"
+    },
+    {
+     "expr": "histogram_quantile(0.95, sum(rate(mlx_token_rate_tokens_per_second_bucket{job=\"mlx-proxy\", node=\"$node\"}[5m])) by (le))",
+     "legendFormat": "p95",
+     "refId": "B"
+    }
+   ],
+   "title": "Token rate (p50 / p95)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 8,
+    "x": 0,
+    "y": 49
+   },
+   "id": 24,
+   "targets": [
+    {
+     "expr": "mlx_in_flight{model=~\".*\"}",
+     "legendFormat": "__auto",
+     "refId": "A"
+    }
+   ],
+   "title": "In-flight (proxy)",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "red"
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 16,
+    "x": 8,
+    "y": 49
+   },
+   "id": 25,
+   "targets": [
+    {
+     "expr": "sum(rate(mlx_error_total[1m])) by (status)",
+     "legendFormat": "{{status}}",
+     "refId": "A"
+    }
+   ],
+   "title": "Errors / min (proxy)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 8,
+    "x": 0,
+    "y": 53
+   },
+   "id": 17,
+   "targets": [
+    {
+     "expr": "mlx_hw_cpu_count{node=\"$node\"}",
+     "legendFormat": "cpu cores",
+     "refId": "A"
+    },
+    {
+     "expr": "mlx_hw_uptime_seconds{node=\"$node\"}",
+     "legendFormat": "uptime s",
+     "refId": "B"
+    },
+    {
+     "expr": "mlx_hw_mem_total_bytes{node=\"$node\"}",
+     "legendFormat": "mem total",
+     "refId": "C"
+    }
+   ],
+   "title": "Node info",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "red",
+        "value": null
+       },
+       {
+        "color": "green",
+        "value": 1
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 16,
+    "x": 8,
+    "y": 53
+   },
+   "id": 18,
+   "targets": [
+    {
+     "expr": "up{node=\"$node\"}",
+     "legendFormat": "{{job}}",
+     "refId": "A"
+    },
+    {
+     "expr": "mlx_hw_up{node=\"$node\"}",
+     "legendFormat": "hw agent",
+     "refId": "B"
+    }
+   ],
+   "title": "Telemetry up",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       },
+       {
+        "color": "red",
+        "value": 3
+       }
+      ]
+     },
+     "unit": "short",
+     "links": [
+      {
+       "title": "View firing alerts",
+       "url": "/alerting/list?search=state:firing",
+       "targetBlank": false
+      }
+     ]
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 8,
+    "x": 0,
+    "y": 57
+   },
+   "id": 33,
+   "options": {
+    "colorMode": "value",
+    "graphMode": "area",
+    "justifyMode": "auto",
+    "orientation": "auto",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "textMode": "auto"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     },
+     "expr": "count(ALERTS{alertstate=\"firing\", node=\"$node\"})",
+     "legendFormat": "firing",
+     "refId": "A"
+    }
+   ],
+   "title": "Active alerts",
+   "type": "stat"
+  }
+ ],
+ "refresh": "1m",
+ "schemaVersion": 39,
+ "tags": [
+  "mlx",
+  "node"
+ ],
+ "templating": {
+  "list": [
+   {
+    "current": {
+     "text": "rank0",
+     "value": "rank0"
+    },
+    "datasource": {
+     "type": "prometheus",
+     "uid": "VictoriaMetrics"
+    },
+    "label": "Node",
+    "name": "node",
+    "query": "label_values(mlx_hw_load1, node)",
+    "refresh": 1,
+    "type": "query"
+   }
+  ]
+ },
+ "time": {
+  "from": "now-1h",
+  "to": "now"
+ },
+ "timezone": "browser",
+ "title": "MLX Node",
+ "uid": "mlx-node",
+ "links": [
+  {
+   "asDropdown": false,
+   "icon": "external link",
+   "tags": [],
+   "targetBlank": false,
+   "tooltip": "",
+   "type": "link",
+   "title": "MLX Cluster",
+   "url": "/d/mlx-cluster"
+  },
+  {
+   "asDropdown": false,
+   "icon": "external link",
+   "tags": [],
+   "targetBlank": false,
+   "tooltip": "",
+   "type": "link",
+   "title": "MLX GPU Power",
+   "url": "/d/mlx-gpu-power"
+  },
+  {
+   "asDropdown": false,
+   "icon": "external link",
+   "tags": [],
+   "targetBlank": false,
+   "tooltip": "",
+   "type": "link",
+   "title": "MLX Model Sharding & Internals",
+   "url": "/d/mlx-model-internals"
+  },
+  {
+   "asDropdown": false,
+   "icon": "external link",
+   "tags": [],
+   "targetBlank": false,
+   "tooltip": "",
+   "type": "link",
+   "title": "MLX Logs & Runtime",
+   "url": "/d/mlx-logs"
+  }
+ ]
 }

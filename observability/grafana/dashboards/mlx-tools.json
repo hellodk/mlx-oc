@@ -1,698 +1,730 @@
 {
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      },
-      {
-        "datasource": {
-          "type": "prometheus",
-          "uid": "VictoriaMetrics"
-        },
-        "enable": true,
-        "expr": "ALERTS{alertstate=\"firing\"}",
-        "hide": false,
-        "iconColor": "#e24d42",
-        "name": "Alerts",
-        "showIn": 0,
-        "step": "60s",
-        "textFormat": "{{labels.node}} {{labels.severity}}",
-        "titleFormat": "ALERT: {{alertname}}",
-        "type": "prometheus"
-      }
-    ]
-  },
-  "editable": true,
-  "fiscalYearStartMonth": 0,
-  "graphTooltip": 1,
-  "id": null,
-  "links": [],
-  "liveNow": false,
-  "refresh": "10s",
-  "schemaVersion": 39,
-  "style": "dark",
-  "tags": [
-    "mlx",
-    "tools"
-  ],
-  "title": "MLX Tool Calls",
-  "uid": "mlx-tools",
-  "version": 1,
-  "weekStart": "",
-  "time": {
-    "from": "now-6h",
-    "to": "now"
-  },
-  "timepicker": {},
-  "templating": {
-    "list": [
-      {
-        "current": {},
-        "allValue": ".+",
-        "definition": "label_values(mlx_tool_calls_total{job=\"mlx-proxy\", tool=~\".+\"}, model)",
-        "hide": 0,
-        "includeAll": true,
-        "label": "model",
-        "multi": false,
-        "name": "model",
-        "options": [],
-        "query": {
-          "query": "label_values(mlx_tool_calls_total{job=\"mlx-proxy\", tool=~\".+\"}, model)",
-          "refId": "VictoriaMetrics-model-Variable-Query"
-        },
-        "refresh": 2,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "current": {},
-        "allValue": ".+",
-        "definition": "label_values(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}, tool)",
-        "hide": 0,
-        "includeAll": true,
-        "label": "tool",
-        "multi": false,
-        "name": "tool",
-        "options": [],
-        "query": {
-          "query": "label_values(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}, tool)",
-          "refId": "VictoriaMetrics-tool-Variable-Query"
-        },
-        "refresh": 2,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
-      }
-    ]
-  },
-  "panels": [
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 501,
-      "title": "Tool usage",
-      "type": "row"
+ "annotations": {
+  "list": [
+   {
+    "builtIn": 1,
+    "datasource": {
+     "type": "grafana",
+     "uid": "-- Grafana --"
     },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 0,
-        "y": 1
-      },
-      "id": 502,
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "expr": "sum(increase(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}[$__range]))",
-          "legendFormat": "__auto",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Tool calls (30d)",
-      "type": "stat"
+    "enable": true,
+    "hide": true,
+    "iconColor": "rgba(0, 211, 255, 1)",
+    "name": "Annotations & Alerts",
+    "type": "dashboard"
+   },
+   {
+    "datasource": {
+     "type": "prometheus",
+     "uid": "VictoriaMetrics"
     },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 6,
-        "y": 1
-      },
-      "id": 503,
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "expr": "count(sum by (tool) (increase(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}[$__range])))",
-          "legendFormat": "__auto",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Distinct tools (30d)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 12,
-        "y": 1
-      },
-      "id": 504,
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "expr": "count(sum by (tool) (increase(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}[7d])))",
-          "legendFormat": "__auto",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Tools active (7d)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 18,
-        "y": 1
-      },
-      "id": 505,
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "expr": "count(sum by (tool) (increase(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}[24h])))",
-          "legendFormat": "__auto",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Tools active (24h)",
-      "type": "stat"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 8
-      },
-      "id": 506,
-      "title": "Live by tool",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "short",
-          "custom": {
-            "fillOpacity": 20,
-            "lineWidth": 2,
-            "drawStyle": "line",
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 9
-      },
-      "id": 507,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(mlx_tool_calls_total{model=~\"$model\", tool=~\"$tool\"}[5m])) by (tool) * 60",
-          "legendFormat": "{{tool}}",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Tool calls / min (by tool)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "short",
-          "custom": {
-            "fillOpacity": 20,
-            "lineWidth": 2,
-            "drawStyle": "line",
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 9
-      },
-      "id": 508,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(mlx_tool_calls_total{model=~\"$model\", tool=~\"$tool\"}[5m])) by (type) * 60",
-          "legendFormat": "{{type}}",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Tool calls / min (by type)",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 18
-      },
-      "id": 509,
-      "title": "Breakdown",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 19
-      },
-      "id": 510,
-      "options": {
-        "showHeader": true,
-        "sortBy": [
-          {
-            "displayName": "Value",
-            "desc": true
-          }
-        ]
-      },
-      "targets": [
-        {
-          "expr": "sort_desc(sum by (tool, type) (increase(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}[$__range])))",
-          "format": "table",
-          "instant": true,
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "All tools called (30d)",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "short",
-          "custom": {
-            "fillOpacity": 80,
-            "lineWidth": 1
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 19
-      },
-      "id": 511,
-      "options": {
-        "orientation": "auto",
-        "showValue": "auto",
-        "legend": {
-          "showLegend": false
-        },
-        "xField": "tool",
-        "tooltip": {
-          "mode": "single"
-        }
-      },
-      "targets": [
-        {
-          "expr": "sort_desc(sum by (tool) (increase(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}[24h])))",
-          "legendFormat": "{{tool}}",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Tool calls (24h)",
-      "type": "barchart"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 30
-      },
-      "id": 512,
-      "title": "Distribution",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 12,
-        "x": 0,
-        "y": 31
-      },
-      "id": 513,
-      "options": {
-        "displayMode": "gradient",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showUnfilled": true,
-        "text": {
-          "valueSize": 16
-        }
-      },
-      "targets": [
-        {
-          "expr": "sort_desc(100 * sum by (tool) (increase(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}[$__range])) / clamp_min(sum(increase(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}[$__range])), 1))",
-          "legendFormat": "{{tool}}",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Share of calls (30d)",
-      "type": "bargauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "short",
-          "custom": {
-            "fillOpacity": 20,
-            "lineWidth": 2,
-            "drawStyle": "line",
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 12,
-        "x": 12,
-        "y": 31
-      },
-      "id": 514,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(mlx_tool_calls_total{model=~\"$model\", tool=~\"$tool\"}[5m])) by (kind) * 60",
-          "legendFormat": "{{kind}}",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          }
-        }
-      ],
-      "title": "Tool calls / min (by kind)",
-      "type": "timeseries"
-    }
+    "enable": true,
+    "expr": "ALERTS{alertstate=\"firing\"}",
+    "hide": false,
+    "iconColor": "#e24d42",
+    "name": "Alerts",
+    "showIn": 0,
+    "step": "60s",
+    "textFormat": "{{labels.node}} {{labels.severity}}",
+    "titleFormat": "ALERT: {{alertname}}",
+    "type": "prometheus"
+   }
   ]
+ },
+ "editable": true,
+ "fiscalYearStartMonth": 0,
+ "graphTooltip": 1,
+ "id": null,
+ "links": [
+  {
+   "asDropdown": false,
+   "icon": "external link",
+   "tags": [],
+   "targetBlank": false,
+   "tooltip": "",
+   "type": "link",
+   "title": "MLX HTTP Requests",
+   "url": "/d/mlx-http"
+  },
+  {
+   "asDropdown": false,
+   "icon": "external link",
+   "tags": [],
+   "targetBlank": false,
+   "tooltip": "",
+   "type": "link",
+   "title": "MLX Call Types",
+   "url": "/d/mlx-call-types"
+  },
+  {
+   "asDropdown": false,
+   "icon": "external link",
+   "tags": [],
+   "targetBlank": false,
+   "tooltip": "",
+   "type": "link",
+   "title": "MLX Performance",
+   "url": "/d/mlx-performance"
+  }
+ ],
+ "liveNow": false,
+ "refresh": "1m",
+ "schemaVersion": 39,
+ "style": "dark",
+ "tags": [
+  "mlx",
+  "tools"
+ ],
+ "title": "MLX Tool Calls",
+ "uid": "mlx-tools",
+ "version": 1,
+ "weekStart": "",
+ "time": {
+  "from": "now-6h",
+  "to": "now"
+ },
+ "timepicker": {},
+ "templating": {
+  "list": [
+   {
+    "current": {},
+    "allValue": ".+",
+    "definition": "label_values(mlx_tool_calls_total{job=\"mlx-proxy\", tool=~\".+\"}, model)",
+    "hide": 0,
+    "includeAll": true,
+    "label": "model",
+    "multi": false,
+    "name": "model",
+    "options": [],
+    "query": {
+     "query": "label_values(mlx_tool_calls_total{job=\"mlx-proxy\", tool=~\".+\"}, model)",
+     "refId": "VictoriaMetrics-model-Variable-Query"
+    },
+    "refresh": 2,
+    "regex": "",
+    "skipUrlSync": false,
+    "sort": 1,
+    "type": "query"
+   },
+   {
+    "current": {},
+    "allValue": ".+",
+    "definition": "label_values(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}, tool)",
+    "hide": 0,
+    "includeAll": true,
+    "label": "tool",
+    "multi": false,
+    "name": "tool",
+    "options": [],
+    "query": {
+     "query": "label_values(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}, tool)",
+     "refId": "VictoriaMetrics-tool-Variable-Query"
+    },
+    "refresh": 2,
+    "regex": "",
+    "skipUrlSync": false,
+    "sort": 1,
+    "type": "query"
+   }
+  ]
+ },
+ "panels": [
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 0
+   },
+   "id": 501,
+   "title": "Tool usage",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 6,
+    "x": 0,
+    "y": 1
+   },
+   "id": 502,
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "auto"
+   },
+   "targets": [
+    {
+     "expr": "sum(increase(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}[$__range]))",
+     "legendFormat": "__auto",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Tool calls (30d)",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 6,
+    "x": 6,
+    "y": 1
+   },
+   "id": 503,
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "auto"
+   },
+   "targets": [
+    {
+     "expr": "count(sum by (tool) (increase(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}[$__range])))",
+     "legendFormat": "__auto",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Distinct tools (30d)",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 6,
+    "x": 12,
+    "y": 1
+   },
+   "id": 504,
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "auto"
+   },
+   "targets": [
+    {
+     "expr": "count(sum by (tool) (increase(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}[7d])))",
+     "legendFormat": "__auto",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Tools active (7d)",
+   "type": "stat"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 6,
+    "x": 18,
+    "y": 1
+   },
+   "id": 505,
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "auto"
+   },
+   "targets": [
+    {
+     "expr": "count(sum by (tool) (increase(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}[24h])))",
+     "legendFormat": "__auto",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Tools active (24h)",
+   "type": "stat"
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 8
+   },
+   "id": 506,
+   "title": "Live by tool",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "short",
+     "custom": {
+      "fillOpacity": 20,
+      "lineWidth": 2,
+      "drawStyle": "line",
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 9
+   },
+   "id": 507,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum(rate(mlx_tool_calls_total{model=~\"$model\", tool=~\"$tool\"}[5m])) by (tool) * 60",
+     "legendFormat": "{{tool}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Tool calls / min (by tool)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "short",
+     "custom": {
+      "fillOpacity": 20,
+      "lineWidth": 2,
+      "drawStyle": "line",
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 9
+   },
+   "id": 508,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum(rate(mlx_tool_calls_total{model=~\"$model\", tool=~\"$tool\"}[5m])) by (type) * 60",
+     "legendFormat": "{{type}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Tool calls / min (by type)",
+   "type": "timeseries"
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 18
+   },
+   "id": 509,
+   "title": "Breakdown",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "thresholds"
+     },
+     "mappings": [],
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "short"
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 10,
+    "w": 12,
+    "x": 0,
+    "y": 19
+   },
+   "id": 510,
+   "options": {
+    "showHeader": true,
+    "sortBy": [
+     {
+      "displayName": "Value",
+      "desc": true
+     }
+    ]
+   },
+   "targets": [
+    {
+     "expr": "sort_desc(sum by (tool, type) (increase(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}[$__range])))",
+     "format": "table",
+     "instant": true,
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "All tools called (30d)",
+   "type": "table"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "short",
+     "custom": {
+      "fillOpacity": 80,
+      "lineWidth": 1
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 10,
+    "w": 12,
+    "x": 12,
+    "y": 19
+   },
+   "id": 511,
+   "options": {
+    "orientation": "auto",
+    "showValue": "auto",
+    "legend": {
+     "showLegend": false
+    },
+    "xField": "tool",
+    "tooltip": {
+     "mode": "single"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sort_desc(sum by (tool) (increase(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}[24h])))",
+     "legendFormat": "{{tool}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Tool calls (24h)",
+   "type": "barchart"
+  },
+  {
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 30
+   },
+   "id": 512,
+   "title": "Distribution",
+   "type": "row"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "percent",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 12,
+    "x": 0,
+    "y": 31
+   },
+   "id": 513,
+   "options": {
+    "displayMode": "gradient",
+    "orientation": "horizontal",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "showUnfilled": true,
+    "text": {
+     "valueSize": 16
+    }
+   },
+   "targets": [
+    {
+     "expr": "sort_desc(100 * sum by (tool) (increase(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}[$__range])) / clamp_min(sum(increase(mlx_tool_calls_total{model=~\"$model\", tool=~\".+\"}[$__range])), 1))",
+     "legendFormat": "{{tool}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Share of calls (30d)",
+   "type": "bargauge"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "color": {
+      "mode": "palette-classic"
+     },
+     "unit": "short",
+     "custom": {
+      "fillOpacity": 20,
+      "lineWidth": 2,
+      "drawStyle": "line",
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 12,
+    "x": 12,
+    "y": 31
+   },
+   "id": 514,
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum(rate(mlx_tool_calls_total{model=~\"$model\", tool=~\"$tool\"}[5m])) by (kind) * 60",
+     "legendFormat": "{{kind}}",
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "VictoriaMetrics"
+     }
+    }
+   ],
+   "title": "Tool calls / min (by kind)",
+   "type": "timeseries"
+  }
+ ],
+ "timezone": "browser"
 }

@@ -76,6 +76,13 @@ class ModelInfo:
     quant_group_size: int = 0
     arch: str = ""
     dtype: str = ""
+    linear_key_heads: int = 0
+    linear_value_heads: int = 0
+    linear_key_head_dim: int = 0
+    linear_value_head_dim: int = 0
+    linear_conv_kernel_dim: int = 0
+    mtp_layers: int = 0
+    tie_word_embeddings: bool = False
 
     @property
     def kv_bytes_for_max_context(self) -> int:
@@ -136,6 +143,13 @@ def model_info(model: str) -> ModelInfo:
         quant_group_size=int(quant.get("group_size") or 0),
         arch=archs[0] if archs else "",
         dtype=str(text.get("dtype") or ""),
+        linear_key_heads=int(text.get("linear_num_key_heads") or 0),
+        linear_value_heads=int(text.get("linear_num_value_heads") or 0),
+        linear_key_head_dim=int(text.get("linear_key_head_dim") or 0),
+        linear_value_head_dim=int(text.get("linear_value_head_dim") or 0),
+        linear_conv_kernel_dim=int(text.get("linear_conv_kernel_dim") or 0),
+        mtp_layers=int(text.get("mtp_num_hidden_layers") or 0),
+        tie_word_embeddings=bool(text.get("tie_word_embeddings") or False),
     )
 
 
