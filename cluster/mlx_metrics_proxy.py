@@ -794,6 +794,24 @@ class Proxy(BaseHTTPRequestHandler):
     logprobs_top = 0        # top_logprobs to request upstream; 0 == never inject
     stream_sample = 0.0     # fraction of streaming requests to de-stream
     low_conf_threshold = 0.5
+    max_prompt_tokens = 12000  # reject oversized prompts before upstream OOMs
+    max_tokens_cap = 4096      # clamp requested output length
+    max_body_bytes = 4 * 1024 * 1024  # reject oversized request bodies (413)
+    api_key = ""               # if set, require Authorization: Bearer <key>
+    rate_limit = 0             # requests per window per client IP; 0 == off
+    rate_window = 10.0
+    _rate_hits = {}            # ip -> list[monotonic timestamps]
+
+    def _rate_limited(self, key):
+        now = time.monotonic()
+        hits = [t for t in self._rate_hits.get(key, [])
+                if now - t < self.rate_window]
+        if len(hits) >= self.rate_limit:
+            self._rate_hits[key] = hits
+            return True
+        hits.append(now)
+        self._rate_hits[key] = hits
+        return False
 
     # -- helpers -----------------------------------------------------------
     def log_message(self, fmt, *args):
@@ -854,10 +872,44 @@ class Proxy(BaseHTTPRequestHandler):
         self.wfile.write(payload)
         self.wfile.flush()
 
+    def _reject(self, code, obj, model, kind):
+        """Write a JSON error response (guardrail rejection) and log it."""
+        try:
+            ERRORS.labels(model, f"{code // 100}xx", kind).inc()
+            payload = json.dumps(obj).encode("utf-8")
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(payload)
+            self.wfile.flush()
+        except Exception:
+            pass
+        self.close_connection = True
+
     def _forward(self):
         """Forward the current request to upstream and stream the reply."""
         t_arrival = time.monotonic()
         length = int(self.headers.get("Content-Length", 0) or 0)
+
+        # -- guardrails (auth / body size / rate limit) --------------------
+        if self.api_key and self.headers.get("Authorization") != f"Bearer {self.api_key}":
+            self._reject(401, {"error": {"message": "unauthorized",
+                                         "type": "authentication_error"}},
+                         MODEL_DEFAULT, "auth")
+            return
+        if length > self.max_body_bytes:
+            self._reject(413, {"error": {"message": "request body too large",
+                                         "type": "invalid_request_error"}},
+                         MODEL_DEFAULT, "chat")
+            return
+        if self.rate_limit and self._rate_limited(self.client_address[0]):
+            self._reject(429, {"error": {"message": "rate limit exceeded",
+                                         "type": "rate_limit_error"}},
+                         MODEL_DEFAULT, "chat")
+            return
+
         body = self.rfile.read(length) if length else b""
 
         req_path = self.path
@@ -895,6 +947,39 @@ class Proxy(BaseHTTPRequestHandler):
                 messages = req.get("messages") or []
                 if bool(req.get("enable_thinking", False)):
                     kind = "reasoning"
+
+                # Guardrails: the proxy fronts exactly one loaded model, and an
+                # 8 GB node OOMs on oversized prompts. Reject before upstream.
+                if model != MODEL_DEFAULT:
+                    self._reject(
+                        400,
+                        {"error": {"message": "model not loaded (proxy serves "
+                         f"{MODEL_DEFAULT})", "type": "invalid_request_error"}},
+                        model, kind,
+                    )
+                    return
+                prompt_tokens = sum(
+                    len((m.get("content") or "") if isinstance(m.get("content"), str)
+                        else json.dumps(m.get("content") or ""))
+                    for m in messages
+                ) // 4
+                if prompt_tokens > self.max_prompt_tokens:
+                    self._reject(
+                        400,
+                        {"error": {"message": f"prompt too long (~{prompt_tokens} "
+                         f"tokens > max {self.max_prompt_tokens})",
+                         "type": "invalid_request_error"}},
+                        model, kind,
+                    )
+                    return
+                # Bound output length: clamp client max_tokens and default it
+                # so a single request can never hog the GPU indefinitely.
+                mt = req.get("max_tokens")
+                if mt is None:
+                    req["max_tokens"] = self.max_tokens_cap
+                elif mt > self.max_tokens_cap:
+                    req["max_tokens"] = self.max_tokens_cap
+                    body = json.dumps(req).encode("utf-8")
 
                 if req.get("logprobs"):
                     # The caller wants them: leave the request alone and read
@@ -1505,6 +1590,31 @@ def main():
         "http://192.168.1.10:32173/api/v1/private/otel). Adds OpenInference "
         "spans exported to Opik's OTLP ingestion.",
     )
+    ap.add_argument(
+        "--max-prompt-tokens",
+        type=int,
+        default=int(os.environ.get("MLX_MAX_PROMPT_TOKENS", "12000")),
+        help="Reject chat prompts longer than this (proxy-side guardrail). "
+        "Prevents upstream Metal OOM on the 8 GB rank0 node.",
+    )
+    ap.add_argument(
+        "--max-tokens-cap",
+        type=int,
+        default=int(os.environ.get("MLX_MAX_TOKENS_CAP", "4096")),
+        help="Clamp/default the client's max_tokens to this value.",
+    )
+    ap.add_argument(
+        "--max-body-bytes",
+        type=int,
+        default=int(os.environ.get("MLX_MAX_BODY_BYTES", str(4 * 1024 * 1024))),
+        help="Reject request bodies larger than this (413).",
+    )
+    ap.add_argument(
+        "--rate-limit",
+        type=int,
+        default=int(os.environ.get("MLX_RATE_LIMIT", "0")),
+        help="Max chat requests per 10s per client IP; 0 disables (429).",
+    )
     args = ap.parse_args()
 
     host, _, port = args.listen.rpartition(":")
@@ -1515,6 +1625,11 @@ def main():
     Proxy.logprobs_top = max(0, min(10, args.logprobs))
     Proxy.stream_sample = max(0.0, min(1.0, args.logprobs_stream_sample))
     Proxy.low_conf_threshold = args.low_confidence_threshold
+    Proxy.api_key = os.environ.get("MLX_API_KEY", "")
+    Proxy.max_prompt_tokens = args.max_prompt_tokens
+    Proxy.max_tokens_cap = args.max_tokens_cap
+    Proxy.max_body_bytes = args.max_body_bytes
+    Proxy.rate_limit = args.rate_limit
 
     MODEL_DEFAULT = args.model
     # Seed zero-valued series for counters that only fire on real events, so

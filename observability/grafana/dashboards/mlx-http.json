@@ -708,75 +708,6 @@
      "color": {
       "mode": "palette-classic"
      },
-     "unit": "s",
-     "custom": {
-      "fillOpacity": 20,
-      "lineWidth": 2,
-      "drawStyle": "line",
-      "showPoints": "never"
-     }
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 8,
-    "w": 6,
-    "x": 12,
-    "y": 19
-   },
-   "id": 322,
-   "options": {
-    "legend": {
-     "displayMode": "list",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "targets": [
-    {
-     "expr": "histogram_quantile(0.50, sum(rate(mlx_generation_seconds_bucket[30m])) by (le))",
-     "legendFormat": "p50",
-     "refId": "A",
-     "datasource": {
-      "type": "prometheus",
-      "uid": "VictoriaMetrics"
-     }
-    },
-    {
-     "expr": "histogram_quantile(0.95, sum(rate(mlx_generation_seconds_bucket[30m])) by (le))",
-     "legendFormat": "p95",
-     "refId": "B",
-     "datasource": {
-      "type": "prometheus",
-      "uid": "VictoriaMetrics"
-     }
-    }
-   ],
-   "title": "Generation time (p50 / p95)",
-   "type": "timeseries",
-   "links": [
-    {
-     "title": "Drill-down: performance",
-     "url": "/d/mlx-performance",
-     "targetBlank": false,
-     "type": "link"
-    }
-   ]
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
      "unit": "short",
      "custom": {
       "fillOpacity": 20,
@@ -1247,86 +1178,6 @@
    "type": "stat"
   },
   {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "thresholds"
-     },
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       }
-      ]
-     },
-     "unit": "short"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 7,
-    "w": 6,
-    "x": 12,
-    "y": 37
-   },
-   "id": 9058,
-   "targets": [
-    {
-     "expr": "mlx_context_used_tokens{model=~\"$model\"}",
-     "legendFormat": "{{model}}",
-     "refId": "A"
-    }
-   ],
-   "title": "Context used (tokens)",
-   "type": "stat"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "thresholds"
-     },
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       }
-      ]
-     },
-     "unit": "percentunit"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 7,
-    "w": 6,
-    "x": 18,
-    "y": 37
-   },
-   "id": 9059,
-   "targets": [
-    {
-     "expr": "mlx_context_utilization{model=~\"$model\"}",
-     "legendFormat": "{{model}}",
-     "refId": "A"
-    }
-   ],
-   "title": "Context utilization",
-   "type": "stat"
-  },
-  {
    "collapsed": false,
    "gridPos": {
     "h": 1,
@@ -1563,58 +1414,6 @@
      "type": "link"
     }
    ]
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "unit": "reqps",
-     "custom": {
-      "fillOpacity": 20,
-      "lineWidth": 2,
-      "drawStyle": "line",
-      "showPoints": "never"
-     }
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 7,
-    "w": 6,
-    "x": 0,
-    "y": 52
-   },
-   "id": 9065,
-   "options": {
-    "legend": {
-     "displayMode": "list",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "targets": [
-    {
-     "expr": "sum(rate(mlx_low_confidence_response_total{model=~\"$model\"}[5m])) * 60",
-     "legendFormat": "low-conf",
-     "refId": "A",
-     "datasource": {
-      "type": "prometheus",
-      "uid": "VictoriaMetrics"
-     }
-    }
-   ],
-   "title": "Low-confidence responses / min",
-   "type": "timeseries"
   },
   {
    "collapsed": false,
@@ -1961,73 +1760,6 @@
      "type": "link"
     }
    ]
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "thresholds"
-     },
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "orange",
-        "value": 5
-       },
-       {
-        "color": "red",
-        "value": 20
-       }
-      ]
-     },
-     "max": 100,
-     "min": 0,
-     "unit": "percent"
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 8,
-    "w": 8,
-    "x": 16,
-    "y": 68
-   },
-   "id": 9076,
-   "options": {
-    "reduceOptions": {
-     "calcs": [
-      "lastNotNull"
-     ],
-     "fields": "",
-     "values": false
-    },
-    "orientation": "auto",
-    "showThresholdLabels": false,
-    "showThresholdMarkers": true
-   },
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "VictoriaMetrics"
-     },
-     "expr": "100 * sum(rate(mlx_error_total{model=~\"$model\"}[5m])) / clamp_min(sum(rate(mlx_requests_total{model=~\"$model\"}[5m])), 0.0001) or on() vector(0)",
-     "legendFormat": "error ratio",
-     "refId": "A",
-     "format": "time_series"
-    }
-   ],
-   "title": "Error ratio %",
-   "type": "gauge"
   }
  ],
  "refresh": "5m",
@@ -2068,6 +1800,6 @@
  "timezone": "browser",
  "title": "MLX HTTP Requests",
  "uid": "mlx-http",
- "version": 4,
+ "version": 5,
  "weekStart": ""
 }

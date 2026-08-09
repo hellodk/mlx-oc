@@ -99,58 +99,6 @@
    "fieldConfig": {
     "defaults": {
      "color": {
-      "mode": "palette-classic"
-     },
-     "unit": "short",
-     "custom": {
-      "fillOpacity": 20,
-      "lineWidth": 2,
-      "drawStyle": "line",
-      "showPoints": "never"
-     }
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 8,
-    "w": 8,
-    "x": 0,
-    "y": 1
-   },
-   "id": 402,
-   "options": {
-    "legend": {
-     "displayMode": "list",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "targets": [
-    {
-     "expr": "sum(rate(mlx_requests_total{model=~\"$model\"}[5m])) by (kind) * 60",
-     "legendFormat": "{{kind}}",
-     "refId": "A",
-     "datasource": {
-      "type": "prometheus",
-      "uid": "VictoriaMetrics"
-     }
-    }
-   ],
-   "title": "Requests / min (kind)",
-   "type": "timeseries"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "color": {
       "mode": "thresholds"
      },
      "unit": "percent",
@@ -528,58 +476,6 @@
     }
    },
    "type": "timeseries",
-   "id": 416,
-   "title": "Tool calls / min (tool)",
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 0,
-    "y": 20
-   },
-   "targets": [
-    {
-     "expr": "sum(rate(mlx_tool_calls_total{model=~\"$model\"}[5m])) by (tool) * 60",
-     "legendFormat": "{{tool}}",
-     "refId": "A",
-     "datasource": {
-      "type": "prometheus",
-      "uid": "VictoriaMetrics"
-     }
-    }
-   ]
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "unit": "short",
-     "custom": {
-      "fillOpacity": 20,
-      "lineWidth": 2,
-      "drawStyle": "line",
-      "showPoints": "never"
-     }
-    },
-    "overrides": []
-   },
-   "options": {
-    "legend": {
-     "displayMode": "list",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "type": "timeseries",
    "id": 417,
    "title": "Tool calls / min (type)",
    "gridPos": {
@@ -786,58 +682,6 @@
    "type": "timeseries"
   },
   {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "unit": "short",
-     "custom": {
-      "fillOpacity": 20,
-      "lineWidth": 2,
-      "drawStyle": "line",
-      "showPoints": "never"
-     }
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 8,
-    "w": 6,
-    "x": 18,
-    "y": 28
-   },
-   "id": 424,
-   "options": {
-    "legend": {
-     "displayMode": "list",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "targets": [
-    {
-     "expr": "mlx_temperature{model=~\"$model\"}",
-     "legendFormat": "{{kind}}",
-     "refId": "A",
-     "datasource": {
-      "type": "prometheus",
-      "uid": "VictoriaMetrics"
-     }
-    }
-   ],
-   "title": "Temperature (kind, last)",
-   "type": "timeseries"
-  },
-  {
    "collapsed": false,
    "gridPos": {
     "h": 1,
@@ -921,58 +765,6 @@
    "title": "Hallucination risk (kind)",
    "type": "timeseries",
    "description": "Composite heuristic risk of the most recent request per kind."
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "unit": "short",
-     "custom": {
-      "fillOpacity": 20,
-      "lineWidth": 2,
-      "drawStyle": "line",
-      "showPoints": "never"
-     }
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 8,
-    "w": 6,
-    "x": 12,
-    "y": 37
-   },
-   "id": 432,
-   "options": {
-    "legend": {
-     "displayMode": "list",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "targets": [
-    {
-     "expr": "sum(rate(mlx_hallucination_flag_total{model=~\"$model\"}[5m])) * 60",
-     "legendFormat": "flags",
-     "refId": "A",
-     "datasource": {
-      "type": "prometheus",
-      "uid": "VictoriaMetrics"
-     }
-    }
-   ],
-   "title": "Hallucination flags / min (kind)",
-   "type": "timeseries"
   },
   {
    "datasource": {
@@ -1078,6 +870,6 @@
  "timezone": "browser",
  "title": "MLX Call Types (reasoning vs chat)",
  "uid": "mlx-call-types",
- "version": 2,
+ "version": 3,
  "weekStart": ""
 }

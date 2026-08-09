@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>22 — The Observability Reference: Every Panel, Every Formula, and the Day the Server Fell Over</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#4f46e5;--accent-soft:#eef0ff;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(79,70,229,.10), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(219,39,119,.09), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #dfe1ff;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:720px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  .pill{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 9px;margin-right:4px}
+  .p0{background:#fde8f1;color:#9d174d;border:1px solid #fbcfe8}
+  .p1{background:#fef3d7;color:#92400e;border:1px solid #fde68a}
+  .p2{background:#e6f6f4;color:#065f46;border:1px solid #a7f3d0}
+  .dbadge{display:inline-block;font-size:11px;font-weight:800;border-radius:6px;padding:2px 8px;margin-right:6px;background:var(--accent-soft);color:var(--accent);border:1px solid #dfe1ff;vertical-align:middle}
+  .q{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--code-bg);border:1px solid var(--line);border-radius:6px;padding:1px 5px;white-space:nowrap}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="3-dashboards.html">Dashboards</a>
+  <a href="17-opik-dashboards.html">Opik dashboards</a>
+  <a href="21-thunderbolt-ring-launchdaemons.html">TB4 launchd</a>
+  <a href="22-observability-dashboard-reference.html" style="color:var(--accent);font-weight:700">Dashboard reference</a>
+</div></nav>
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Post 22 &middot; the observability reference</span>
+    <h1>Every Panel, Every Formula &mdash; and the Day the Server Fell Over</h1>
+    <p class="sub">A complete reference to the twelve Grafana dashboards: what each of the 259 panels is, the exact PromQL behind it, and the significance of the signal. Plus the crash post-mortem that shaped three of them, the proxy guardrails that stopped it, and the signal-to-noise pass that removed 20 duplicate widgets.</p>
+    <div class="meta"><span><b>Panels</b> 259 across 12 dashboards</span><span><b>Crash</b> 4 restarts in 31 minutes</span><span><b>Removed</b> 20 duplicate widgets</span><span><b>Guardrails</b> 5 proxy-side checks</span></div>
+  </div>
+</header>
+<main class="wrap">
+
+<section>
+  <h2><span class="num">1</span>The day the server fell over</h2>
+  <p>Four crashes in 31 minutes, all <code>metal_gpu_error</code>. The supervisor sniffed the reason from the log and restarted each time, but the pattern &mdash; &ldquo;crashes after a few requests&rdquo; &mdash; was a real bug, not a flaky GPU:</p>
+  <table>
+    <tr><th>Time</th><th>Metal error</th><th>Context</th></tr>
+    <tr><td>21:28</td><td>Command buffer failed</td><td>warm-up traffic</td></tr>
+    <tr><td>21:38</td><td>Command buffer failed</td><td>warm-up traffic</td></tr>
+    <tr><td>21:59</td><td><code>SubmissionsIgnored</code></td><td><code>Prompt Cache: 3 sequences, 3.04 GB</code></td></tr>
+    <tr><td>22:20</td><td><code>OutOfMemory</code> (rank0 SIGABRT)</td><td>a <b>17,667-token</b> prompt in flight</td></tr>
+  </table>
+  <p>rank0 (this Mac mini) has <b>8 GiB</b> of unified GPU memory. The 8-bit Qwen3.5-4B weights allocate ~4.6 GiB. fp16 KV costs ~<b>144 KB per token</b>, so a 17.6k-token prompt alone needs ~2.5 GiB of KV &mdash; and the server&rsquo;s LRU <i>prompt cache</i> was holding up to 10 assistant sequences with <i>no byte limit</i> (3 sequences had already grown to 3.04 GB). Two compounding causes:</p>
+  <ol>
+    <li><b>Unbounded assistant prompt cache</b> &mdash; <code>mlx_lm.server</code> defaults to <code>--prompt-cache-size 10</code> with <code>--prompt-cache-bytes</code> unset.</li>
+    <li><b>An external client (192.168.1.10)</b> POSTing models the node cannot host &mdash; <code>Meta-Llama-3.1-8B-Instruct-8bit</code> (~8 GB) &mdash; plus a 17,667-token prompt.</li>
+  </ol>
+  <div class="callout warn"><span class="ic">!</span><div>The crash was <b>memory exhaustion</b>, and it looked like &ldquo;the server is unstable after a few requests&rdquo;. The dashboards made the real cause visible in minutes: the prompt-cache bytes in MLX Performance (kv agent row) and the request source in MLX Logs &amp; Runtime.</div></div>
+
+  <h3>The fixes that stopped it</h3>
+  <pre><code># start_server.sh — bound the in-GPU prompt cache
+--prompt-cache-size 4 --prompt-cache-bytes 2g --prompt-concurrency 4
+
+# mlx_metrics_proxy.py — reject before the GPU ever sees the request
+--max-prompt-tokens 12000   # prompt-token cap        (400)
+--max-tokens-cap 4096       # clamp/default max_tokens
+--max-body-bytes 4MiB       # request body cap        (413)
+--rate-limit 0              # per-IP / 10s            (429, off)
+MLX_API_KEY=                # bearer auth             (401, off)</code></pre>
+  <p>Since the guardrails landed (22:27): <b>zero crashes, zero restarts</b>. The proxy is now a hard gate in front of the 8 GiB node &mdash; it cannot be made to load a model it has not loaded, or process a prompt that would OOM the Metal command buffer.</p>
+</section>
+
+<section>
+  <h2><span class="num">2</span>The twelve dashboards at a glance</h2>
+  <p>All dashboards run on the single <code>VictoriaMetrics</code> datasource, refresh every 5 minutes, and use only core Grafana plugins (timeseries, stat, gauge, heatmap, barchart, table, bargauge, text, row). One canonical home per metric family &mdash; the result of the signal-to-noise pass in section 14.</p>
+  <table>
+    <tr><th>Dashboard</th><th>Panels</th><th>Feeds off</th><th>Job it answers</th></tr>
+    <tr><td>MLX Cluster</td><td>38</td><td>all exporters</td><td>&ldquo;Is the whole system healthy right now?&rdquo;</td></tr>
+    <tr><td>MLX Alerts &amp; Serving Health</td><td>24</td><td>supervisor, logtailer, ALERTS</td><td>&ldquo;What is crashing / flapping?&rdquo;</td></tr>
+    <tr><td>MLX HTTP Requests</td><td>26</td><td>proxy</td><td>&ldquo;How is serving performing?&rdquo;</td></tr>
+    <tr><td>MLX Performance</td><td>31</td><td>proxy + kv agent</td><td>&ldquo;Where are the latency/quality regressions?&rdquo;</td></tr>
+    <tr><td>MLX Call Types</td><td>12</td><td>proxy (kind/reasoning)</td><td>&ldquo;Are reasoning vs chat behaving differently?&rdquo;</td></tr>
+    <tr><td>MLX Tool Calls</td><td>10</td><td>proxy (tool/type)</td><td>&ldquo;Which tools are used, how often, with what share?&rdquo;</td></tr>
+    <tr><td>MLX Model Sharding &amp; Internals</td><td>35</td><td>model_info + kv agent + ring</td><td>&ldquo;How is the model split across the ring?&rdquo;</td></tr>
+    <tr><td>MLX Model</td><td>19</td><td>model_info</td><td>&ldquo;What exactly is this model?&rdquo;</td></tr>
+    <tr><td>MLX Node</td><td>29</td><td>hw telemetry</td><td>&ldquo;What is one Mac mini doing?&rdquo;</td></tr>
+    <tr><td>MLX GPU &amp; Power</td><td>12</td><td>hw telemetry</td><td>&ldquo;Is the GPU hot, throttled, power-hungry?&rdquo;</td></tr>
+    <tr><td>MLX Logs &amp; Runtime</td><td>9</td><td>logtailer + supervisor</td><td>&ldquo;Is the log pipeline healthy?&rdquo;</td></tr>
+    <tr><td>MLX SRE</td><td>14</td><td>proxy (SLI view)</td><td>&ldquo;Are we inside the SLO budget?&rdquo;</td></tr>
+  </table>
+  <p class="pill p2">259 data panels after consolidation</p>
+</section>
+
+<section>
+  <h2><span class="num">3</span>MLX Cluster &mdash; the one-glance screen</h2>
+  <p>Rows: Summary, Inference, Hallucination &amp; Quality, Hardware (per node), Hardware (GPU &amp; power), Proxy runtime, Status. Every stat row is the &ldquo;answer in one number&rdquo; version of a panel that lives in detail elsewhere &mdash; this is the dashboard you open first.</p>
+  <table>
+    <tr><th>Row</th><th>Panel</th><th>Formula</th><th>Significance</th></tr>
+    <tr><td>Summary</td><td>Nodes online</td><td class="q">count(up{job="mlx-hw"}==1)</td><td>both Mac minis present</td></tr>
+    <tr><td>Summary</td><td>Requests / Tokens out / Tool calls / Halluc. flags (5m)</td><td class="q">sum(increase(mlx_requests_total[5m]))</td><td>raw activity in the last 5 minutes</td></tr>
+    <tr><td>Summary</td><td>Avg tok/s</td><td class="q">sum(rate(mlx_token_rate_tokens_per_second_sum[5m])) / sum(rate(..._count[5m]))</td><td>mean decode speed, sum/count trick</td></tr>
+    <tr><td>Summary</td><td>TTFT p95</td><td class="q">histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket[5m])) by (le))</td><td>95th % of first-token latency</td></tr>
+    <tr><td>Summary</td><td>Upstream up / Exporters up / Active alerts</td><td class="q">mlx_up / up / count(ALERTS{firing})</td><td>the three health tripwires</td></tr>
+    <tr><td>Summary</td><td>Nodes throttling</td><td class="q">count(mlx_hw_thermal_pressure>0)</td><td>any node under thermal throttling</td></tr>
+    <tr><td>Inference</td><td>Requests, TTFT, Generation time, Token rate, Tool calls, Streaming share, Prompt tokens</td><td class="q">histogram_quantile(p, sum(rate(mlx_*_bucket[5m])) by (le))</td><td>serving perf in one glance (p50/p95)</td></tr>
+    <tr><td>Hallucination &amp; Quality</td><td>Risk (last) / Risk p95 / Heuristics / Flags</td><td class="q">mlx_hallucination_risk + histogram_quantile + mlx_heuristic_*</td><td>composite risk vs its component heuristics</td></tr>
+    <tr><td>Hardware</td><td>Load, mem %, memory pressure, worker RSS/CPU, disk %, GPU/power, GPU mem</td><td class="q">mlx_hw_*{node=~"$node"}</td><td>resource envelope per node</td></tr>
+    <tr><td>Status</td><td>Tool calls by tool</td><td class="q">sum(rate(mlx_tool_calls_total[1m])) by (tool)*60</td><td>which tool is hottest right now</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">4</span>MLX Alerts &amp; Serving Health &mdash; failure reasons with counts</h2>
+  <p>Rows: Alert state, Serving status (supervisor :9105), Crash context &amp; probe health, Log streaming, Faults/errors/restarts. This is where the crash post-mortem lives.</p>
+  <table>
+    <tr><th>Panel</th><th>Formula</th><th>Significance</th></tr>
+    <tr><td>Active firing alerts / Firing by severity / Alert event rate</td><td class="q">count(ALERTS{firing}) / sum by (severity) / rate(...)</td><td>alert state from vmalert</td></tr>
+    <tr><td>Process / ready / model loaded</td><td class="q">max(mlx_server_up)</td><td>is the supervisor&rsquo;s child alive</td></tr>
+    <tr><td>Serving status history / Server restarts (5m) / uptime</td><td class="q">mlx_server_up, increase(mlx_server_restarts_total[5m])</td><td>flapping visibility</td></tr>
+    <tr><td>Last crash reason</td><td class="q">mlx_server_last_crash_reason{reason=...}</td><td>which reason is current (bool stat per reason)</td></tr>
+    <tr><td>Health probe outcomes (ok vs fail)</td><td class="q">sum(rate(mlx_server_health_checks_total[5m])) by (result)</td><td>did probes start failing before the crash</td></tr>
+    <tr><td><b>Failure reasons (table)</b></td><td class="q">sum(mlx_server_crashes_total) by (reason) + increase[24h] + last_crash_reason</td><td><b>reason | total | last-24h | active</b> in one table</td></tr>
+    <tr><td>Crashes by reason (total) / Crashes per hour / Crashes last 24h</td><td class="q">sum by (reason), increase[1h] by (reason)</td><td>totals + rate per reason</td></tr>
+    <tr><td>Backoff delay / Last exit code / Total restarts</td><td class="q">mlx_server_backoff_seconds, mlx_server_last_exit_code, mlx_server_restarts_total</td><td>crash-loop indicator</td></tr>
+    <tr><td>Proxy errors by status class / Error ratio</td><td class="q">sum(rate(mlx_error_total[5m])) by (status) / .../requests</td><td>client-facing health</td></tr>
+    <tr><td>Log tailer up / shipped / dropped / errors</td><td class="q">mlx_log_tailer_*</td><td>the log pipeline is a first-class citizen</td></tr>
+    <tr><td>Flapping alerts table</td><td class="q">sum(increase(ALERTS{firing}[15m])) by (alertname)>0</td><td>alerts that arm/disarm repeatedly</td></tr>
+  </table>
+  <div class="callout ok"><span class="ic">&#10003;</span><div>During the incident this dashboard read <code>metal_gpu_error=4</code>, exit <code>-6</code>, backoff growing 0&rarr;6&rarr;12s &mdash; the classic crash-loop signature, before the guardrails landed.</div></div>
+</section>
+
+<section>
+  <h2><span class="num">5</span>MLX HTTP Requests &mdash; serving telemetry</h2>
+  <p>Rows: Traffic, Outcomes &amp; errors, Latency, Throughput, Call profile, Cache &amp; queue, Distributions &amp; aggregates. The day-to-day serving dashboard.</p>
+  <table>
+    <tr><th>Row</th><th>Panel</th><th>Formula</th><th>Significance</th></tr>
+    <tr><td>Traffic</td><td>Requests/min (streaming / kind), In-flight, Requests 24h</td><td class="q">sum(rate(mlx_requests_total[5m])) by (streaming|kind)*60</td><td>volume, mix, queue depth</td></tr>
+    <tr><td>Outcomes</td><td>Errors/min (status class / kind)</td><td class="q">sum(rate(mlx_error_total[5m])) by (status|kind)*60</td><td>4xx vs 5xx split</td></tr>
+    <tr><td>Outcomes</td><td>Error ratio %</td><td class="q">100*sum(rate(errors))/clamp_min(sum(rate(requests)),0.0001) or on() vector(0)</td><td>the <code>vector(0)</code> keeps it at 0 when idle</td></tr>
+    <tr><td>Latency</td><td>TTFT p50/p95/p99</td><td class="q">histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket[30m])) by (le))</td><td>time to first token</td></tr>
+    <tr><td>Latency</td><td>Token rate p50/p95</td><td class="q">histogram_quantile(... mlx_token_rate_tokens_per_second_bucket)</td><td>decode speed percentiles</td></tr>
+    <tr><td>Throughput</td><td>Tokens/min in/out, avg tokens/req, tool calls/min, hall. flags/min, by tool</td><td class="q">rate/prometheus-rate arithmetic</td><td>economics + quality events</td></tr>
+    <tr><td>Call profile</td><td>Finish reason/min, Temperature</td><td class="q">sum(rate(mlx_finish_reason_total[5m])) by (reason)</td><td>stop vs length vs tool_calls mix</td></tr>
+    <tr><td>Cache &amp; queue</td><td>Prompt cache hit ratio, cumulative hit %, cached tokens/min, queue wait</td><td class="q">mlx_prompt_cache_ratio, 100*increase(cached)/clamp_min(increase(prompt)), histogram_quantile(queue_wait)</td><td>how much prompt recompute the cache saves</td></tr>
+    <tr><td>Distributions</td><td>TTFT / entropy / hallucination-risk heatmaps</td><td class="q">sum(rate(mlx_*_bucket[30m])) by (le)</td><td>full distribution, not just quantiles</td></tr>
+    <tr><td>Aggregates</td><td>Errors by status (24h) barchart, Requests by kind table</td><td class="q">sort_desc(sum by (status) (increase(mlx_error_total[24h])))</td><td>long-window rollups</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">6</span>MLX Performance &mdash; latency &amp; quality regressions</h2>
+  <p>Rows: KV cache (kv agent :9104), Context length, Throughput &amp; latency, Model quality, Completion outcomes, Answer confidence (token logprobs). The &ldquo;why is it slow / bad&rdquo; dashboard.</p>
+  <table>
+    <tr><th>Row</th><th>Panel</th><th>Formula</th><th>Significance</th></tr>
+    <tr><td>KV cache</td><td>Cache size by type, cached sequences, utilization %</td><td class="q">mlx_kv_cache_bytes{type!="total"}/1e9, mlx_kv_cache_utilization*100</td><td>the exact metric that exposed the 3.04 GB cache</td></tr>
+    <tr><td>Context</td><td>Context used, utilization %, max context</td><td class="q">mlx_context_used_tokens, max(mlx_context_utilization)*100</td><td>are requests approaching the ceiling</td></tr>
+    <tr><td>Throughput</td><td>Requests/min, Tokens/min, TTFT, Generation time</td><td class="q">histogram_quantile(...)</td><td>p50/p95 on 30m buckets</td></tr>
+    <tr><td>Quality</td><td>Hallucination risk (last + p95), flags total</td><td class="q">mlx_hallucination_risk, sum(mlx_hallucination_flag_total)</td><td>heuristic risk trend</td></tr>
+    <tr><td>Outcomes</td><td>Finish reason breakdown, truncated %, truncated (5m)</td><td class="q">100*rate(finish_reason{length})/clamp_min(rate(total))</td><td>silent quality loss = outputs cut at max_tokens</td></tr>
+    <tr><td>Confidence</td><td>Token confidence mean/min/std, perplexity p50/p95, entropy, margin, low-confidence %</td><td class="q">mlx_token_confidence_*, histogram_quantile(perplexity), mlx_token_entropy_nats, 100*mlx_low_confidence_token_ratio</td><td>sampler-level honesty signals (logprobs)</td></tr>
+    <tr><td>Confidence</td><td>Scoring coverage %</td><td class="q">100*rate(mlx_confidence_scored_total)/clamp_min(rate(requests))</td><td>what fraction of responses were actually scored</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">7</span>MLX Call Types &mdash; reasoning vs chat</h2>
+  <p>Everything sliced by <code>kind</code> (<code>chat</code> vs <code>reasoning</code>, set by <code>enable_thinking</code>) and by streaming.</p>
+  <table>
+    <tr><th>Panel</th><th>Formula</th><th>Significance</th></tr>
+    <tr><td>Reasoning share % / Reasoning share 24h</td><td class="q">100*rate(requests{kind="reasoning"})/clamp_min(rate(requests))</td><td>how much of traffic is thinking mode</td></tr>
+    <tr><td>Stream vs sync by kind</td><td class="q">sum(rate(...)) by (kind, streaming)*60</td><td>interaction-style mix</td></tr>
+    <tr><td>Tokens/min prompt &amp; completion by kind</td><td class="q">sum(rate(mlx_tokens_*_total)) by (kind)</td><td>reasoning burns more tokens &mdash; quantify it</td></tr>
+    <tr><td>Tool calls/min, Finish reason by kind</td><td class="q">sum(rate(...)) by (kind | reason, kind)</td><td>behavioral differences per mode</td></tr>
+    <tr><td>Avg prompt/completion tokens per request by kind</td><td class="q">rate(tokens)/clamp_min(rate(requests)) by (kind)</td><td>efficiency per mode</td></tr>
+    <tr><td>Error ratio % (kind), Hallucination risk (kind)</td><td class="q">100*rate(errors)/rate(requests) by (kind)</td><td>quality/errors per mode</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">8</span>MLX Tool Calls &mdash; agentic usage</h2>
+  <p>Uses <code>tool=~".+"</code> to exclude the seeded empty-label series, so counts are real tool events only.</p>
+  <table>
+    <tr><th>Panel</th><th>Formula</th><th>Significance</th></tr>
+    <tr><td>Tool calls 30d / Distinct tools 30d / Tools active 7d / 24h</td><td class="q">sum(increase(mlx_tool_calls_total{...,tool=~".+"}[$__range]))</td><td>breadth and depth of tool usage</td></tr>
+    <tr><td>Tool calls/min by tool / by type / by kind</td><td class="q">sum(rate(...)) by (tool|type|kind)*60</td><td>live activity split</td></tr>
+    <tr><td>All tools called (30d) table / Tool calls 24h barchart / Share of calls</td><td class="q">sort_desc(sum by (tool,type)(increase(...)))</td><td>long-window rankings + share</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">9</span>MLX Model Sharding &amp; Internals &mdash; the distributed view</h2>
+  <p>Rows: Model facts, Linear attention, Weight footprint, Runtime shards, Ring interconnect, KV cache agent, Context, Parallelism. Reads <code>mlx_model_info{attr=...}</code> (emitted once at load) plus live ring/kv/worker metrics.</p>
+  <table>
+    <tr><th>Row</th><th>Panel</th><th>Formula</th><th>Significance</th></tr>
+    <tr><td>Model facts</td><td>Architecture, layers, heads, KV heads, head dim, hidden</td><td class="q">mlx_model_info{attr="layer_count"|"kv_heads"|...}</td><td>GQA shape that sets the KV-per-token cost</td></tr>
+    <tr><td>Linear attention</td><td>Linear key/value heads, dims, conv kernel, MTP layers</td><td class="q">mlx_model_info{attr="linear_*"|"mtp_layers"}</td><td>Qwen3.5-style hybrid attention</td></tr>
+    <tr><td>Weight footprint</td><td>Quant bits, group size, vocab, intermediate</td><td class="q">mlx_model_info{attr="quant_bits"|...}</td><td>why the weights cost ~4.6 GiB</td></tr>
+    <tr><td>Runtime shards</td><td>server RSS / GPU mem / GPU util per node</td><td class="q">sum(mlx_worker_rss_bytes) by (node)</td><td>tensor-parallel shard balance</td></tr>
+    <tr><td>Ring</td><td>RX/TX bytes/s, TX, errors/s per node</td><td class="q">sum(rate(mlx_net_rx_bytes_total[5m])) by (node)</td><td>TB4 link utilization + error state</td></tr>
+    <tr><td>KV cache agent</td><td>bytes by type, utilization, sequences, bytes/token, est@max, max seqs</td><td class="q">sum(mlx_kv_cache_bytes) by (type), mlx_kv_bytes_per_token</td><td>the memory-accounting row that caught the crash</td></tr>
+    <tr><td>Context</td><td>max/used/utilization</td><td class="q">mlx_context_*</td><td>how close requests get to the ceiling</td></tr>
+    <tr><td>Parallelism</td><td>Worker CPU % per node, Shards (workers) per node</td><td class="q">sum(mlx_worker_cpu_percent) by (node), count(mlx_worker_rss_bytes) by (node)</td><td>is one node doing the heavy lifting</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">10</span>MLX Model &mdash; architecture &amp; runtime</h2>
+  <p>The &ldquo;what exactly is loaded&rdquo; dashboard. Static <code>mlx_model_info</code> attributes in the first rows; live context/KV in the runtime rows.</p>
+  <table>
+    <tr><th>Panel</th><th>Formula</th><th>Significance</th></tr>
+    <tr><td>Transformer layers / KV heads / Head dim / Attn heads / Hidden / FFN / Vocab / Quant bits / Quant group</td><td class="q">mlx_model_info{attr=...}</td><td>full architecture fingerprint</td></tr>
+    <tr><td>Architecture / dtype</td><td class="q">mlx_model_arch</td><td>model class label</td></tr>
+    <tr><td>Max context / KV bytes/token / KV @ max context</td><td class="q">mlx_context_length_max_tokens, mlx_kv_bytes_per_token, <b>product</b></td><td>theoretical KV ceiling at full context</td></tr>
+    <tr><td>Context utilization % gauge</td><td class="q">max(mlx_context_utilization)*100</td><td>headroom warning</td></tr>
+    <tr><td>Context used / utilization (last request)</td><td class="q">mlx_context_used_tokens, mlx_context_utilization</td><td>live per-request usage</td></tr>
+    <tr><td>Restarts total / Last crash reason</td><td class="q">sum(mlx_server_restarts_total), mlx_server_last_crash_reason==1</td><td>runtime health tie-in</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">11</span>MLX Node &mdash; one Mac mini, everything</h2>
+  <p>Rows: Hardware gauges, GPU &amp; power, Over time, LLM on this node. Template variable <code>$node</code> (rank0/rank1) selects the machine. Gauges give the current value; the Over-time row gives the trend for the same metrics &mdash; a deliberate current+trend pair.</p>
+  <table>
+    <tr><th>Row</th><th>Panel</th><th>Formula</th><th>Significance</th></tr>
+    <tr><td>Gauges</td><td>Load, mem %, worker RSS, GPU freq, GPU util, GPU power, package power, thermal, GPU mem %, CPU/ANE power</td><td class="q">mlx_hw_*{node="$node"}</td><td>current state, glanceable</td></tr>
+    <tr><td>Over time</td><td>Load 1/5/15, mem, pressure, RSS+CPU, disk %, GPU freq, GPU util heatmap, GPU mem, CPU&amp;ANE power</td><td class="q">mlx_hw_*{node="$node"}</td><td>trend + distribution for the same metrics</td></tr>
+    <tr><td>LLM on this node</td><td>Requests/min, TTFT p50/p95, token rate, in-flight, errors/min (proxy)</td><td class="q">mlx_*{node="$node"}</td><td>serving signals scoped to this node</td></tr>
+    <tr><td>LLM on this node</td><td>Node info, Telemetry up, Active alerts</td><td class="q">mlx_hw_cpu_count, up{node=}, count(ALERTS{node=})</td><td>identity + health</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">12</span>MLX GPU &amp; Power</h2>
+  <p>The thermal/power view &mdash; where throttling shows up before throughput drops.</p>
+  <table>
+    <tr><th>Panel</th><th>Formula</th><th>Significance</th></tr>
+    <tr><td>GPU utilization (heatmap + timeseries), IOKit util, frequency</td><td class="q">mlx_hw_gpu_utilization_percent, mlx_hw_gpu_iokit_util_percent, mlx_hw_gpu_frequency_mhz</td><td>actual utilization vs the IOKit counter; clock speed</td></tr>
+    <tr><td>GPU memory used/alloc (GiB) + % of unified pool</td><td class="q">mlx_hw_gpu_mem_used_bytes/2^30, 100*used/total</td><td>the crash-critical memory envelope</td></tr>
+    <tr><td>GPU/CPU/ANE/package power (W)</td><td class="q">mlx_hw_*_power_milliwatts/1000</td><td>power draw by engine</td></tr>
+    <tr><td>Thermal pressure</td><td class="q">mlx_hw_thermal_pressure</td><td>throttling trigger</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">13</span>MLX Logs &amp; Runtime, and MLX SRE</h2>
+  <h3>MLX Logs &amp; Runtime (9 panels)</h3>
+  <p>Reads <code>mlx_log_tailer_*</code> (the exporter that ships server logs to Opik) plus <code>mlx_server_state</code>. Lines/min by severity and by category, shipped vs dropped, queue depth, tailer errors, tailer up, server-log file size &mdash; the log pipeline&rsquo;s own SLO. If this dashboard goes dark, you have lost forensic history.</p>
+  <h3>MLX SRE - SLI / SLA / SLO (14 panels)</h3>
+  <p>Rows: SLO status, Volume basis, Trends, Burn rate. The reliability contract in numbers.</p>
+  <table>
+    <tr><th>Panel</th><th>Formula</th><th>Significance</th></tr>
+    <tr><td>Availability SLI (30 d)</td><td class="q">100*clamp_min(1 - increase(errors{5xx}[30d])/clamp_min(increase(requests[30d]),1), 0)</td><td>success ratio over 30 days</td></tr>
+    <tr><td>Availability error budget left</td><td class="q">100*clamp_min(1 - (5xx ratio)/0.99, 0)</td><td>fraction of the 1% budget remaining</td></tr>
+    <tr><td>Latency SLI (30 d, TTFT&lt;=10s)</td><td class="q">100*clamp_min(sum(increase(mlx_ttft_seconds_bucket{le="10"}[30d]))/sum(increase(count[30d])), 0)</td><td>% of requests under the 10s TTFT target</td></tr>
+    <tr><td>Latency error budget left</td><td class="q">100*(1 - (1 - SLI)/0.90)</td><td>latency budget burn</td></tr>
+    <tr><td>Requests / 5xx / 4xx / uptime (30 d)</td><td class="q">sum(increase(...[30d])), mlx_server_uptime_seconds</td><td>volume basis for the ratios</td></tr>
+    <tr><td>5xx ratio %, TTFT p95 vs SLO</td><td class="q">100*rate(errors{5xx})/clamp_min(rate(requests)), histogram_quantile(0.95,...)</td><td>current vs target</td></tr>
+    <tr><td>Availability burn rate / Latency burn rate</td><td class="q">(5xx ratio)/0.005, (1 - TTFT-SLI)/0.001</td><td>1.0 == budget spent at exactly the break-even rate</td></tr>
+    <tr><td>Firing alerts</td><td class="q">count(ALERTS{firing}) or on() vector(0)</td><td>ties the SLO view to vmalert</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">14</span>Signal-to-noise: 20 duplicate widgets removed</h2>
+  <p>A scan across all twelve dashboards found <b>19 groups of identical PromQL</b> shown in two places. Each duplicate is visual noise when you compare dashboards side by side &mdash; you wonder whether one of them is stale. The rule adopted: <b>one canonical home per metric family</b>.</p>
+  <table>
+    <tr><th>Metric</th><th>Removed from</th><th>Canonical home</th></tr>
+    <tr><td>GPU utilization / heatmap</td><td>Cluster (2 panels)</td><td>GPU &amp; Power</td></tr>
+    <tr><td>GPU frequency, thermal pressure</td><td>Cluster</td><td>GPU &amp; Power</td></tr>
+    <tr><td>Nodes online, active alerts</td><td>GPU &amp; Power</td><td>Cluster</td></tr>
+    <tr><td>Upstream reachability (timeseries)</td><td>Cluster</td><td>Cluster stat</td></tr>
+    <tr><td>Requests/min, tool calls/min, temperature, hall. flags/min</td><td>Call Types (4)</td><td>HTTP Requests</td></tr>
+    <tr><td>Generation time, context used, context utilization, low-conf responses</td><td>HTTP Requests</td><td>Performance / Internals</td></tr>
+    <tr><td>Error ratio % (gauge)</td><td>HTTP Requests</td><td>HTTP Requests timeseries</td></tr>
+    <tr><td>Server CPU%/node, RSS/node</td><td>Logs &amp; Runtime</td><td>Internals</td></tr>
+    <tr><td>Server uptime, scoring coverage</td><td>Model</td><td>SRE / Performance</td></tr>
+  </table>
+  <p>Result: 279 &rarr; <b>259 panels</b>, no signal lost. The MLX Node gauge+timeseries pairs were deliberately kept &mdash; current value and trend are different questions.</p>
+</section>
+
+<section>
+  <h2><span class="num">15</span>Reliability backlog &mdash; what to build next</h2>
+  <p>Ordered by expected impact on availability of this 8 GiB + 16 GiB ring:</p>
+  <ol>
+    <li><b>KV quantization</b> &mdash; <code>mlx_lm.server</code> here exposes no <code>--kv-bits</code> (verified). Upgrading MLX to a build with 4-bit KV would cut KV memory 2&times;, roughly doubling usable context on rank0.</li>
+    <li><b>4-bit weights</b> &mdash; the 8-bit 4B costs ~4.6 GiB; 4-bit frees ~2.3 GiB for KV and activations.</li>
+    <li><b>Auto context trimming</b> in the proxy for multi-turn conversations (keep the last ~8k tokens, summarize the rest) so prompts never approach the ceiling.</li>
+    <li><b>Alert on crash rate by reason</b> &mdash; vmalert rules for <code>metal_gpu_error</code> and <code>oom</code> with severity + a 5-minute burn window.</li>
+    <li><b>Proactive probe</b> &mdash; the supervisor health check already answers <code>/v1/models</code>; add a periodic tiny generation that exercises the GPU so Metal errors surface on a probe, not on a user request.</li>
+    <li><b>Graceful degradation</b> &mdash; when the server is in backoff, have the proxy return a structured 503 with <code>Retry-After</code> instead of letting clients hang.</li>
+    <li><b>Persistent KV (Redis / filesystem)</b> &mdash; feasible on Apple Silicon (CPU/GPU share unified memory, so offload copies are cheap) but requires a custom <code>mlx_lm.generate</code> loop; it buys cross-restart conversation persistence, not OOM protection &mdash; the guardrails own that.</li>
+  </ol>
+  <div class="callout info"><span class="ic">i</span><div>Items 1&ndash;4 are the &ldquo;more memory headroom / catch it sooner&rdquo; layer; 5&ndash;7 are the &ldquo;fail cleanly and keep history&rdquo; layer. Together they move the cluster from <i>restart-after-crash</i> to <i>stay-inside-the-envelope</i>.</div></div>
+</section>
+
+<section>
+  <h2><span class="num">16</span>What changed and where</h2>
+  <table>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td><code>cluster/start_server.sh</code></td><td>server launched with <code>--prompt-cache-size 4 --prompt-cache-bytes 2g --prompt-concurrency 4</code></td></tr>
+    <tr><td><code>cluster/mlx_metrics_proxy.py</code></td><td>guardrails: model whitelist, prompt cap 12k (400), body cap 4 MiB (413), max_tokens clamp 4096, optional bearer auth (401) and per-IP rate limit (429)</td></tr>
+    <tr><td><code>cluster/cluster.env</code></td><td>documented knobs: <code>MLX_API_KEY</code>, <code>MLX_MAX_PROMPT_TOKENS</code>, <code>MLX_MAX_TOKENS_CAP</code>, <code>MLX_MAX_BODY_BYTES</code>, <code>MLX_RATE_LIMIT</code></td></tr>
+    <tr><td><code>observability/grafana/dashboards/*.json</code></td><td>7 files touched: 20 duplicate panels removed; failure-reasons table added to MLX Alerts</td></tr>
+    <tr><td><code>tools/opik_dashboards.py</code></td><td>unchanged &mdash; the Opik-native health &amp; quality dashboard (post 17) still complements these twelve</td></tr>
+  </table>
+</section>
+
+</main>
+<footer class="wrap">
+  mlx-oc &middot; a two-Mac-mini distributed MLX inference cluster with full observability &middot; <a href="../README.md">repo README</a> &middot; next: <a href="21-thunderbolt-ring-launchdaemons.html">TB4 LaunchDaemons</a>
+</footer>
+</body>
+</html>

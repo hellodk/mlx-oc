@@ -1156,42 +1156,6 @@
    },
    "fieldConfig": {
     "defaults": {
-     "min": 0,
-     "unit": "short",
-     "links": [
-      {
-       "title": "View this node -> MLX Node dashboard",
-       "url": "/d/mlx-node/mlx-node?var-node=${__field.labels.node}",
-       "targetBlank": false
-      }
-     ]
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 6,
-    "w": 12,
-    "x": 0,
-    "y": 54
-   },
-   "id": 32,
-   "targets": [
-    {
-     "expr": "mlx_hw_gpu_frequency_mhz{node=~\"$node\"}",
-     "legendFormat": "{{node}}",
-     "refId": "A"
-    }
-   ],
-   "title": "GPU frequency",
-   "type": "timeseries"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
      "color": {
       "mode": "thresholds"
      },
@@ -1284,52 +1248,6 @@
      "color": {
       "mode": "palette-classic"
      },
-     "unit": "percent",
-     "links": [
-      {
-       "title": "View GPU & Power detail",
-       "url": "/d/mlx-gpu-power/mlx-gpu-and-power?var-node=${__field.labels.node}",
-       "targetBlank": false
-      }
-     ]
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 6,
-    "w": 6,
-    "x": 0,
-    "y": 61
-   },
-   "id": 38,
-   "targets": [
-    {
-     "expr": "mlx_hw_gpu_utilization_percent{node=~\"$node\"}",
-     "legendFormat": "{{node}}",
-     "refId": "A"
-    }
-   ],
-   "title": "GPU utilization",
-   "type": "timeseries",
-   "links": [
-    {
-     "title": "Drill-down: GPU & power",
-     "url": "/d/mlx-gpu-power?var-node=${__field.labels.node}",
-     "targetBlank": false,
-     "type": "link"
-    }
-   ]
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
      "unit": "watt",
      "links": [
       {
@@ -1403,133 +1321,6 @@
    ],
    "title": "Package power",
    "type": "timeseries"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "min": 0,
-     "unit": "percentunit",
-     "links": [
-      {
-       "title": "View GPU & Power detail",
-       "url": "/d/mlx-gpu-power/mlx-gpu-and-power?var-node=${__field.labels.node}",
-       "targetBlank": false
-      }
-     ]
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 6,
-    "w": 6,
-    "x": 18,
-    "y": 61
-   },
-   "id": 41,
-   "targets": [
-    {
-     "expr": "mlx_hw_thermal_pressure{node=~\"$node\"}",
-     "legendFormat": "{{node}}",
-     "refId": "A"
-    }
-   ],
-   "title": "Thermal pressure",
-   "type": "timeseries"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "custom": {
-      "scaleDistribution": {
-       "type": "linear"
-      }
-     },
-     "links": [
-      {
-       "title": "View GPU & Power detail",
-       "url": "/d/mlx-gpu-power/mlx-gpu-and-power?var-node=${__field.labels.node}",
-       "targetBlank": false
-      }
-     ]
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 6,
-    "w": 12,
-    "x": 0,
-    "y": 67
-   },
-   "id": 45,
-   "options": {
-    "calculate": true,
-    "cellGap": 1,
-    "cellValues": {
-     "unit": "short"
-    },
-    "color": {
-     "exponent": 0.5,
-     "fill": "dark-orange",
-     "mode": "scheme",
-     "reverse": false,
-     "scale": "exponential",
-     "scheme": "RdYlGn",
-     "steps": 64
-    },
-    "exemplars": {
-     "color": "rgba(255,0,255,0.7)"
-    },
-    "legend": {
-     "show": true
-    },
-    "rowsFrame": {
-     "layout": "auto"
-    },
-    "tooltip": {
-     "show": true,
-     "yHistogram": false
-    },
-    "yAxis": {
-     "axisPlacement": "left",
-     "reverse": false
-    },
-    "yBucketBoundAuto": true,
-    "yBucketNumber": 24
-   },
-   "pluginVersion": "10.0.0",
-   "targets": [
-    {
-     "datasource": {
-      "type": "prometheus",
-      "uid": "VictoriaMetrics"
-     },
-     "expr": "mlx_hw_gpu_utilization_percent{node=~\"$node\"}",
-     "format": "time_series",
-     "legendFormat": "{{node}}",
-     "refId": "A"
-    }
-   ],
-   "title": "GPU utilization heatmap",
-   "type": "heatmap",
-   "links": [
-    {
-     "title": "Drill-down: GPU & power",
-     "url": "/d/mlx-gpu-power?var-node=${__field.labels.node}",
-     "targetBlank": false,
-     "type": "link"
-    }
-   ]
   },
   {
    "datasource": {
@@ -1820,35 +1611,6 @@
    },
    "fieldConfig": {
     "defaults": {
-     "max": 1,
-     "min": 0
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 4,
-    "w": 16,
-    "x": 8,
-    "y": 85
-   },
-   "id": 36,
-   "targets": [
-    {
-     "expr": "mlx_up{job=\"mlx-proxy\"}",
-     "legendFormat": "mlx_lm.server",
-     "refId": "A"
-    }
-   ],
-   "title": "Upstream reachability",
-   "type": "timeseries"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
      "color": {
       "mode": "thresholds"
      },
@@ -2097,5 +1859,5 @@
    "url": "/d/mlx-logs"
   }
  ],
- "version": 2
+ "version": 3
 }

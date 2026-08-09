@@ -106,9 +106,10 @@ start_server() {
   # Local-Network privacy silently blocks the third-party py3.14 binary from
   # reaching local addresses when spawned over SSH (EHOSTUNREACH, no TCC entry).
   local srv_cmd="$MLX_VENV/bin/mlx.launch --hostfile $DIR/hosts.json --backend ring \
---cwd $DIR --python $MLX_VENV/bin/python -- $MLX_VENV/bin/python -m mlx_lm.server \
---model $MODEL --host 127.0.0.1 --port 8081 \
---chat-template-args '{\"enable_thinking\":false}'"
+ --cwd $DIR --python $MLX_VENV/bin/python -- $MLX_VENV/bin/python -m mlx_lm.server \
+ --model $MODEL --host 127.0.0.1 --port 8081 \
+ --chat-template-args '{\"enable_thinking\":false}' \
+ --prompt-cache-size 4 --prompt-cache-bytes 2g --prompt-concurrency 4"
 
   nohup "$VENV/bin/python" "$DIR/mlx_server_supervisor.py" \
     --model "$MODEL" \

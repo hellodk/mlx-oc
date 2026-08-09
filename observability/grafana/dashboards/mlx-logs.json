@@ -468,110 +468,6 @@
      "color": {
       "mode": "palette-classic"
      },
-     "unit": "percent",
-     "custom": {
-      "fillOpacity": 20,
-      "lineWidth": 2,
-      "drawStyle": "line",
-      "showPoints": "never"
-     }
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 7,
-    "w": 8,
-    "x": 0,
-    "y": 18
-   },
-   "id": 9009,
-   "options": {
-    "legend": {
-     "displayMode": "list",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "targets": [
-    {
-     "expr": "sum(mlx_worker_cpu_percent) by (node)",
-     "legendFormat": "{{node}}",
-     "refId": "A",
-     "datasource": {
-      "type": "prometheus",
-      "uid": "VictoriaMetrics"
-     }
-    }
-   ],
-   "title": "mlx_lm.server CPU % per node",
-   "type": "timeseries"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
-     "unit": "bytes",
-     "custom": {
-      "fillOpacity": 20,
-      "lineWidth": 2,
-      "drawStyle": "line",
-      "showPoints": "never"
-     }
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 7,
-    "w": 8,
-    "x": 8,
-    "y": 18
-   },
-   "id": 9010,
-   "options": {
-    "legend": {
-     "displayMode": "list",
-     "placement": "bottom",
-     "showLegend": true
-    },
-    "tooltip": {
-     "mode": "multi",
-     "sort": "desc"
-    }
-   },
-   "targets": [
-    {
-     "expr": "sum(mlx_worker_rss_bytes) by (node)",
-     "legendFormat": "{{node}}",
-     "refId": "A",
-     "datasource": {
-      "type": "prometheus",
-      "uid": "VictoriaMetrics"
-     }
-    }
-   ],
-   "title": "mlx_lm.server RSS per node",
-   "type": "timeseries"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
      "unit": "short",
      "custom": {
       "fillOpacity": 20,
@@ -632,5 +528,5 @@
  "timezone": "browser",
  "title": "MLX Logs & Runtime",
  "uid": "mlx-logs",
- "version": 2
+ "version": 3
 }

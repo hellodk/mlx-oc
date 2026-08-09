@@ -973,54 +973,6 @@
      "color": {
       "mode": "palette-classic"
      },
-     "unit": "s",
-     "decimals": 0
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 8,
-    "w": 6,
-    "x": 0,
-    "y": 57
-   },
-   "id": 551,
-   "options": {
-    "reduceOptions": {
-     "calcs": [
-      "lastNotNull"
-     ],
-     "fields": "",
-     "values": false
-    },
-    "colorMode": "value",
-    "graphMode": "none",
-    "textMode": "auto"
-   },
-   "targets": [
-    {
-     "expr": "mlx_server_uptime_seconds",
-     "legendFormat": "uptime",
-     "refId": "A",
-     "datasource": {
-      "type": "prometheus",
-      "uid": "VictoriaMetrics"
-     }
-    }
-   ],
-   "title": "Server uptime",
-   "type": "stat"
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "palette-classic"
-     },
      "unit": "short",
      "decimals": 0
     },
@@ -1107,73 +1059,6 @@
    "title": "Last crash reason",
    "type": "stat",
    "description": "Metal GPU fault / OOM / python error classification from the last crash."
-  },
-  {
-   "datasource": {
-    "type": "prometheus",
-    "uid": "VictoriaMetrics"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "color": {
-      "mode": "thresholds"
-     },
-     "unit": "percent",
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 1
-       },
-       {
-        "color": "green",
-        "value": 3
-       }
-      ]
-     },
-     "decimals": 1,
-     "description": "Share of requests scored with logprobs; blind below ~3%."
-    },
-    "overrides": []
-   },
-   "gridPos": {
-    "h": 8,
-    "w": 6,
-    "x": 18,
-    "y": 57
-   },
-   "id": 554,
-   "options": {
-    "reduceOptions": {
-     "calcs": [
-      "lastNotNull"
-     ],
-     "fields": "",
-     "values": false
-    },
-    "colorMode": "background",
-    "graphMode": "none",
-    "textMode": "auto"
-   },
-   "targets": [
-    {
-     "expr": "100 * sum(rate(mlx_confidence_scored_total[30m])) / clamp_min(sum(rate(mlx_requests_total[30m])), 0.0001)",
-     "legendFormat": "coverage",
-     "refId": "A",
-     "datasource": {
-      "type": "prometheus",
-      "uid": "VictoriaMetrics"
-     }
-    }
-   ],
-   "title": "Scoring coverage %",
-   "type": "stat",
-   "description": "Share of requests scored with logprobs; blind below ~3%."
   }
  ],
  "refresh": "5m",
@@ -1214,6 +1099,6 @@
  "timezone": "browser",
  "title": "MLX Model (architecture & runtime)",
  "uid": "mlx-model",
- "version": 2,
+ "version": 3,
  "weekStart": ""
 }

@@ -1269,6 +1269,72 @@
    "type": "row"
   },
   {
+   "type": "table",
+   "id": 29,
+   "title": "Failure reasons (reason | total | last 24h | active)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "VictoriaMetrics"
+   },
+   "gridPos": {
+    "h": 5,
+    "w": 12,
+    "x": 12,
+    "y": 0
+   },
+   "options": {
+    "showHeader": true,
+    "footer": {
+     "show": false
+    },
+    "sortBy": [
+     {
+      "displayName": "Total",
+      "desc": true
+     }
+    ]
+   },
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "align": "left",
+      "displayMode": "auto"
+     },
+     "mappings": []
+    },
+    "overrides": []
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum(mlx_server_crashes_total{job=\"mlx-supervisor\"}) by (reason)",
+     "format": "table",
+     "legendFormat": "__auto",
+     "instant": true
+    },
+    {
+     "refId": "B",
+     "expr": "sum(increase(mlx_server_crashes_total{job=\"mlx-supervisor\"}[24h])) by (reason)",
+     "format": "table",
+     "legendFormat": "__auto",
+     "instant": true
+    },
+    {
+     "refId": "C",
+     "expr": "mlx_server_last_crash_reason{job=\"mlx-supervisor\"}",
+     "format": "table",
+     "legendFormat": "__auto",
+     "instant": true
+    }
+   ],
+   "transformations": [
+    {
+     "id": "merge",
+     "options": {}
+    }
+   ]
+  },
+  {
    "datasource": {
     "type": "prometheus",
     "uid": "VictoriaMetrics"
@@ -1883,6 +1949,6 @@
  "timezone": "browser",
  "title": "MLX Alerts & Serving Health",
  "uid": "mlx-alerts",
- "version": 2,
+ "version": 3,
  "weekStart": ""
 }
