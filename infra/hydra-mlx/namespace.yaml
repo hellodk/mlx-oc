@@ -1,0 +1,13 @@
+# Namespace for every MLX / Hydra Grafana observability object: dashboard
+# ConfigMaps and the datasource that points at the VictoriaMetrics instance
+# holding the mlx_* series.
+#
+# The app itself does not run here - it runs on the Mac minis. This namespace
+# exists so the observability objects live outside `monitoring`, which holds
+# only the Prometheus/Grafana/Alertmanager core install.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hydra-mlx
+  labels:
+    app.kubernetes.io/part-of: hydra-mlx
