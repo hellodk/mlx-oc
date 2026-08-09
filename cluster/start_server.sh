@@ -115,6 +115,11 @@ start_server() {
     --health http://127.0.0.1:8081/v1/models \
     --server-log "$LOG/server.log" \
     --listen 0.0.0.0:9105 \
+    --probe-interval 5 \
+    --backoff 3 \
+    --backoff-max 30 \
+    --hang-after 15 \
+    --backoff-reset 120 \
     --command "$srv_cmd" \
     > "$LOG/supervisor.log" 2>&1 &
   echo $! > "$PID_SRV"

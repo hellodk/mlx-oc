@@ -15,9 +15,14 @@ that loop:
   * spawns the distributed server command (mlx.launch ...) as a child
   * watches the child; on exit it records the exit code, sniffs the last
     lines of the server log for a crash *reason* (metal / oom / python /
-    unknown), and restarts the child with exponential backoff
+    hung / unknown), and restarts the child with exponential backoff
   * probes the upstream /v1/models endpoint to distinguish "process up"
     from "process up AND serving" from "model actually loaded"
+  * keep-alive: if the process stays alive but stops answering /v1/models for
+    --hang-after seconds, the supervisor kills and restarts it itself
+  * resets the restart backoff to the initial value once the server has been
+    serving continuously for --backoff-reset seconds, so a single fresh crash
+    after a long healthy run recovers immediately
   * exports Prometheus metrics on :9105/metrics that become the source of
     truth for model-serving health in VictoriaMetrics + vmalert + Grafana
 
@@ -31,7 +36,7 @@ Metrics (:9105/metrics)
   mlx_server_crashes_total{reason}      server crashes by sniffed reason
   mlx_server_uptime_seconds             current child process uptime
   mlx_server_last_exit_code             exit code of the most recent child exit
-  mlx_server_last_crash_reason{reason}  metal_gpu_error / oom / python_error / unknown / none
+  mlx_server_last_crash_reason{reason}  metal_gpu_error / oom / python_error / hung / unknown / none
   mlx_server_health_checks_total{result="ok"|"fail"}   health probe outcomes
   mlx_server_backoff_seconds            current backoff delay before next restart
 
@@ -121,6 +126,9 @@ class Supervisor:
         self.backoff = 0.0
         self.stop_event = threading.Event()
         self.health_lock = threading.Lock()
+        self.hung_since = None
+        self.last_ready = 0.0
+        self.forced_reason = None
 
     # -- process lifecycle -------------------------------------------------
     def _spawn(self):
@@ -155,10 +163,11 @@ class Supervisor:
                 break
             G_UP.set(0)
             self.exit_code = rc
-            self.reason = sniff_crash_reason(self.args.server_log)
+            self.reason = self.forced_reason or sniff_crash_reason(self.args.server_log)
+            self.forced_reason = None
             G_EXIT.set(rc)
             G_CRASHES.labels(reason=self.reason).inc()
-            for r in ("metal_gpu_error", "oom", "python_error", "exit", "unknown"):
+            for r in ("metal_gpu_error", "oom", "python_error", "hung", "exit", "unknown"):
                 G_REASON.labels(reason=r).set(1 if r == self.reason else 0)
             G_UPTIME.set(0)
             G_READY.set(0)
@@ -167,21 +176,33 @@ class Supervisor:
             if self.stop_event.is_set():
                 break
             G_RESTARTS.inc()
-            self._log(
-                f"server exited rc={rc} reason={self.reason} "
-                f"next_start_in={self.backoff:.0f}s"
-            )
-            if first:
-                # First crash: restart promptly (fast MTTR).
+
+            # Fast MTTR: restart promptly on the first crash or whenever the
+            # server had been serving continuously for >= --backoff-reset
+            # seconds (backoff is reset after a long healthy run). Otherwise
+            # ratchet the backoff for crash-loop protection.
+            stable = time.monotonic() - self.last_ready if self.last_ready else 0.0
+            if first or stable >= self.args.backoff_reset:
+                if not first:
+                    self._log(
+                        f"server was stable for {stable:.0f}s, "
+                        f"resetting backoff to {self.args.backoff:.0f}s"
+                    )
+                self.backoff = self.args.backoff
                 first = False
+                delay = 0.0
             else:
-                # Crash loop protection: back off and cap it.
                 self.backoff = min(self.backoff * 2, self.args.backoff_max)
+                delay = self.backoff
                 self.state = 3  # backoff
                 G_STATE.set(3)
                 G_BACKOFF.set(self.backoff)
-                if self.stop_event.wait(self.backoff):
-                    break
+            self._log(
+                f"server exited rc={rc} reason={self.reason} "
+                f"next_start_in={delay:.0f}s"
+            )
+            if delay > 0 and self.stop_event.wait(delay):
+                break
             G_BACKOFF.set(0)
         self.state = 0
         G_STATE.set(0)
@@ -227,18 +248,44 @@ class Supervisor:
             except Exception:
                 ok = False
             with self.health_lock:
+                alive = self.child is not None and self.child.poll() is None
                 G_CHECKS.labels(result="ok" if ok else "fail").inc()
                 G_READY.set(1 if ok else 0)
                 if ok:
+                    self.hung_since = None
+                    self.last_ready = time.monotonic()
                     G_MODEL.labels(model=self.args.model).set(1)
-                    if self.child and self.child.poll() is None:
+                    if alive:
                         G_UPTIME.set(max(0, time.monotonic() - self.child_started))
                         if self.state != 1:
                             self.state = 1  # running
                             G_STATE.set(1)
-                elif self.state == 1:
-                    self.state = 2  # process alive but health degraded
-                    G_STATE.set(2)
+                elif alive and not ok and self.last_ready:
+                    # Was serving recently, the process is still alive, but
+                    # /v1/models no longer answers: candidate hang. Kill it
+                    # after --hang-after of consecutive failures so the run
+                    # loop respawns it (keep-alive).
+                    if self.hung_since is None:
+                        self.hung_since = time.monotonic()
+                    elif time.monotonic() - self.hung_since >= self.args.hang_after:
+                        self._log(
+                            f"server not serving for {self.args.hang_after:.0f}s, "
+                            "killing for restart (keep-alive)"
+                        )
+                        self.forced_reason = "hung"
+                        self.hung_since = None
+                        try:
+                            self.child.terminate()
+                        except Exception:
+                            pass
+                    if self.state == 1:
+                        self.state = 2  # process alive but health degraded
+                        G_STATE.set(2)
+                else:
+                    self.hung_since = None
+                    if self.state == 1:
+                        self.state = 2  # process alive but health degraded
+                        G_STATE.set(2)
 
     # -- logging -----------------------------------------------------------
     def _log(self, msg):
@@ -279,11 +326,18 @@ def main():
     ap.add_argument("--health", default=HEALTH_URL)
     ap.add_argument("--server-log", default="cluster/logs/server.log")
     ap.add_argument("--listen", default="0.0.0.0:9105")
-    ap.add_argument("--probe-interval", type=float, default=15.0)
-    ap.add_argument("--backoff", type=float, default=5.0,
+    ap.add_argument("--probe-interval", type=float, default=5.0,
+                    help="health probe interval in seconds (default 5s)")
+    ap.add_argument("--backoff", type=float, default=3.0,
                     help="initial restart delay after a crash")
-    ap.add_argument("--backoff-max", type=float, default=60.0,
+    ap.add_argument("--backoff-max", type=float, default=30.0,
                     help="maximum restart delay (crash-loop protection)")
+    ap.add_argument("--hang-after", type=float, default=20.0,
+                    help="kill + restart the server after this many seconds of "
+                         "health failures while the process stays alive (keep-alive)")
+    ap.add_argument("--backoff-reset", type=float, default=120.0,
+                    help="reset the restart backoff to the initial value after "
+                         "this many seconds of continuous serving")
     args = ap.parse_args()
 
     host, _, port = args.listen.rpartition(":")
@@ -292,7 +346,7 @@ def main():
 
     # Emit all crash-reason series at 0 so the dashboard has every reason
     # present before the first crash (counters only appear once incremented).
-    for r in ("metal_gpu_error", "oom", "python_error", "exit", "unknown"):
+    for r in ("metal_gpu_error", "oom", "python_error", "hung", "exit", "unknown"):
         G_CRASHES.labels(reason=r).inc(0)
 
     threading.Thread(target=sup.health_loop, daemon=True).start()
