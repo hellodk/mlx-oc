@@ -1,0 +1,72 @@
+# MLX observability stack — all tunables.
+#
+# Consumed by infra/ansible/observability.yml -> roles/mlx-observability.
+# The Salt equivalent lives in infra/salt/pillar/observability.sls — keep the
+# two in sync when you change a knob here.
+#
+# Defaults match the manual deployment path in observability/ (up.sh /
+# setup.sh / compose.yaml). See infra/ansible/README.md for how to run.
+
+# --- Nodes -------------------------------------------------------------------
+# The podman stack runs on the observability host (node A). It scrapes the
+# serving node (rank 0) and the hw-telemetry peer (rank 1) over the LAN.
+obs_host_ip: 192.168.1.64       # node A — observability host (also ring rank 1)
+obs_rank0_ip: 192.168.1.5       # Mac mini B — serving node, LAN IP
+obs_rank1_ip: 192.168.1.64      # Mac mini A — hw-telemetry peer, LAN IP
+
+# --- Deployment --------------------------------------------------------------
+# present  -> render configs, pull images, compose up, wait for health
+# absent   -> podman compose down (volumes kept)
+obs_state: present
+obs_repo_dir: "{{ ansible_env.HOME }}/mlx-oc"
+obs_target_dir: "{{ obs_repo_dir }}/observability"         # rendered configs land here
+obs_source_dir: "{{ playbook_dir }}/../../observability"    # static assets (grafana/, vmalert/)
+
+# Install podman + podman-compose via Homebrew and bring the podman machine up?
+obs_manage_prereqs: true
+obs_podman_machine: podman-machine-default
+obs_podman_cpus: 4
+obs_podman_memory: 2              # GiB
+
+# --- Container images (pin tags per deployment) ------------------------------
+obs_images:
+  victoria_metrics: docker.io/victoriametrics/victoria-metrics:latest
+  otel_collector: docker.io/otel/opentelemetry-collector-contrib:latest
+  grafana: docker.io/grafana/grafana:latest
+  vmalert: docker.io/victoriametrics/vmalert:latest
+  alertmanager: docker.io/prom/alertmanager:latest
+
+# --- Host -> container ports -------------------------------------------------
+obs_ports:
+  vm: "8428:8428"
+  otlp_grpc: "4317:4317"
+  otlp_http: "4318:4318"
+  grafana: "3000:3000"
+  vmalert: "8880:8880"
+  alertmanager: "9093:9093"
+
+# --- VictoriaMetrics / collector / scraping ----------------------------------
+obs_vm_retention: 30d
+obs_scrape_interval: 10s
+obs_sglang_enabled: true
+obs_otel_log_mb: 50
+obs_otel_log_backups: 5
+
+# --- Grafana -----------------------------------------------------------------
+obs_grafana_admin_user: admin
+obs_grafana_admin_password: admin
+obs_grafana_anonymous: true
+obs_grafana_theme: light
+
+# --- Alertmanager ------------------------------------------------------------
+obs_alertmanager_resolve_timeout: 5m
+obs_alertmanager_repeat_interval: 4h
+obs_webhook_oncall: "http://host.containers.internal:9000/hooks/oncall"
+obs_webhook_default: "http://host.containers.internal:9000/hooks/alert"
+
+# --- k8s dashboards (optional, requires kubectl + cluster kubeconfig) --------
+# After deploy, push the Grafana dashboards into the k0s Grafana via
+# observability/grafana/apply-dashboards.sh.
+obs_apply_dashboards: false
+obs_grafana_namespace: hydra-mlx
+obs_grafana_datasource_uid: mlx-vm

@@ -1,0 +1,136 @@
+---
+# mlx-observability role
+# ----------------------
+# Renders the observability configs from Jinja2 templates (every knob comes
+# from group_vars/all/observability.yml) and manages the podman stack.
+#
+# Runs locally on the observability host (ansible_connection: local). Static
+# assets (Grafana provisioning + dashboards, vmalert rules) are copied from the
+# repo checkout at {{ obs_source_dir }}; the variable-bearing files are
+# templated. The templates mirror observability/*.yaml — change them, not the
+# manual files, when you deploy via Ansible.
+
+- name: Install podman + podman-compose (Homebrew)
+  ansible.builtin.package:
+    name:
+      - podman
+      - podman-compose
+    state: present
+  when: obs_manage_prereqs and obs_state == "present"
+  tags: [prereqs]
+
+- name: Check whether podman is reachable
+  ansible.builtin.command: podman info
+  register: obs_podman_info
+  changed_when: false
+  failed_when: false
+  tags: [prereqs]
+
+- name: Start the podman machine when podman is not reachable
+  ansible.builtin.command: "podman machine start {{ obs_podman_machine }}"
+  when:
+    - obs_manage_prereqs
+    - obs_state == "present"
+    - obs_podman_info.rc != 0
+  tags: [prereqs]
+
+- name: Tear the stack down (obs_state == absent)
+  ansible.builtin.command:
+    cmd: podman compose down
+    chdir: "{{ obs_target_dir }}"
+  changed_when: true
+  when: obs_state == "absent"
+  tags: [down]
+
+- block:
+    - name: Create the observability target directory
+      ansible.builtin.file:
+        path: "{{ obs_target_dir }}"
+        state: directory
+        recurse: true
+      tags: [config]
+
+    - name: Copy static assets (Grafana provisioning + dashboards, vmalert rules, alertmanager)
+      ansible.builtin.copy:
+        src: "{{ obs_source_dir }}/{{ item }}/"
+        dest: "{{ obs_target_dir }}/{{ item }}/"
+      loop:
+        - grafana
+        - vmalert
+        - alertmanager
+      tags: [config]
+
+    - name: Render vm-scrape.yml (scrape targets from topology vars)
+      ansible.builtin.template:
+        src: vm-scrape.yml.j2
+        dest: "{{ obs_target_dir }}/vm-scrape.yml"
+        mode: "0644"
+      tags: [config]
+
+    - name: Render compose.yaml (images / ports / tunables)
+      ansible.builtin.template:
+        src: compose.yaml.j2
+        dest: "{{ obs_target_dir }}/compose.yaml"
+        mode: "0644"
+      tags: [config]
+
+    - name: Render otelcol-config.yaml (collector pipelines)
+      ansible.builtin.template:
+        src: otelcol-config.yaml.j2
+        dest: "{{ obs_target_dir }}/otelcol-config.yaml"
+        mode: "0644"
+      tags: [config]
+
+    - name: Render alertmanager.yml (webhooks / inhibit rules)
+      ansible.builtin.template:
+        src: alertmanager.yml.j2
+        dest: "{{ obs_target_dir }}/alertmanager/alertmanager.yml"
+        mode: "0644"
+      tags: [config]
+
+    - name: Pull images and (re)create containers
+      ansible.builtin.command:
+        cmd: podman compose up -d
+        chdir: "{{ obs_target_dir }}"
+      register: obs_compose_up
+      changed_when: >-
+        obs_compose_up.stdout | regex_search('(Creating|Starting|Recreating|Pulling)') is not none
+      tags: [up]
+
+    - name: Wait for VictoriaMetrics to listen on :{{ obs_ports.vm.split(':')[0] }}
+      ansible.builtin.wait_for:
+        port: "{{ obs_ports.vm.split(':')[0] }}"
+        state: started
+        timeout: 120
+      tags: [up]
+
+    - name: Check VictoriaMetrics /health
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ obs_ports.vm.split(':')[0] }}/health"
+      register: obs_health
+      until: obs_health.status == 200
+      retries: 10
+      delay: 3
+      tags: [up]
+
+    - name: Print stack endpoints
+      ansible.builtin.debug:
+        msg:
+          - "Grafana         http://{{ obs_host_ip }}:{{ obs_ports.grafana.split(':')[0] }}  ({{ obs_grafana_admin_user }}/{{ obs_grafana_admin_password }})"
+          - "VictoriaMetrics http://{{ obs_host_ip }}:{{ obs_ports.vm.split(':')[0] }}/vmui"
+          - "vmalert         http://{{ obs_host_ip }}:{{ obs_ports.vmalert.split(':')[0] }}"
+          - "Alertmanager    http://{{ obs_host_ip }}:{{ obs_ports.alertmanager.split(':')[0] }}"
+          - "OTLP gRPC/HTTP  {{ obs_host_ip }}:{{ obs_ports.otlp_grpc.split(':')[0] }} / {{ obs_ports.otlp_http.split(':')[0] }}"
+          - "scrapes         rank0={{ obs_rank0_ip }} rank1={{ obs_rank1_ip }} every {{ obs_scrape_interval }}"
+      tags: [up]
+
+    - name: Push dashboards into the k0s Grafana (optional)
+      ansible.builtin.command:
+        cmd: "./apply-dashboards.sh"
+        chdir: "{{ obs_source_dir }}/grafana"
+      environment:
+        GRAFANA_NAMESPACE: "{{ obs_grafana_namespace }}"
+        MLX_DS_UID: "{{ obs_grafana_datasource_uid }}"
+      when: obs_apply_dashboards
+      tags: [up, k8s]
+  when: obs_state == "present"

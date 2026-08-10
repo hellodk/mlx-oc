@@ -1,0 +1,23 @@
+---
+# MLX observability stack — deploy / start / tear down.
+#
+# Deploys the podman stack (VictoriaMetrics + otel-collector + Grafana +
+# vmalert + Alertmanager) onto the observability host and starts it, exactly
+# like `cd observability && ./up.sh` but with every value parameterized in
+# group_vars/all/observability.yml.
+#
+# Usage:
+#   ansible-playbook observability.yml                       # deploy + start
+#   ansible-playbook observability.yml -e obs_state=absent   # compose down
+#   ansible-playbook observability.yml --tags prereqs        # only deps
+#   ansible-playbook observability.yml --tags config         # only render
+#   ansible-playbook observability.yml --tags up             # only compose up
+#
+# Targets the `observability` group in inventories/example/hosts.yml.
+- name: MLX observability stack
+  hosts: observability
+  gather_facts: true
+  vars_files:
+    - "group_vars/all/observability.yml"
+  roles:
+    - role: mlx-observability

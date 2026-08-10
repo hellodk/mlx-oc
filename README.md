@@ -181,7 +181,9 @@ Proxy `/metrics` runtime gauges:
 
 ## Observability (VictoriaMetrics on podman)
 
-`observability/compose.yaml` runs five containers on rank 0 with podman:
+`observability/compose.yaml` runs five containers with podman on the
+observability host (node A, `192.168.1.64`); it scrapes the serving node
+(rank 0) and the hw-telemetry peer (rank 1) over the LAN:
 
 | Container | Port | Role |
 |---|---|---|
@@ -198,6 +200,11 @@ cd observability
 ./setup.sh                      # writes vm-scrape.yml (edit VM's machine IPs if needed)
 podman compose up -d            # or: podman-compose up -d
 ```
+
+`./up.sh` does all three (podman machine start → `setup.sh` → `compose up` →
+wait for `/health`); `./down.sh` tears it down. The same deployment is fully
+automated and parameterized in `infra/ansible/observability.yml` (Ansible) and
+`infra/salt/` (Salt) — see those READMEs.
 
 Check it:
 
