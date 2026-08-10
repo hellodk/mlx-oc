@@ -11,6 +11,11 @@
 #   mlx_kv_cache_agent.py      :9104  KV-cache / context-length gauges
 #   mlx_server_log_tailer.py   :9106  streams server.log -> Opik (OTLP logs)
 #
+# This script must be run ON RANK 0 (the serving node), i.e. the machine that
+# owns MLX_RANK0_IP from cluster/cluster.env (192.168.2.2, Mac mini B, 16 GiB
+# since 2026-08-10). Rank 1 (192.168.2.1) is the ring prefill peer running hw
+# telemetry only.
+#
 # opencode and other clients talk to the proxy on :8080; the proxy records
 # TTFT, token rate, temperature and hallucination-risk heuristics, and can
 # export OpenTelemetry spans/metrics/logs.
@@ -36,10 +41,12 @@ MLX_VENV="$HOME/venvs/mlx"               # py3.12: mlx.launch + mlx_lm.server
 source "$DIR/cluster.env"
 export MLX_MODEL MLX_DEFAULT_TEMP
 export MLX_LOGPROBS MLX_LOGPROBS_STREAM_SAMPLE MLX_LOW_CONFIDENCE
+export MLX_MAX_PROMPT_TOKENS MLX_MAX_TOKENS_CAP MLX_RANK0_IP MLX_RANK1_IP
 MODEL="$MLX_MODEL"
 
 LOG="$DIR/logs"
-RANK1="192.168.2.2"
+RANK0_IP="$MLX_RANK0_IP"
+RANK1="$MLX_RANK1_IP"
 
 # Opik OTLP ingestion for traces (proxy) + logs (logtailer). On by default so
 # one trace per request lands in the "mlx" project; override to disable.
@@ -82,8 +89,9 @@ wait_port_free() { # wait_port_free <port> [ttl]
 
 # --- preflight ----------------------------------------------------------------
 preflight() {
-  info "preflight: venv=$VENV mlx_venv=$MLX_VENV model=$MODEL rank1=$RANK1"
+  info "preflight: venv=$VENV mlx_venv=$MLX_VENV model=$MODEL rank0=$RANK0_IP rank1=$RANK1"
   local ok=1
+  ifconfig 2>/dev/null | grep -q "inet $RANK0_IP " || { fail "this machine does not own rank0 IP $RANK0_IP - run start_server.sh ON rank 0 ($RANK0_IP)"; ok=0; }
   [[ -x "$VENV/bin/python" ]]  || { fail "missing $VENV/bin/python (run: python3 -m venv $VENV)"; ok=0; }
   [[ -x "$MLX_VENV/bin/mlx.launch" ]] || { fail "missing $MLX_VENV/bin/mlx.launch (py3.12 venv)"; ok=0; }
   "$VENV/bin/python" -c "import prometheus_client" 2>/dev/null \
@@ -135,7 +143,9 @@ start_proxy() {
                     --opik-otlp-endpoint "$OPIK_OTLP" --model "$MODEL"
                     --logprobs "$MLX_LOGPROBS"
                     --logprobs-stream-sample "$MLX_LOGPROBS_STREAM_SAMPLE"
-                    --low-confidence-threshold "$MLX_LOW_CONFIDENCE")
+                    --low-confidence-threshold "$MLX_LOW_CONFIDENCE"
+                    --max-prompt-tokens "$MLX_MAX_PROMPT_TOKENS"
+                    --max-tokens-cap "$MLX_MAX_TOKENS_CAP")
   if [[ -n "${OPIK_ENDPOINT:-}" ]]; then proxy_args+=(--opik-endpoint "$OPIK_ENDPOINT"); fi
   nohup "$VENV/bin/python" "$DIR/mlx_metrics_proxy.py" "${proxy_args[@]}" \
     > "$LOG/proxy.log" 2>&1 &

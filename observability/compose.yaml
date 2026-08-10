@@ -10,7 +10,7 @@ services:
       - -retentionPeriod=30d
       - -storageDataPath=/victoria-metrics-data
     environment:
-      - MLX_IP=${MLX_IP:-192.168.1.64}
+      - MLX_IP=${MLX_IP:-192.168.1.5}
     volumes:
       - vm-data:/victoria-metrics-data
       - ./vm-scrape.yml:/etc/vm-scrape.yml:ro
