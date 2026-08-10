@@ -19,7 +19,7 @@ from opik.api_objects.dashboard import types
 
 DASHBOARD_NAME = "mlx: serving health & quality"
 PROJECT_NAME = "mlx"
-BASE_URL = os.environ.get("OPIK_BASE_URL", "http://192.168.1.10:32173/api")
+BASE_URL = os.environ.get("OPIK_BASE_URL", "http://localhost:32173/api")
 
 
 def _wid() -> str:

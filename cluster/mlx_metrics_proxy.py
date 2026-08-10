@@ -46,21 +46,21 @@ otel-collector). Disabled unless --otlp-endpoint is set.
 
 Optional Opik tracing (two independent paths, both optional):
 
-  * --opik-endpoint      base URL of a self-hosted Opik (e.g.
-                         http://192.168.1.10:32173). Uses the opik SDK to log
-                         each chat completion as a trace with an LLM span
-                         (input/output/usage/metadata) into the "mlx" project.
+  * --opik-endpoint      base URL of a self-hosted Opik (e.g. $OPIK_BASE).
+                         Uses the opik SDK to log each chat completion as a
+                         trace with an LLM span (input/output/usage/metadata)
+                         into the "mlx" project.
   * --opik-otlp-endpoint OTLP HTTP endpoint of Opik's ingestion (e.g.
-                         http://192.168.1.10:32173/api/v1/private/otel). Adds a
+                         $MLX_OPIK_OTLP_ENDPOINT). Adds a
                          second trace exporter and stamps spans with
                          OpenInference attributes (input.value, llm.model_name,
                          token counts, ...) so the Opik collector renders them.
 
 Usage:
-  mlx_metrics_proxy.py --listen 0.0.0.0:8080 --upstream 127.0.0.1:8081
-  mlx_metrics_proxy.py --otlp-endpoint http://192.168.1.10:30318 --node-name rank0
-  mlx_metrics_proxy.py --opik-endpoint http://192.168.1.10:32173 --node-name rank0
-  mlx_metrics_proxy.py --opik-otlp-endpoint http://192.168.1.10:32173/api/v1/private/otel
+  mlx_metrics_proxy.py --listen 0.0.0.0:8080 --upstream $MLX_SERVER_IP:$MLX_SERVER_PORT
+  mlx_metrics_proxy.py --otlp-endpoint $MLX_OTLP_ENDPOINT --node-name rank0
+  mlx_metrics_proxy.py --opik-endpoint $OPIK_BASE --node-name rank0
+  mlx_metrics_proxy.py --opik-otlp-endpoint $MLX_OPIK_OTLP_ENDPOINT
 """
 
 import argparse
@@ -789,7 +789,10 @@ class _StreamParser:
 # --------------------------------------------------------------------------
 class Proxy(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
-    upstream = ("127.0.0.1", 8081)
+    upstream = (
+        os.environ.get("MLX_SERVER_IP", "127.0.0.1"),
+        int(os.environ.get("MLX_SERVER_PORT", "8081")),
+    )
     default_temp = 0.0
     logprobs_top = 0        # top_logprobs to request upstream; 0 == never inject
     stream_sample = 0.0     # fraction of streaming requests to de-stream
@@ -1568,7 +1571,7 @@ def main():
     ap.add_argument(
         "--otlp-endpoint",
         default=os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
-        help="OTLP HTTP endpoint (e.g. http://192.168.1.10:30318). "
+        help="OTLP HTTP endpoint (e.g. $MLX_OTLP_ENDPOINT). "
         "Enables traces/metrics/logs export via OpenTelemetry.",
     )
     ap.add_argument(
@@ -1579,16 +1582,15 @@ def main():
     ap.add_argument(
         "--opik-endpoint",
         default=os.environ.get("OPIK_ENDPOINT", ""),
-        help="Opik self-hosted base URL (e.g. http://192.168.1.10:32173). "
+        help="Opik self-hosted base URL (e.g. $OPIK_BASE). "
         "Enables opik-SDK tracing of chat completions into the 'mlx' project. "
         "A trailing '/api' is appended automatically when missing.",
     )
     ap.add_argument(
         "--opik-otlp-endpoint",
         default=os.environ.get("OPIK_OTLP_ENDPOINT", ""),
-        help="Opik OTLP HTTP endpoint (e.g. "
-        "http://192.168.1.10:32173/api/v1/private/otel). Adds OpenInference "
-        "spans exported to Opik's OTLP ingestion.",
+        help="Opik OTLP HTTP endpoint (e.g. $MLX_OPIK_OTLP_ENDPOINT). Adds "
+        "OpenInference spans exported to Opik's OTLP ingestion.",
     )
     ap.add_argument(
         "--max-prompt-tokens",

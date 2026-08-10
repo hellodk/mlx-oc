@@ -33,7 +33,7 @@ from prometheus_client import (
 )
 
 DEFAULT_LOG = str(Path(__file__).resolve().parent / "logs" / "server.log")
-DEFAULT_OTLP = "http://192.168.1.64:4318"
+DEFAULT_OTLP = "http://localhost:4318"
 DEFAULT_PROJECT = "mlx"
 POLL_INTERVAL = 0.5
 

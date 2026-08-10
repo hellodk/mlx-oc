@@ -18,8 +18,8 @@ proxy logs in-band (hallucination_quality / hallucination_flagged).
 
 Usage:
   opik_evaluator.py --once
-  opik_evaluator.py --opik-base http://192.168.1.10:32173 --judge-url http://127.0.0.1:8080/v1
-  OPIK_BASE=... JUDGE_URL=... opik_evaluator.py --interval 15
+  opik_evaluator.py --opik-base $OPIK_BASE --judge-url $MLX_JUDGE_URL
+  OPIK_BASE=... MLX_JUDGE_URL=... opik_evaluator.py --interval 15
 """
 
 import argparse
@@ -185,13 +185,13 @@ def main():
     ap = argparse.ArgumentParser(description="Opik evaluation feedback loop")
     ap.add_argument(
         "--opik-base",
-        default=os.environ.get("OPIK_BASE", "http://192.168.1.10:32173"),
+        default=os.environ.get("OPIK_BASE", "http://localhost:32173"),
         help="Opik frontend base URL (NodePort)",
     )
     ap.add_argument("--project", default="mlx")
     ap.add_argument(
         "--judge-url",
-        default=os.environ.get("JUDGE_URL", "http://127.0.0.1:8080/v1"),
+        default=os.environ.get("MLX_JUDGE_URL", "http://127.0.0.1:8080/v1"),
         help="OpenAI-compatible endpoint used as the judge (the MLX proxy)",
     )
     ap.add_argument(

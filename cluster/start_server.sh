@@ -1,31 +1,29 @@
 #!/bin/zsh
 # =============================================================================
-# Start / stop / status for the distributed MLX stack on both Mac minis.
+# Start / stop / status for the distributed MLX stack.
 #
-# Topology:
+# Topology (N-node ring; all addresses come from cluster/cluster.env + hosts.json):
 #   mlx_server_supervisor.py   :9105  watchdog for mlx_lm.server (restarts it
 #                                      with backoff, exports serving-status)
-#   mlx_lm.server (mlx.launch) :8081  rank 0 only, bound to 127.0.0.1 (internal)
+#   mlx_lm.server (mlx.launch) :8081  rank 0 only (httpd bind = MLX_SERVER_IP)
 #   mlx_metrics_proxy.py       :8080  0.0.0.0 public OpenAI API + /metrics
-#   mlx_hw_telemetry.py        :9102  on BOTH nodes (Prometheus hardware metrics)
+#   mlx_hw_telemetry.py        :9102  on EVERY node (Prometheus hardware metrics)
 #   mlx_kv_cache_agent.py      :9104  KV-cache / context-length gauges
 #   mlx_server_log_tailer.py   :9106  streams server.log -> Opik (OTLP logs)
 #
-# This script must be run ON RANK 0 (the serving node), i.e. the machine that
-# owns MLX_RANK0_IP from cluster/cluster.env (192.168.2.2, Mac mini B, 16 GiB
-# since 2026-08-10). Rank 1 (192.168.2.1) is the ring prefill peer running hw
-# telemetry only.
+# CONFIG: cluster/cluster.env is the single source of truth for model, ports,
+# server bind IP and observability endpoints. hosts.json (MLX_HOSTFILE) is the
+# node list: entry order == ring rank order, host[0] == rank 0 == the serving
+# node (this script must run there), every other entry is a ring peer that
+# runs hw telemetry. The same repo is correct from any node.
 #
-# opencode and other clients talk to the proxy on :8080; the proxy records
-# TTFT, token rate, temperature and hallucination-risk heuristics, and can
-# export OpenTelemetry spans/metrics/logs.
-#
-# Repo layout:  .venv/ at repo root (py3.14, rank0 proxy), cluster/ holds the
-# runtime scripts, tools/ holds experiments + bench.py.
+# opencode and other clients talk to the proxy on MLX_PROXY_LISTEN; the proxy
+# records TTFT, token rate, temperature and hallucination-risk heuristics, and
+# can export OpenTelemetry spans/metrics/logs.
 #
 # Usage:
 #   ./start_server.sh [start]           start the whole stack
-#   ./start_server.sh stop              stop everything (local + node B)
+#   ./start_server.sh stop              stop everything (local + every peer)
 #   ./start_server.sh status            one-line status per component
 #   ./start_server.sh restart           stop then start
 #   ./start_server.sh logs              tail the last 40 lines of every log
@@ -35,29 +33,26 @@ REPO="$(dirname "$DIR")"
 VENV="$REPO/.venv"                       # py3.14: proxy / hw / kv / supervisor
 MLX_VENV="$HOME/venvs/mlx"               # py3.12: mlx.launch + mlx_lm.server
 
-# Single source of truth for the model id: cluster/cluster.env. Exported so
-# every child process below (and anything invoked in this shell afterward)
-# inherits it without needing its own --model flag.
+# Single source of truth: cluster/cluster.env. Exported so every child process
+# below (and anything invoked in this shell afterward) inherits it without
+# needing its own flag.
 source "$DIR/cluster.env"
 export MLX_MODEL MLX_DEFAULT_TEMP
 export MLX_LOGPROBS MLX_LOGPROBS_STREAM_SAMPLE MLX_LOW_CONFIDENCE
-export MLX_MAX_PROMPT_TOKENS MLX_MAX_TOKENS_CAP MLX_RANK0_IP MLX_RANK1_IP
-export MLX_SERVER_IP
+export MLX_MAX_PROMPT_TOKENS MLX_MAX_TOKENS_CAP
+export MLX_HOSTFILE MLX_SERVER_IP MLX_SERVER_PORT MLX_RING_SUBNET
+export MLX_PROXY_LISTEN MLX_SUPERVISOR_LISTEN MLX_HW_LISTEN MLX_KV_LISTEN MLX_LOGTAILER_LISTEN
+export MLX_OTLP_ENDPOINT MLX_OPIK_OTLP_ENDPOINT OPIK_BASE MLX_JUDGE_URL
 MODEL="$MLX_MODEL"
-SERVER_HOST="$MLX_SERVER_IP"
+SERVER_HOST="${MLX_SERVER_IP:-127.0.0.1}"
+SERVER_PORT="${MLX_SERVER_PORT:-8081}"
+PROXY_PORT="${MLX_PROXY_LISTEN##*:}"
+SUPERVISOR_PORT="${MLX_SUPERVISOR_LISTEN##*:}"
+HW_PORT="${MLX_HW_LISTEN##*:}"
+KV_PORT="${MLX_KV_LISTEN##*:}"
+LOGTAILER_PORT="${MLX_LOGTAILER_LISTEN##*:}"
 
 LOG="$DIR/logs"
-RANK0_IP="$MLX_RANK0_IP"
-RANK1="$MLX_RANK1_IP"
-
-# Opik OTLP ingestion for traces (proxy) + logs (logtailer). On by default so
-# one trace per request lands in the "mlx" project; override to disable.
-OPIK_OTLP="${OPIK_OTLP_ENDPOINT:-http://192.168.1.10:32173/api/v1/private/otel}"
-
-# Primary OTLP gateway (otel-collector): metrics/traces/logs from the proxy and
-# the logtailer. Its logs pipeline writes a durable JSONL file.
-OTLP="${MLX_OTLP_ENDPOINT:-http://192.168.1.64:4318}"
-
 BOOT="$LOG/bootstrap.log"
 PID_SRV="$LOG/supervisor.pid"
 PID_PROXY="$LOG/proxy.pid"
@@ -89,18 +84,60 @@ wait_port_free() { # wait_port_free <port> [ttl]
   return 1
 }
 
+# --- topology (hosts.json) ----------------------------------------------------
+# Populates MLX_BACKEND, MLX_RANK_SSH/MLX_RANK_IP (1-based arrays in zsh),
+# MLX_NRANKS, RANK0_SSH, RANK0_IP and PEERS. hosts.json entry order IS the ring
+# rank order; host[1] is rank 0 (the serving node).
+load_topology() {
+  local hostfile="$REPO/$MLX_HOSTFILE"
+  [[ -f "$hostfile" ]] || { fail "hostfile not found: $hostfile (MLX_HOSTFILE=$MLX_HOSTFILE)"; return 1; }
+  local parsed
+  parsed="$("$VENV/bin/python" - "$hostfile" 2>/dev/null <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(d.get("backend", "ring"))
+for h in d["hosts"]:
+    ssh = h.get("ssh") or (h.get("ips") or [""])[0]
+    mesh = (h.get("ips") or [ssh])[0]
+    print(ssh)
+    print(mesh)
+PY
+)"
+  [[ -n "$parsed" ]] || { fail "could not parse $hostfile"; return 1; }
+  local -a lines=("${(f)parsed}")
+  MLX_BACKEND="${lines[1]:-ring}"
+  MLX_RANK_SSH=(); MLX_RANK_IP=()
+  local i=1
+  while (( 2 + 2*(i-1) <= ${#lines} )); do
+    MLX_RANK_SSH+=("${lines[$((2 + 2*(i-1)))]}")
+    MLX_RANK_IP+=("${lines[$((3 + 2*(i-1)))]}")
+    i=$((i+1))
+  done
+  MLX_NRANKS="${#MLX_RANK_SSH}"
+  RANK0_SSH="${MLX_RANK_SSH[1]}"
+  RANK0_IP="${MLX_RANK_IP[1]}"
+  PEERS=("${MLX_RANK_SSH[@]:1}")
+  (( MLX_NRANKS >= 1 )) || { fail "hostfile $hostfile has no hosts"; return 1; }
+  info "topology: backend=$MLX_BACKEND nodes=$MLX_NRANKS rank0=$RANK0_IP (ssh=$RANK0_SSH) peers=${#PEERS} server=$SERVER_HOST:$SERVER_PORT"
+}
+
 # --- preflight ----------------------------------------------------------------
 preflight() {
-  info "preflight: venv=$VENV mlx_venv=$MLX_VENV model=$MODEL rank0=$RANK0_IP rank1=$RANK1"
+  load_topology || return 1
+  info "preflight: venv=$VENV mlx_venv=$MLX_VENV model=$MODEL"
   local ok=1
-  ifconfig 2>/dev/null | grep -q "inet $RANK0_IP " || { fail "this machine does not own rank0 IP $RANK0_IP - run start_server.sh ON rank 0 ($RANK0_IP)"; ok=0; }
+  ifconfig 2>/dev/null | grep -Eq "inet ($SERVER_HOST|$RANK0_IP) " \
+    || { fail "this machine is not rank 0 (owns neither $SERVER_HOST nor $RANK0_IP) - run start_server.sh ON the serving node"; ok=0; }
   [[ -x "$VENV/bin/python" ]]  || { fail "missing $VENV/bin/python (run: python3 -m venv $VENV)"; ok=0; }
   [[ -x "$MLX_VENV/bin/mlx.launch" ]] || { fail "missing $MLX_VENV/bin/mlx.launch (py3.12 venv)"; ok=0; }
   "$VENV/bin/python" -c "import prometheus_client" 2>/dev/null \
     || { fail "$VENV missing prometheus_client"; ok=0; }
-  ssh -o ConnectTimeout=5 -o BatchMode=yes "$RANK1" "true" 2>/dev/null \
-    || { fail "cannot ssh to $RANK1 (passwordless auth required)"; ok=0; }
-  for p in 8081 8080 9102 9104 9105 9106; do
+  local peer
+  for peer in "${PEERS[@]}"; do
+    ssh -o ConnectTimeout=5 -o BatchMode=yes "$peer" "true" 2>/dev/null \
+      || { fail "cannot ssh to $peer (passwordless auth required)"; ok=0; }
+  done
+  for p in "$SERVER_PORT" "$PROXY_PORT" "$HW_PORT" "$KV_PORT" "$SUPERVISOR_PORT" "$LOGTAILER_PORT"; do
     if lsof -nP -iTCP:$p -sTCP:LISTEN >/dev/null 2>&1; then
       warn "port $p already in use - is the stack already running?"
     fi
@@ -111,22 +148,22 @@ preflight() {
 
 # --- component launchers -----------------------------------------------------
 start_server() {
-  info "starting mlx_lm.server via supervisor -> logs/server.log, metrics :9105"
-  # The distributed server MUST use the py3.12 venv (~/venvs/mlx): nodeB's macOS
+  info "starting mlx_lm.server via supervisor -> logs/server.log, metrics :$SUPERVISOR_PORT"
+  # The distributed server MUST use the py3.12 venv (~/venvs/mlx): macOS
   # Local-Network privacy silently blocks the third-party py3.14 binary from
   # reaching local addresses when spawned over SSH (EHOSTUNREACH, no TCC entry).
-  local srv_cmd="$MLX_VENV/bin/mlx.launch --hostfile $DIR/hosts.json --backend ring \
+  local srv_cmd="$MLX_VENV/bin/mlx.launch --hostfile $REPO/$MLX_HOSTFILE --backend $MLX_BACKEND \
  --cwd $DIR --python $MLX_VENV/bin/python -- $MLX_VENV/bin/python $DIR/mlx_server_launcher.py \
- --model $MODEL --host $SERVER_HOST --port 8081 \
+ --model $MODEL --host $SERVER_HOST --port $SERVER_PORT \
  --chat-template-args '{\"enable_thinking\":false}' \
  --prompt-cache-size 4 --prompt-cache-bytes 2g --prompt-concurrency 4"
 
   nohup "$VENV/bin/python" "$DIR/mlx_server_supervisor.py" \
     --model "$MODEL" \
-    --peer "$RANK1" \
-    --health "http://$SERVER_HOST:8081/v1/models" \
+    --hostfile "$REPO/$MLX_HOSTFILE" \
+    --health "http://$SERVER_HOST:$SERVER_PORT/v1/models" \
     --server-log "$LOG/server.log" \
-    --listen 0.0.0.0:9105 \
+    --listen "$MLX_SUPERVISOR_LISTEN" \
     --probe-interval 5 \
     --backoff 3 \
     --backoff-max 30 \
@@ -141,9 +178,9 @@ start_server() {
 
 start_proxy() {
   info "starting mlx_metrics_proxy -> logs/proxy.log"
-  local proxy_args=(--listen 0.0.0.0:8080 --upstream "$SERVER_HOST:8081"
-                    --default-temp "$MLX_DEFAULT_TEMP" --node-name rank0 --otlp-endpoint "$OTLP"
-                    --opik-otlp-endpoint "$OPIK_OTLP" --model "$MODEL"
+  local proxy_args=(--listen "$MLX_PROXY_LISTEN" --upstream "$SERVER_HOST:$SERVER_PORT"
+                    --default-temp "$MLX_DEFAULT_TEMP" --node-name rank0 --otlp-endpoint "$MLX_OTLP_ENDPOINT"
+                    --opik-otlp-endpoint "$MLX_OPIK_OTLP_ENDPOINT" --model "$MODEL"
                     --logprobs "$MLX_LOGPROBS"
                     --logprobs-stream-sample "$MLX_LOGPROBS_STREAM_SAMPLE"
                     --low-confidence-threshold "$MLX_LOW_CONFIDENCE"
@@ -158,22 +195,25 @@ start_proxy() {
 }
 
 start_hw() {
-  info "starting hw telemetry rank0 (:9102) -> logs/hw0.log"
+  info "starting hw telemetry rank0 (local) -> logs/hw0.log"
   nohup "$VENV/bin/python" "$DIR/mlx_hw_telemetry.py" \
-    --node-name rank0 --listen 0.0.0.0:9102 \
+    --node-name rank0 --listen "$MLX_HW_LISTEN" \
     > "$LOG/hw0.log" 2>&1 &
   echo $! > "$PID_HW0"
   disown
-  info "hw rank0 pid $(cat "$PID_HW0")"
 
-  info "starting hw telemetry rank1 ($RANK1:9102) -> logs/hw1.log"
-  nohup ssh -o ConnectTimeout=5 "$RANK1" \
-    "nohup '$MLX_VENV/bin/python' '$DIR/mlx_hw_telemetry.py' \
-     --node-name rank1 --listen 0.0.0.0:9102 \
-     > '$LOG/hw1.log' 2>&1 &" \
-    > /dev/null 2>&1 &
-  disown
-  info "hw rank1 launching over ssh"
+  local i node name
+  for (( i=2; i <= MLX_NRANKS; i++ )); do
+    node="${MLX_RANK_SSH[$i]}"
+    name="rank$((i-1))"
+    info "starting hw telemetry $name ($node:$HW_PORT) -> logs/hw$((i-1)).log"
+    nohup ssh -o ConnectTimeout=5 "$node" \
+      "nohup '$MLX_VENV/bin/python' '$DIR/mlx_hw_telemetry.py' \
+       --node-name '$name' --listen '$MLX_HW_LISTEN' \
+       > '$LOG/hw$((i-1)).log' 2>&1 &" \
+      > /dev/null 2>&1 &
+    disown
+  done
 }
 
 start_kv() {
@@ -181,7 +221,7 @@ start_kv() {
   nohup "$VENV/bin/python" "$DIR/mlx_kv_cache_agent.py" \
     --log-file "$LOG/server.log" \
     --model "$MODEL" \
-    --listen 0.0.0.0:9104 \
+    --listen "$MLX_KV_LISTEN" \
     > "$LOG/kvagent.log" 2>&1 &
   echo $! > "$PID_KV"
   disown
@@ -190,12 +230,12 @@ start_kv() {
 
 start_logtailer() {
   info "starting mlx_server_log_tailer -> otel-collector logs -> logs/logtailer.log"
-  wait_port_free 9106 20 || true
+  wait_port_free "$LOGTAILER_PORT" 20 || true
   nohup "$VENV/bin/python" "$DIR/mlx_server_log_tailer.py" \
     --log-file "$LOG/server.log" \
-    --otlp-endpoint "$OTLP" \
+    --otlp-endpoint "$MLX_OTLP_ENDPOINT" \
     --project mlx \
-    --listen 0.0.0.0:9106 \
+    --listen "$MLX_LOGTAILER_LISTEN" \
     > "$LOG/logtailer.log" 2>&1 &
   echo $! > "$PID_LT"
   disown
@@ -208,7 +248,7 @@ wait_ready() {
   local t0=$SECONDS
   info "waiting for mlx_lm.server readiness (ttl=${ttl}s)..."
   while (( SECONDS - t0 < ttl )); do
-    if curl -sf -m 2 "http://$SERVER_HOST:8081/v1/models" >/dev/null 2>&1; then
+    if curl -sf -m 2 "http://$SERVER_HOST:$SERVER_PORT/v1/models" >/dev/null 2>&1; then
       info "mlx_lm.server ready after $((SECONDS - t0))s"
       return 0
     fi
@@ -220,17 +260,18 @@ wait_ready() {
 
 # --- status -------------------------------------------------------------------
 status() {
-  echo "[$(ts)] mlx cluster status"
+  load_topology || return 1
+  echo "[$(ts)] mlx cluster status ($MLX_NRANKS nodes)"
   local up down name port
-  up="$(curl -s -o /dev/null -w '%{http_code}' -m 3 "http://$SERVER_HOST:8081/v1/models" 2>/dev/null)"; [[ "$up" == 200 ]] && up=UP || up=DOWN
-  echo "  mlx_lm.server   :8081  $up (process: $(pgrep -f mlx_server_launcher | wc -l | tr -d ' ') alive)"
+  up="$(curl -s -o /dev/null -w '%{http_code}' -m 3 "http://$SERVER_HOST:$SERVER_PORT/v1/models" 2>/dev/null)"; [[ "$up" == 200 ]] && up=UP || up=DOWN
+  echo "  mlx_lm.server   :$SERVER_PORT  $up (process: $(pgrep -f mlx_server_launcher | wc -l | tr -d ' ') alive)"
   for pidf in "$PID_SRV" "$PID_PROXY" "$PID_HW0" "$PID_KV" "$PID_LT"; do
     case "$pidf" in
-      *supervisor*) name=supervisor; port=9105 ;;
-      *proxy*)      name=proxy;      port=8080 ;;
-      *hw0*)        name=hw_rank0;   port=9102 ;;
-      *kv*)         name=kv_agent;   port=9104 ;;
-      *logtailer*)  name=logtailer;  port=9106 ;;
+      *supervisor*) name=supervisor;  port="$SUPERVISOR_PORT" ;;
+      *proxy*)      name=proxy;       port="$PROXY_PORT" ;;
+      *hw0*)        name=hw_rank0;    port="$HW_PORT" ;;
+      *kv*)         name=kv_agent;    port="$KV_PORT" ;;
+      *logtailer*)  name=logtailer;   port="$LOGTAILER_PORT" ;;
     esac
     if alive "$pidf"; then
       local http="$(curl -s -o /dev/null -w '%{http_code}' -m 3 "http://127.0.0.1:$port/metrics" 2>/dev/null)"
@@ -239,8 +280,12 @@ status() {
       echo "  $name  :$port  STOPPED"
     fi
   done
-  local rank1up="$(ssh -o ConnectTimeout=5 "$RANK1" "curl -s -o /dev/null -w '%{http_code}' -m 3 http://127.0.0.1:9102/metrics" 2>/dev/null)"
-  echo "  hw_rank1        :9102  ${rank1up:-000} (${rank1up:+metric HTTP $rank1up})"
+  local peer i=0
+  for peer in "${PEERS[@]}"; do
+    i=$((i+1))
+    local pup="$(ssh -o ConnectTimeout=5 "$peer" "curl -s -o /dev/null -w '%{http_code}' -m 3 http://127.0.0.1:$HW_PORT/metrics" 2>/dev/null)"
+    echo "  hw_rank$i  $peer:$HW_PORT  ${pup:-000} (${pup:+metric HTTP $pup})"
+  done
   if [[ -f "$LOG/server.log" ]]; then
     echo "  last crash: $(grep -m1 -E 'METAL|terminating' "$LOG/server.log" 2>/dev/null || echo 'none')"
   fi
@@ -248,7 +293,8 @@ status() {
 
 # --- stop ----------------------------------------------------------------------
 stop() {
-  info "stopping stack (local + $RANK1)"
+  load_topology || return 1
+  info "stopping stack (local + ${#PEERS} peers)"
   for pidf in "$PID_SRV" "$PID_PROXY" "$PID_HW0" "$PID_KV" "$PID_LT"; do
     alive "$pidf" && kill "$(cat "$pidf")" 2>/dev/null && info "killed $(basename "$pidf") pid $(cat "$pidf")"
   done
@@ -262,7 +308,12 @@ stop() {
   pkill -f "mlx_lm.server" 2>/dev/null
   pkill -f "mlx_server_launcher" 2>/dev/null
   pkill -f "mlx.launch" 2>/dev/null
-  ssh -o ConnectTimeout=5 "$RANK1" "pkill -f 'mlx_hw_telemetry[.]py'; pkill -f 'mlx_lm[.]server'; pkill -f 'mlx_server_launcher[.]py'; pkill -f 'mlx[.]launch'" 2>/dev/null
+  # Bracket the dots so the wrapper's own cmdline cannot match and kill the
+  # cleanup mid-run (see note in _kill_remote_rank).
+  local peer
+  for peer in "${PEERS[@]}"; do
+    ssh -o ConnectTimeout=5 "$peer" "pkill -f 'mlx_hw_telemetry[.]py'; pkill -f 'mlx_lm[.]server'; pkill -f 'mlx_server_launcher[.]py'; pkill -f 'mlx[.]launch'" 2>/dev/null
+  done
   for pidf in "$PID_SRV" "$PID_PROXY" "$PID_HW0" "$PID_KV" "$PID_LT"; do rm -f "$pidf"; done
   info "stopped"
 }
@@ -273,9 +324,10 @@ case "$ACTION" in
   start)
     preflight || exit 1
     # After a stop, the old supervisor/server can take a few seconds to release
-    # :9105/:8081; spawning the new supervisor first would die on EADDRINUSE.
-    wait_port_free 9105 30 || true
-    wait_port_free 8081 30 || true
+    # :$SUPERVISOR_PORT/:$SERVER_PORT; spawning the new supervisor first would
+    # die on EADDRINUSE.
+    wait_port_free "$SUPERVISOR_PORT" 30 || true
+    wait_port_free "$SERVER_PORT" 30 || true
     start_server
     start_proxy
     start_hw
@@ -285,12 +337,11 @@ case "$ACTION" in
     sleep 3
     status
     echo
-    info "poll: curl -s http://127.0.0.1:8080/v1/models"
-    info "metrics: curl -s http://192.168.1.64:8080/metrics"
-    info "serving: curl -s http://127.0.0.1:9105/metrics | grep mlx_server"
+    info "poll: curl -s http://127.0.0.1:$PROXY_PORT/v1/models"
+    info "serving: curl -s http://127.0.0.1:$SUPERVISOR_PORT/metrics | grep mlx_server"
     ;;
   stop) stop ;;
-  restart) stop; sleep 2; preflight || exit 1; wait_port_free 9105 30 || true; wait_port_free 8081 30 || true; start_server; start_proxy; start_hw; start_kv; start_logtailer; wait_ready || exit 1; status ;;
+  restart) stop; sleep 2; preflight || exit 1; wait_port_free "$SUPERVISOR_PORT" 30 || true; wait_port_free "$SERVER_PORT" 30 || true; start_server; start_proxy; start_hw; start_kv; start_logtailer; wait_ready || exit 1; status ;;
   status) status ;;
   logs)
     for f in "$LOG"/supervisor.log "$LOG"/server.log "$LOG"/proxy.log "$LOG"/hw0.log "$LOG"/kvagent.log "$LOG"/logtailer.log; do

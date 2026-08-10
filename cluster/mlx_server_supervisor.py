@@ -65,7 +65,10 @@ from pathlib import Path
 from prometheus_client import Gauge, Counter, generate_latest, CONTENT_TYPE_LATEST
 
 LISTEN = ("0.0.0.0", 9105)
-HEALTH_URL = "http://127.0.0.1:8081/v1/models"
+HEALTH_URL = (
+    f"http://{os.environ.get('MLX_SERVER_IP', '127.0.0.1')}"
+    f":{os.environ.get('MLX_SERVER_PORT', '8081')}/v1/models"
+)
 DEFAULT_MODEL = os.environ.get("MLX_MODEL", "mlx-community/Qwen3.5-4B-MLX-8bit")
 
 CRASH_REASONS = [
@@ -221,18 +224,36 @@ class Supervisor:
         self._kill_remote_rank()
 
     def _kill_remote_rank(self):
-        try:
-            subprocess.run(
-                ["ssh", "-o", "ConnectTimeout=5", self.args.peer,
-                 "pkill -f 'mlx_lm[.]server'; pkill -f 'mlx_server_launcher[.]py'; pkill -f 'mlx[.]launch'"],
-                capture_output=True, timeout=15,
-            )
-        except Exception:
-            pass
+        """Clean up every remote ring rank (hosts[1:] from the hostfile) and any
+        local orphans left by mlx.launch. Bracketed patterns keep the wrapper's
+        own cmdline from matching the pkill and killing the cleanup mid-run."""
+        for peer in self._remote_peers():
+            try:
+                subprocess.run(
+                    ["ssh", "-o", "ConnectTimeout=5", peer,
+                     "pkill -f 'mlx_lm[.]server'; pkill -f 'mlx_server_launcher[.]py'; "
+                     "pkill -f 'mlx[.]launch'"],
+                    capture_output=True, timeout=15,
+                )
+            except Exception:
+                pass
         # mlx.launch terminates but its local python -m mlx_lm.server worker
-        # can survive as an orphan holding :8081; take it down too.
+        # can survive as an orphan holding the httpd port; take it down too.
         for pat in ("mlx_lm.server", "mlx_server_launcher", "mlx.launch"):
             subprocess.run(["pkill", "-f", pat], capture_output=True)
+
+    def _remote_peers(self):
+        """ssh targets of every ring rank except rank 0 (which runs locally)."""
+        try:
+            with open(self.args.hostfile) as f:
+                hosts = json.load(f)["hosts"]
+            return [
+                (h.get("ssh") or (h.get("ips") or [""])[0])
+                for h in hosts[1:]
+                if (h.get("ssh") or (h.get("ips") or [""])[0])
+            ]
+        except Exception:
+            return []
 
     # -- health ------------------------------------------------------------
     def health_loop(self):
@@ -323,8 +344,9 @@ def main():
     ap.add_argument("--command", required=True, help="shell command that runs mlx_lm.server")
     ap.add_argument("--cwd", default=".", help="working directory for the server command")
     ap.add_argument("--model", default=DEFAULT_MODEL)
-    ap.add_argument("--peer", default="192.168.2.1",
-                    help="rank 1 peer IP to clean up on shutdown")
+    ap.add_argument("--hostfile", default=os.environ.get("MLX_HOSTFILE", "cluster/hosts.json"),
+                    help="path to hosts.json; remote ring ranks (hosts[1:]) are "
+                         "cleaned up on shutdown")
     ap.add_argument("--health", default=HEALTH_URL)
     ap.add_argument("--server-log", default="cluster/logs/server.log")
     ap.add_argument("--listen", default="0.0.0.0:9105")
