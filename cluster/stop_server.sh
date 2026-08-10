@@ -11,6 +11,7 @@ pkill -f "mlx_hw_telemetry.py" 2>/dev/null
 pkill -f "mlx_server_supervisor.py" 2>/dev/null
 pkill -f "mlx_server_log_tailer.py" 2>/dev/null
 pkill -f "mlx_lm.server" 2>/dev/null
+pkill -f "mlx_server_launcher" 2>/dev/null
 pkill -f "mlx.launch" 2>/dev/null
-ssh -o ConnectTimeout=5 "$RANK1" "pkill -f 'mlx_hw_telemetry.py'; pkill -f 'mlx_lm.server'; pkill -f 'mlx.launch'" 2>/dev/null
+ssh -o ConnectTimeout=5 "$RANK1" "pkill -f 'mlx_hw_telemetry[.]py'; pkill -f 'mlx_lm[.]server'; pkill -f 'mlx_server_launcher[.]py'; pkill -f 'mlx[.]launch'" 2>/dev/null
 echo "stopped"

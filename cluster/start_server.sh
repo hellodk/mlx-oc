@@ -42,7 +42,9 @@ source "$DIR/cluster.env"
 export MLX_MODEL MLX_DEFAULT_TEMP
 export MLX_LOGPROBS MLX_LOGPROBS_STREAM_SAMPLE MLX_LOW_CONFIDENCE
 export MLX_MAX_PROMPT_TOKENS MLX_MAX_TOKENS_CAP MLX_RANK0_IP MLX_RANK1_IP
+export MLX_SERVER_IP
 MODEL="$MLX_MODEL"
+SERVER_HOST="$MLX_SERVER_IP"
 
 LOG="$DIR/logs"
 RANK0_IP="$MLX_RANK0_IP"
@@ -114,14 +116,15 @@ start_server() {
   # Local-Network privacy silently blocks the third-party py3.14 binary from
   # reaching local addresses when spawned over SSH (EHOSTUNREACH, no TCC entry).
   local srv_cmd="$MLX_VENV/bin/mlx.launch --hostfile $DIR/hosts.json --backend ring \
- --cwd $DIR --python $MLX_VENV/bin/python -- $MLX_VENV/bin/python -m mlx_lm.server \
- --model $MODEL --host 127.0.0.1 --port 8081 \
+ --cwd $DIR --python $MLX_VENV/bin/python -- $MLX_VENV/bin/python $DIR/mlx_server_launcher.py \
+ --model $MODEL --host $SERVER_HOST --port 8081 \
  --chat-template-args '{\"enable_thinking\":false}' \
  --prompt-cache-size 4 --prompt-cache-bytes 2g --prompt-concurrency 4"
 
   nohup "$VENV/bin/python" "$DIR/mlx_server_supervisor.py" \
     --model "$MODEL" \
-    --health http://127.0.0.1:8081/v1/models \
+    --peer "$RANK1" \
+    --health "http://$SERVER_HOST:8081/v1/models" \
     --server-log "$LOG/server.log" \
     --listen 0.0.0.0:9105 \
     --probe-interval 5 \
@@ -138,7 +141,7 @@ start_server() {
 
 start_proxy() {
   info "starting mlx_metrics_proxy -> logs/proxy.log"
-  local proxy_args=(--listen 0.0.0.0:8080 --upstream 127.0.0.1:8081
+  local proxy_args=(--listen 0.0.0.0:8080 --upstream "$SERVER_HOST:8081"
                     --default-temp "$MLX_DEFAULT_TEMP" --node-name rank0 --otlp-endpoint "$OTLP"
                     --opik-otlp-endpoint "$OPIK_OTLP" --model "$MODEL"
                     --logprobs "$MLX_LOGPROBS"
@@ -205,7 +208,7 @@ wait_ready() {
   local t0=$SECONDS
   info "waiting for mlx_lm.server readiness (ttl=${ttl}s)..."
   while (( SECONDS - t0 < ttl )); do
-    if curl -sf -m 2 http://127.0.0.1:8081/v1/models >/dev/null 2>&1; then
+    if curl -sf -m 2 "http://$SERVER_HOST:8081/v1/models" >/dev/null 2>&1; then
       info "mlx_lm.server ready after $((SECONDS - t0))s"
       return 0
     fi
@@ -219,8 +222,8 @@ wait_ready() {
 status() {
   echo "[$(ts)] mlx cluster status"
   local up down name port
-  up="$(curl -s -o /dev/null -w '%{http_code}' -m 3 http://127.0.0.1:8081/v1/models 2>/dev/null)"; [[ "$up" == 200 ]] && up=UP || up=DOWN
-  echo "  mlx_lm.server   :8081  $up (process: $(pgrep -f mlx_lm.server | wc -l | tr -d ' ') alive)"
+  up="$(curl -s -o /dev/null -w '%{http_code}' -m 3 "http://$SERVER_HOST:8081/v1/models" 2>/dev/null)"; [[ "$up" == 200 ]] && up=UP || up=DOWN
+  echo "  mlx_lm.server   :8081  $up (process: $(pgrep -f mlx_server_launcher | wc -l | tr -d ' ') alive)"
   for pidf in "$PID_SRV" "$PID_PROXY" "$PID_HW0" "$PID_KV" "$PID_LT"; do
     case "$pidf" in
       *supervisor*) name=supervisor; port=9105 ;;
@@ -257,8 +260,9 @@ stop() {
   pkill -f "mlx_server_supervisor.py" 2>/dev/null
   pkill -f "mlx_server_log_tailer.py" 2>/dev/null
   pkill -f "mlx_lm.server" 2>/dev/null
+  pkill -f "mlx_server_launcher" 2>/dev/null
   pkill -f "mlx.launch" 2>/dev/null
-  ssh -o ConnectTimeout=5 "$RANK1" "pkill -f 'mlx_hw_telemetry.py'; pkill -f 'mlx_lm.server'; pkill -f 'mlx.launch'" 2>/dev/null
+  ssh -o ConnectTimeout=5 "$RANK1" "pkill -f 'mlx_hw_telemetry[.]py'; pkill -f 'mlx_lm[.]server'; pkill -f 'mlx_server_launcher[.]py'; pkill -f 'mlx[.]launch'" 2>/dev/null
   for pidf in "$PID_SRV" "$PID_PROXY" "$PID_HW0" "$PID_KV" "$PID_LT"; do rm -f "$pidf"; done
   info "stopped"
 }

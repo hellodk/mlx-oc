@@ -223,15 +223,15 @@ class Supervisor:
     def _kill_remote_rank(self):
         try:
             subprocess.run(
-                ["ssh", "-o", "ConnectTimeout=5", "192.168.2.2",
-                 "pkill -f 'mlx_lm.server'; pkill -f 'mlx.launch'"],
+                ["ssh", "-o", "ConnectTimeout=5", self.args.peer,
+                 "pkill -f 'mlx_lm[.]server'; pkill -f 'mlx_server_launcher[.]py'; pkill -f 'mlx[.]launch'"],
                 capture_output=True, timeout=15,
             )
         except Exception:
             pass
         # mlx.launch terminates but its local python -m mlx_lm.server worker
         # can survive as an orphan holding :8081; take it down too.
-        for pat in ("mlx_lm.server", "mlx.launch"):
+        for pat in ("mlx_lm.server", "mlx_server_launcher", "mlx.launch"):
             subprocess.run(["pkill", "-f", pat], capture_output=True)
 
     # -- health ------------------------------------------------------------
@@ -323,6 +323,8 @@ def main():
     ap.add_argument("--command", required=True, help="shell command that runs mlx_lm.server")
     ap.add_argument("--cwd", default=".", help="working directory for the server command")
     ap.add_argument("--model", default=DEFAULT_MODEL)
+    ap.add_argument("--peer", default="192.168.2.1",
+                    help="rank 1 peer IP to clean up on shutdown")
     ap.add_argument("--health", default=HEALTH_URL)
     ap.add_argument("--server-log", default="cluster/logs/server.log")
     ap.add_argument("--listen", default="0.0.0.0:9105")
