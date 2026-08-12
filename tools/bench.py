@@ -64,14 +64,17 @@ def sse_parse_stream(resp):
             continue
 
 
-def run_one(base, model, prompt, max_tokens, concurrency=0):
-    body = json.dumps({
+def run_one(base, model, prompt, max_tokens, concurrency=0, extra_body=None):
+    req_body = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "stream": True,
         "max_tokens": max_tokens,
         "temperature": 0.0,
-    }).encode()
+    }
+    if extra_body:
+        req_body.update(extra_body)
+    body = json.dumps(req_body).encode()
 
     t_send = time.monotonic()
     req = urllib.request.Request(
@@ -116,7 +119,7 @@ def run_one(base, model, prompt, max_tokens, concurrency=0):
 
 def bench_scenario(args, prompt, label):
     print(f"\n--- {label}  (max_tokens={args.max_tokens}, iters={args.iters}) ---")
-    results = [run_one(args.base, args.model, prompt, args.max_tokens) for _ in range(args.iters)]
+    results = [run_one(args.base, args.model, prompt, args.max_tokens, extra_body=args.extra_body) for _ in range(args.iters)]
 
     def avg(key, fmt="{:.3f}"):
         vals = [r[key] for r in results if r.get(key) is not None]
@@ -141,7 +144,8 @@ def bench_concurrency(args):
     t0 = time.monotonic()
     with ThreadPoolExecutor(max_workers=args.concurrency) as ex:
         futures = [
-            ex.submit(run_one, args.base, args.model, MEDIUM, args.max_tokens)
+            ex.submit(run_one, args.base, args.model, MEDIUM, args.max_tokens,
+                      extra_body=args.extra_body)
             for _ in range(args.concurrency * args.iters)
         ]
         for f in futures:
@@ -168,12 +172,26 @@ def main():
                     help="if >0, run a concurrency burst instead of the prompt matrix")
     ap.add_argument("--label", default="bench", help="tag recorded under _label")
     ap.add_argument("--json", action="store_true", help="also emit JSON summary")
+    ap.add_argument("--extra-body", default="",
+                    help='JSON object merged into every request body, e.g. '
+                         '{"reasoning_effort":"none"} to disable exo/Qwen thinking mode')
     args = ap.parse_args()
+
+    if args.extra_body:
+        try:
+            extra = json.loads(args.extra_body)
+        except json.JSONDecodeError:
+            ap.error(f"--extra-body is not valid JSON: {args.extra_body!r}")
+        if not isinstance(extra, dict):
+            ap.error("--extra-body must be a JSON object")
+        args.extra_body = extra
+    else:
+        args.extra_body = None
 
     print(f"bench start={datetime.now().isoformat(timespec='seconds')} "
           f"base={args.base} model={args.model} label={args.label}")
     print("warming up...")
-    run_one(args.base, args.model, "warmup", 4)
+    run_one(args.base, args.model, "warmup", 4, extra_body=args.extra_body)
 
     all_results = []
     if args.concurrency:

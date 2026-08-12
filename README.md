@@ -489,6 +489,9 @@ Per-section field notes on the observability layer, with animated pastel SVGs
 18. [The Sampler Doesn't Lie: Entropy, Perplexity and Confidence from Logprobs](blog/18-token-confidence-logprobs.html)
 19. [Every Signal, One Map: Telemetry and Test Tooling in Tables](blog/19-observability-telemetry-and-testing.html)
 20. [The Same Dashboards, Any Grafana: Shipping Data to the k8s Stack](blog/20-k8s-grafana-data-path.html)
+21. [The Ring Kept Dropping. One LaunchDaemon Fixed It.](blog/21-thunderbolt-ring-launchdaemons.html)
+22. [The Observability Reference: Every Panel, Every Formula](blog/22-observability-dashboard-reference.html)
+23. [Setting Up the Two-Mac MLX Cluster, From Zero to a Working Ring](blog/23-using-the-mlx-cluster.html)
 
 ## Known platform quirks
 

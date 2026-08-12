@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>23 — Setting Up the Two-Mac MLX Cluster: From Zero to a Working Ring</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#4f46e5;--accent-soft:#eef0ff;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(79,70,229,.10), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(219,39,119,.09), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #dfe1ff;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:720px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  .dbadge{display:inline-block;font-size:11px;font-weight:800;border-radius:6px;padding:2px 8px;margin-right:6px;background:var(--accent-soft);color:var(--accent);border:1px solid #dfe1ff;vertical-align:middle}
+  .q{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--code-bg);border:1px solid var(--line);border-radius:6px;padding:1px 5px;white-space:nowrap}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="1-hardware-telemetry.html">Telemetry</a>
+  <a href="16-mlx-distributed-options-tuning.html">Tuning</a>
+  <a href="21-thunderbolt-ring-launchdaemons.html">TB4 launchd</a>
+  <a href="22-observability-dashboard-reference.html">Dashboard reference</a>
+  <a href="23-using-the-mlx-cluster.html" style="color:var(--accent);font-weight:700">Using the cluster</a>
+</div></nav>
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Post 23 &middot; the field manual</span>
+    <h1>Setting Up the Two-Mac MLX Cluster, From Zero to a Working Ring</h1>
+    <p class="sub">Everything needed to stand up the distributed MLX ring on two Mac minis and actually use it: the two venvs and why there are two Pythons, the network and hostfiles, model placement on both nodes, the one config knob that changes the model, every curl that proves it works, the load-test rigs, and the six gotchas that bite first-time builders.</p>
+    <div class="meta"><span><b>Nodes</b> 2 Mac minis</span><span><b>Venvs</b> 2 (py3.12 + py3.14)</span><span><b>Ports</b> 8080/8081/9102/9104/9105/9106</span><span><b>Model</b> one line in cluster.env</span></div>
+  </div>
+</header>
+<main class="wrap">
+
+<section>
+  <h2><span class="num">1</span>What you are building</h2>
+  <p>One logical model split across two Mac minis over the MLX <code>ring</code> backend, fronted by an OpenAI-compatible proxy that makes it observable. Six processes, three of them pure telemetry:</p>
+  <table>
+    <tr><th>Piece</th><th>Runs on</th><th>Port</th><th>Needs</th></tr>
+    <tr><td><code>mlx_lm.server</code> (via <code>mlx.launch --backend ring</code>)</td><td>both nodes, sharded</td><td><code>127.0.0.1:8081</code> (rank 0)</td><td><code>~/venvs/mlx</code> &mdash; Python 3.12</td></tr>
+    <tr><td><code>cluster/mlx_metrics_proxy.py</code></td><td>rank 0</td><td><code>0.0.0.0:8080</code></td><td>repo <code>.venv</code> &mdash; Python 3.14</td></tr>
+    <tr><td><code>cluster/mlx_server_supervisor.py</code></td><td>rank 0</td><td><code>0.0.0.0:9105</code></td><td>repo <code>.venv</code></td></tr>
+    <tr><td><code>cluster/mlx_hw_telemetry.py</code></td><td>both nodes</td><td><code>0.0.0.0:9102</code></td><td>repo <code>.venv</code></td></tr>
+    <tr><td><code>cluster/mlx_kv_cache_agent.py</code></td><td>rank 0</td><td><code>0.0.0.0:9104</code></td><td>repo <code>.venv</code></td></tr>
+    <tr><td><code>cluster/mlx_server_log_tailer.py</code></td><td>rank 0</td><td><code>0.0.0.0:9106</code></td><td>repo <code>.venv</code></td></tr>
+  </table>
+  <p>Two venvs, two Pythons, one reason: macOS Local-Network privacy (TCC) silently blocks the third-party <b>py3.14</b> binary from reaching local subnets when it is spawned over SSH (<code>EHOSTUNREACH</code>, no dialog). The remote shard therefore runs on the <b>py3.12</b> venv; rank-0-only processes use py3.14. Both venvs carry identical <code>mlx 0.32.0</code> / <code>mlx-lm 0.31.3</code>.</p>
+</section>
+
+<section>
+  <h2><span class="num">2</span>The network: two links, two jobs</h2>
+  <p>Traffic is split so ring collectives never compete with management:</p>
+  <table>
+    <tr><th>Link</th><th>Subnet (this repo)</th><th>Carries</th></tr>
+    <tr><td>Ring &mdash; dedicated Ethernet (<code>en0</code>)</td><td><code>10.0.0.0/24</code> &mdash; repo now uses <code>192.168.2.2</code> / <code>192.168.2.1</code></td><td>model shards, per-token ring sync</td></tr>
+    <tr><td>Management LAN</td><td><code>192.168.1.0/24</code></td><td>SSH, telemetry scraping, proxy clients</td></tr>
+  </table>
+  <p>Set static IPs (<code>System Settings &rarr; Network &rarr; Ethernet &rarr; Manual</code>, or <code>sudo networksetup -setmanual "Ethernet" 10.0.0.1 255.255.255.0</code>), then verify L2 reachability &mdash; <code>ping 10.0.0.2</code> from rank 0 should be ~0.5&nbsp;ms with 0% loss. A missing or flaky ring link is the #1 cause of "the ring keeps dropping" (post 21).</p>
+</section>
+
+<section>
+  <h2><span class="num">3</span>Two venvs, both nodes</h2>
+  <pre><code># server venv (Python 3.12) &mdash; BOTH nodes
+python3.12 -m venv ~/venvs/mlx
+~/venvs/mlx/bin/python -m pip install \
+  mlx==0.32.0 mlx-lm==0.31.3 mlx-metal==0.32.0 prometheus_client \
+  opentelemetry-api opentelemetry-sdk \
+  opentelemetry-exporter-otlp-proto-http opentelemetry-proto \
+  opentelemetry-semantic-conventions opentelemetry-instrumentation
+
+# proxy venv (Python 3.14) &mdash; rank 0 only, at the repo root
+cd mlx-oc && python3.14 -m venv .venv
+.venv/bin/python -m pip install prometheus_client opentelemetry-*
+# optional, for Opik tracing / agentic bench:
+.venv/bin/python -m pip install opik==2.2.13 aiohttp litellm</code></pre>
+  <div class="callout warn"><span class="ic">!</span><div><code>mlx-metal</code> is a separate platform wheel &mdash; installing <code>mlx</code> alone gives the CPU backend and no Metal/GPU acceleration. And use <code>python -m pip</code>, never the venv <code>bin/pip</code> script: its shebang can point at a path that no longer exists if the venv is ever moved.</div></div>
+</section>
+
+<section>
+  <h2><span class="num">4</span>SSH and the hostfiles</h2>
+  <pre><code>ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519          # on rank 0
+ssh-copy-id dk@192.168.1.5                                 # reach rank 1
+ssh -o BatchMode=yes 192.168.1.5 true                      # must not prompt</code></pre>
+  <p>Hostfile entry order <b>is</b> ring rank order. <code>cluster/hosts.json</code> (rank 0 side) and <code>cluster/hosts_rev.json</code> (the reverse file used on the remote) must be updated <b>together</b> whenever IPs change:</p>
+  <pre><code>{
+  "backend": "ring",
+  "envs": [],
+  "hosts": [
+    {"ssh": "127.0.0.1", "ips": ["192.168.2.2"]},   # rank 0 = serving node
+    {"ssh": "192.168.2.1", "ips": ["192.168.2.1"]}  # rank 1 = peer
+  ]
+}</code></pre>
+  <p>Or regenerate automatically: <code>~/venvs/mlx/bin/mlx.distributed_config --hosts 127.0.0.1,&lt;rank1&gt; --over ethernet --backend ring --auto-setup</code>. If <code>mlx.launch</code> ever fails, the same command without <code>--auto-setup</code> probes the ring link and prints whether a full ring is possible.</p>
+</section>
+
+<section>
+  <h2><span class="num">5</span>The model lives on BOTH nodes</h2>
+  <p>The ring shards weights across the two Macs, so rank 1 must hold a copy too. Either layout works; a plain directory is simplest:</p>
+  <pre><code>huggingface-cli download mlx-community/Qwen3.5-4B-MLX-8bit --local-dir Qwen3.5-4B-MLX-8bit
+sudo mkdir -p /opt/mlx-models && sudo cp -R Qwen3.5-4B-MLX-8bit /opt/mlx-models/   # both nodes</code></pre>
+  <p>A missing weight file on rank 1 crashes the ring at load &mdash; verify with <code>ls</code> on each node before starting. For an air-gapped site, set <code>HF_HUB_OFFLINE=1</code> and <code>HF_HUB_DISABLE_TELEMETRY=1</code> at the top of <code>start_server.sh</code>.</p>
+</section>
+
+<section>
+  <h2><span class="num">6</span>The one knob: <code>cluster.env</code></h2>
+  <p>Every script reads <code>MLX_MODEL</code> from <code>cluster/cluster.env</code>, so changing the model is one edit, one render, one restart:</p>
+  <pre><code>MLX_MODEL=mlx-community/Qwen3.5-4B-MLX-4bit   # &lt;-- change this line
+MLX_SERVER_IP=192.168.1.5                     # rank 0 server bind
+MLX_DEFAULT_TEMP=0.0                          # agentic/coding defaults to deterministic
+
+./render-config.sh           # regenerate opencode.json from cluster.env
+./cluster/start_server.sh    # start
+./cluster/start_server.sh status</code></pre>
+  <p>The same file carries the guardrails that stopped the post-22 Metal OOM: <code>MLX_MAX_PROMPT_TOKENS=16000</code>, <code>MLX_MAX_TOKENS_CAP=4096</code>, <code>MLX_MAX_BODY_BYTES</code>, optional <code>MLX_API_KEY</code>, and <code>MLX_RATE_LIMIT</code>. The proxy enforces all of them before the GPU ever sees a request.</p>
+</section>
+
+<section>
+  <h2><span class="num">7</span>Start &amp; verify</h2>
+  <pre><code>./cluster/start_server.sh                       # supervisor, ring, proxy, hw, kv, logtailer
+curl -s http://127.0.0.1:8080/v1/models
+curl -s http://127.0.0.1:8080/v1/chat/completions -H 'Content-Type: application/json' \
+  -d '{"model":"mlx-community/Qwen3.5-4B-MLX-4bit",
+       "messages":[{"role":"user","content":"say hi"}],"max_tokens":16}'
+curl -s http://127.0.0.1:9105/metrics | grep mlx_server_state    # expect 1.0
+curl -s http://127.0.0.1:9102/metrics | grep mlx_hw_load1        # rank 0
+curl -s http://192.168.1.5:9102/metrics | grep mlx_hw_load1      # rank 1
+./cluster/stop_server.sh</code></pre>
+  <p>The launch line in <code>start_server.sh</code> already carries the blog-16 tuning (<code>--decode-concurrency 8 --prompt-concurrency 4 --prefill-step-size 512 --prompt-cache-size 2 --max-tokens 1024</code>). The <code>:8081</code> readiness check only proves rank 0 is up &mdash; the full ring picture lives in <code>cluster/logs/server.log</code> and the <code>mlx_net_*</code> ring counters.</p>
+</section>
+
+<section>
+  <h2><span class="num">8</span>Use it: OpenAI-compatible, anything works</h2>
+  <p>The proxy at <code>http://&lt;rank0-ip&gt;:8080/v1</code> speaks the OpenAI protocol &mdash; streaming and non-streaming chat completions, with TTFT / token-rate / hallucination-risk recorded per request. Any OpenAI client can point at it:</p>
+  <pre><code># opencode, pointed at the cluster (rendered into opencode.json by render-config.sh)
+opencode --model mlx-community/Qwen3.5-4B-MLX-4bit
+
+# raw streaming chat
+curl -sN http://127.0.0.1:8080/v1/chat/completions -H 'Content-Type: application/json' \
+  -d '{"model":"mlx-community/Qwen3.5-4B-MLX-4bit","stream":true,
+       "messages":[{"role":"user","content":"Explain the ring topology."}]}'</code></pre>
+  <p>One proxy detail matters for TTFT: it relays SSE with <code>resp.read1()</code> so it never waits for a full 64&nbsp;KiB buffer before forwarding a chunk &mdash; without it, streaming TTFT looks like the whole generation time.</p>
+</section>
+
+<section>
+  <h2><span class="num">9</span>Load test and smoke it</h2>
+  <pre><code>.venv/bin/python tools/bench.py --base http://127.0.0.1:8080/v1 \
+  --model mlx-community/Qwen3.5-4B-MLX-4bit --iters 3 --label "ring"
+
+.venv/bin/python tools/bench.py --concurrency 4 --max-tokens 256 --iters 5 --label "4-way burst"
+.venv/bin/python tools/smoke.py        # ring connectivity test
+.venv/bin/python tools/agent.py        # distributed tool-loop demo</code></pre>
+  <p>What the numbers say on this hardware (from the README, measured against <code>Qwen3-1.7B-4bit</code>): the 2-node ring is <b>~3&times; slower than a single Mac</b> for a small model &mdash; ring collectives dominate at 1.7B parameters. Distribution pays off only when the model is too big for one node&rsquo;s memory. Aggregate throughput: single ~51.5 tok/s vs ring ~23.6 tok/s. For the 4B on the ring, blog 16 measured 18&ndash;29 engine tok/s depending on tuning.</p>
+</section>
+
+<section>
+  <h2><span class="num">10</span>The Thunderbolt variant</h2>
+  <p>The same cluster can run the ring over a TB4/USB4 cable instead of Ethernet. Post 21 documented the failure mode: link re-negotiations silently reverted the ring interface to link-local addressing and MTU 1500, leaking ring traffic out the LAN gateway (a 12&ndash;25&nbsp;ms detour). The fix is an idempotent LaunchDaemon that re-applies <code>192.168.2.1/.2</code> and the 8000-byte jumbo MTU every 20 seconds on both nodes. It is worth it: TB4-vs-Ethernet showed <b>+7.6% conc16 throughput</b>.</p>
+</section>
+
+<section>
+  <h2><span class="num">11</span>Observability (optional but the point of this blog)</h2>
+  <pre><code>cd observability
+./setup.sh                # renders vm-scrape.yml from your IPs
+podman compose up -d      # VictoriaMetrics + otel-collector + Grafana + vmalert + Alertmanager
+open http://localhost:8428/vmui     # query UI
+open http://localhost:3000          # Grafana (admin/admin) &mdash; "MLX Cluster" dashboard</code></pre>
+  <p>The stack scrapes the proxy (<code>:8080</code>), both hw agents (<code>:9102</code>), the KV-cache agent (<code>:9104</code>), the supervisor (<code>:9105</code>) and the log tailer (<code>:9106</code>) every 15&nbsp;s, evaluates 46 alert rules, and renders twelve provisioned dashboards. Proxy traces/logs also flow to Opik over OTLP when <code>MLX_OTLP_ENDPOINT</code> is set.</p>
+</section>
+
+<section>
+  <h2><span class="num">12</span>The six gotchas that bite</h2>
+  <table>
+    <tr><th>Gotcha</th><th>What it does</th></tr>
+    <tr><td>TCC blocks py3.14 over SSH</td><td>Remote shard must run on the py3.12 venv (<code>~/venvs/mlx</code>) &mdash; instant <code>EHOSTUNREACH</code> otherwise, with no dialog.</td></tr>
+    <tr><td>No <code>mlx-metal</code></td><td><code>mlx</code> alone is CPU-only &mdash; GPU inference silently falls back to the CPU.</td></tr>
+    <tr><td>Hostfiles out of sync</td><td><code>hosts.json</code> and <code>hosts_rev.json</code> must be edited together; entry order is ring rank order.</td></tr>
+    <tr><td>Model missing on rank 1</td><td>Ring crashes at load with no useful message &mdash; verify weights on both nodes first.</td></tr>
+    <tr><td>Model bigger than the node</td><td>rank 0 is memory-constrained (the post-22 crash was a 17,667-token prompt OOMing an 8&nbsp;GiB node). Pick a quant that fits with KV, and keep the proxy guardrails on.</td></tr>
+    <tr><td><code>bin/pip</code> stale shebang</td><td>Always use <code>python -m pip</code>; the venv <code>bin/pip</code> script breaks if the venv moves.</td></tr>
+  </table>
+</section>
+
+</main>
+<footer class="wrap">
+  mlx-oc &middot; a two-Mac-mini distributed MLX inference cluster with full observability &middot; <a href="../README.md">repo README</a> &middot; install path: <a href="../INSTALL.md">INSTALL.md</a> &middot; <a href="index.html">all posts</a>
+</footer>
+</body>
+</html>

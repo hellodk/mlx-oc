@@ -1,0 +1,7 @@
+[ 2026-08-11 23:49:06.246 | INFO     | exo.worker.engines.mlx.utils_mlx:mlx_distributed_init:135 ] rank 1 MLX_IBV_DEVICES: /var/folders/c6/5nwnzzvn557_9qbc9679qgnr0000gn/T/tmpnk0xuxbs/hosts_8e5af432-0
+[ 2026-08-11 23:49:06.246 | INFO     | exo.worker.engines.mlx.utils_mlx:mlx_distributed_init:138 ] rank 1 MLX_JACCL_COORDINATOR: 10.0.0.2:51546
+[ 2026-08-11 23:49:08.238 | ERROR    | exo.worker.runner.runner_supervisor:_check_runner:273 ] Runner terminated with signal=11 (Segmentation fault: 11)
+RuntimeError: Runner found to be dead
+[ 2026-08-11 23:49:13.607 | INFO     | exo.worker.engines.mlx.utils_mlx:mlx_distributed_init:135 ] rank 1 MLX_IBV_DEVICES: /var/folders/c6/5nwnzzvn557_9qbc9679qgnr0000gn/T/tmpekm7ktim/hosts_8e5af432-0
+[ 2026-08-11 23:49:13.607 | INFO     | exo.worker.engines.mlx.utils_mlx:mlx_distributed_init:138 ] rank 1 MLX_JACCL_COORDINATOR: 10.0.0.2:51546
+[ 2026-08-11 23:49:16.208 | ERROR    | exo.worker.runner.runner_supervisor:_check_runner:273 ] Runner terminated with signal=11 (Segmentation fault: 11)

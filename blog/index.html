@@ -46,6 +46,8 @@
   .n19{background:linear-gradient(135deg,#334155,#0f766e)}
   .n20{background:linear-gradient(135deg,#b45309,#4f46e5)}
   .n21{background:linear-gradient(135deg,#0f766e,#db2777)}
+  .n22{background:linear-gradient(135deg,#0e7490,#4f46e5)}
+  .n23{background:linear-gradient(135deg,#db2777,#0f766e)}
   .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
   .post p{margin:0;color:var(--muted);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
@@ -232,6 +234,22 @@
       <h2>The Ring Kept Dropping. One LaunchDaemon Fixed It.</h2>
       <p>Thunderbolt link re-negotiations silently reverted the ring interface to link-local addressing and MTU 1500 &mdash; so traffic to rank1 leaked out the LAN gateway to a router (a 12&ndash;25 ms detour, and an OpenWrt dropbear answering our SSH). An idempotent LaunchDaemon now re-applies <code>192.168.2.1/.2</code> and the 8000-byte jumbo MTU every 20 seconds on both nodes: the full script and plist, the break-and-restore test with unedited logs, and why the MTU is worth persisting (+7.6% conc16 throughput in the TB4-vs-Ethernet benchmark).</p>
       <span class="tag">LaunchDaemon</span><span class="tag">Thunderbolt</span><span class="tag">MTU</span><span class="tag">jumbo frames</span><span class="tag">self-healing</span>
+    </div>
+  </a>
+  <a class="post" href="22-observability-dashboard-reference.html">
+    <div class="num n22">22</div>
+    <div>
+      <h2>Every Panel, Every Formula &mdash; and the Day the Server Fell Over</h2>
+      <p>A complete reference to the twelve Grafana dashboards: what each of the 259 panels is, the exact PromQL behind it, and the significance of the signal. Plus the crash post-mortem that shaped three of them &mdash; four <code>metal_gpu_error</code> restarts in 31 minutes from an unbounded prompt cache and a 17,667-token prompt on an 8&nbsp;GiB node &mdash; the five proxy guardrails that stopped it, and the signal-to-noise pass that removed 20 duplicate widgets.</p>
+      <span class="tag">dashboard reference</span><span class="tag">PromQL</span><span class="tag">259 panels</span><span class="tag">OOM post-mortem</span><span class="tag">guardrails</span>
+    </div>
+  </a>
+  <a class="post" href="23-using-the-mlx-cluster.html">
+    <div class="num n23">23</div>
+    <div>
+      <h2>Setting Up the Two-Mac MLX Cluster, From Zero to a Working Ring</h2>
+      <p>The field manual: the two venvs and why there are two Pythons (TCC blocks py3.14 over SSH, so the remote shard runs on py3.12), the ring and management links and the hostfiles that must match both sides, the model that has to live on both nodes, the single <code>cluster.env</code> line that changes the model, every curl that proves the stack is healthy, the bench/smoke/agent load-test rigs, the TB4 variant, the optional observability stack &mdash; and the six gotchas that bite first-time builders.</p>
+      <span class="tag">setup</span><span class="tag">ring</span><span class="tag">two venvs</span><span class="tag">hostfiles</span><span class="tag">verification curls</span><span class="tag">gotchas</span>
     </div>
   </a>
 </main>
