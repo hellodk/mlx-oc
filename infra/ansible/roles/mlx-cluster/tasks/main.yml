@@ -1,0 +1,39 @@
+---
+# mlx-cluster role: deploy / check / stop the distributed MLX ring.
+#
+# Tags:
+#   prereqs  — read-only per-node pre-flight (run via check.yml)
+#   setup    — venvs, wheels, model, repo sync, rendered configs (idempotent)
+#   start    — bring the ring up on rank0 and wait for readiness
+#   stop     — tear the ring down (rank0 orchestrates)
+#
+# Everything is driven by group_vars/all/mlx-cluster.yml — no host IPs, ports,
+# models or versions are hardcoded in this role.
+
+- name: "expand home-based paths"
+  set_fact:
+    mlx_venv_server: "{{ mlx_cluster.venv_server | expanduser }}"
+    mlx_repo_dir: "{{ mlx_cluster.repo_dir | expanduser }}"
+  tags: [prereqs, setup, start, stop]
+
+- name: "locate this host's entry in mlx_cluster.nodes"
+  set_fact:
+    mlx_node: "{{ mlx_cluster.nodes | selectattr('name', 'equalto', inventory_hostname) | list | first }}"
+  tags: [prereqs, setup, start, stop]
+
+- name: "include pre-flight checks"
+  include_tasks: prereqs.yml
+  tags: [prereqs]
+
+- name: "include node setup"
+  include_tasks: setup.yml
+  tags: [setup]
+
+- name: "include ring start"
+  include_tasks: deploy.yml
+  tags: [start]
+
+- name: "include ring stop (only when --tags stop is explicitly requested)"
+  include_tasks: stop.yml
+  tags: [stop]
+  when: "'stop' in ansible_run_tags"

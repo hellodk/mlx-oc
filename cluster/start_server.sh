@@ -244,7 +244,7 @@ start_logtailer() {
 
 # --- readiness ----------------------------------------------------------------
 wait_ready() {
-  local ttl=${1:-180}
+  local ttl=${1:-300}
   local t0=$SECONDS
   info "waiting for mlx_lm.server readiness (ttl=${ttl}s)..."
   while (( SECONDS - t0 < ttl )); do

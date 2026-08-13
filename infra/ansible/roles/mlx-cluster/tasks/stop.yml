@@ -1,0 +1,11 @@
+---
+# Tear the stack down (rank 0 only — stop_server.sh kills the local processes
+# and every peer's ring/telemetry processes over ssh).
+
+- name: "stop the MLX stack on rank0"
+  command: "./cluster/stop_server.sh"
+  args:
+    chdir: "{{ mlx_repo_dir }}"
+  ignore_errors: true
+  when: inventory_hostname == mlx_rank0_host
+  tags: [stop]

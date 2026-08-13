@@ -1,0 +1,30 @@
+---
+# MLX distributed ring — deploy / start / stop / check.
+#
+# Everything (nodes, model, versions, ports, tuning) lives in
+# group_vars/all/mlx-cluster.yml and the inventory (group `mlx_ring`). The
+# interactive wizard (tools/mlx-deploy.py) writes both from your answers.
+#
+# Usage (from infra/ansible):
+#   ansible-playbook -i inventories/generated/hosts.yml cluster.yml            # prereqs + setup + start
+#   ansible-playbook -i inventories/generated/hosts.yml cluster.yml --tags prereqs
+#   ansible-playbook -i inventories/generated/hosts.yml cluster.yml --tags setup
+#   ansible-playbook -i inventories/generated/hosts.yml cluster.yml --tags start
+#   ansible-playbook -i inventories/generated/hosts.yml cluster.yml --tags stop
+#   ansible-playbook -i inventories/generated/hosts.yml check.yml              # read-only pre-flight report
+#
+# The stack is brought up on rank0 by ./cluster/start_server.sh (supervisor +
+# mlx.launch ring + metrics proxy + hw/kv/logtailer agents); peers only need
+# the venv, the repo and the weights (setup tasks).
+- name: MLX distributed ring
+  hosts: mlx_ring
+  gather_facts: true
+  vars_files:
+    - "group_vars/all/mlx-cluster.yml"
+  # Non-interactive ssh PATH omits /opt/homebrew/bin (and /usr/local/bin for
+  # the python.org installer), so bare `python3.12` fails on fresh nodes.
+  # Prepend both so venv creation / prereq checks find the interpreter.
+  environment:
+    PATH: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+  roles:
+    - role: mlx-cluster

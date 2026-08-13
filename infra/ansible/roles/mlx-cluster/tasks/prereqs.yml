@@ -1,0 +1,168 @@
+---
+# Per-node pre-flight checks for the distributed MLX ring. Read-only; every task
+# either passes silently or prints a concrete suggested fix. Run alone via
+# infra/ansible/check.yml.
+#
+# Each node in the ring must be an Apple Silicon Mac running the py3.12 venv
+# (macOS Local-Network privacy blocks a third-party py3.14 binary spawned over
+# SSH, so the *server* venv is pinned to Python 3.12 — see INSTALL.md §8).
+
+- name: "locate this host's entry in mlx_cluster.nodes"
+  set_fact:
+    mlx_node: "{{ mlx_cluster.nodes | selectattr('name', 'equalto', inventory_hostname) | list | first }}"
+  tags: [prereqs]
+
+- name: "OS is macOS"
+  assert:
+    that: ansible_os_family == "Darwin"
+    fail_msg: "{{ inventory_hostname }} is not macOS (family={{ ansible_os_family }}) — MLX rings run on Apple Silicon Macs only"
+  tags: [prereqs]
+
+- name: "CPU is Apple Silicon (arm64)"
+  assert:
+    that: ansible_machine == "arm64"
+    fail_msg: "{{ inventory_hostname }} is {{ ansible_machine }} — mlx-metal needs arm64; there is no CUDA/MLX path on x86"
+  tags: [prereqs]
+
+- name: "macOS version"
+  command: sw_vers -productVersion
+  register: mlx_os_ver
+  changed_when: false
+  tags: [prereqs]
+
+- name: "Python 3.12 on PATH"
+  command: command -v python3.12
+  register: mlx_py312
+  changed_when: false
+  failed_when: false
+  tags: [prereqs]
+
+- name: "suggest installing Python 3.12"
+  debug:
+    msg: >-
+      python3.12 NOT found on {{ inventory_hostname }}.
+      Suggested fix: brew install python@3.12   (or install the python.org
+      3.12 universal2 .pkg — required on air-gapped sites, see INSTALL.md §2.1)
+  when: mlx_py312.rc != 0
+  tags: [prereqs]
+
+- name: "memory"
+  set_fact:
+    mlx_ram_gb: "{{ ansible_facts['memtotal_mb'] | int // 1024 }}"
+  tags: [prereqs]
+
+- name: "memory is enough for the model"
+  assert:
+    that: ansible_facts['memtotal_mb'] | int >= mlx_cluster.min_ram_mb
+    fail_msg: >-
+      {{ inventory_hostname }} has {{ mlx_ram_gb }} GiB RAM; this model wants
+      >= {{ mlx_cluster.min_ram_mb // 1024 }} GiB per node (weights on every
+      node + KV cache + prompt cache share unified memory). Run a smaller
+      quant (8-bit -> 4-bit -> 3-bit) or drop nodes.
+  tags: [prereqs]
+
+- name: "disk space for model + venvs"
+  command: "df -k /"
+  register: mlx_df
+  changed_when: false
+  tags: [prereqs]
+
+- name: "disk has headroom"
+  set_fact:
+    mlx_free_gb: "{{ (mlx_df.stdout_lines[1].split()[3] | int) // (1024 * 1024) }}"
+  tags: [prereqs]
+
+- name: "disk has headroom"
+  assert:
+    that: mlx_free_gb | int >= (mlx_cluster.min_disk_gb | int)
+    fail_msg: >-
+      {{ inventory_hostname }} has ~{{ mlx_free_gb }} GiB free on /; need
+      >= {{ mlx_cluster.min_disk_gb }} GiB (two venvs + model weights on every
+      node).
+  tags: [prereqs]
+
+- name: "ring IP configured on this node"
+  command: "ifconfig"
+  register: mlx_ifcfg
+  changed_when: false
+  tags: [prereqs]
+
+- name: "ring IP present"
+  assert:
+    that: mlx_node.ring_ip in mlx_ifcfg.stdout
+    fail_msg: >-
+      {{ mlx_node.ring_ip }} is not assigned to any interface on
+      {{ inventory_hostname }}. Suggested fix (System Settings -> Network ->
+      Ethernet -> manual IPv4, or):
+      sudo networksetup -setmanual "Ethernet" {{ mlx_node.ring_ip }} 255.255.255.0
+  tags: [prereqs]
+
+- name: "model is staged on this node (or downloads are enabled)"
+  stat:
+    path: "{{ mlx_cluster.model_dir }}/{{ mlx_cluster.model_name }}"
+  register: mlx_model_stat
+  when: not mlx_cluster.download_model
+  tags: [prereqs]
+
+- name: "model present on every node"
+  assert:
+    that: mlx_model_stat.stat.exists
+    fail_msg: >-
+      missing weights on {{ inventory_hostname }}: expected
+      {{ mlx_cluster.model_dir }}/{{ mlx_cluster.model_name }}.
+      The ring shards the model across ALL nodes — a missing file on any rank
+      crashes the ring at load. Copy the model dir to every node (or set
+      mlx_cluster.download_model: true).
+  when: not mlx_cluster.download_model
+  tags: [prereqs]
+
+- name: "hw telemetry port free"
+  command: "lsof -nP -iTCP:{{ mlx_cluster.ports.hw }} -sTCP:LISTEN"
+  register: mlx_port_hw
+  changed_when: false
+  failed_when: false
+  tags: [prereqs]
+
+- name: "hw telemetry port is free (else a stale stack is running)"
+  debug:
+    msg: "WARN: {{ mlx_cluster.ports.hw }} is already listening on {{ inventory_hostname }} — run ./cluster/stop_server.sh before applying"
+  when: mlx_port_hw.rc == 0
+  tags: [prereqs]
+
+- name: "ring link reachable from rank0 (ping each peer's ring IP)"
+  command: "ping -c1 -t2 {{ item.ring_ip }}"
+  register: mlx_ping
+  failed_when: false
+  changed_when: false
+  with_items: "{{ mlx_cluster.nodes }}"
+  when:
+    - inventory_hostname == mlx_rank0_host
+    - not item.local
+  tags: [prereqs]
+
+- name: "report ring ping results"
+  debug:
+    msg: "  ping {{ item.item.ring_ip }}: {{ 'OK (~0.5 ms expected)' if item.rc == 0 else 'FAILED — check cable + static IP on both ends' }}"
+  with_items: "{{ mlx_ping.results | default([]) | selectattr('skipped', 'undefined') | list }}"
+  when: inventory_hostname == mlx_rank0_host
+  tags: [prereqs]
+
+- name: "passwordless ssh from rank0 to every peer (mlx.launch needs it)"
+  command: "ssh -o BatchMode=yes -o ConnectTimeout=5 {{ item.ssh }} true"
+  register: mlx_ssh
+  failed_when: false
+  changed_when: false
+  with_items: "{{ mlx_cluster.nodes }}"
+  when:
+    - inventory_hostname == mlx_rank0_host
+    - not item.local
+  tags: [prereqs]
+
+- name: "report ssh results (suggest ssh-copy-id on failure)"
+  debug:
+    msg: >-
+      ssh {{ item.item.ssh }}: {{ 'OK (passwordless)' if item.rc == 0 else
+      'FAILED — run: ssh-copy-id ' + item.item.ssh + '  (or ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519 first)' }}
+  with_items: "{{ mlx_ssh.results | default([]) | selectattr('skipped', 'undefined') | list }}"
+  when: inventory_hostname == mlx_rank0_host
+  tags: [prereqs]

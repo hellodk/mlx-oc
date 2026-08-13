@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>24 — Deploy the MLX Cluster with a Wizard: tools/mlx-deploy.py + Ansible</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#4f46e5;--accent-soft:#eef0ff;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(79,70,229,.10), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(219,39,119,.09), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #dfe1ff;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:720px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  .dbadge{display:inline-block;font-size:11px;font-weight:800;border-radius:6px;padding:2px 8px;margin-right:6px;background:var(--accent-soft);color:var(--accent);border:1px solid #dfe1ff;vertical-align:middle}
+  .q{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--code-bg);border:1px solid var(--line);border-radius:6px;padding:1px 5px;white-space:nowrap}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="23-using-the-mlx-cluster.html">Using the cluster</a>
+  <a href="16-mlx-distributed-options-tuning.html">Tuning</a>
+  <a href="21-thunderbolt-ring-launchdaemons.html">TB4 launchd</a>
+  <a href="24-deploy-wizard.html" style="color:var(--accent);font-weight:700">Deploy wizard</a>
+</div></nav>
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Post 24 &middot; the input wizard</span>
+    <h1>Deploy the MLX Cluster with a Wizard: tools/mlx-deploy.py + Ansible</h1>
+    <p class="sub">Post 23 was the manual. This is the tool that does the manual for you: an interactive input wizard that asks for the node details, topology and versions, scans every node for prerequisites (and tells you the fix), then drives an Ansible playbook that builds the venvs, syncs the repo, stages the model and starts the ring &mdash; for one node or many.</p>
+    <div class="meta"><span><b>Wizard</b> tools/mlx-deploy.py</span><span><b>Playbooks</b> infra/ansible/cluster.yml + check.yml</span><span><b>Modes</b> interactive or --config</span><span><b>Nodes</b> 1..N</span></div>
+  </div>
+</header>
+<main class="wrap">
+
+<section>
+  <h2><span class="num">1</span>What you get</h2>
+  <p>Deploying the cluster by hand (post 23) means: two venvs per node, pinned wheels, the model on every Mac, matching hostfiles, <code>cluster.env</code>, SSH keys, and a ring link that actually stays up. The wizard collapses all of that into answers to questions, and the playbook makes the answers true, idempotently, on every node at once.</p>
+  <table>
+    <tr><th>Piece</th><th>Path</th><th>Job</th></tr>
+    <tr><td><code>tools/mlx-deploy.py</code></td><td>the input wizard</td><td>asks for node count, per-node ssh + ring IPs, interconnect, model, Python/pins, install method &rarr; scans rank0 + every peer &rarr; writes the inventory + <code>group_vars</code> &rarr; optionally runs Ansible</td></tr>
+    <tr><td><code>infra/ansible/cluster.yml</code></td><td>main playbook</td><td>tags <code>prereqs</code> / <code>setup</code> / <code>start</code> / <code>stop</code>; brings the ring up on rank0 via <code>./cluster/start_server.sh</code></td></tr>
+    <tr><td><code>infra/ansible/check.yml</code></td><td>read-only report</td><td>the prereqs tasks only &mdash; nothing created or started</td></tr>
+    <tr><td><code>group_vars/all/mlx-cluster.yml</code></td><td>every knob</td><td>nodes, model, ports, pins, venv paths, guardrails &mdash; written by the wizard, hand-editable</td></tr>
+    <tr><td><code>roles/mlx-cluster/*</code></td><td>the role</td><td>prereq asserts + suggested fixes, venv/wheel install, repo sync, hostfile/cluster.env rendering, start/stop</td></tr>
+  </table>
+  <p>It runs with plain <code>python3</code> (the wizard writes its own YAML &mdash; zero third-party deps) and with <code>ansible-core</code> only (no extra collections).</p>
+</section>
+
+<section>
+  <h2><span class="num">2</span>Run it interactively</h2>
+  <pre><code>python3 tools/mlx-deploy.py</code></pre>
+  <p>Press Enter to accept every default and re-deploy the current two-node ring, or answer for a brand-new / bigger one:</p>
+  <table>
+    <tr><th>Question</th><th>Default</th><th>What it feeds</th></tr>
+    <tr><td>How many nodes (rank0 + peers)?</td><td>2</td><td>the ring size &mdash; 1 for single-node</td></tr>
+    <tr><td>rank0 ring IP / peer ssh + ring IP</td><td>192.168.2.2 / dk@192.168.2.1</td><td><code>hosts.json</code> (order = rank order)</td></tr>
+    <tr><td>Ring interconnect</td><td>ethernet</td><td>ethernet or thunderbolt (blog 21 subnet)</td></tr>
+    <tr><td>rank0 server bind IP</td><td>127.0.0.1</td><td><code>MLX_SERVER_IP</code></td></tr>
+    <tr><td>Model (HF id or absolute path)</td><td>mlx-community/Qwen3.5-4B-MLX-4bit</td><td><code>MLX_MODEL</code> + where to stage it</td></tr>
+    <tr><td>Download weights onto every node now?</td><td>N</td><td><code>huggingface-cli download</code> vs "already staged"</td></tr>
+    <tr><td>Server / proxy venv python</td><td>3.12 / 3.12</td><td>the two venvs</td></tr>
+    <tr><td>pip install method</td><td>online</td><td>online or <code>wheelhouse</code> (air-gapped, INSTALL.md)</td></tr>
+    <tr><td>Use the verified pins?</td><td>Y</td><td>mlx 0.32.0 / mlx-lm 0.31.3 / mlx-metal 0.32.0</td></tr>
+    <tr><td>Repo path on every node</td><td>&lt;repo&gt;</td><td>must be the same absolute path on all nodes</td></tr>
+    <tr><td>Sync this repo out to peers?</td><td>Y</td><td>rsync from rank0 before render</td></tr>
+  </table>
+  <p>After the questions it prints the plan, runs the local prereq scan, writes the inventory and group_vars, and asks whether to run the full deployment playbook now.</p>
+</section>
+
+<section>
+  <h2><span class="num">3</span>The prereq scan, and the suggestions it makes</h2>
+  <p>Before anything is created, the wizard checks rank0 directly, and the playbook re-checks <em>every</em> node read-only (<code>check.yml</code>). Each failing check prints the concrete fix:</p>
+  <table>
+    <tr><th>Check</th><th>Failure &rarr; suggestion</th></tr>
+    <tr><td>Apple Silicon (arm64)</td><td>there is no x86 path &mdash; abort</td></tr>
+    <tr><td>python3.12 on PATH</td><td><code>brew install python@3.12</code> (or the python.org 3.12 .pkg)</td></tr>
+    <tr><td>ansible-playbook</td><td><code>brew install ansible</code></td></tr>
+    <tr><td>RAM &ge; model floor</td><td>smaller quant or fewer nodes</td></tr>
+    <tr><td>disk headroom</td><td>free space for two venvs + weights</td></tr>
+    <tr><td>ring IP on an interface</td><td><code>sudo networksetup -setmanual "Ethernet" &lt;ip&gt; 255.255.255.0</code></td></tr>
+    <tr><td>model staged on every node</td><td>copy the weights to every Mac (or set download)</td></tr>
+    <tr><td>ping to each peer ring IP</td><td>cable + static IP on both ends</td></tr>
+    <tr><td>passwordless ssh from rank0</td><td><code>ssh-copy-id &lt;peer&gt;</code></td></tr>
+    <tr><td>hw telemetry port free</td><td><code>./cluster/stop_server.sh</code> (stale stack)</td></tr>
+  </table>
+  <p>Run the report alone with:</p>
+  <pre><code>python3 tools/mlx-deploy.py --check</code></pre>
+  <p>On this repo it correctly flags the gaps in the example config &mdash; e.g. rank1 has no <code>python3.12</code> yet, and the example&rsquo;s ring IP is not on rank0&rsquo;s current interface &mdash; each with the one-line fix.</p>
+</section>
+
+<section>
+  <h2><span class="num">4</span>What the playbook does</h2>
+  <pre><code># from infra/ansible (the wizard runs these for you)
+ansible-playbook -i inventories/generated/hosts.yml check.yml      # read-only report
+ansible-playbook -i inventories/generated/hosts.yml cluster.yml    # prereqs + setup + start
+ansible-playbook -i inventories/generated/hosts.yml cluster.yml --tags setup   # venvs only
+ansible-playbook -i inventories/generated/hosts.yml cluster.yml --tags start   # ring only
+ansible-playbook -i inventories/generated/hosts.yml cluster.yml --tags stop    # tear down</code></pre>
+  <p><b>setup</b> (every node): creates the two venvs, installs the pinned wheels, verifies <code>mlx_lm</code> imports, rsyncs the repo from rank0 to peers (same absolute path &mdash; see the callout), renders <code>hosts.json</code> / <code>hosts_rev.json</code> / <code>cluster.env</code>, and downloads or asserts the weights. <b>start</b> (rank0): runs <code>./cluster/start_server.sh</code> and waits until <code>:8081</code> and the proxy <code>:8080</code> answer <code>/v1/models</code>.</p>
+  <div class="callout warn"><span class="ic">!</span><div>The repo must live at the <b>same absolute path</b> on every node: <code>mlx.launch</code> and <code>start_server.sh</code> ssh the remote ranks with rank0&rsquo;s paths, so a different path on a peer breaks the ring at launch (the same constraint post 23 called out for the hostfiles).</div></div>
+</section>
+
+<section>
+  <h2><span class="num">5</span>Versions, decided from the blogs</h2>
+  <ul>
+    <li><b>Python 3.12</b> for the server venv on every node (posts 1, 23; INSTALL.md &sect;8): macOS Local-Network privacy (TCC) silently blocks a third-party <b>py3.14</b> binary from reaching local subnets when spawned over SSH (<code>EHOSTUNREACH</code>, no dialog) &mdash; and <code>mlx.launch</code> spawns the remote shard exactly that way. The proxy/telemetry venv defaults to 3.12 too so the whole cluster is one interpreter.</li>
+    <li><b>mlx 0.32.0 / mlx-lm 0.31.3 / mlx-metal 0.32.0</b> identical on every rank (posts 13, 14, 23). <code>mlx-metal</code> is a separate platform wheel &mdash; <code>mlx</code> alone is CPU-only.</li>
+    <li>Extras pinned to the repo&rsquo;s versions: <code>prometheus_client 0.26.0</code>, otel <code>1.44.0</code>/<code>0.65b0</code>, optional <code>opik 2.2.13</code> + <code>aiohttp</code> + <code>litellm</code> (post 23).</li>
+    <li>Offline: <code>install_method: wheelhouse</code> + a wheelhouse dir installs with <code>--no-index --find-links</code> (INSTALL.md &sect;2).</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="num">6</span>Non-interactive: a config file</h2>
+  <p>The wizard can run headless from the same JSON it can save (<code>--save-config</code>):</p>
+  <pre><code>python3 tools/mlx-deploy.py --config infra/ansible/mlx-deploy.example.json --apply
+python3 tools/mlx-deploy.py --config cfg.json --check     # report only
+python3 tools/mlx-deploy.py --config cfg.json --no-run    # write config, don't touch</code></pre>
+  <p><code>mlx-deploy.example.json</code> is the complete schema: <code>nodes</code> (name, ssh, ring_ip, local), <code>interconnect</code>, <code>server_bind_ip</code>, <code>model</code>/<code>model_dir</code>/<code>download_model</code>, <code>python_server</code>/<code>python_proxy</code>, <code>venv_server</code>, <code>repo_dir</code>, <code>sync_repo</code>, <code>install_method</code>/<code>wheelhouse</code>, <code>install_opik</code>, resource floors, and the <code>pins</code>. Everything else falls back to sane defaults.</p>
+</section>
+
+<section>
+  <h2><span class="num">7</span>Adding nodes to a live cluster</h2>
+  <p><b>Yes &mdash; the ring reads its size from the hostfile at launch, so it is not fixed-size.</b> To add a node: append it to <code>mlx_cluster.nodes</code> and the inventory (rank order = hostfile order, rank0 first), put the new Mac on the ring link with a static IP in <code>ring_subnet</code>, <code>ssh-copy-id</code> from rank0, then re-run <code>cluster.yml</code> &mdash; setup creates the venv, installs the pins, syncs the repo and stages the weights there, and start rebuilds the whole N-node ring.</p>
+  <p>Caveats (from the blogs): there is <b>no hot-add</b> &mdash; a node change is a restart of the stack (16); every node must hold the full weights (23); the ring syncs to its <b>slowest member</b>, so a heterogeneous pair is the documented crash source (13, 16); and distribution only pays off past a single node&rsquo;s memory (19, 23).</p>
+</section>
+
+<section>
+  <h2><span class="num">8</span>Single node works too</h2>
+  <p>A one-entry <code>nodes</code> list runs the same playbook: <code>mlx.launch</code> with a single hostfile entry serves locally with no ring sync, and the whole stack &mdash; supervisor, proxy, hw/kv/logtailer telemetry &mdash; starts and verifies exactly the same way.</p>
+</section>
+
+<section>
+  <h2><span class="num">9</span>The files</h2>
+  <table>
+    <tr><th>File</th><th>What</th></tr>
+    <tr><td><code>tools/mlx-deploy.py</code></td><td>the wizard (interactive + <code>--config</code>/<code>--check</code>/<code>--apply</code>/<code>--no-run</code>/<code>--save-config</code>/<code>--list</code>)</td></tr>
+    <tr><td><code>infra/ansible/cluster.yml</code></td><td>deploy playbook, tags prereqs/setup/start/stop</td></tr>
+    <tr><td><code>infra/ansible/check.yml</code></td><td>read-only pre-flight report</td></tr>
+    <tr><td><code>infra/ansible/group_vars/all/mlx-cluster.yml</code></td><td>every knob &mdash; wizard-written, hand-editable</td></tr>
+    <tr><td><code>infra/ansible/roles/mlx-cluster/{tasks,templates}/</code></td><td>the role: prereqs, setup, deploy, stop + the <code>hosts.json</code> / <code>hosts_rev.json</code> / <code>cluster.env</code> / requirements templates</td></tr>
+    <tr><td><code>infra/ansible/mlx-deploy.example.json</code></td><td>the non-interactive config schema</td></tr>
+    <tr><td><code>infra/ansible/inventories/generated/hosts.yml</code></td><td>wizard output (gitignored)</td></tr>
+  </table>
+</section>
+
+</main>
+<footer class="wrap">
+  mlx-oc &middot; a two-Mac-mini distributed MLX inference cluster with full observability &middot; <a href="../README.md">repo README</a> &middot; install path: <a href="../INSTALL.md">INSTALL.md</a> &middot; <a href="index.html">all posts</a>
+</footer>
+</body>
+</html>

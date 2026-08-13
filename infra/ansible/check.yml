@@ -1,0 +1,27 @@
+---
+# Read-only pre-flight report for the MLX ring. Runs the prereqs tasks only —
+# nothing is created, modified or started. Output ends with a per-node checklist
+# (OS/arch/python/memory/disk/ring-IP/model) plus cross-node ping and
+# passwordless-ssh checks from rank0, each with a concrete suggested fix.
+#
+# Usage (from infra/ansible):
+#   ansible-playbook -i inventories/generated/hosts.yml check.yml
+- name: MLX cluster pre-flight checks (read-only)
+  hosts: mlx_ring
+  gather_facts: true
+  vars_files:
+    - "group_vars/all/mlx-cluster.yml"
+  environment:
+    PATH: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+  tasks:
+    - name: "expand home-based paths"
+      set_fact:
+        mlx_venv_server: "{{ mlx_cluster.venv_server | expanduser }}"
+        mlx_repo_dir: "{{ mlx_cluster.repo_dir | expanduser }}"
+      tags: [prereqs]
+
+    - name: "run pre-flight checks"
+      ansible.builtin.include_tasks:
+        file: "roles/mlx-cluster/tasks/prereqs.yml"
+        apply:
+          tags: [prereqs]

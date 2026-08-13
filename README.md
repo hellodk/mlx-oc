@@ -492,6 +492,7 @@ Per-section field notes on the observability layer, with animated pastel SVGs
 21. [The Ring Kept Dropping. One LaunchDaemon Fixed It.](blog/21-thunderbolt-ring-launchdaemons.html)
 22. [The Observability Reference: Every Panel, Every Formula](blog/22-observability-dashboard-reference.html)
 23. [Setting Up the Two-Mac MLX Cluster, From Zero to a Working Ring](blog/23-using-the-mlx-cluster.html)
+24. [Deploy the MLX Cluster with a Wizard: tools/mlx-deploy.py + Ansible](blog/24-deploy-wizard.html)
 
 ## Known platform quirks
 

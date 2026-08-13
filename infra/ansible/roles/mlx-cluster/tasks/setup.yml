@@ -1,0 +1,157 @@
+---
+# Idempotent node setup: venvs, pinned wheels, model weights, repo sync and the
+# rendered config files (hosts.json / hosts_rev.json / cluster.env). Runs on
+# every node in the ring. mlx_venv_server / mlx_repo_dir are expanded in
+# tasks/main.yml.
+
+- name: "server venv exists (Python 3.12, remote-shard-safe)"
+  command: "{{ mlx_cluster.python_server }} -m venv {{ mlx_venv_server }}"
+  args:
+    creates: "{{ mlx_venv_server }}/bin/python"
+  tags: [setup]
+
+- name: "proxy/telemetry venv exists at the repo root"
+  command: "{{ mlx_cluster.python_proxy }} -m venv {{ mlx_repo_dir }}/.venv"
+  args:
+    creates: "{{ mlx_repo_dir }}/.venv/bin/python"
+  tags: [setup]
+
+- name: "write server requirements"
+  template:
+    src: requirements-server.txt.j2
+    dest: "/tmp/mlx-reqs-server.txt"
+  tags: [setup]
+
+- name: "write proxy requirements"
+  template:
+    src: requirements-proxy.txt.j2
+    dest: "/tmp/mlx-reqs-proxy.txt"
+  tags: [setup]
+
+- name: "install server venv wheels"
+  command: >-
+    {{ mlx_venv_server }}/bin/python -m pip install
+    {{ ('--no-index --find-links ' + mlx_cluster.wheelhouse) if mlx_cluster.install_method == 'wheelhouse' else '' }}
+    -r /tmp/mlx-reqs-server.txt
+  args:
+    creates: "{{ mlx_venv_server }}/.mlx-requirements-ok"
+  register: mlx_reqs_server
+  tags: [setup]
+
+- name: "mark server venv requirements installed"
+  file:
+    path: "{{ mlx_venv_server }}/.mlx-requirements-ok"
+    state: touch
+  when: mlx_reqs_server.changed
+  tags: [setup]
+
+- name: "install proxy venv wheels"
+  command: >-
+    {{ mlx_repo_dir }}/.venv/bin/python -m pip install
+    {{ ('--no-index --find-links ' + mlx_cluster.wheelhouse) if mlx_cluster.install_method == 'wheelhouse' else '' }}
+    -r /tmp/mlx-reqs-proxy.txt
+  args:
+    creates: "{{ mlx_repo_dir }}/.venv/.mlx-requirements-ok"
+  register: mlx_reqs_proxy
+  tags: [setup]
+
+- name: "mark proxy venv requirements installed"
+  file:
+    path: "{{ mlx_repo_dir }}/.venv/.mlx-requirements-ok"
+    state: touch
+  when: mlx_reqs_proxy.changed
+  tags: [setup]
+
+- name: "verify mlx + Metal backend on this node"
+  command: "{{ mlx_venv_server }}/bin/python -c \"import mlx.core as mx, mlx_lm; print('mlx_lm', mlx_lm.__version__)\""
+  register: mlx_import_check
+  changed_when: false
+  failed_when: false
+  tags: [setup]
+
+- name: "warn if mlx failed to import"
+  debug:
+    msg: "FAILED on {{ inventory_hostname }}: {{ mlx_import_check.stderr | default('') }} — check pins in group_vars/all/mlx-cluster.yml"
+  when: mlx_import_check.rc != 0
+  tags: [setup]
+
+- name: "sync the repo from rank0 to peers (same absolute path on every node)"
+  command: >-
+    rsync -az --delete
+    --exclude=.git --exclude=.venv --exclude=cluster/logs
+    --exclude='__pycache__' --exclude='*.pyc'
+    --exclude=infra/ansible/inventories/generated
+    {{ mlx_repo_dir }}/
+    {{ mlx_node.ssh }}:{{ mlx_repo_dir }}/
+  delegate_to: "{{ mlx_rank0_host }}"
+  when:
+    - mlx_cluster.sync_repo
+    - inventory_hostname != mlx_rank0_host
+  tags: [setup]
+
+- name: "render ring hostfile (hosts.json, rank order = hostfile order)"
+  template:
+    src: hosts.json.j2
+    dest: "{{ mlx_repo_dir }}/cluster/hosts.json"
+  tags: [setup]
+
+- name: "render reverse hostfile (hosts_rev.json, for manual mlx.distributed_config use)"
+  template:
+    src: hosts_rev.json.j2
+    dest: "{{ mlx_repo_dir }}/cluster/hosts_rev.json"
+  tags: [setup]
+
+- name: "render cluster.env (single source of truth for the stack)"
+  template:
+    src: cluster.env.j2
+    dest: "{{ mlx_repo_dir }}/cluster/cluster.env"
+  tags: [setup]
+
+- name: "download model weights onto rank0 (single download for the whole ring)"
+  command: >-
+    {{ mlx_venv_server }}/bin/hf download {{ mlx_cluster.model }}
+    --local-dir {{ mlx_cluster.model_dir }}/{{ mlx_cluster.model_name }}
+  args:
+    creates: "{{ mlx_cluster.model_dir }}/{{ mlx_cluster.model_name }}/config.json"
+  when:
+    - mlx_cluster.download_model
+    - mlx_cluster.model_sync_from_rank0
+    - inventory_hostname == mlx_rank0_host
+  tags: [setup]
+
+- name: "sync model weights from rank0 to every peer (one download, N copies over the LAN)"
+  command: >-
+    rsync -az --delete --exclude='__pycache__' --exclude='*.pyc'
+    {{ mlx_cluster.model_dir }}/{{ mlx_cluster.model_name }}/
+    {{ mlx_node.ssh }}:{{ mlx_cluster.model_dir }}/{{ mlx_cluster.model_name }}/
+  delegate_to: "{{ mlx_rank0_host }}"
+  when:
+    - mlx_cluster.model_sync_from_rank0
+    - mlx_cluster.download_model
+    - inventory_hostname != mlx_rank0_host
+  tags: [setup]
+
+- name: "download model weights onto this node"
+  command: >-
+    {{ mlx_venv_server }}/bin/hf download {{ mlx_cluster.model }}
+    --local-dir {{ mlx_cluster.model_dir }}/{{ mlx_cluster.model_name }}
+  args:
+    creates: "{{ mlx_cluster.model_dir }}/{{ mlx_cluster.model_name }}/config.json"
+  when:
+    - mlx_cluster.download_model
+    - not mlx_cluster.model_sync_from_rank0
+  tags: [setup]
+
+- name: "model weights present"
+  stat:
+    path: "{{ mlx_cluster.model_dir }}/{{ mlx_cluster.model_name }}/config.json"
+  register: mlx_model_config
+  when: not mlx_cluster.download_model
+  tags: [setup]
+
+- name: "assert model weights staged"
+  assert:
+    that: mlx_model_config.stat.exists
+    fail_msg: "model {{ mlx_cluster.model }} not found under {{ mlx_cluster.model_dir }}/{{ mlx_cluster.model_name }}/ on {{ inventory_hostname }}"
+  when: not mlx_cluster.download_model
+  tags: [setup]

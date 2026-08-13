@@ -1,0 +1,18 @@
+---
+# Example inventory for the MLX ring (group `mlx_ring`), matching the default
+# group_vars/all/mlx-cluster.yml two-node topology. rank0 runs the playbook
+# itself (ansible_connection: local); peers are reached by ssh from rank0.
+# Host names here must match mlx_cluster.nodes[].name.
+#
+# The wizard writes the real one to inventories/generated/hosts.yml — the
+# example is only for trying the playbook read-only (check.yml).
+all:
+  children:
+    mlx_ring:
+      hosts:
+        rank0:
+          ansible_connection: local
+          ansible_host: 127.0.0.1
+        rank1:
+          ansible_host: 192.168.2.1
+          ansible_user: dk

@@ -1,0 +1,9 @@
+{
+  "backend": "{{ mlx_cluster.ring_backend }}",
+  "envs": [],
+  "hosts": [
+{% for node in mlx_cluster.nodes %}
+    {"ssh": "{{ node.ssh }}", "ips": ["{{ node.ring_ip }}"]}{{ "," if not loop.last else "" }}
+{% endfor %}
+  ]
+}

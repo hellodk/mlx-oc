@@ -48,6 +48,7 @@
   .n21{background:linear-gradient(135deg,#0f766e,#db2777)}
   .n22{background:linear-gradient(135deg,#0e7490,#4f46e5)}
   .n23{background:linear-gradient(135deg,#db2777,#0f766e)}
+  .n24{background:linear-gradient(135deg,#4f46e5,#b45309)}
   .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
   .post p{margin:0;color:var(--muted);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
@@ -59,7 +60,7 @@
   <div class="wrap">
     <span class="kicker">MLX Observability &middot; Field Notes</span>
     <h1>Making Two Mac minis<br>Actually Observable</h1>
-    <p class="sub">Nineteen deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 46 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, a performance dashboard that finally shows the KV cache and context window, a head-to-head with hydra&rsquo;s push-first fleet stack, how a real GPU crash exposed the missing process-level truth &mdash; now fixed with a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that stress the cluster like an agent &mdash; the streamed server runtime log that finally carries an incident&rsquo;s server-side context into Opik, a per-reason fault ledger in Grafana, the forensics that found the fault lives on the remote rank, and the consolidated decision ledger we now choose from &mdash; an experimental SGLang scaffold with an unverified Apple Silicon backend, the tuning lever table measured on the ring, and now the Opik-native dashboard that renders the mlx project&rsquo;s traces and judge scores in place &mdash; and the reference map: every metric, log, trace, feedback score and alert in tables, with the files and configurations behind each, and how the four load-test rigs and forty unit tests drive the cluster.</p>
+    <p class="sub">Nineteen deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 46 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, a performance dashboard that finally shows the KV cache and context window, a head-to-head with hydra&rsquo;s push-first fleet stack, how a real GPU crash exposed the missing process-level truth &mdash; now fixed with a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that stress the cluster like an agent &mdash; the streamed server runtime log that finally carries an incident&rsquo;s server-side context into Opik, a per-reason fault ledger in Grafana, the forensics that found the fault lives on the remote rank, and the consolidated decision ledger we now choose from &mdash; an experimental SGLang scaffold with an unverified Apple Silicon backend, the tuning lever table measured on the ring, and now the Opik-native dashboard that renders the mlx project&rsquo;s traces and judge scores in place &mdash; and the reference map: every metric, log, trace, feedback score and alert in tables, with the files and configurations behind each, and how the four load-test rigs and forty unit tests drive the cluster &mdash; plus the field manual for setting the whole thing up, and now the deploy wizard that automates it: an interactive input tool and an Ansible playbook that build the venvs, sync the repo, stage the model and bring the ring up &mdash; for one node or many.</p>
     <div class="meta">
       <span><b>Stack</b> VictoriaMetrics + vmalert + Alertmanager + Grafana</span>
       <span><b>Agents</b> mlx_metrics_proxy :8080 &middot; mlx_hw_telemetry :9102 &middot; mlx_kv_cache_agent :9104</span>
@@ -250,6 +251,14 @@
       <h2>Setting Up the Two-Mac MLX Cluster, From Zero to a Working Ring</h2>
       <p>The field manual: the two venvs and why there are two Pythons (TCC blocks py3.14 over SSH, so the remote shard runs on py3.12), the ring and management links and the hostfiles that must match both sides, the model that has to live on both nodes, the single <code>cluster.env</code> line that changes the model, every curl that proves the stack is healthy, the bench/smoke/agent load-test rigs, the TB4 variant, the optional observability stack &mdash; and the six gotchas that bite first-time builders.</p>
       <span class="tag">setup</span><span class="tag">ring</span><span class="tag">two venvs</span><span class="tag">hostfiles</span><span class="tag">verification curls</span><span class="tag">gotchas</span>
+    </div>
+  </a>
+  <a class="post" href="24-deploy-wizard.html">
+    <div class="num n24">24</div>
+    <div>
+      <h2>Deploy the MLX Cluster with a Wizard: tools/mlx-deploy.py + Ansible</h2>
+      <p>Post 23 was the manual; this is the tool that does it for you. An interactive input wizard that asks for the node details, topology and versions &mdash; rank0 and peer IPs, ethernet or TB4 ring, model, Pythons and the verified pins &mdash; scans every node for prerequisites and prints the exact fix, then drives an Ansible playbook that builds the venvs, syncs the repo, stages the weights and starts the ring &mdash; for one node or many, interactive or from a JSON config file.</p>
+      <span class="tag">deploy wizard</span><span class="tag">tools/mlx-deploy.py</span><span class="tag">ansible</span><span class="tag">prereq scan</span><span class="tag">non-interactive</span>
     </div>
   </a>
 </main>

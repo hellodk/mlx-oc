@@ -1,0 +1,16 @@
+# Pinned server venv requirements (Python 3.12) — rendered by the mlx-cluster
+# role. The mlx/mlx-lm/mlx-metal trio is the verified pair from the repo blogs
+# (posts 13/14/23): identical on every rank.
+mlx=={{ mlx_cluster.pins.mlx }}
+mlx-lm=={{ mlx_cluster.pins.mlx_lm }}
+mlx-metal=={{ mlx_cluster.pins.mlx_metal }}
+huggingface_hub=={{ mlx_cluster.pins.huggingface_hub | default('1.26.0') }}
+prometheus_client=={{ mlx_cluster.pins.prometheus_client }}
+opentelemetry-api=={{ mlx_cluster.pins.opentelemetry }}
+opentelemetry-sdk=={{ mlx_cluster.pins.opentelemetry }}
+opentelemetry-exporter-otlp-proto-http=={{ mlx_cluster.pins.opentelemetry }}
+opentelemetry-exporter-otlp-proto-common=={{ mlx_cluster.pins.opentelemetry }}
+opentelemetry-proto=={{ mlx_cluster.pins.opentelemetry }}
+opentelemetry-semantic-conventions=={{ mlx_cluster.pins.otel_contrib }}
+opentelemetry-instrumentation=={{ mlx_cluster.pins.otel_contrib }}
+opentelemetry-instrumentation-logging=={{ mlx_cluster.pins.otel_contrib }}

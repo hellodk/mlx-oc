@@ -1,0 +1,22 @@
+{
+  "nodes": [
+    {"name": "rank0", "ssh": "127.0.0.1", "ring_ip": "192.168.2.1", "local": true},
+    {"name": "rank1", "ssh": "dk@192.168.2.2", "ring_ip": "192.168.2.2", "local": false}
+  ],
+  "ring_backend": "ring",
+  "interconnect": "ethernet",
+  "ring_subnet": "192.168.2",
+  "server_bind_ip": "127.0.0.1",
+  "model": "mlx-community/Qwen3.5-4B-MLX-4bit",
+  "model_dir": "/Users/dk/mlx-models",
+  "download_model": true,
+  "model_sync_from_rank0": true,
+  "python_server": "python3.12",
+  "python_proxy": "python3.12",
+  "venv_server": "~/venvs/mlx",
+  "repo_dir": "/Users/dk/mlx-oc",
+  "sync_repo": true,
+  "install_method": "online",
+  "wheelhouse": "",
+  "install_opik": false
+}

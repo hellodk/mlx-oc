@@ -14,3 +14,6 @@ sglang/logs/*.log
 test-reports/
 .pytest_cache/
 opencode-session
+
+# wizard-generated ansible inventory
+infra/ansible/inventories/generated/

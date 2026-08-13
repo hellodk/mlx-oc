@@ -82,3 +82,90 @@ open http://<obs_host_ip>:8428/vmui       # VictoriaMetrics
 curl -s http://127.0.0.1:8428/api/v1/query?query=mlx_requests_total
 curl -s http://127.0.0.1:8428/api/v1/query?query='up{job="mlx-proxy"}'
 ```
+
+## MLX cluster deploy (the ring itself)
+
+`cluster.yml` deploys the distributed inference ring: per-node prereqs, venvs
+(pinned wheels), model weights, repo sync and the rendered `hosts.json` /
+`hosts_rev.json` / `cluster.env`, then starts the stack on rank0 via
+`./cluster/start_server.sh`.
+
+### Layout
+
+| Path | What |
+|------|------|
+| `cluster.yml` | main playbook (`hosts: mlx_ring`); tags `prereqs` / `setup` / `start` / `stop` |
+| `check.yml` | read-only pre-flight report (prereqs only, nothing modified) |
+| `inventories/example/mlx-cluster.yml` | example ring inventory (group `mlx_ring`) |
+| `inventories/generated/hosts.yml` | **written by the wizard** — don't hand-edit |
+| `group_vars/all/mlx-cluster.yml` | **every knob** — nodes, model, versions, ports, pins |
+| `roles/mlx-cluster/tasks/*` | prereqs -> setup -> deploy / stop |
+| `roles/mlx-cluster/templates/*` | `hosts.json`, `hosts_rev.json`, `cluster.env`, `requirements-*.txt` |
+| `mlx-deploy.example.json` | non-interactive config the wizard accepts via `--config` |
+
+### The wizard (recommended)
+
+`tools/mlx-deploy.py` is an interactive input wizard: it asks for node count,
+per-node ssh + ring IPs, interconnect, model, Python/versions and install
+method, scans rank0 + every peer for prerequisites (and tells you the fix —
+`brew install ansible`, `ssh-copy-id`, static ring IP, staging the weights,
+etc.), then writes the inventory + group_vars and optionally runs the playbook.
+
+```bash
+python3 tools/mlx-deploy.py                 # interactive
+python3 tools/mlx-deploy.py --config infra/ansible/mlx-deploy.example.json --apply   # non-interactive
+python3 tools/mlx-deploy.py --check         # collect + read-only pre-flight report
+python3 tools/mlx-deploy.py --no-run        # collect + write config, stop
+```
+
+### Hand-edited equivalent
+
+```bash
+cd infra/ansible
+# 1. edit group_vars/all/mlx-cluster.yml (nodes, model, pins) and the inventory
+ansible-playbook -i inventories/example/mlx-cluster.yml check.yml              # read-only
+ansible-playbook -i inventories/example/mlx-cluster.yml cluster.yml            # deploy + start
+ansible-playbook -i inventories/example/mlx-cluster.yml cluster.yml --tags stop
+```
+
+### Versions (decided from the blogs — post numbers in parens)
+
+- **Python 3.12** for the server venv on every node (1, 23, INSTALL.md §8):
+  macOS Local-Network privacy blocks a third-party **py3.14** binary spawned
+  over SSH (`EHOSTUNREACH`), and mlx.launch spawns the remote shard exactly
+  that way. The proxy/telemetry venv defaults to 3.12 too so the whole cluster
+  is one interpreter; it never touches SSH, so it could stay on a newer Python.
+- **mlx 0.32.0 / mlx-lm 0.31.3 / mlx-metal 0.32.0** identical on every rank
+  (13, 14, 23). `mlx-metal` is a separate wheel — `mlx` alone is CPU-only (23).
+- Optional extras pinned to the repo's versions: prometheus_client 0.26.0,
+  otel 1.44.0 / 0.65b0, opik 2.2.13 + aiohttp 3.14.3 + litellm 1.95.0 (23).
+- Offline sites: set `install_method: wheelhouse` and point `wheelhouse` at the
+  air-gap kit's wheelhouse dir (INSTALL.md §2); wheels are installed with
+  `--no-index --find-links`.
+
+### Adding nodes to an existing cluster
+
+**Yes — the ring reads its size from the hostfile at launch**, so a ring is not
+fixed-size. To add a node:
+
+1. Append it to `mlx_cluster.nodes` (rank order = hostfile order, rank0 first)
+   and to the inventory.
+2. On the new node: install Python 3.12, put it on the ring link (static IP in
+   `ring_subnet`), `ssh-copy-id` from rank0, and re-run the playbook — setup
+   creates the venv, installs the pins, syncs the repo and stages the model
+   there.
+3. Re-run `cluster.yml`; `start_server.sh start` re-creates the whole ring with
+   N nodes.
+
+Caveats (from the blogs): there is **no hot-add** — the ring is rebuilt on
+restart, so a node change is a rolling restart of the stack (16); every node
+must hold the full weights (23); the ring syncs to its **slowest member** and
+adds per-token ring-sync latency, so heterogeneous M2+M4 pairs are the
+documented crash source (13, 16). Distribution only pays off past a single
+node's memory (19, 23).
+
+### Single node
+
+A one-entry `nodes` list works: `mlx.launch` with a single hostfile entry runs
+the server locally with no ring sync — the whole stack still starts, proxies
+and telemetries exactly the same.

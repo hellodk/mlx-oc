@@ -1,0 +1,19 @@
+# Pinned proxy/telemetry venv requirements (repo root .venv) — rendered by the
+# mlx-cluster role. Runs the metrics proxy + hw/kv/supervisor/logtailer agents
+# on rank 0 (no SSH-spawned shards, so any recent Python works; 3.12 keeps a
+# single interpreter across the cluster).
+prometheus_client=={{ mlx_cluster.pins.prometheus_client }}
+opentelemetry-api=={{ mlx_cluster.pins.opentelemetry }}
+opentelemetry-sdk=={{ mlx_cluster.pins.opentelemetry }}
+opentelemetry-exporter-otlp-proto-http=={{ mlx_cluster.pins.opentelemetry }}
+opentelemetry-exporter-otlp-proto-common=={{ mlx_cluster.pins.opentelemetry }}
+opentelemetry-proto=={{ mlx_cluster.pins.opentelemetry }}
+opentelemetry-semantic-conventions=={{ mlx_cluster.pins.otel_contrib }}
+opentelemetry-instrumentation=={{ mlx_cluster.pins.otel_contrib }}
+opentelemetry-instrumentation-logging=={{ mlx_cluster.pins.otel_contrib }}
+{% if mlx_cluster.install_opik %}
+# Optional: Opik LLM tracing / the agentic bench (only if you want it).
+opik==2.2.13
+aiohttp==3.14.3
+litellm==1.95.0
+{% endif %}

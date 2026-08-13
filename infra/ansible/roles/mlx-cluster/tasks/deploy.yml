@@ -1,0 +1,45 @@
+---
+# Bring the stack up (rank 0 only — it orchestrates the ring via mlx.launch and
+# ssh's the telemetry agents to the peers). Everything model/port/IP related is
+# already baked into cluster.env + hosts.json by the setup tasks.
+
+- name: "start the MLX stack on rank0 (supervisor + ring + proxy + telemetry)"
+  command: "./cluster/start_server.sh start"
+  args:
+    chdir: "{{ mlx_repo_dir }}"
+  environment:
+    PATH: "{{ ansible_env.PATH }}"
+  when: inventory_hostname == mlx_rank0_host
+  tags: [start]
+
+- name: "wait for mlx_lm.server on rank0"
+  uri:
+    url: "http://{{ mlx_cluster.server_bind_ip }}:{{ mlx_cluster.ports.server }}/v1/models"
+    status_code: 200
+  register: mlx_ready
+  until: mlx_ready.status == 200
+  retries: 180
+  delay: 2
+  when: inventory_hostname == mlx_rank0_host
+  tags: [start]
+
+- name: "verify the OpenAI proxy is serving"
+  uri:
+    url: "http://{{ mlx_cluster.server_bind_ip }}:{{ mlx_cluster.ports.proxy }}/v1/models"
+    status_code: 200
+  register: mlx_proxy_ready
+  until: mlx_proxy_ready.status == 200
+  retries: 30
+  delay: 2
+  when: inventory_hostname == mlx_rank0_host
+  tags: [start]
+
+- name: "report the serving endpoint"
+  debug:
+    msg: >-
+      MLX cluster is UP ({{ mlx_cluster.nodes | length }} nodes).
+      curl -s http://{{ mlx_cluster.server_bind_ip }}:{{ mlx_cluster.ports.proxy }}/v1/models
+      | model: {{ mlx_cluster.model }}
+      | ring: {{ mlx_cluster.interconnect }} / {{ mlx_cluster.ring_backend }}
+  when: inventory_hostname == mlx_rank0_host
+  tags: [start]
