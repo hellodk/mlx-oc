@@ -128,6 +128,28 @@ ansible-playbook -i inventories/example/mlx-cluster.yml cluster.yml            #
 ansible-playbook -i inventories/example/mlx-cluster.yml cluster.yml --tags stop
 ```
 
+### Validated start-only workflow (nodes already deployed)
+
+When the venvs, weights and repo are already in place on every node (e.g. an
+air-gapped install where setup was done once), the ring can be brought up with
+the start tag alone — no prereq scan, no reinstall:
+
+```bash
+cd infra/ansible
+ansible-playbook -i inventories/generated/hosts.yml check.yml            # read-only pre-flight (validated 2-node ring)
+ansible-playbook -i inventories/generated/hosts.yml cluster.yml --tags start
+```
+
+`check.yml` asserts the per-node prereqs (python, venv, model, disk/RAM, ring
+link reachability at ~0.5 ms, passwordless ssh to every peer, ports free); the
+start tag runs `./cluster/start_server.sh start` on rank0 and waits for the
+server and the OpenAI proxy. All components are daemonized (nohup, pid files
+under `cluster/logs/`); the observability stack reads `cluster/logs/server.log`
+for KV/context metrics, so keep the log files even on a quiet system.
+Verified end-to-end against the live 2-node ring: check = 0 failures, start
+brings up supervisor + mlx.launch ring + metrics proxy + hw/kv/logtailer agents,
+and a chat completion round-trips through the proxy in seconds.
+
 ### Versions (decided from the blogs — post numbers in parens)
 
 - **Python 3.12** for the server venv on every node (1, 23, INSTALL.md §8):
