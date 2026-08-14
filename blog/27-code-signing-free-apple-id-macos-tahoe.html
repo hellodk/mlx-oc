@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>27 — Test iOS Code Signing in Jenkins Without Paying Apple: Free Personal Teams on macOS Tahoe</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#4f46e5;--accent-soft:#eef0ff;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(79,70,229,.10), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(219,39,119,.09), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #dfe1ff;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:720px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  .dbadge{display:inline-block;font-size:11px;font-weight:800;border-radius:6px;padding:2px 8px;margin-right:6px;background:var(--accent-soft);color:var(--accent);border:1px solid #dfe1ff;vertical-align:middle}
+  .q{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--code-bg);border:1px solid var(--line);border-radius:6px;padding:1px 5px;white-space:nowrap}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="26-slms-and-router.html">SLMs &amp; the router</a>
+  <a href="25-token-decode-prefill-kv-cache-context.html">Tokens &amp; KV cache</a>
+  <a href="27-code-signing-free-apple-id-macos-tahoe.html" style="color:var(--accent);font-weight:700">Free code signing</a>
+</div></nav>
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Post 27 &middot; CI without an Apple Developer Program seat</span>
+    <h1>Testing iOS Code Signing in Jenkins Without Paying Apple &mdash; Free Personal Teams Still Work on macOS Tahoe</h1>
+    <p class="sub">No Apple Developer Program membership, no $99. You can still sign real on-device iOS builds through a free Apple ID &ldquo;Personal Team&rdquo; and run them from a Jenkins pipeline. This post covers how to sign up, the limitations, and &mdash; importantly &mdash; what actually changed on macOS Tahoe (26) and newer that can break your CI signing scripts.</p>
+    <div class="meta"><span><b>Cost</b> $0 (free Apple ID, no paid membership)</span><span><b>Expiry</b> 7-day profile/cert for free teams</span><span><b>macOS</b> Sequoia 15.6+ / Tahoe 26+ (Xcode 16&ndash;26)</span><span><b>Stack</b> Jenkins on a Mac &middot; Xcode automatic signing</span></div>
+  </div>
+</header>
+<main class="wrap">
+
+<section>
+  <h2><span class="num">1</span>What you get for free, and what you don&rsquo;t</h2>
+  <p>A plain <b>Apple ID</b> gives you a free Apple developer account. No payment, no enrollment form. When you sign into that account in Xcode (<em>Settings &rarr; Accounts</em>), Xcode creates a <b>Personal Team</b> for you and can sign builds with &ldquo;Automatically manage signing&rdquo; selected. That covers development builds you install on your own devices.</p>
+  <table>
+    <tr><th>What the free team can do</th><th>What it cannot do</th></tr>
+    <tr><td>Sign and run iOS development builds on your own device</td><td>Submit to the App Store or TestFlight</td></tr>
+    <tr><td>Generate an iOS Development certificate + provisioning profile automatically</td><td>Create distribution certificates / App Store profiles</td></tr>
+    <tr><td>Test the whole signing path inside a Jenkins pipeline</td><td>Use capabilities that require a paid membership</td></tr>
+    <tr><td>Build for the simulator (no signing needed at all)</td><td>Exceed ~3 apps registered to the free Apple ID</td></tr>
+  </table>
+  <div class="callout warn"><span class="ic">&#9888;</span><div><b>The 7-day expiry is the catch.</b> Free-team certificates and provisioning profiles expire after 7 days. In CI you handle it by re-running the automatic-signing profile generation on every build &mdash; Xcode creates a fresh profile each time, so Jenkins builds keep working as long as the Apple ID is signed in on the build Mac.</div></div>
+  <div class="callout ok"><span class="ic">&#10003;</span><div><b>Two zero-account escape hatches.</b> If you only need to prove the pipeline works: build for the <b>simulator</b> (no signing required) or disable signing for device builds with <code>CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO</code>. Both need no Apple ID at all.</div></div>
+</section>
+
+<section>
+  <h2><span class="num">2</span>How to sign up (official links)</h2>
+  <ol>
+    <li>Create the free <b>Apple ID</b>: <a href="https://appleid.apple.com">https://appleid.apple.com</a></li>
+    <li>Log into the <b>Apple Developer site</b> with it (no payment step needed): <a href="https://developer.apple.com/account">https://developer.apple.com/account</a></li>
+    <li>Open Xcode &rarr; <b>Settings &rarr; Accounts</b>, add that Apple ID, and your Personal Team appears automatically.</li>
+    <li>In the target&rsquo;s <b>Signing &amp; Capabilities</b> tab, tick &ldquo;Automatically manage signing&rdquo; and select your Personal Team.</li>
+  </ol>
+  <p>Official docs for reference:</p>
+  <ul>
+    <li>Compare memberships (what free vs paid get you): <a href="https://developer.apple.com/support/compare-memberships/">developer.apple.com/support/compare-memberships</a></li>
+    <li>Apple&rsquo;s Technical Q&amp;A QA1915 &mdash; the free Personal Team cannot sign for the App Store: <a href="https://developer.apple.com/library/archive/qa/qa1915/_index.html">developer.apple.com/library/archive/qa/qa1915</a></li>
+    <li>Code signing overview: <a href="https://developer.apple.com/support/code-signing/">developer.apple.com/support/code-signing</a></li>
+    <li>Xcode help &mdash; manually sign an app: <a href="https://help.apple.com/xcode/mac/current/#/dev1bf96f17e">help.apple.com/xcode/mac/current</a></li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="num">3</span>Does it still hold on macOS Tahoe (26) and newer?</h2>
+  <p><b>Yes.</b> Free Personal Team signing is not deprecated and nothing in the macOS 26 / Xcode 26 releases removes it. Apple&rsquo;s own forums still show free accounts signing builds on Sequoia 15.7+ and Tahoe, and Xcode 26 officially runs on macOS Sequoia 15.6 &ndash; Tahoe 26.x. But several <em>security-related</em> changes since Xcode 16 do affect CI scripts that sign automatically &mdash; get these right and your pipeline survives upgrades:</p>
+  <table>
+    <tr><th>Change</th><th>What it is</th><th>What to do in Jenkins</th></tr>
+    <tr><td><b>Provisioning profile location moved</b> (Xcode 16+)</td><td>New profiles are stored at <code>~/Library/Developer/Xcode/UserData/Provisioning Profiles</code>, not the old <code>~/Library/MobileDevice/Provisioning Profiles</code></td><td>Update any script that greps or reads the old path; Xcode still loads old profiles, but new downloads land in the new folder</td></tr>
+    <tr><td><b>WWDR intermediate cert rotation</b></td><td>Apple rotated the Worldwide Developer Relations certificate and the App Store receipt signing cert (Jan 2025)</td><td>Let Xcode manage certs; if your pipeline uses <code>security</code>/manual keychain tricks, make sure the current AppleWWDRCA is in the build machine&rsquo;s keychain or verification fails</td></tr>
+    <tr><td><b>Stricter <code>codesign</code></b></td><td>&ldquo;resource fork, Finder information, or similar detritus not allowed&rdquo; is now a hard error</td><td>Keep CI build outputs clean &mdash; no <code>.DS_Store</code>, no xattrs left by <code>unzip</code>/<code>scp</code>, before the sign step runs</td></tr>
+    <tr><td><b>macOS-level signing rules</b></td><td>On Apple silicon all executables must be signed; ad-hoc signing covers local tools and is unaffected</td><td>Nothing to change &mdash; iOS app signing via Xcode automatic signing is a separate path from macOS Gatekeeper/notarization rules</td></tr>
+    <tr><td><b>Tahoe is the last Intel macOS</b></td><td>Rosetta 2 support ends with macOS 27; Tahoe gets security-only support in 2026</td><td>Prefer an Apple-silicon build agent if you are choosing CI hardware now</td></tr>
+  </table>
+  <div class="callout info"><span class="ic">&#9432;</span><div><b>Best-practice CI shape.</b> Install Xcode on the Jenkins Mac, sign into the free Apple ID once in Xcode (this stores credentials), and let <em>automatic signing</em> create/refresh the profile on each build. That is the whole trick &mdash; the free team&rsquo;s 7-day profile expiry becomes a non-issue because every build generates a new profile.</div></div>
+</section>
+
+<section>
+  <h2><span class="num">4</span>Blogs and walkthroughs worth reading</h2>
+  <ul>
+    <li><b>Set up code signing with a free Personal Team, entirely from the command line</b> &mdash; the exact scriptable flow you replicate inside a Jenkins step: <a href="https://gist.github.com/Francesco149/a050b4637d8ea1b4e76ccccda68490b2">gist.github.com/Francesco149/a050b4637d8ea1b4e76ccccda68490b2</a></li>
+    <li><b>LiveCode &mdash; How to create a free iOS development provisioning profile</b> (Xcode 7-era but the account steps are unchanged): <a href="https://legacy.livecode.com/how-to-create-a-free-ios-development-provisioning-profile/">legacy.livecode.com</a></li>
+    <li><b>FreeCodeCamp &mdash; The Apple Code Signing Handbook</b> (certs, profiles, devices explained): <a href="https://www.freecodecamp.org/news/apple-code-signing-handbook/">freecodecamp.org/news/apple-code-signing-handbook</a></li>
+    <li><b>Xcode signing from Jenkins</b> (Stack Overflow thread): <a href="https://stackoverflow.com/questions/56724708/xcode-signing-using-jenkins">stackoverflow.com/questions/56724708</a></li>
+    <li><b>fastlane provisioning docs</b> &mdash; generate/renew/repair profiles from CI: <a href="https://docs.fastlane.tools/actions/get_provisioning_profile/">docs.fastlane.tools</a></li>
+    <li><b>What&rsquo;s happening with code signing and future macOS</b> &mdash; Howard Oakley&rsquo;s analysis of Tahoe-era signing (ad-hoc signing stays): <a href="https://eclecticlight.co/2026/01/17/whats-happening-with-code-signing-and-future-macos/">eclecticlight.co</a></li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="num">5</span>The bottom line</h2>
+  <ul>
+    <li><b>It works.</b> Free Personal Team signing is alive on macOS Tahoe and newer &mdash; no paid account needed to exercise the real signing path in Jenkins.</li>
+    <li><b>Watch the moving parts.</b> The profile-folder move, the WWDR rotation, and the stricter <code>codesign</code> are the three things that quietly break old CI signing scripts after a macOS/Xcode upgrade.</li>
+    <li><b>Embrace automatic signing.</b> On a free team, let Xcode regenerate the profile on every build; never hand-craft profiles in CI.</li>
+    <li><b>Remember the limits.</b> No App Store/TestFlight, ~3 apps, 7-day profiles &mdash; fine for testing pipelines, not for shipping.</li>
+  </ul>
+</section>
+
+</main>
+</body>
+</html>

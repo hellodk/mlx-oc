@@ -51,6 +51,7 @@
   .n24{background:linear-gradient(135deg,#4f46e5,#b45309)}
   .n25{background:linear-gradient(135deg,#0f766e,#4f46e5)}
   .n26{background:linear-gradient(135deg,#db2777,#4f46e5)}
+  .n27{background:linear-gradient(135deg,#0e7490,#db2777)}
   .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
   .post p{margin:0;color:var(--muted);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
@@ -277,6 +278,14 @@
       <h2>SLMs for the Team, and a Router in Front: Tickets, Dashboards, Builds &amp; the Frontier Escape Hatch</h2>
       <p>Two specialist small models &mdash; Jira/Confluence tickets &amp; dashboards, and mobile app builds &mdash; fine-tuned (not trained from scratch) on mlx-lm, served through the existing vllm-metal cluster. Plus what a router and OpenRouter actually are, and a three-tier logic router (specialist SLM &rarr; local generic 4B &rarr; frontier API) that keeps routine work nearly free and only spends money on reasoning that needs it.</p>
       <span class="tag">SLM fine-tuning</span><span class="tag">mlx-lm LoRA</span><span class="tag">router</span><span class="tag">LiteLLM</span><span class="tag">cost tiers</span><span class="tag">Jira</span><span class="tag">mobile builds</span>
+    </div>
+  </a>
+  <a class="post" href="27-code-signing-free-apple-id-macos-tahoe.html">
+    <div class="num n27">27</div>
+    <div>
+      <h2>Testing iOS Code Signing in Jenkins Without Paying Apple &mdash; Free Personal Teams Still Work on macOS Tahoe</h2>
+      <p>No Apple Developer Program membership, no $99: a free Apple ID Personal Team signs real on-device iOS builds, and that still holds on macOS Tahoe (26) and newer. How to sign up (with official links), the 7-day expiry gotcha, and the three security-era changes that break old CI signing scripts after an upgrade &mdash; the profile-folder move in Xcode 16, the WWDR certificate rotation, and the stricter codesign that rejects resource forks.</p>
+      <span class="tag">code signing</span><span class="tag">free Apple ID</span><span class="tag">Personal Team</span><span class="tag">Jenkins CI</span><span class="tag">macOS Tahoe</span><span class="tag">provisioning</span>
     </div>
   </a>
 </main>
