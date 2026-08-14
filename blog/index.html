@@ -49,6 +49,8 @@
   .n22{background:linear-gradient(135deg,#0e7490,#4f46e5)}
   .n23{background:linear-gradient(135deg,#db2777,#0f766e)}
   .n24{background:linear-gradient(135deg,#4f46e5,#b45309)}
+  .n25{background:linear-gradient(135deg,#0f766e,#4f46e5)}
+  .n26{background:linear-gradient(135deg,#db2777,#4f46e5)}
   .post h2{margin:0 0 6px;font-size:20px;color:var(--ink)}
   .post p{margin:0;color:var(--muted);font-size:14.5px}
   .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:10px 4px 0 0}
@@ -60,7 +62,7 @@
   <div class="wrap">
     <span class="kicker">MLX Observability &middot; Field Notes</span>
     <h1>Making Two Mac minis<br>Actually Observable</h1>
-    <p class="sub">Nineteen deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 46 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, a performance dashboard that finally shows the KV cache and context window, a head-to-head with hydra&rsquo;s push-first fleet stack, how a real GPU crash exposed the missing process-level truth &mdash; now fixed with a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that stress the cluster like an agent &mdash; the streamed server runtime log that finally carries an incident&rsquo;s server-side context into Opik, a per-reason fault ledger in Grafana, the forensics that found the fault lives on the remote rank, and the consolidated decision ledger we now choose from &mdash; an experimental SGLang scaffold with an unverified Apple Silicon backend, the tuning lever table measured on the ring, and now the Opik-native dashboard that renders the mlx project&rsquo;s traces and judge scores in place &mdash; and the reference map: every metric, log, trace, feedback score and alert in tables, with the files and configurations behind each, and how the four load-test rigs and forty unit tests drive the cluster &mdash; plus the field manual for setting the whole thing up, and now the deploy wizard that automates it: an interactive input tool and an Ansible playbook that build the venvs, sync the repo, stage the model and bring the ring up &mdash; for one node or many.</p>
+    <p class="sub">Nineteen deep-dives into the observability layer of the distributed MLX cluster: reading Apple Silicon GPU/power without root, alerting on 46 rules, Grafana dashboards, what an external audit found, self-hosted LLM tracing with Opik, a feedback loop that scores every chat completion, a performance dashboard that finally shows the KV cache and context window, a head-to-head with hydra&rsquo;s push-first fleet stack, how a real GPU crash exposed the missing process-level truth &mdash; now fixed with a supervising watchdog, serving-status metrics, an alert dashboard, and load tests that stress the cluster like an agent &mdash; the streamed server runtime log that finally carries an incident&rsquo;s server-side context into Opik, a per-reason fault ledger in Grafana, the forensics that found the fault lives on the remote rank, and the consolidated decision ledger we now choose from &mdash; an experimental SGLang scaffold with an unverified Apple Silicon backend, the tuning lever table measured on the ring, and now the Opik-native dashboard that renders the mlx project&rsquo;s traces and judge scores in place &mdash; and the reference map: every metric, log, trace, feedback score and alert in tables, with the files and configurations behind each, and how the four load-test rigs and forty unit tests drive the cluster &mdash; plus the field manual for setting the whole thing up, and now the deploy wizard that automates it: an interactive input tool and an Ansible playbook that build the venvs, sync the repo, stage the model and bring the ring up &mdash; for one node or many, and now the mental model: tokens, prefill, decode and the KV cache in one budget &mdash; why an 8&nbsp;GiB node serves 24,288 while a 16&nbsp;GiB node could stretch to 60,000 &mdash; and the plan for the next layer: specialist SLMs for tickets/dashboards and mobile builds, fine-tuned on the cluster itself, with a three-tier logic router in front that routes routine work to the free local models and pays for frontier reasoning only when the task actually needs it.</p>
     <div class="meta">
       <span><b>Stack</b> VictoriaMetrics + vmalert + Alertmanager + Grafana</span>
       <span><b>Agents</b> mlx_metrics_proxy :8080 &middot; mlx_hw_telemetry :9102 &middot; mlx_kv_cache_agent :9104</span>
@@ -259,6 +261,22 @@
       <h2>Deploy the MLX Cluster with a Wizard: tools/mlx-deploy.py + Ansible</h2>
       <p>Post 23 was the manual; this is the tool that does it for you. An interactive input wizard that asks for the node details, topology and versions &mdash; rank0 and peer IPs, ethernet or TB4 ring, model, Pythons and the verified pins &mdash; scans every node for prerequisites and prints the exact fix, then drives an Ansible playbook that builds the venvs, syncs the repo, stages the weights and starts the ring &mdash; for one node or many, interactive or from a JSON config file.</p>
       <span class="tag">deploy wizard</span><span class="tag">tools/mlx-deploy.py</span><span class="tag">ansible</span><span class="tag">prereq scan</span><span class="tag">non-interactive</span>
+    </div>
+  </a>
+  <a class="post" href="25-token-decode-prefill-kv-cache-context.html">
+    <div class="num n25">25</div>
+    <div>
+      <h2>Tokens, Prefill, Decode and the KV Cache: How They Bound Context Length</h2>
+      <p>One request, three phases &mdash; prefill (the TTFT wall), decode (the token drip), and the KV cache that grows one 32&nbsp;KiB block per token and is the reason an 8&nbsp;GiB node tops out at 24,288 while the 16&nbsp;GiB peer could serve &asymp; 60,000. The real memory-budget breakdown from the 4,096&rarr;15,312&rarr;24,288 experiment, why input and output share one pool, and the cheat sheet that ties token, prefill, decode, KV cache and context length together.</p>
+      <span class="tag">max_model_len</span><span class="tag">KV cache</span><span class="tag">prefill</span><span class="tag">decode</span><span class="tag">memory budget</span>
+    </div>
+  </a>
+  <a class="post" href="26-slms-and-router.html">
+    <div class="num n26">26</div>
+    <div>
+      <h2>SLMs for the Team, and a Router in Front: Tickets, Dashboards, Builds &amp; the Frontier Escape Hatch</h2>
+      <p>Two specialist small models &mdash; Jira/Confluence tickets &amp; dashboards, and mobile app builds &mdash; fine-tuned (not trained from scratch) on mlx-lm, served through the existing vllm-metal cluster. Plus what a router and OpenRouter actually are, and a three-tier logic router (specialist SLM &rarr; local generic 4B &rarr; frontier API) that keeps routine work nearly free and only spends money on reasoning that needs it.</p>
+      <span class="tag">SLM fine-tuning</span><span class="tag">mlx-lm LoRA</span><span class="tag">router</span><span class="tag">LiteLLM</span><span class="tag">cost tiers</span><span class="tag">Jira</span><span class="tag">mobile builds</span>
     </div>
   </a>
 </main>

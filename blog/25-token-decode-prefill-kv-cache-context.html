@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>25 — Tokens, Prefill, Decode and the KV Cache: How They Bound Context Length</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#4f46e5;--accent-soft:#eef0ff;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(79,70,229,.10), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(15,118,110,.09), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #dfe1ff;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:720px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  .dbadge{display:inline-block;font-size:11px;font-weight:800;border-radius:6px;padding:2px 8px;margin-right:6px;background:var(--accent-soft);color:var(--accent);border:1px solid #dfe1ff;vertical-align:middle}
+  .q{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--code-bg);border:1px solid var(--line);border-radius:6px;padding:1px 5px;white-space:nowrap}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="23-using-the-mlx-cluster.html">Using the cluster</a>
+  <a href="24-deploy-wizard.html">Deploy wizard</a>
+  <a href="25-token-decode-prefill-kv-cache-context.html" style="color:var(--accent);font-weight:700">Tokens, prefill &amp; KV cache</a>
+</div></nav>
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Post 25 &middot; the mental model</span>
+    <h1>Tokens, Prefill, Decode and the KV Cache: How They Bound Context Length</h1>
+    <p class="sub">Every time we bump <code>--max-model-len</code> on this cluster we hit a wall that is pure arithmetic: the KV cache for 16,384 tokens is 0.56&nbsp;GiB, and a node only has so much memory left after the weights and the engine overhead. This post puts token, prefill, decode, KV cache and context length on one page &mdash; with the real breakdown from the two-Mac ring that took us from 4,096 to 24,288.</p>
+    <div class="meta"><span><b>Measured on</b> rank0 (M2 8&nbsp;GiB) &middot; peer (M4 16&nbsp;GiB)</span><span><b>Model</b> Qwen3.5-4B-MLX-4bit (hybrid, 8 full-attention + 24 linear layers)</span><span><b>KV</b> 32&nbsp;KiB per token</span><span><b>Ceiling</b> 24,288</span></div>
+  </div>
+</header>
+<main class="wrap">
+
+<section>
+  <h2><span class="num">1</span>One request, three phases</h2>
+  <p>A single LLM call is a small pipeline. The text prompt is first <em>tokenized</em> into integer ids &mdash; the model never sees characters, it sees token ids, and every length limit in a serving engine is counted in <em>tokens</em>, not words or characters (roughly 1 token &asymp; 0.75 English words). Then the model runs twice, in very different modes:</p>
+  <table>
+    <tr><th>Phase</th><th>What happens</th><th>Cost character</th><th>You see it as</th></tr>
+    <tr><td><b>Prefill</b></td><td>the whole prompt is processed <em>in one parallel pass</em>; every layer reads all prompt tokens at once and writes their K/V into the cache</td><td>compute-bound; cost grows with prompt length</td><td><b>TTFT</b> (time to first token)</td></tr>
+    <tr><td><b>Decode</b></td><td>one token at a time, each step reading the <em>entire</em> accumulated context through attention before emitting the next id</td><td>memory-bandwidth-bound; roughly constant per token</td><td><b>tokens/sec</b>, inter-token latency</td></tr>
+  </table>
+  <p>On this ring the split is easy to see. A short prompt pre-fills in well under a second (TTFT p50 &asymp; 0.3&ndash;0.6&nbsp;s depending on node and concurrency), then decode streams at 26&ndash;32&nbsp;tok/s single-stream. TTFT is almost entirely <em>prefill</em>; the steady drip after it is <em>decode</em>. Tools, streaming, and every turn of an agent are just many of these pipeline passes stacked together.</p>
+</section>
+
+<section>
+  <h2><span class="num">2</span>The KV cache: what grows, and why</h2>
+  <p>Attention works by comparing a query against <em>keys and values</em> of every previous position. During decode, step&nbsp;N would naively re-derive all N&minus;1 previous K/V pairs &mdash; wasteful. So serving engines cache them: each layer stores, for every token seen so far, its <em>Key</em> and <em>Value</em> vectors. That cache is the <b>KV cache</b>, and it is the reason a "second token" is much cheaper than the first: prefill pays the full attention cost for the whole prompt, decode only pays for one new position against a cached context.</p>
+  <p>Two consequences shape everything else:</p>
+  <ul>
+    <li><b>It grows by exactly one token per generated token.</b> Bigger prompt or longer answer &rArr; bigger cache. The cache footprint is linear in total sequence length.</li>
+    <li><b>It is allocated in fixed-size blocks.</b> This model's engine uses 528-token blocks at 17,301,504 bytes per block &rarr; <b>&asymp; 32&nbsp;KiB per token</b> (&asymp; 35.8&nbsp;KiB with the hybrid state overhead counted). That number is a property of the model's layer count, head count and head dims &mdash; it does not shrink because the machine is small.</li>
+  </ul>
+  <p>One subtlety specific to this model: Qwen3.5-4B is <em>hybrid</em> &mdash; only 8 of its 32 layers are full attention with a real KV cache; the other 24 use linear attention with a compact per-sequence state (here 51.5&nbsp;MB/seq, lazily reserved). So the "KV cache" you see in the breakdown is only the 8-layer part, and the linear layers ride on a small fixed state instead of a growing cache.</p>
+  <div class="callout warn"><span class="ic">&#9888;</span><div><b>Rule of thumb:</b> memory_for_context &asymp; tokens &times; bytes_per_token. Doubling the context doubles that line on the budget, no matter how fast the GPU is.</div></div>
+</section>
+
+<section>
+  <h2><span class="num">3</span>Context length is one budget: input + output</h2>
+  <p>Here is the confusion that bites most people: <code>max_model_len</code> is <em>not</em> a prompt limit. vLLM counts the <b>total sequence</b> &mdash; prompt tokens plus generated tokens must fit inside it, or the request is rejected. So a 24,288-token ceiling means, say, 23,264 tokens of input <em>and</em> 1,024 tokens of output &mdash; not "24&nbsp;K of prompt".</p>
+  <table>
+    <tr><th>max_model_len</th><th>prompt + tool results</th><th>generated</th><th>fits?</th></tr>
+    <tr><td>24,288</td><td>23,000</td><td>1,288</td><td>&#10003;</td></tr>
+    <tr><td>24,288</td><td>24,000</td><td>1,000</td><td>&#10007; (25,000 &gt; 24,288)</td></tr>
+    <tr><td>24,288</td><td>8,000</td><td>16,288</td><td>&#10007; (too long an answer)</td></tr>
+  </table>
+  <p>This is why the opencode config on this cluster sets <code>context: 24288, output: 1024</code>: the client's <em>context</em> window and its <em>output</em> budget are two numbers drawn from the same single pool. An agent with a growing transcript + tool results + a reply consumes all three lines of that table at once.</p>
+</section>
+
+<section>
+  <h2><span class="num">4</span>Where the ceiling comes from: the memory budget</h2>
+  <p>The engine does this arithmetic at startup:</p>
+  <pre>kv_budget = usable_metal &minus; model_weights &minus; engine_overhead &minus; hybrid_state_reserve</pre>
+  <p>then derives <code>max_model_len</code> from <code>kv_budget / bytes_per_token</code>. It is the <em>least flexible number in the whole serving stack</em> &mdash; weights and overhead are fixed for a given model and engine, so the only dials are total memory and the KV share of it. Here is the actual breakdown from rank0 (M2, 8&nbsp;GiB), twice:</p>
+  <table>
+    <tr><th>Setting</th><th>usable_metal</th><th>model</th><th>overhead</th><th>gdn reserve</th><th>kv_budget</th><th>blocks (528&nbsp;tok)</th><th>cached tokens</th><th>max length</th></tr>
+    <tr><td>fraction 0.90</td><td>5.15&nbsp;GB</td><td>2.37&nbsp;GB</td><td>2.05&nbsp;GB</td><td>0.15&nbsp;GB</td><td>0.58&nbsp;GB (0.53&nbsp;GiB)</td><td>33</td><td>17,424</td><td><b>15,312</b></td></tr>
+    <tr><td>fraction 0.95</td><td>5.44&nbsp;GB</td><td>2.37&nbsp;GB</td><td>2.05&nbsp;GB</td><td>0.15&nbsp;GB</td><td>0.87&nbsp;GB (0.81&nbsp;GiB)</td><td>50</td><td>26,400</td><td><b>24,288</b></td></tr>
+  </table>
+  <div class="callout warn"><span class="ic">&#9888;</span><div><b>The price of the +33%:</b> fraction 0.95 wires almost the whole 8&nbsp;GiB machine to Metal. free memory hovers around 60&ndash;80&nbsp;MB and the OS survives on compression. That is the true maximum for rank0 &mdash; 0.98 is not a "bit more", it is a likely crash.</div></div>
+</section>
+
+<section>
+  <h2><span class="num">5</span>The experiment that made it concrete</h2>
+  <p>At fraction 0.9, asking for 16,384 failed immediately:</p>
+  <pre>ValueError: To serve at least one request with the model's max seq len (16384),
+(0.56 GiB KV cache is needed, which is larger than the available KV cache memory
+(0.53 GiB). Based on the available memory, the estimated maximum model length is 15312.</pre>
+  <p>Every "more please" then became a hunt for memory, in order:</p>
+  <ul>
+    <li><b>Lower <code>max-num-seqs</code> (4 &rarr; 2):</b> the hybrid state reserve barely moved &mdash; available KV stayed 0.53&nbsp;GiB. Dead end.</li>
+    <li><b>CPU KV offload:</b> the module ships in this vLLM build, but no CLI flag and no Metal platform support. Dead end.</li>
+    <li><b>Quantized KV (<code>--kv-cache-dtype</code>):</b> not exposed on the Metal backend. Dead end.</li>
+    <li><b>Raise the memory fraction (0.9 &rarr; 0.95):</b> freed 0.29&nbsp;GB &rarr; kv_budget 0.58&nbsp;GB &rarr; 0.87&nbsp;GB &rarr; ceiling 15,312 &rarr; <b>24,288</b> (a 24,576 probe reported the exact estimate).</li>
+  </ul>
+  <p>One serving requirement made the number <em>cluster-wide</em>: the session proxy balances sessions across both backends, and vLLM hard-rejects any request above <code>max_model_len</code>. So both nodes run <code>--max-model-len 24288</code>, even though the 16&nbsp;GiB peer could physically serve roughly 60&nbsp;K+. The weakest node sets the contract.</p>
+</section>
+
+<section>
+  <h2><span class="num">6</span>What it means when you actually serve</h2>
+  <table>
+    <tr><th>Observation</th><th>Why</th><th>Consequence on this cluster</th></tr>
+    <tr><td>Longer context &rArr; fewer cached tokens left for others</td><td>the cache is pre-allocated in blocks; blocks &times; 528 tokens is the concurrency envelope</td><td>rank0 at 24,288 &asymp; 1.0&times; concurrency for full-length sessions; short sessions still share fine</td></tr>
+    <tr><td>Decode slows as context grows</td><td>each step re-reads all cached K/V through attention &mdash; bandwidth-bound</td><td>long-agent transcripts pay more per token; TTFT also grows with prompt length</td></tr>
+    <tr><td>Prefill is one parallel wall, decode is a drip</td><td>prefill compute-bound, decode bandwidth-bound</td><td>benchmark split: TTFT p50 0.6&nbsp;s vs ~26&ndash;32&nbsp;tok/s decode</td></tr>
+    <tr><td>Input and output share one pool</td><td>max_model_len = prompt + generation</td><td>client limits (context + output) must sum &le; engine ceiling</td></tr>
+  </table>
+  <div class="callout ok"><span class="ic">&#10003;</span><div><b>Cheat sheet.</b> <b>Token</b>: the unit of length, &asymp; 0.75 words. <b>Prefill</b>: reads the whole prompt at once &rarr; TTFT. <b>Decode</b>: one token per step &rarr; tok/s. <b>KV cache</b>: K/V for every token so far &asymp; 32&nbsp;KiB/token here. <b>Context length</b>: prompt + output must fit one budget. <b>Ceiling</b>: <code>(memory &minus; weights &minus; overhead) / bytes-per-token</code> &mdash; and that is why an 8&nbsp;GiB node tops out at 24,288 while the 16&nbsp;GiB node could stretch to &asymp; 60,000.</div></div>
+</section>
+
+</main>
+</body>
+</html>

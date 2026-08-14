@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>26 — SLMs for the Team, and a Router in Front: Tickets, Dashboards, Builds, and a Three-Tier Escape Hatch to the Frontier</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#4f46e5;--accent-soft:#eef0ff;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(79,70,229,.10), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(219,39,119,.09), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #dfe1ff;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:720px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  .dbadge{display:inline-block;font-size:11px;font-weight:800;border-radius:6px;padding:2px 8px;margin-right:6px;background:var(--accent-soft);color:var(--accent);border:1px solid #dfe1ff;vertical-align:middle}
+  .q{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--code-bg);border:1px solid var(--line);border-radius:6px;padding:1px 5px;white-space:nowrap}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="25-token-decode-prefill-kv-cache-context.html">Tokens &amp; KV cache</a>
+  <a href="24-deploy-wizard.html">Deploy wizard</a>
+  <a href="26-slms-and-router.html" style="color:var(--accent);font-weight:700">SLMs &amp; the router</a>
+</div></nav>
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Post 26 &middot; the plan for the next layer</span>
+    <h1>SLMs for the Team, and a Router in Front: Tickets, Dashboards, Builds &mdash; and a Three-Tier Escape Hatch to the Frontier</h1>
+    <p class="sub">Two specialist small models (Jira/Confluence tickets &amp; dashboards, mobile app builds) and a logic router in front that sends routine work to the local cluster and only pays for frontier reasoning when it&rsquo;s actually needed. This is the shape of it: what &ldquo;training an SLM&rdquo; really costs, what a router is, and how the whole thing slots onto the infra this repo already runs.</p>
+    <div class="meta"><span><b>SLMs</b> fine-tuned 1&ndash;4B (not trained from scratch)</span><span><b>Toolchain</b> mlx-lm LoRA &rarr; MLX 4-bit &rarr; vllm-metal</span><span><b>Router</b> LiteLLM or an extended vllm_session_proxy</span><span><b>Tiers</b> SLM &rarr; local generic &rarr; frontier</span></div>
+  </div>
+</header>
+<main class="wrap">
+
+<section>
+  <h2><span class="num">1</span>Yes, you can &mdash; but &ldquo;train&rdquo; means fine-tune</h2>
+  <p>The two targets &mdash; a <em>tickets &amp; dashboards</em> SLM for Jira/Confluence and a <em>mobile build</em> SLM for Gradle/Xcode/fastlane &mdash; are both excellent fine-tuning problems: they have narrow output formats, bounded vocabulary (JQL, JSON, build commands), and lots of repeated structure. That is the sweet spot for a small model.</p>
+  <div class="callout info"><span class="ic">&#9432;</span><div><b>From scratch vs fine-tune.</b> Pretraining a 1&ndash;4B model from random weights needs billions of tokens and a GPU cluster you do not have. Fine-tuning (LoRA/QLoRA) a strong open base on a few thousand domain examples gives you a specialist that is 90% of the way there &mdash; and runs on one of these Mac minis in hours. Start from <b>Qwen3.5-4B</b> (already on the cluster), <b>Qwen2.5-3B</b>, or <b>Llama-3.2-3B</b>.</div></div>
+  <p>What it actually takes, per SLM:</p>
+  <table>
+    <tr><th>Step</th><th>What you need</th><th>Cost</th></tr>
+    <tr><td>Data</td><td>500&ndash;5,000 <code>(prompt &rarr; expected output)</code> examples. Tickets: title/description/priority/labels + JQL + dashboard JSON + Confluence page templates. Builds: (log or error &rarr; fix) pairs, CI configs, Gradle/Xcode/fastlane invocations</td><td>the real work &mdash; export your own Jira/Confluence; synthesize the rest with a frontier model</td></tr>
+    <tr><td>Training</td><td><code>mlx-lm</code> LoRA on one Mac mini (rank0 is enough)</td><td>hours for 1&ndash;4B; &lt; a few dollars of electricity</td></tr>
+    <tr><td>Eval</td><td>held-out set scoring JSON validity, JQL that actually runs, tool-call success</td><td>an afternoon</td></tr>
+    <tr><td>Serving</td><td>convert to MLX 4-bit, drop on the cluster, serve through vllm-metal &mdash; one model file per SLM</td><td>already built in this repo</td></tr>
+  </table>
+  <div class="callout warn"><span class="ic">&#9888;</span><div><b>What fine-tuning does and doesn&rsquo;t fix.</b> It makes output <em>format-reliable</em> (well-formed tickets, valid JQL, correct JSON schema) and cheap. It does not add knowledge or reasoning. If the task is &ldquo;turn these notes into a ticket following our template&rdquo;, the SLM nails it. If it is &ldquo;design the dashboard architecture for a new product&rdquo;, that is frontier territory &mdash; and the router&rsquo;s job is to know the difference.</div></div>
+</section>
+
+<section>
+  <h2><span class="num">2</span>What a router is, and what OpenRouter is</h2>
+  <p>A <b>router</b> is the layer between your clients and many LLM backends that decides <em>which model answers which request</em>. It is the load balancer + circuit breaker + cost controller of LLM traffic: classification, fallback chains, budgets, timeouts.</p>
+  <p><b>OpenRouter</b> is a <em>hosted</em> router: one API key, one OpenAI-compatible endpoint, and it forwards to hundreds of models across many providers, with price/context filters and server-side routing. Zero self-hosting &mdash; you buy a black box. The alternative is a <b>self-hosted</b> router: <b>LiteLLM proxy</b> (config-file routing, fallbacks, budgets, OpenAI-compatible) or your own code.</p>
+  <p>For this cluster the answer is <em>both, layered</em>: a self-hosted router owns the local SLMs and the generic local model; it only talks to OpenRouter (or the frontier APIs directly) for the expensive tier.</p>
+</section>
+
+<section>
+  <h2><span class="num">3</span>The three tiers and the routing logic</h2>
+  <table>
+    <tr><th>Tier</th><th>What runs it</th><th>Cost</th><th>Good for</th></tr>
+    <tr><td><b>0 &mdash; specialist SLM</b></td><td>tickets/dashboards model, mobile-build model (local cluster)</td><td>~free</td><td>ticket creation, JQL, dashboard JSON, build-error fixes, CI config</td></tr>
+    <tr><td><b>1 &mdash; local generic</b></td><td>Qwen3.5-4B on the ring</td><td>~free</td><td>rewrites, summaries, everyday chat, tool calling</td></tr>
+    <tr><td><b>2 &mdash; frontier</b></td><td>GPT/Claude/Gemini via OpenRouter or direct API</td><td>pay-per-call</td><td>hard reasoning, novel code, messy/long documents, escalation</td></tr>
+  </table>
+  <p>The router&rsquo;s decision is a small deterministic function &mdash; an SLM is <em>not</em> needed to make the call:</p>
+  <ol>
+    <li><b>Classify</b> the task (regex + keyword, or a tiny local classifier: <code>is_ticket</code> / <code>is_build_error</code> / <code>is_generic</code>).</li>
+    <li><b>Capability check</b>: does it need long context, file access, or heavy tool use beyond the SLM&rsquo;s schema? If yes &rarr; up-tier.</li>
+    <li><b>Budget &amp; latency</b>: hard cost cap and timeout per request type.</li>
+    <li><b>Fallback chain</b>: frontier down or over budget &rarr; local generic; local failed twice &rarr; escalate to frontier.</li>
+    <li><b>Stickiness</b>: keep one session on one backend (the proxy already does this by session hash).</li>
+  </ol>
+  <div class="callout ok"><span class="ic">&#10003;</span><div><b>Where it lives here.</b> The fastest path is <b>LiteLLM proxy</b> as the front door with three <code>model_list</code> entries (the two SLMs + the generic 4B) and a router rule sending a task-matched model per request, with frontier as fallback. The zero-dependency path is extending <b>vllm_session_proxy.py</b> &mdash; it already balances sessions across backends; adding a task-classification tier is the natural next step, and the classifier can itself be the tiny local model. The last-mile classification (&ldquo;is this a ticket? a build error? generic?&rdquo;) is exactly what an SLM is good at, so the router can run on the cluster it routes.</div></div>
+</section>
+
+<section>
+  <h2><span class="num">4</span>The bottom line</h2>
+  <ul>
+    <li><b>Feasibility:</b> both SLMs are a realistic month-of-part-time project; data is the bottleneck, not compute.</li>
+    <li><b>Cost model:</b> tier 0/1 traffic is nearly free on the Macs; only tier 2 spends money &mdash; and the router&rsquo;s whole purpose is to make sure that spend is reserved for requests that actually need it.</li>
+    <li><b>Efficiency:</b> two specialists sharing one cluster is the distributed serving this repo already does &mdash; same engine, same proxy, extra model files.</li>
+    <li><b>Deployment order:</b> (1) stand up LiteLLM in front of the current 4B, (2) classify + fallback to a frontier API, (3) train SLM-A, serve it, route tickets to it, (4) train SLM-B, repeat.</li>
+  </ul>
+</section>
+
+</main>
+</body>
+</html>
