@@ -1,9 +1,15 @@
 # VictoriaMetrics single-node scrape config.
 # Generated from vm-scrape.tmpl.yml by ./setup.sh (substitutes __MLX_IP__ /
-# __RANK1_IP__ with your Mac addresses). rank0 = Mac mini B (192.168.1.5, the
-# 16 GiB serving node); rank1 = Mac mini A (192.168.1.64, hw telemetry only).
-# This podman stack runs on node A; it scrapes the rank0 stack over the LAN.
-# Targets:
+# __RANK1_IP__ with your Mac addresses). The podman stack runs on this node
+# (192.168.1.64, rank0 = vLLM/vllm-metal + vllm session proxy on the ring).
+#
+# vLLM topology (since 2026-08-13):
+#   - session proxy  192.168.1.64:8080/metrics   (vllm_session_proxy_*)
+#   - vllm rank0     192.168.1.64:8081/metrics   (native vllm:* metrics, 8 GiB)
+#   - vllm peer      192.168.2.2:8081/metrics    (native vllm:* metrics, 16 GiB)
+#
+# Legacy MLX targets (stack currently stopped; kept so the config is valid if
+# the MLX cluster is redeployed):
 #   - proxy      <MLX_IP>:8080/metrics   (inference + hallucination metrics)
 #   - hw agents  <MLX_IP>:9102 (rank0) and <RANK1_IP>:9102 (rank1)
 #   - kv agent   <MLX_IP>:9104           (KV cache + context-length gauges)
@@ -11,6 +17,28 @@ global:
   scrape_interval: 10s
 
 scrape_configs:
+  # vllm_session_proxy.py on rank0: per-session routing, per-backend request
+  # counters. Source of truth for "which session went to which node".
+  - job_name: vllm-proxy
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["192.168.1.64:8080"]
+        labels:
+          service: vllm-proxy
+          node: rank0
+
+  # Native vllm:* Prometheus metrics from each vllm-metal serving node.
+  - job_name: vllm
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["192.168.1.64:8081"]
+        labels:
+          service: vllm
+          node: rank0
+      - targets: ["192.168.2.2:8081"]
+        labels:
+          service: vllm
+          node: peer
   - job_name: mlx-proxy
     metrics_path: /metrics
     static_configs:

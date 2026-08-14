@@ -1,0 +1,225 @@
+{
+  "uid": "vllm-cluster",
+  "title": "vLLM Cluster",
+  "description": "vllm-metal serving nodes (rank0 8GiB + peer 16GiB) and the session-splitting proxy in front of them.",
+  "tags": ["vllm", "mlx", "proxy"],
+  "timezone": "browser",
+  "editable": true,
+  "time": { "from": "now-30m", "to": "now" },
+  "refresh": "30s",
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "collapsed": false,
+      "title": "Cluster & health",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "vLLM nodes up",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "up{job=\"vllm\"}", "legendFormat": "{{node}}", "refId": "A", "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" } }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Session proxy up",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "up{job=\"vllm-proxy\"}", "legendFormat": "proxy", "refId": "A", "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" } }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Requests running",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 25, "lineWidth": 1 } },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "vllm:num_requests_running", "legendFormat": "{{node}}", "refId": "A", "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" } }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Requests waiting",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 25, "lineWidth": 1 } },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "vllm:num_requests_waiting", "legendFormat": "{{node}}", "refId": "A", "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" } }
+      ]
+    },
+    {
+      "id": 6,
+      "collapsed": false,
+      "title": "Throughput & latency",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+      "panels": []
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Tokens/s (prompt + generation)",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 25, "lineWidth": 1 }, "unit": "tokps" },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "sum(rate(vllm:prompt_tokens_total[1m]) + rate(vllm:generation_tokens_total[1m])) by (node)", "legendFormat": "{{node}}", "refId": "A", "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" } }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Time to first token (p50)",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 25, "lineWidth": 1 }, "unit": "s" },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum by (le, node) (rate(vllm:time_to_first_token_seconds_bucket[5m])))", "legendFormat": "{{node}}", "refId": "A", "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" } }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Time per output token (p50)",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 14 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 25, "lineWidth": 1 }, "unit": "s" },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum by (le, node) (rate(vllm:request_time_per_output_token_seconds_bucket[5m])))", "legendFormat": "{{node}}", "refId": "A", "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" } }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Queue time (p50)",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 14 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 25, "lineWidth": 1 }, "unit": "s" },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum by (le, node) (rate(vllm:request_queue_time_seconds_bucket[5m])))", "legendFormat": "{{node}}", "refId": "A", "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" } }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "KV cache usage %",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 20 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 25, "lineWidth": 1 }, "unit": "percent", "max": 100 },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "vllm:kv_cache_usage_perc * 100", "legendFormat": "{{node}}", "refId": "A", "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" } }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Requests succeeded/s",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 20 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 25, "lineWidth": 1 } },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "rate(vllm:request_success_total[1m])", "legendFormat": "{{node}}", "refId": "A", "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" } }
+      ]
+    },
+    {
+      "id": 13,
+      "collapsed": false,
+      "title": "Session proxy",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "panels": []
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Requests/s per backend",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 27 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 25, "lineWidth": 1 } },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "sum by (backend) (rate(vllm_session_proxy_reqs_total[1m]))", "legendFormat": "{{backend}}", "refId": "A", "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" } }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Top sessions by requests",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 27 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 25, "lineWidth": 1 } },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "topk(5, vllm_session_proxy_session_requests)", "legendFormat": "{{session}}", "refId": "A", "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" } }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "stat",
+      "title": "Total requests forwarded",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 33 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "sum(vllm_session_proxy_reqs_total) by (backend)", "legendFormat": "{{backend}}", "refId": "A", "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" } }
+      ]
+    }
+  ]
+}
