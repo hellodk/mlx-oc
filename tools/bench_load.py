@@ -85,19 +85,24 @@ def sse_parse_stream(resp):
             continue
 
 
-def run_one(base, model, prompt, max_tokens, stream=True, timeout=600):
+def run_one(base, model, prompt, max_tokens, stream=True, timeout=600, session=None):
+    headers = {"Content-Type": "application/json",
+               "Connection": "close", "X-Mlx-Trace": "1"}
+    if session:
+        headers["X-Session-Id"] = session
     body = json.dumps({
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "stream": stream,
         "max_tokens": max_tokens,
         "temperature": 0.0,
+        "chat_template_kwargs": {"enable_thinking": False},
+        "stream_options": {"include_usage": True},
     }).encode()
     req = urllib.request.Request(
         f"{base}/chat/completions",
         data=body,
-        headers={"Content-Type": "application/json",
-                 "Connection": "close", "X-Mlx-Trace": "1"},
+        headers=headers,
     )
     t_send = time.monotonic()
     ttft, last_chunk, first_chunk, content, usage = None, None, None, "", None
@@ -199,13 +204,14 @@ def run_sweep(args):
         stop = threading.Event()
         results = []
 
-        def worker():
+        def worker(i):
             while not stop.is_set():
                 results.append(run_one(args.base, args.model,
-                                       PROMPTS[args.prompt], args.max_tokens))
+                                       PROMPTS[args.prompt], args.max_tokens,
+                                       session=f"sess{i}"))
         pool = ThreadPoolExecutor(max_workers=c)
-        for _ in range(c):
-            pool.submit(worker)
+        for i in range(c):
+            pool.submit(worker, i)
         time.sleep(args.duration)
         stop.set()
         pool.shutdown(wait=True)
@@ -220,13 +226,14 @@ def run_sustain(args):
     results = []
     snapshots = []
 
-    def worker():
+    def worker(i):
         while not stop.is_set():
             results.append(run_one(args.base, args.model,
-                                   PROMPTS[args.prompt], args.max_tokens))
+                                   PROMPTS[args.prompt], args.max_tokens,
+                                   session=f"sess{i}"))
     pool = ThreadPoolExecutor(max_workers=args.concurrency)
-    for _ in range(args.concurrency):
-        pool.submit(worker)
+    for i in range(args.concurrency):
+        pool.submit(worker, i)
     t0 = time.monotonic()
     while time.monotonic() - t0 < args.duration:
         snapshots.append(snapshot_cluster())
