@@ -1,0 +1,95 @@
+{
+  "repo_dir": "{{ mlx_repo_dir }}",
+  "logs_dir": "{{ mlx_repo_dir }}/cluster/logs",
+  "components": [
+    {
+      "name": "server",
+      "host": "rank0",
+      "cwd": "{{ mlx_repo_dir }}/cluster",
+      "port": {{ mlx_cluster.ports.supervisor }},
+      "pidfile": "{{ mlx_repo_dir }}/cluster/logs/supervisor.pid",
+      "logfile": "{{ mlx_repo_dir }}/cluster/logs/supervisor.log",
+      "health": "http://127.0.0.1:{{ mlx_cluster.ports.supervisor }}/metrics",
+      "wait_retries": 30,
+      "wait_delay": 2,
+      "kill_hosts": ["rank0", "rank1"],
+      "kill_patterns": [
+        "mlx_server_supervisor[.]py",
+        "mlx[.]launch",
+        "mlx_lm[.]server",
+        "mlx_server_launcher[.]py"
+      ],
+      "start_cmd": "{{ mlx_repo_dir }}/.venv/bin/python {{ mlx_repo_dir }}/cluster/mlx_server_supervisor.py --model {{ mlx_cluster.model_dir }}/{{ mlx_cluster.model_name }} --hostfile {{ mlx_repo_dir }}/cluster/hosts.json --health http://{{ mlx_cluster.server_bind_ip }}:{{ mlx_cluster.ports.server }}/v1/models --server-log {{ mlx_repo_dir }}/cluster/logs/server.log --listen 0.0.0.0:{{ mlx_cluster.ports.supervisor }} --probe-interval 5 --backoff 3 --backoff-max 30 --hang-after 15 --backoff-reset 120 --command \"{{ mlx_venv_server }}/bin/mlx.launch --hostfile {{ mlx_repo_dir }}/cluster/hosts.json --backend {{ mlx_cluster.ring_backend }} --cwd {{ mlx_repo_dir }}/cluster --python {{ mlx_venv_server }}/bin/python -- {{ mlx_venv_server }}/bin/python {{ mlx_repo_dir }}/cluster/mlx_server_launcher.py --model {{ mlx_cluster.model_dir }}/{{ mlx_cluster.model_name }} --host {{ mlx_cluster.server_bind_ip }} --port {{ mlx_cluster.ports.server }} --chat-template-args '{\\\"enable_thinking\\\":false}' --prompt-cache-size 4 --prompt-cache-bytes 2g --prompt-concurrency 4\""
+    },
+    {
+      "name": "proxy",
+      "host": "rank0",
+      "cwd": "{{ mlx_repo_dir }}/cluster",
+      "port": {{ mlx_cluster.ports.proxy }},
+      "pidfile": "{{ mlx_repo_dir }}/cluster/logs/proxy.pid",
+      "logfile": "{{ mlx_repo_dir }}/cluster/logs/proxy.log",
+      "health": "http://127.0.0.1:{{ mlx_cluster.ports.proxy }}/metrics",
+      "wait_retries": 30,
+      "wait_delay": 2,
+      "kill_hosts": ["rank0"],
+      "kill_patterns": ["mlx_metrics_proxy[.]py"],
+      "start_cmd": "{{ mlx_repo_dir }}/.venv/bin/python {{ mlx_repo_dir }}/cluster/mlx_metrics_proxy.py --listen 0.0.0.0:{{ mlx_cluster.ports.proxy }} --upstream {{ mlx_cluster.server_bind_ip }}:{{ mlx_cluster.ports.server }} --default-temp {{ mlx_cluster.default_temp }} --node-name rank0 --otlp-endpoint \"{{ mlx_cluster.otlp_endpoint | default('') }}\" --opik-otlp-endpoint \"{{ mlx_cluster.opik_otlp_endpoint | default('') }}\" --model {{ mlx_cluster.model_dir }}/{{ mlx_cluster.model_name }} --logprobs {{ mlx_cluster.logprobs }} --logprobs-stream-sample {{ mlx_cluster.logprobs_stream_sample }} --low-confidence-threshold {{ mlx_cluster.low_confidence }} --max-prompt-tokens {{ mlx_cluster.max_prompt_tokens }} --max-tokens-cap {{ mlx_cluster.max_tokens_cap }} --max-body-bytes {{ mlx_cluster.max_body_bytes }} --rate-limit {{ mlx_cluster.rate_limit }}"
+    },
+    {
+      "name": "hw_rank0",
+      "host": "rank0",
+      "cwd": "{{ mlx_repo_dir }}/cluster",
+      "port": {{ mlx_cluster.ports.hw }},
+      "pidfile": "{{ mlx_repo_dir }}/cluster/logs/hw0.pid",
+      "logfile": "{{ mlx_repo_dir }}/cluster/logs/hw0.log",
+      "health": "http://127.0.0.1:{{ mlx_cluster.ports.hw }}/metrics",
+      "wait_retries": 15,
+      "wait_delay": 2,
+      "kill_hosts": ["rank0"],
+      "kill_patterns": ["mlx_hw_telemetry[.]py"],
+      "start_cmd": "{{ mlx_repo_dir }}/.venv/bin/python {{ mlx_repo_dir }}/cluster/mlx_hw_telemetry.py --node-name rank0 --listen 0.0.0.0:{{ mlx_cluster.ports.hw }}"
+    },
+    {
+      "name": "hw_rank1",
+      "host": "rank1",
+      "cwd": "{{ mlx_repo_dir }}/cluster",
+      "port": {{ mlx_cluster.ports.hw }},
+      "pidfile": "{{ mlx_repo_dir }}/cluster/logs/hw1.pid",
+      "logfile": "{{ mlx_repo_dir }}/cluster/logs/hw1.log",
+      "health": "http://127.0.0.1:{{ mlx_cluster.ports.hw }}/metrics",
+      "wait_retries": 15,
+      "wait_delay": 2,
+      "kill_hosts": ["rank1"],
+      "kill_patterns": ["mlx_hw_telemetry[.]py"],
+      "start_cmd": "{{ mlx_venv_server }}/bin/python {{ mlx_repo_dir }}/cluster/mlx_hw_telemetry.py --node-name rank1 --listen 0.0.0.0:{{ mlx_cluster.ports.hw }}"
+    },
+    {
+      "name": "kv",
+      "host": "rank0",
+      "cwd": "{{ mlx_repo_dir }}/cluster",
+      "port": {{ mlx_cluster.ports.kv }},
+      "pidfile": "{{ mlx_repo_dir }}/cluster/logs/kv.pid",
+      "logfile": "{{ mlx_repo_dir }}/cluster/logs/kvagent.log",
+      "health": "http://127.0.0.1:{{ mlx_cluster.ports.kv }}/metrics",
+      "wait_retries": 15,
+      "wait_delay": 2,
+      "kill_hosts": ["rank0"],
+      "kill_patterns": ["mlx_kv_cache_agent[.]py"],
+      "start_cmd": "{{ mlx_repo_dir }}/.venv/bin/python {{ mlx_repo_dir }}/cluster/mlx_kv_cache_agent.py --log-file {{ mlx_repo_dir }}/cluster/logs/server.log --model {{ mlx_cluster.model_dir }}/{{ mlx_cluster.model_name }} --listen 0.0.0.0:{{ mlx_cluster.ports.kv }} --interval 5"
+    },
+    {
+      "name": "logtailer",
+      "host": "rank0",
+      "cwd": "{{ mlx_repo_dir }}/cluster",
+      "port": {{ mlx_cluster.ports.logtailer }},
+      "pidfile": "{{ mlx_repo_dir }}/cluster/logs/logtailer.pid",
+      "logfile": "{{ mlx_repo_dir }}/cluster/logs/logtailer.log",
+      "health": "http://127.0.0.1:{{ mlx_cluster.ports.logtailer }}/metrics",
+      "wait_retries": 15,
+      "wait_delay": 2,
+      "kill_hosts": ["rank0"],
+      "kill_patterns": ["mlx_server_log_tailer[.]py"],
+      "start_cmd": "{{ mlx_repo_dir }}/.venv/bin/python {{ mlx_repo_dir }}/cluster/mlx_server_log_tailer.py --log-file {{ mlx_repo_dir }}/cluster/logs/server.log --otlp-endpoint \"{{ mlx_cluster.otlp_endpoint | default('') }}\" --project mlx --listen 0.0.0.0:{{ mlx_cluster.ports.logtailer }}"
+    }
+  ]
+}

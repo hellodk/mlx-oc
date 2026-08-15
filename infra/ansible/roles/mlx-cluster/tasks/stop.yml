@@ -1,11 +1,92 @@
 ---
-# Tear the stack down (rank 0 only — stop_server.sh kills the local processes
-# and every peer's ring/telemetry processes over ssh).
+# Tear the stack down from the manifest cluster/mlx-stack.json. Every host
+# stops every component whose kill_hosts includes it: first the pidfile pid
+# (only for components hosted on this node), then each kill pattern. Ring
+# processes that the supervisor spawns on the peers (mlx.launch /
+# mlx_server_launcher / mlx_lm.server) are covered because the "server"
+# component lists every node in kill_hosts.
+#
+# Ends with a verification pass on every node: no matching processes, no stack
+# ports listening, no pidfiles. Any leftover fails the playbook loudly — a
+# silent partial stop is impossible. Stop is idempotent (already-down == pass).
 
-- name: "stop the MLX stack on rank0"
-  command: "./cluster/stop_server.sh"
-  args:
-    chdir: "{{ mlx_repo_dir }}"
-  ignore_errors: true
+- name: "read the stack manifest"
+  slurp:
+    src: "{{ mlx_repo_dir }}/cluster/mlx-stack.json"
+  register: mlx_manifest_raw
+  tags: [stop]
+
+- name: "decode the stack manifest"
+  set_fact:
+    mlx_manifest: "{{ mlx_manifest_raw.content | b64decode | from_json }}"
+  tags: [stop]
+
+- name: "stop manifest components touching this host"
+  include_tasks: stop_one.yml
+  loop: "{{ mlx_manifest.components }}"
+  loop_control:
+    loop_var: mlx_comp
+  when: inventory_hostname in mlx_comp.kill_hosts
+  tags: [stop]
+
+- name: "give the ring time to finish tearing down"
+  pause:
+    seconds: 4
+  tags: [stop]
+
+- name: "compile verification patterns from the manifest"
+  set_fact:
+    mlx_stop_proc_regex: "{{ mlx_manifest.components | map(attribute='kill_patterns') | flatten | unique | join('|') }}"
+    mlx_stop_port_regex: ":{{ mlx_manifest.components | map(attribute='port') | map('string') | unique | join('|:') }}"
+  tags: [stop]
+
+- name: "wait for mlx processes to exit on {{ inventory_hostname }}"
+  shell: "ps aux | grep -E '{{ mlx_stop_proc_regex }}' | grep -v grep || true"
+  register: mlx_leftover_procs
+  until: mlx_leftover_procs.stdout_lines | length == 0
+  retries: 15
+  delay: 2
+  changed_when: false
+  tags: [stop]
+
+- name: "assert no mlx processes remain on {{ inventory_hostname }}"
+  assert:
+    that: mlx_leftover_procs.stdout_lines | length == 0
+    fail_msg: "still running on {{ inventory_hostname }}: {{ mlx_leftover_procs.stdout_lines | join('; ') }}"
+  tags: [stop]
+
+- name: "wait for stack ports to free on {{ inventory_hostname }}"
+  shell: "lsof -nP -iTCP -sTCP:LISTEN | grep -E '{{ mlx_stop_port_regex }}' || true"
+  register: mlx_leftover_ports
+  until: mlx_leftover_ports.stdout_lines | length == 0
+  retries: 15
+  delay: 2
+  changed_when: false
+  tags: [stop]
+
+- name: "assert stack ports are free on {{ inventory_hostname }}"
+  assert:
+    that: mlx_leftover_ports.stdout_lines | length == 0
+    fail_msg: "still listening on {{ inventory_hostname }}: {{ mlx_leftover_ports.stdout_lines | join('; ') }}"
+  tags: [stop]
+
+- name: "wait for pidfiles to be removed on {{ inventory_hostname }}"
+  shell: "ls {{ mlx_manifest.logs_dir }}/*.pid 2>/dev/null || true"
+  register: mlx_leftover_pidfiles
+  until: mlx_leftover_pidfiles.stdout_lines | length == 0
+  retries: 10
+  delay: 1
+  changed_when: false
+  tags: [stop]
+
+- name: "assert no pidfiles remain on {{ inventory_hostname }}"
+  assert:
+    that: mlx_leftover_pidfiles.stdout_lines | length == 0
+    fail_msg: "pidfiles remain on {{ inventory_hostname }}: {{ mlx_leftover_pidfiles.stdout_lines | join('; ') }}"
+  tags: [stop]
+
+- name: "report clean stop"
+  debug:
+    msg: "MLX stack is fully down on {{ inventory_hostname }} (no processes, ports free, no pidfiles)"
   when: inventory_hostname == mlx_rank0_host
   tags: [stop]

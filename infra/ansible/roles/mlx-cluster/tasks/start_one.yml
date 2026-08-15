@@ -1,0 +1,40 @@
+---
+# Start a single manifest component. Included once per component by deploy.yml;
+# mlx_comp is the loop variable.
+#
+# Idempotent: if the component's port is already listening we skip the launch
+# and the health wait — the stack is already up. Otherwise we nohup the command,
+# write its pidfile and wait for its health endpoint. Failures fail loudly.
+
+- name: "check :{{ mlx_comp.port }} on {{ inventory_hostname }}"
+  command: "lsof -nP -iTCP:{{ mlx_comp.port }} -sTCP:LISTEN"
+  register: mlx_comp_port
+  failed_when: false
+  changed_when: false
+  tags: [start]
+
+- name: "skip {{ mlx_comp.name }} (already listening on :{{ mlx_comp.port }})"
+  debug:
+    msg: "{{ mlx_comp.name }} is already up on :{{ mlx_comp.port }} — skipping"
+  when: mlx_comp_port.rc == 0
+  tags: [start]
+
+- name: "launch {{ mlx_comp.name }} on {{ inventory_hostname }}"
+  shell: |
+    nohup {{ mlx_comp.start_cmd }} > {{ mlx_comp.logfile }} 2>&1 &
+    echo $! > {{ mlx_comp.pidfile }}
+  args:
+    chdir: "{{ mlx_comp.cwd | default(mlx_manifest.repo_dir) }}"
+  when: mlx_comp_port.rc != 0
+  tags: [start]
+
+- name: "wait for {{ mlx_comp.name }} health"
+  uri:
+    url: "{{ mlx_comp.health }}"
+    status_code: 200
+  register: mlx_comp_health
+  until: mlx_comp_health.status == 200
+  retries: "{{ mlx_comp.wait_retries | default(30) }}"
+  delay: "{{ mlx_comp.wait_delay | default(2) }}"
+  when: mlx_comp_port.rc != 0
+  tags: [start]

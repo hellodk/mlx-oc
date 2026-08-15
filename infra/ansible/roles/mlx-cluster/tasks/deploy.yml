@@ -1,15 +1,35 @@
 ---
-# Bring the stack up (rank 0 only — it orchestrates the ring via mlx.launch and
-# ssh's the telemetry agents to the peers). Everything model/port/IP related is
-# already baked into cluster.env + hosts.json by the setup tasks.
+# Bring the stack up from the manifest cluster/mlx-stack.json (rendered by the
+# setup tasks). Every node starts only its own components
+# (component.host == inventory_hostname) and waits for each component's health
+# endpoint before moving on. The ring itself is the "server" component on rank0
+# (supervisor -> mlx.launch shards to the peers over the hostfile).
+#
+# The final rank0-only waits prove the whole path: mlx_lm.server on :8081 and
+# the OpenAI proxy on :8080/v1/models.
 
-- name: "start the MLX stack on rank0 (supervisor + ring + proxy + telemetry)"
-  command: "./cluster/start_server.sh start"
-  args:
-    chdir: "{{ mlx_repo_dir }}"
-  environment:
-    PATH: "{{ ansible_env.PATH }}"
-  when: inventory_hostname == mlx_rank0_host
+- name: "read the stack manifest"
+  slurp:
+    src: "{{ mlx_repo_dir }}/cluster/mlx-stack.json"
+  register: mlx_manifest_raw
+  tags: [start]
+
+- name: "decode the stack manifest"
+  set_fact:
+    mlx_manifest: "{{ mlx_manifest_raw.content | b64decode | from_json }}"
+  tags: [start]
+
+- name: "ensure the logs dir exists on this node"
+  file:
+    path: "{{ mlx_manifest.logs_dir }}"
+    state: directory
+  tags: [start]
+
+- name: "start this node's components from the manifest"
+  include_tasks: start_one.yml
+  loop: "{{ mlx_manifest.components | selectattr('host', 'equalto', inventory_hostname) | list }}"
+  loop_control:
+    loop_var: mlx_comp
   tags: [start]
 
 - name: "wait for mlx_lm.server on rank0"

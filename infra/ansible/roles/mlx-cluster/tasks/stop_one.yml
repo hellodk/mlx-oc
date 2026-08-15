@@ -1,0 +1,18 @@
+---
+# Stop a single manifest component. Included once per component in stop.yml for
+# every host in mlx_comp.kill_hosts; mlx_comp is the loop variable.
+#
+# Kills the pidfile pid first (when this node hosts the component), then applies
+# every kill pattern. Patterns are bracketed ([.]) in the manifest so a pattern
+# can never match pkill's own command line (the regex only matches a literal
+# dot, not the bracket text).
+
+- name: "kill {{ mlx_comp.name }} pid ({{ mlx_comp.pidfile }}) on {{ inventory_hostname }}"
+  shell: "if [ -f {{ mlx_comp.pidfile }} ] && kill -0 $(cat {{ mlx_comp.pidfile }}) 2>/dev/null; then kill $(cat {{ mlx_comp.pidfile }}) 2>/dev/null; fi; rm -f {{ mlx_comp.pidfile }}"
+  when: mlx_comp.host == inventory_hostname
+  tags: [stop]
+
+- name: "apply kill patterns for {{ mlx_comp.name }} on {{ inventory_hostname }}"
+  shell: "pkill -f '{{ item }}' 2>/dev/null || true"
+  loop: "{{ mlx_comp.kill_patterns }}"
+  tags: [stop]

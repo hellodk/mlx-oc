@@ -1,0 +1,95 @@
+{
+  "repo_dir": "/Users/dk/mlx-oc",
+  "logs_dir": "/Users/dk/mlx-oc/cluster/logs",
+  "components": [
+    {
+      "name": "server",
+      "host": "rank0",
+      "cwd": "/Users/dk/mlx-oc/cluster",
+      "port": 9105,
+      "pidfile": "/Users/dk/mlx-oc/cluster/logs/supervisor.pid",
+      "logfile": "/Users/dk/mlx-oc/cluster/logs/supervisor.log",
+      "health": "http://127.0.0.1:9105/metrics",
+      "wait_retries": 30,
+      "wait_delay": 2,
+      "kill_hosts": ["rank0", "rank1"],
+      "kill_patterns": [
+        "mlx_server_supervisor[.]py",
+        "mlx[.]launch",
+        "mlx_lm[.]server",
+        "mlx_server_launcher[.]py"
+      ],
+      "start_cmd": "/Users/dk/mlx-oc/.venv/bin/python /Users/dk/mlx-oc/cluster/mlx_server_supervisor.py --model /Users/dk/mlx-models/Qwen3.5-4B-MLX-4bit --hostfile /Users/dk/mlx-oc/cluster/hosts.json --health http://127.0.0.1:8081/v1/models --server-log /Users/dk/mlx-oc/cluster/logs/server.log --listen 0.0.0.0:9105 --probe-interval 5 --backoff 3 --backoff-max 30 --hang-after 15 --backoff-reset 120 --command \"/Users/dk/venvs/mlx/bin/mlx.launch --hostfile /Users/dk/mlx-oc/cluster/hosts.json --backend ring --cwd /Users/dk/mlx-oc/cluster --python /Users/dk/venvs/mlx/bin/python -- /Users/dk/venvs/mlx/bin/python /Users/dk/mlx-oc/cluster/mlx_server_launcher.py --model /Users/dk/mlx-models/Qwen3.5-4B-MLX-4bit --host 127.0.0.1 --port 8081 --chat-template-args '{\\\"enable_thinking\\\":false}' --prompt-cache-size 4 --prompt-cache-bytes 2g --prompt-concurrency 4\""
+    },
+    {
+      "name": "proxy",
+      "host": "rank0",
+      "cwd": "/Users/dk/mlx-oc/cluster",
+      "port": 8080,
+      "pidfile": "/Users/dk/mlx-oc/cluster/logs/proxy.pid",
+      "logfile": "/Users/dk/mlx-oc/cluster/logs/proxy.log",
+      "health": "http://127.0.0.1:8080/metrics",
+      "wait_retries": 30,
+      "wait_delay": 2,
+      "kill_hosts": ["rank0"],
+      "kill_patterns": ["mlx_metrics_proxy[.]py"],
+      "start_cmd": "/Users/dk/mlx-oc/.venv/bin/python /Users/dk/mlx-oc/cluster/mlx_metrics_proxy.py --listen 0.0.0.0:8080 --upstream 127.0.0.1:8081 --default-temp 0.0 --node-name rank0 --otlp-endpoint \"\" --opik-otlp-endpoint \"\" --model /Users/dk/mlx-models/Qwen3.5-4B-MLX-4bit --logprobs 3 --logprobs-stream-sample 0.05 --low-confidence-threshold 0.5 --max-prompt-tokens 16000 --max-tokens-cap 4096 --max-body-bytes 4194304 --rate-limit 0"
+    },
+    {
+      "name": "hw_rank0",
+      "host": "rank0",
+      "cwd": "/Users/dk/mlx-oc/cluster",
+      "port": 9102,
+      "pidfile": "/Users/dk/mlx-oc/cluster/logs/hw0.pid",
+      "logfile": "/Users/dk/mlx-oc/cluster/logs/hw0.log",
+      "health": "http://127.0.0.1:9102/metrics",
+      "wait_retries": 15,
+      "wait_delay": 2,
+      "kill_hosts": ["rank0"],
+      "kill_patterns": ["mlx_hw_telemetry[.]py"],
+      "start_cmd": "/Users/dk/mlx-oc/.venv/bin/python /Users/dk/mlx-oc/cluster/mlx_hw_telemetry.py --node-name rank0 --listen 0.0.0.0:9102"
+    },
+    {
+      "name": "hw_rank1",
+      "host": "rank1",
+      "cwd": "/Users/dk/mlx-oc/cluster",
+      "port": 9102,
+      "pidfile": "/Users/dk/mlx-oc/cluster/logs/hw1.pid",
+      "logfile": "/Users/dk/mlx-oc/cluster/logs/hw1.log",
+      "health": "http://127.0.0.1:9102/metrics",
+      "wait_retries": 15,
+      "wait_delay": 2,
+      "kill_hosts": ["rank1"],
+      "kill_patterns": ["mlx_hw_telemetry[.]py"],
+      "start_cmd": "/Users/dk/venvs/mlx/bin/python /Users/dk/mlx-oc/cluster/mlx_hw_telemetry.py --node-name rank1 --listen 0.0.0.0:9102"
+    },
+    {
+      "name": "kv",
+      "host": "rank0",
+      "cwd": "/Users/dk/mlx-oc/cluster",
+      "port": 9104,
+      "pidfile": "/Users/dk/mlx-oc/cluster/logs/kv.pid",
+      "logfile": "/Users/dk/mlx-oc/cluster/logs/kvagent.log",
+      "health": "http://127.0.0.1:9104/metrics",
+      "wait_retries": 15,
+      "wait_delay": 2,
+      "kill_hosts": ["rank0"],
+      "kill_patterns": ["mlx_kv_cache_agent[.]py"],
+      "start_cmd": "/Users/dk/mlx-oc/.venv/bin/python /Users/dk/mlx-oc/cluster/mlx_kv_cache_agent.py --log-file /Users/dk/mlx-oc/cluster/logs/server.log --model /Users/dk/mlx-models/Qwen3.5-4B-MLX-4bit --listen 0.0.0.0:9104 --interval 5"
+    },
+    {
+      "name": "logtailer",
+      "host": "rank0",
+      "cwd": "/Users/dk/mlx-oc/cluster",
+      "port": 9106,
+      "pidfile": "/Users/dk/mlx-oc/cluster/logs/logtailer.pid",
+      "logfile": "/Users/dk/mlx-oc/cluster/logs/logtailer.log",
+      "health": "http://127.0.0.1:9106/metrics",
+      "wait_retries": 15,
+      "wait_delay": 2,
+      "kill_hosts": ["rank0"],
+      "kill_patterns": ["mlx_server_log_tailer[.]py"],
+      "start_cmd": "/Users/dk/mlx-oc/.venv/bin/python /Users/dk/mlx-oc/cluster/mlx_server_log_tailer.py --log-file /Users/dk/mlx-oc/cluster/logs/server.log --otlp-endpoint \"\" --project mlx --listen 0.0.0.0:9106"
+    }
+  ]
+}

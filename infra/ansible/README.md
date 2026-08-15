@@ -87,8 +87,8 @@ curl -s http://127.0.0.1:8428/api/v1/query?query='up{job="mlx-proxy"}'
 
 `cluster.yml` deploys the distributed inference ring: per-node prereqs, venvs
 (pinned wheels), model weights, repo sync and the rendered `hosts.json` /
-`hosts_rev.json` / `cluster.env`, then starts the stack on rank0 via
-`./cluster/start_server.sh`.
+`hosts_rev.json` / `cluster.env`, plus the stack manifest `cluster/mlx-stack.json`
+that drives the start/stop lifecycle.
 
 ### Layout
 
@@ -99,8 +99,9 @@ curl -s http://127.0.0.1:8428/api/v1/query?query='up{job="mlx-proxy"}'
 | `inventories/example/mlx-cluster.yml` | example ring inventory (group `mlx_ring`) |
 | `inventories/generated/hosts.yml` | **written by the wizard** — don't hand-edit |
 | `group_vars/all/mlx-cluster.yml` | **every knob** — nodes, model, versions, ports, pins |
-| `roles/mlx-cluster/tasks/*` | prereqs -> setup -> deploy / stop |
-| `roles/mlx-cluster/templates/*` | `hosts.json`, `hosts_rev.json`, `cluster.env`, `requirements-*.txt` |
+| `roles/mlx-cluster/tasks/*` | prereqs -> setup -> deploy (start) / stop, each with `*_one.yml` per-component helpers |
+| `roles/mlx-cluster/templates/*` | `hosts.json`, `hosts_rev.json`, `cluster.env`, `mlx-stack.json`, `requirements-*.txt` |
+| `cluster/mlx-stack.json` | **the stack manifest** — rendered by setup; the single source of truth for what `start`/`stop` do |
 | `mlx-deploy.example.json` | non-interactive config the wizard accepts via `--config` |
 
 ### The wizard (recommended)
@@ -128,7 +129,29 @@ ansible-playbook -i inventories/example/mlx-cluster.yml cluster.yml            #
 ansible-playbook -i inventories/example/mlx-cluster.yml cluster.yml --tags stop
 ```
 
-### Validated start-only workflow (nodes already deployed)
+### The lifecycle is driven by one manifest
+
+`cluster/mlx-stack.json` (rendered by the `setup` tag from
+`roles/mlx-cluster/templates/mlx-stack.json.j2`) is the single source of truth
+for the running stack: it lists every component — `server` (supervisor ->
+`mlx.launch` ring), `proxy`, `hw_rank0`, `hw_rank1`, `kv`, `logtailer` — with
+its host, port, pidfile, logfile, health endpoint and **kill patterns**.
+Nothing about the process list lives in a script anymore, so there is no second
+copy to drift.
+
+- `--tags start` — every node starts its own components from the manifest
+  (idempotent: a port already listening skips the launch), waits for each
+  component's health endpoint, then waits for `:8081/v1/models` and
+  `:8080/v1/models` on rank0.
+- `--tags stop` — every node kills the pidfile pid of the components it hosts,
+  applies every component's kill patterns that mention it (the `server`
+  component lists all nodes, so the ring shards on the peers are covered), then
+  **waits and verifies**: no matching processes, no stack ports listening, no
+  pidfiles. Any leftover fails the playbook loudly — a silent partial stop is
+  impossible. Stop is idempotent (already-down == pass).
+- `./cluster/start_server.sh` / `stop_server.sh` are now thin wrappers around
+  `ansible-playbook cluster.yml --tags start|stop` (`status` / `logs` stay
+  local and read-only).
 
 When the venvs, weights and repo are already in place on every node (e.g. an
 air-gapped install where setup was done once), the ring can be brought up with
@@ -138,17 +161,18 @@ the start tag alone — no prereq scan, no reinstall:
 cd infra/ansible
 ansible-playbook -i inventories/generated/hosts.yml check.yml            # read-only pre-flight (validated 2-node ring)
 ansible-playbook -i inventories/generated/hosts.yml cluster.yml --tags start
+ansible-playbook -i inventories/generated/hosts.yml cluster.yml --tags stop
 ```
 
 `check.yml` asserts the per-node prereqs (python, venv, model, disk/RAM, ring
-link reachability at ~0.5 ms, passwordless ssh to every peer, ports free); the
-start tag runs `./cluster/start_server.sh start` on rank0 and waits for the
-server and the OpenAI proxy. All components are daemonized (nohup, pid files
-under `cluster/logs/`); the observability stack reads `cluster/logs/server.log`
-for KV/context metrics, so keep the log files even on a quiet system.
-Verified end-to-end against the live 2-node ring: check = 0 failures, start
-brings up supervisor + mlx.launch ring + metrics proxy + hw/kv/logtailer agents,
-and a chat completion round-trips through the proxy in seconds.
+link reachability at ~0.5 ms, passwordless ssh to every peer, ports free).
+All components are daemonized (nohup, pidfiles under `cluster/logs/`); the
+observability stack reads `cluster/logs/server.log` for KV/context metrics, so
+keep the log files even on a quiet system.
+Verified end-to-end against the live 2-node ring: `--tags start` brings up
+supervisor + mlx.launch ring + metrics proxy + hw/kv/logtailer agents, a chat
+completion round-trips through the proxy, `--tags stop` tears everything down
+and asserts clean on both nodes, and both tags are idempotent.
 
 ### Versions (decided from the blogs — post numbers in parens)
 

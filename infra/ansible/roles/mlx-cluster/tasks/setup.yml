@@ -107,6 +107,12 @@
     dest: "{{ mlx_repo_dir }}/cluster/cluster.env"
   tags: [setup]
 
+- name: "render the stack manifest (drives the start/stop lifecycle)"
+  template:
+    src: mlx-stack.json.j2
+    dest: "{{ mlx_repo_dir }}/cluster/mlx-stack.json"
+  tags: [setup]
+
 - name: "download model weights onto rank0 (single download for the whole ring)"
   command: >-
     {{ mlx_venv_server }}/bin/hf download {{ mlx_cluster.model }}

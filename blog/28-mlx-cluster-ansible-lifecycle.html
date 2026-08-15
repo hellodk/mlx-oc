@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>28 — Managing the MLX Cluster Lifecycle with Ansible: Check, Deploy, Start, Stop</title>
+<style>
+  :root{
+    --bg:#f7f7fa;--card:#ffffff;--ink:#1d1f2b;--muted:#5b6072;--line:#e5e7f0;
+    --accent:#4f46e5;--accent-soft:#eef0ff;--teal:#0f766e;--teal-soft:#e6f6f4;
+    --amber:#b45309;--amber-soft:#fef3d7;--pink:#db2777;--pink-soft:#fde8f1;
+    --code-bg:#f4f4f8;--radius:14px;
+    --shadow:0 1px 2px rgba(16,18,32,.06),0 8px 24px rgba(16,18,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;line-height:1.65;font-size:16px}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:10;background:rgba(247,247,250,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:16px;overflow-x:auto;padding:12px 24px;font-size:13.5px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--accent)}
+  header.hero{padding:56px 0 36px;background:radial-gradient(1200px 420px at 80% -10%, rgba(79,70,229,.10), transparent 60%),radial-gradient(900px 380px at 10% -20%, rgba(219,39,119,.09), transparent 55%);border-bottom:1px solid var(--line)}
+  .kicker{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border:1px solid #dfe1ff;padding:5px 12px;border-radius:999px}
+  h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:18px 0 12px;letter-spacing:-.02em}
+  .sub{font-size:17px;color:var(--muted);max-width:720px}
+  .meta{margin-top:16px;font-size:13.5px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .meta b{color:var(--ink)}
+  main{padding:40px 0 80px}
+  section{padding:26px 0}
+  h2{font-size:24px;letter-spacing:-.01em;margin:8px 0 6px}
+  h2 .num{font-size:13px;font-weight:800;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:7px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;transform:translateY(-2px)}
+  h3{font-size:18px;margin:24px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--code-bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.6;margin:14px 0}
+  pre code{background:none;border:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin:16px 0}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:#f1f2fa;font-weight:700}
+  tr:nth-child(even) td{background:#fbfbfe}
+  .callout{display:flex;gap:12px;align-items:flex-start;border-radius:var(--radius);padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.warn{background:var(--amber-soft);border:1px solid #f4ddb3}
+  .callout.ok{background:var(--teal-soft);border:1px solid #c7e9e4}
+  .callout.info{background:#eef0ff;border:1px solid #c7d2fe}
+  .callout .ic{font-weight:800;line-height:1.4}
+  .dbadge{display:inline-block;font-size:11px;font-weight:800;border-radius:6px;padding:2px 8px;margin-right:6px;background:var(--accent-soft);color:var(--accent);border:1px solid #dfe1ff;vertical-align:middle}
+  .q{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--code-bg);border:1px solid var(--line);border-radius:6px;padding:1px 5px;white-space:nowrap}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a href="index.html">&larr; All posts</a>
+  <a href="27-code-signing-free-apple-id-macos-tahoe.html">Free code signing</a>
+  <a href="26-slms-and-router.html">SLMs &amp; the router</a>
+  <a href="28-mlx-cluster-ansible-lifecycle.html" style="color:var(--accent);font-weight:700">Ansible lifecycle</a>
+</div></nav>
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Post 28 &middot; the operational runbook</span>
+    <h1>Managing the MLX Cluster Lifecycle with Ansible: Check, Deploy, Start, Stop</h1>
+    <p class="sub">One playbook, four tags, one inventory, zero hand-typed ssh&hellip; mostly. The full runbook for bringing the two-Mac-mini ring down and back up through <code>infra/ansible</code> &mdash; what each tag actually does, how to verify a clean stop, and the one process that looks alive after <code>pkill</code> but isn&rsquo;t.</p>
+    <div class="meta"><span><b>Playbook</b> infra/ansible/cluster.yml</span><span><b>Tags</b> prereqs &middot; setup &middot; start &middot; stop</span><span><b>Inventory</b> inventories/generated/hosts.yml</span><span><b>Config</b> group_vars/all/mlx-cluster.yml</span></div>
+  </div>
+</header>
+<main class="wrap">
+
+<section>
+  <h2><span class="num">1</span>What the stack is, before you stop it</h2>
+  <p>The running stack is six components across two nodes. Knowing them by name is what makes a clean stop verifiable — every one of them is declared, with its host, port, health endpoint and <code>pkill -f</code> patterns, in the stack manifest <code>cluster/mlx-stack.json</code> (rendered by Ansible from the group_vars; nothing is hardcoded in a script anymore):</p>
+  <table>
+    <tr><th>Process</th><th>Runs on</th><th>Port</th><th>Job</th></tr>
+    <tr><td><code>mlx_server_supervisor.py</code></td><td>rank0</td><td>:9105</td><td>spawns the ring, restarts it with backoff, exports serving-status metrics</td></tr>
+    <tr><td><code>mlx.launch --backend ring</code></td><td>rank0 (orchestrates)</td><td>&mdash;</td><td>shards mlx_lm.server across rank0 + rank1 over 192.168.2.0/24</td></tr>
+    <tr><td><code>mlx_server_launcher.py</code></td><td>rank0 + rank1</td><td>&mdash;</td><td>remote shard entrypoint (rank1 runs it over ssh)</td></tr>
+    <tr><td><code>mlx_lm.server</code></td><td>rank0</td><td>:8081</td><td>OpenAI-compatible model server for the loaded model</td></tr>
+    <tr><td><code>mlx_metrics_proxy.py</code></td><td>rank0</td><td>:8080</td><td>front-door proxy &mdash; the endpoint clients actually hit</td></tr>
+    <tr><td><code>mlx_hw_telemetry.py</code></td><td>rank0 + rank1</td><td>:9102</td><td>GPU/power/thermal scrapers</td></tr>
+    <tr><td><code>mlx_kv_cache_agent.py</code></td><td>rank0</td><td>:9104</td><td>KV cache / context-length metrics</td></tr>
+    <tr><td><code>mlx_server_log_tailer.py</code></td><td>rank0</td><td>:9106</td><td>flood-protected server log tailer</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">2</span>The Ansible layout</h2>
+  <p>Everything lives under <code>infra/ansible/</code>:</p>
+  <ul>
+    <li><code>cluster.yml</code> &mdash; the lifecycle playbook against the <code>mlx_ring</code> host group, with four tags: <code>prereqs</code>, <code>setup</code>, <code>start</code>, <code>stop</code>.</li>
+    <li><code>check.yml</code> &mdash; read-only pre-flight report (no changes, no start).</li>
+    <li><code>inventories/generated/hosts.yml</code> &mdash; <code>rank0</code> (local connection) + <code>rank1</code> (ssh as <code>dk</code>).</li>
+    <li><code>group_vars/all/mlx-cluster.yml</code> &mdash; every node, model, port, pin and tuning value; the single source of truth.</li>
+    <li><code>roles/mlx-cluster/tasks/</code> &mdash; <code>prereqs.yml</code>, <code>setup.yml</code>, <code>deploy.yml</code> (start) + <code>start_one.yml</code>, <code>stop.yml</code> + <code>stop_one.yml</code>.</li>
+    <li><code>cluster/mlx-stack.json</code> &mdash; the manifest: every component, its host, port, pidfile, logfile, health URL and kill patterns. Rendered by the <code>setup</code> tag; read by <code>start</code> and <code>stop</code>.</li>
+  </ul>
+  <p>The role resolves each host&rsquo;s entry from <code>mlx_cluster.nodes[]</code> and only <code>rank0</code> (<code>mlx_rank0_host</code>) performs start/stop &mdash; it orchestrates the peers. Host names in the inventory must match <code>mlx_cluster.nodes[].name</code>.</p>
+  <div class="callout info"><span class="ic">&#9432;</span><div><b>Wizard-generated config.</b> Both the inventory and <code>group_vars</code> are written by <code>tools/mlx-deploy.py</code>. Change nodes/model/ports through the wizard, or hand-edit both files together &mdash; not one.</div></div>
+</section>
+
+<section>
+  <h2><span class="num">3</span>Stop the whole stack</h2>
+  <p>From <code>infra/ansible</code>:</p>
+  <pre>ansible-playbook -i inventories/generated/hosts.yml cluster.yml --tags stop</pre>
+  <p>What runs: on every node, the <code>stop</code> tasks read the manifest and stop each component whose <code>kill_hosts</code> mentions that node &mdash; first the pidfile pid (for components hosted there), then every bracketed kill pattern (<code>mlx[.]launch</code> etc., so a pattern can never match <code>pkill</code>&rsquo;s own command line). The <code>server</code> component lists <em>all</em> nodes in <code>kill_hosts</code>, because its supervisor spawns ring shards on the peers &mdash; that is how the remote <code>mlx_lm.server</code> / <code>mlx_server_launcher</code> processes get cleaned up too. <code>cluster/stop_server.sh</code> is now just a thin wrapper around <code>ansible-playbook &hellip; --tags stop</code>.</p>
+  <div class="callout warn"><span class="ic">&#9888;</span><div><b>The process that outlives the playbook.</b> The supervisor tears the ring down asynchronously &mdash; it terminates <code>mlx.launch</code>, waits up to 10&nbsp;s, then ssh&rsquo;s to each peer to kill the remote ranks (up to 15&nbsp;s each) &mdash; so it stays alive for a few seconds after <code>pkill</code>. That is exactly why the playbook doesn&rsquo;t just assert once: it <em>waits</em> (polling every 2&nbsp;s, up to 30&nbsp;s) for the process scan, the port scan and the pidfile scan to come back empty, and fails loudly if they don&rsquo;t. A silent partial stop is impossible &mdash; and stop is idempotent, so already-down == pass.</div></div>
+  <p>Verify a clean stop &mdash; the playbook does all three of these on every node (this is the manual equivalent):</p>
+  <pre>ps aux | grep -E 'mlx_lm|mlx_server|mlx_metrics_proxy|mlx_kv_cache|mlx_hw_telemetry|log_tailer|supervisor|mlx.launch' | grep -v grep
+lsof -nP -iTCP -sTCP:LISTEN | grep -E ':8080|:8081|:910[0-9]'   # expect: no lines
+ssh dk@192.168.2.2 'pgrep -fl mlx'                             # expect: no output</pre>
+</section>
+
+<section>
+  <h2><span class="num">4</span>Run it back up</h2>
+  <p>First the read-only pre-flight &mdash; OS/arch/python/RAM/disk/model per node plus cross-node ping and passwordless-ssh from rank0, each with a suggested fix:</p>
+  <pre>ansible-playbook -i inventories/generated/hosts.yml check.yml</pre>
+  <p>Then the full bring-up (runs <code>prereqs</code> + <code>setup</code> + <code>start</code>). Setup is idempotent &mdash; venvs, pinned wheels, model weights and rendered <code>hosts.json</code>/<code>cluster.env</code> are only (re)created when missing:</p>
+  <pre>ansible-playbook -i inventories/generated/hosts.yml cluster.yml</pre>
+  <p>Or, if setup is already done, start alone:</p>
+  <pre>ansible-playbook -i inventories/generated/hosts.yml cluster.yml --tags start</pre>
+  <p>The <code>start</code> tag reads the manifest and each node starts <em>its own</em> components (idempotent &mdash; a port already listening skips the launch), waiting for each component&rsquo;s health endpoint before moving on. rank0 launches the supervisor &rarr; <code>mlx.launch</code> ring &rarr; proxy &rarr; hw/kv/logtailer agents; rank1 launches its own <code>hw</code> telemetry. Then rank0 polls <code>:8081/v1/models</code> (up to 6 min) and <code>:8080/v1/models</code> (up to 1 min) until both answer 200, and prints the endpoint + model. <code>cluster/start_server.sh start</code> is now just a thin wrapper around <code>ansible-playbook &hellip; --tags start</code>.</p>
+  <div class="callout ok"><span class="ic">&#10003;</span><div><b>After a stop, <code>--tags start</code> is enough.</b> The venvs, weights and rendered configs from the last setup are still on disk, so the ring comes back without the setup pass.</div></div>
+</section>
+
+<section>
+  <h2><span class="num">5</span>The verification checklist</h2>
+  <p>After <code>--tags start</code>, the same checks the playbook ran; after <code>--tags stop</code> they are enforced automatically by the playbook&rsquo;s wait-and-assert pass.</p>
+  <ul>
+    <li><b>Front door:</b> <code>curl -s http://127.0.0.1:8080/v1/models</code> &mdash; returns the loaded model id (e.g. <code>/Users/dk/mlx-models/Qwen3.5-4B-MLX-4bit</code>).</li>
+    <li><b>Upstream:</b> <code>curl -s http://127.0.0.1:8081/v1/models</code> &mdash; same list, proving the sharded server is up, not just the proxy.</li>
+    <li><b>Supervisor truth:</b> <code>curl -s http://127.0.0.1:9105/metrics</code> &mdash; serving-status gauges.</li>
+    <li><b>Ring peers:</b> <code>ssh dk@192.168.2.2 'pgrep -fl mlx'</code> &mdash; remote shard + telemetry present when up, empty when stopped.</li>
+    <li><b>Ports:</b> <code>lsof -nP -iTCP -sTCP:LISTEN</code> shows 8080/8081/9102/9104/9105/9106 only.</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="num">6</span>Gotchas from actually running it</h2>
+  <ul>
+    <li><b>Python interpreter discovery warnings</b> at the top of every run &mdash; rank0 finds <code>python3.14</code>, rank1 <code>/usr/bin/python3</code>. Harmless here; the role pins every venv build to <code>python_server</code>/<code>python_proxy</code> in group_vars.</li>
+    <li><b>Stop outlives a single snapshot.</b> The supervisor tears the ring down asynchronously (terminates <code>mlx.launch</code>, then ssh&rsquo;s to every peer to kill remote ranks, up to ~25&nbsp;s total), so a naive one-shot check would report a false clean. The playbook handles it by <em>polling</em> the process/port/pidfile scans until they come back empty (2&nbsp;s &times; 15) before asserting &mdash; but a plain <code>pkill</code> + immediate start can still hit the old supervisor holding :9105 for a few seconds.</li>
+    <li><b>The launchd design doc</b> (<code>cluster/com.hydra.mlx-server.plist</code>) is a not-yet-deployed daemon that would <code>KeepAlive</code> the supervisor. If you ever install it, <code>--tags stop</code> alone won&rsquo;t hold &mdash; you&rsquo;d <code>launchctl bootout</code> it too.</li>
+    <li><b>Repo sync skips secrets-ish dirs by design</b>: <code>rsync --exclude=.git/.venv/cluster/logs/__pycache__/inventories/generated</code>; peer <code>cluster.env</code> is re-rendered by setup, not copied.</li>
+    <li><b>Host names are the join key.</b> A mismatch between inventory host and <code>mlx_cluster.nodes[].name</code> silently skips tasks via <code>inventory_hostname == mlx_rank0_host</code> guards.</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="num">7</span>Quick reference</h2>
+  <table>
+    <tr><th>Action</th><th>Command (from infra/ansible)</th></tr>
+    <tr><td>Pre-flight (read-only)</td><td><code>ansible-playbook -i inventories/generated/hosts.yml check.yml</code></td></tr>
+    <tr><td>Full deploy + start</td><td><code>ansible-playbook -i inventories/generated/hosts.yml cluster.yml</code></td></tr>
+    <tr><td>Start only</td><td><code>ansible-playbook -i inventories/generated/hosts.yml cluster.yml --tags start</code></td></tr>
+    <tr><td>Stop everything</td><td><code>ansible-playbook -i inventories/generated/hosts.yml cluster.yml --tags stop</code></td></tr>
+    <tr><td>Regenerate config + inventory</td><td><code>python3 tools/mlx-deploy.py</code> (then re-run setup)</td></tr>
+  </table>
+</section>
+
+</main>
+</body>
+</html>
