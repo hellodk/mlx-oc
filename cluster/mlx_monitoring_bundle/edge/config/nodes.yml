@@ -1,0 +1,30 @@
+# Single source of truth for every edge node.
+# Copy from config/nodes.yml.template and fill in your values.
+#
+# Precedence: this file < edge.env < actual environment variables.
+
+central:
+  victoria_metrics: "192.168.1.100:8428"
+  otel: "192.168.1.100:4318"
+  opik: "192.168.1.100:32173"
+
+macbooks:
+  - id: "dk-mac"
+    serial: "ASHU1343"
+    ip: "192.168.1.10"
+    ssh_user: "dk"
+    ssh_key: "~/.ssh/id_rsa"
+    ssh_connect_timeout: 5
+    role: "rank0"
+    enabled: true
+    model: "mlx-community/Qwen3.5-4B-MLX-8bit"
+
+  - id: "ashu-mac"
+    serial: "ASHU1344"
+    ip: "192.168.1.11"
+    ssh_user: "ashu"
+    ssh_key: "~/.ssh/id_rsa"
+    ssh_connect_timeout: 5
+    role: "rank1"
+    enabled: true
+    model: "mlx-community/Qwen3-14B-8bit"

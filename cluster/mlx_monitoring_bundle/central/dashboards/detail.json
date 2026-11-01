@@ -1,0 +1,416 @@
+{
+  "id": null,
+  "title": "MLX Per-Macbook Detail",
+  "tags": [
+    "mlx",
+    "per-node",
+    "detail"
+  ],
+  "timezone": "Asia/Kolkata",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5m",
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_hw_up, macbook)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      },
+      {
+        "name": "node",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_hw_up, node)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Hardware",
+      "panels": [
+        {
+          "type": "graph",
+          "title": "CPU Load15 vs CPU Count",
+          "datasource": "VictoriaMetrics",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 8,
+            "h": 6
+          },
+          "targets": [
+            {
+              "expr": "mlx_hw_load15{macbook=\"$macbook\", node=\"$node\"}",
+              "legendFormat": "{{macbook}} load15",
+              "refId": "A"
+            },
+            {
+              "expr": "mlx_hw_cpu_count{macbook=\"$macbook\", node=\"$node\"}",
+              "legendFormat": "{{macbook}} cpu_count",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "type": "graph",
+          "title": "Memory Used",
+          "datasource": "VictoriaMetrics",
+          "gridPos": {
+            "x": 8,
+            "y": 0,
+            "w": 8,
+            "h": 6
+          },
+          "targets": [
+            {
+              "expr": "mlx_hw_mem_used_bytes{macbook=\"$macbook\", node=\"$node\"}",
+              "legendFormat": "{{macbook}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            }
+          }
+        },
+        {
+          "type": "graph",
+          "title": "Disk Used",
+          "datasource": "VictoriaMetrics",
+          "gridPos": {
+            "x": 16,
+            "y": 0,
+            "w": 8,
+            "h": 6
+          },
+          "targets": [
+            {
+              "expr": "mlx_hw_disk_used_bytes{macbook=\"$macbook\", node=\"$node\"}",
+              "legendFormat": "{{macbook}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Serving",
+      "panels": [
+        {
+          "type": "graph",
+          "title": "Server State",
+          "datasource": "VictoriaMetrics",
+          "gridPos": {
+            "x": 0,
+            "y": 6,
+            "w": 8,
+            "h": 6
+          },
+          "targets": [
+            {
+              "expr": "mlx_server_state{macbook=\"$macbook\"}",
+              "legendFormat": "{{macbook}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "min": 0,
+              "max": 3
+            }
+          }
+        },
+        {
+          "type": "graph",
+          "title": "Server Ready / Up",
+          "datasource": "VictoriaMetrics",
+          "gridPos": {
+            "x": 8,
+            "y": 6,
+            "w": 8,
+            "h": 6
+          },
+          "targets": [
+            {
+              "expr": "mlx_server_up{macbook=\"$macbook\"}",
+              "legendFormat": "{{macbook}} up",
+              "refId": "A"
+            },
+            {
+              "expr": "mlx_server_ready{macbook=\"$macbook\"}",
+              "legendFormat": "{{macbook}} ready",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "type": "graph",
+          "title": "Model Loaded",
+          "datasource": "VictoriaMetrics",
+          "gridPos": {
+            "x": 16,
+            "y": 6,
+            "w": 8,
+            "h": 6
+          },
+          "targets": [
+            {
+              "expr": "mlx_model_loaded{macbook=\"$macbook\"}",
+              "legendFormat": "{{macbook}} {{model}}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Inference",
+      "panels": [
+        {
+          "type": "graph",
+          "title": "Requests / sec",
+          "datasource": "VictoriaMetrics",
+          "gridPos": {
+            "x": 0,
+            "y": 12,
+            "w": 8,
+            "h": 6
+          },
+          "targets": [
+            {
+              "expr": "rate(mlx_requests_total{macbook=\"$macbook\"}[1m])",
+              "legendFormat": "{{macbook}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            }
+          }
+        },
+        {
+          "type": "graph",
+          "title": "TTFT p95",
+          "datasource": "VictoriaMetrics",
+          "gridPos": {
+            "x": 8,
+            "y": 12,
+            "w": 8,
+            "h": 6
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, rate(mlx_ttft_seconds_bucket{macbook=\"$macbook\"}[5m]))",
+              "legendFormat": "{{macbook}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            }
+          }
+        },
+        {
+          "type": "graph",
+          "title": "Token Rate",
+          "datasource": "VictoriaMetrics",
+          "gridPos": {
+            "x": 16,
+            "y": 12,
+            "w": 8,
+            "h": 6
+          },
+          "targets": [
+            {
+              "expr": "rate(mlx_token_rate_tokens_per_second_sum{macbook=\"$macbook\"}[1m]) / rate(mlx_token_rate_tokens_per_second_count{macbook=\"$macbook\"}[1m])",
+              "legendFormat": "{{macbook}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Quality",
+      "panels": [
+        {
+          "type": "graph",
+          "title": "Hallucination Risk",
+          "datasource": "VictoriaMetrics",
+          "gridPos": {
+            "x": 0,
+            "y": 18,
+            "w": 8,
+            "h": 6
+          },
+          "targets": [
+            {
+              "expr": "mlx_hallucination_risk{macbook=\"$macbook\"}",
+              "legendFormat": "{{macbook}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "decimals": 2
+            }
+          }
+        },
+        {
+          "type": "graph",
+          "title": "Mean Confidence",
+          "datasource": "VictoriaMetrics",
+          "gridPos": {
+            "x": 8,
+            "y": 18,
+            "w": 8,
+            "h": 6
+          },
+          "targets": [
+            {
+              "expr": "mlx_token_confidence_mean{macbook=\"$macbook\"}",
+              "legendFormat": "{{macbook}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "decimals": 2
+            }
+          }
+        },
+        {
+          "type": "graph",
+          "title": "Perplexity",
+          "datasource": "VictoriaMetrics",
+          "gridPos": {
+            "x": 16,
+            "y": 18,
+            "w": 8,
+            "h": 6
+          },
+          "targets": [
+            {
+              "expr": "mlx_output_perplexity{macbook=\"$macbook\"}",
+              "legendFormat": "{{macbook}}",
+              "refId": "A"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Power & Thermal",
+      "panels": [
+        {
+          "type": "graph",
+          "title": "GPU Power (mW)",
+          "datasource": "VictoriaMetrics",
+          "gridPos": {
+            "x": 0,
+            "y": 24,
+            "w": 8,
+            "h": 6
+          },
+          "targets": [
+            {
+              "expr": "mlx_hw_gpu_power_milliwatts{macbook=\"$macbook\", node=\"$node\"}",
+              "legendFormat": "{{macbook}} {{node}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "mW"
+            }
+          }
+        },
+        {
+          "type": "graph",
+          "title": "Thermal Pressure",
+          "datasource": "VictoriaMetrics",
+          "gridPos": {
+            "x": 8,
+            "y": 24,
+            "w": 8,
+            "h": 6
+          },
+          "targets": [
+            {
+              "expr": "mlx_hw_thermal_pressure{macbook=\"$macbook\", node=\"$node\"}",
+              "legendFormat": "{{macbook}} {{node}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "decimals": 2
+            }
+          }
+        },
+        {
+          "type": "graph",
+          "title": "GPU Utilization",
+          "datasource": "VictoriaMetrics",
+          "gridPos": {
+            "x": 16,
+            "y": 24,
+            "w": 8,
+            "h": 6
+          },
+          "targets": [
+            {
+              "expr": "mlx_hw_gpu_utilization_percent{macbook=\"$macbook\", node=\"$node\"}",
+              "legendFormat": "{{macbook}} {{node}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 100
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

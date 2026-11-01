@@ -1,0 +1,45 @@
+# nodes.yml.template
+# =================
+# Single source of truth for every edge node.
+# Copy this file to config/nodes.yml and fill in your values.
+#
+# Precedence: this file < edge.env < actual environment variables.
+#
+# Sections:
+#   central   - shared observability endpoints (host:port, one value for all nodes)
+#   macbooks  - one entry per Macbook/edge node
+#
+# All fields are optional unless marked REQUIRED.
+
+central:
+  # VictoriaMetrics remote_write endpoint (host:port). Required for metrics push.
+  victoria_metrics: "192.168.1.100:8428"
+  # OpenTelemetry collector endpoint (host:port). Required for traces/logs push.
+  otel: "192.168.1.100:4318"
+  # Opik server endpoint (host:port). Required for Opik tracing backend.
+  opik: "192.168.1.100:32173"
+
+macbooks:
+  # --- Example node: rank0 (runs all exporters locally) ---
+  - id: "dk-mac"                    # REQUIRED: unique node identifier
+    serial: "ASHU1343"              # OPTIONAL: hardware serial (from system_profiler)
+    ip: "192.168.1.10"              # REQUIRED: this node's IP address
+    ssh_user: "dk"                  # OPTIONAL: SSH user for remote commands
+    ssh_key: "~/.ssh/id_rsa"        # OPTIONAL: SSH private key. If omitted, password
+                                    #       will be prompted at runtime (short-lived only).
+    ssh_connect_timeout: 5          # OPTIONAL: SSH connect timeout in seconds
+    role: "rank0"                   # REQUIRED: rank0 | rank1 (determines which exporters run)
+    enabled: true                   # OPTIONAL: set false to skip this node
+    model: "mlx-community/Qwen3.5-4B-MLX-8bit"  # OPTIONAL: pinned model. If omitted,
+                                    #         discovered from upstream GET /v1/models.
+
+  # --- Example node: rank1 (hardware telemetry via SSH from rank0) ---
+  - id: "ashu-mac"
+    serial: "ASHU1344"
+    ip: "192.168.1.11"
+    ssh_user: "ashu"
+    ssh_key: "~/.ssh/id_rsa"
+    ssh_connect_timeout: 5
+    role: "rank1"
+    enabled: true
+    model: "mlx-community/Qwen3-14B-8bit"

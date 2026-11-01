@@ -1,0 +1,261 @@
+{
+  "id": null,
+  "title": "MLX Hardware Telemetry",
+  "tags": [
+    "mlx",
+    "hardware"
+  ],
+  "timezone": "Asia/Kolkata",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5m",
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_hw_up, macbook)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      },
+      {
+        "name": "node",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_hw_up, node)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "graph",
+      "title": "CPU Load Average",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_load1{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} load1",
+          "refId": "A"
+        },
+        {
+          "expr": "mlx_hw_load5{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} load5",
+          "refId": "B"
+        },
+        {
+          "expr": "mlx_hw_load15{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} load15",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "CPU Count",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_cpu_count{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Memory Used vs Total",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_mem_used_bytes{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} used",
+          "refId": "A"
+        },
+        {
+          "expr": "mlx_hw_mem_total_bytes{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} total",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Free Pages (Pressure)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 6,
+        "w": 4,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_mem_pressure{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Disk Used vs Total",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_disk_used_bytes{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} used",
+          "refId": "A"
+        },
+        {
+          "expr": "mlx_hw_disk_total_bytes{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} total",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "GPU Memory (IOKit)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 12,
+        "w": 4,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_gpu_mem_used_bytes{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} used",
+          "refId": "A"
+        },
+        {
+          "expr": "mlx_hw_gpu_mem_alloc_bytes{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} alloc",
+          "refId": "B"
+        },
+        {
+          "expr": "mlx_hw_gpu_mem_total_bytes{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} total",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "CPU Temperature",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_cpu_temp_celsius{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Uptime",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 6,
+        "y": 18,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_uptime_seconds{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Exporter Up",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_up{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} / {{node}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+# vmagent scrape configuration for mlx monitoring bundle edge node.
+#
+# Template variables substituted at deploy time:
+#   ${CENTRAL_VICTORIA_METRICS} -> host:port of central VictoriaMetrics
+#   ${OTLP_SCHEME}              -> http | https
+#   ${MACBOOK_ID}               -> node identifier from config/nodes.yml
+#   ${MACBOOK_SERIAL}           -> hardware serial from config/nodes.yml
+#   ${VMAGENT_SCRAPE_INTERVAL}  -> scrape interval (default 10s)
+#   ${VMAGENT_MAX_SHARDS}       -> remote_write queue max shards
+#   ${VMAGENT_QUEUE_CAPACITY}   -> remote_write queue capacity
+
+global:
+  scrape_interval: ${VMAGENT_SCRAPE_INTERVAL:-10s}
+  external_labels:
+    macbook: ${MACBOOK_ID:-unknown}
+    serial: ${MACBOOK_SERIAL:-unknown}
+
+scrape_configs:
+  - job_name: mlx-proxy
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["127.0.0.1:8080"]
+    relabel_configs:
+      - target_label: service
+        replacement: mlx-proxy
+      - target_label: instance
+        replacement: ${MACBOOK_ID:-unknown}:8080
+
+  - job_name: mlx-hw
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["127.0.0.1:9102"]
+    relabel_configs:
+      - target_label: service
+        replacement: mlx-hw
+      - target_label: instance
+        replacement: ${MACBOOK_ID:-unknown}:9102
+
+  - job_name: mlx-kv
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["127.0.0.1:9104"]
+    relabel_configs:
+      - target_label: service
+        replacement: mlx-kv
+      - target_label: instance
+        replacement: ${MACBOOK_ID:-unknown}:9104
+
+  - job_name: mlx-supervisor
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["127.0.0.1:9105"]
+    relabel_configs:
+      - target_label: service
+        replacement: mlx-supervisor
+      - target_label: instance
+        replacement: ${MACBOOK_ID:-unknown}:9105
+
+  - job_name: mlx-logtailer
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["127.0.0.1:9106"]
+    relabel_configs:
+      - target_label: service
+        replacement: mlx-logtailer
+      - target_label: instance
+        replacement: ${MACBOOK_ID:-unknown}:9106
+
+remote_write:
+  - url: ${OTLP_SCHEME:-http}://${CENTRAL_VICTORIA_METRICS:-192.168.1.100:8428}/api/v1/write
+    queue_config:
+      max_shards: ${VMAGENT_MAX_SHARDS:-200}
+      capacity: ${VMAGENT_QUEUE_CAPACITY:-5000}
+      min_shards: 1
+      max_pending_send_buffer: 10485760
+      batch_send_deadline: 5s
+      max_batch_size: 10485760
+    write_relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance

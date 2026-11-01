@@ -1,0 +1,150 @@
+{
+  "id": null,
+  "title": "MLX Alerts",
+  "tags": [
+    "mlx",
+    "alerts"
+  ],
+  "timezone": "Asia/Kolkata",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5m",
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(ALERTS, macbook)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      },
+      {
+        "name": "severity",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(ALERTS, severity)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      },
+      {
+        "name": "alertname",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(ALERTS, alertname)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Active Alerts by Macbook",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "ALERTS{alertname=~\"MLX.*\", macbook=~\"$macbook\", severity=~\"$severity\"}",
+          "legendFormat": "{{alertname}} {{severity}} {{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Critical Alerts",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "count(ALERTS{alertname=~\"MLX.*\", macbook=~\"$macbook\", severity=\"critical\", alertstate=\"firing\"})",
+          "legendFormat": "critical",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Warning Alerts",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 4,
+        "y": 6,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "count(ALERTS{alertname=~\"MLX.*\", macbook=~\"$macbook\", severity=\"warning\", alertstate=\"firing\"})",
+          "legendFormat": "warning",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Alert State Over Time",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 6,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "ALERTS{alertname=~\"MLX.*\", macbook=~\"$macbook\"}",
+          "legendFormat": "{{alertname}} {{macbook}} {{alertstate}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 2
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Active Alert Details",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 16,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "ALERTS{alertname=~\"MLX.*\", macbook=~\"$macbook\", severity=~\"$severity\", alertstate=\"firing\"}",
+          "legendFormat": "{{alertname}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+FROM quay.io/hellodk/hydra:central AS base
+
+# central stack config provisioning image: copies otel-collector, alertmanager,
+# vmalert rules, and grafana provisioning into /etc/mlx-monitoring/central.
+# The central docker-compose mounts these as config volumes.
+
+WORKDIR /etc/mlx-monitoring/central
+
+COPY config/ ./config/
+COPY vmalert-rules.yml ./vmalert-rules.yml
+
+# Make config world-readable so non-root containers can mount it.
+RUN chmod -R a+rX . && \
+    find . -type d -exec chmod a+rx {} +
+
+CMD ["true"]

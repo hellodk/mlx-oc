@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Runtime directories (not source)
+logs/
+bin/
+
+# OS
+.DS_Store
+
+# Virtualenv
+.venv/
+venv/

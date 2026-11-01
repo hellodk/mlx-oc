@@ -1,0 +1,141 @@
+{
+  "id": null,
+  "title": "MLX Network (Ring Interconnect)",
+  "tags": [
+    "mlx",
+    "network",
+    "ring"
+  ],
+  "timezone": "Asia/Kolkata",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5m",
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_net_rx_bytes_total, macbook)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      },
+      {
+        "name": "node",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_net_rx_bytes_total, node)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      },
+      {
+        "name": "iface",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_net_rx_bytes_total, iface)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "graph",
+      "title": "RX Bytes per Second",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "rate(mlx_net_rx_bytes_total{macbook=\"$macbook\", node=\"$node\", iface=\"$iface\"}[1m])",
+          "legendFormat": "{{macbook}} {{iface}} rx",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "TX Bytes per Second",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "rate(mlx_net_tx_bytes_total{macbook=\"$macbook\", node=\"$node\", iface=\"$iface\"}[1m])",
+          "legendFormat": "{{macbook}} {{iface}} tx",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "RX Errors",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "rate(mlx_net_rx_errors_total{macbook=\"$macbook\", node=\"$node\", iface=\"$iface\"}[5m])",
+          "legendFormat": "{{macbook}} {{iface}} rx_err",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "TX Errors",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 6,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "rate(mlx_net_tx_errors_total{macbook=\"$macbook\", node=\"$node\", iface=\"$iface\"}[5m])",
+          "legendFormat": "{{macbook}} {{iface}} tx_err",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    }
+  ]
+}

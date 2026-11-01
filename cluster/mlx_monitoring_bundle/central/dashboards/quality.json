@@ -1,0 +1,285 @@
+{
+  "id": null,
+  "title": "MLX Quality & Confidence",
+  "tags": [
+    "mlx",
+    "quality",
+    "confidence"
+  ],
+  "timezone": "Asia/Kolkata",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5m",
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_token_confidence_mean, macbook)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Hallucination Risk",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hallucination_risk{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Mean Token Confidence",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_token_confidence_mean{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Min Token Confidence",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_token_confidence_min{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Output Perplexity",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 6,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_output_perplexity{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Token Entropy (nats)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_token_entropy_nats{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Top-1 vs Top-2 Margin",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 12,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_token_margin_mean{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Low Confidence Token Ratio",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_low_confidence_token_ratio{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Confidence Std Dev",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 18,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_token_confidence_std{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Heuristic Signals",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 16,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_heuristic_repetition{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}} repetition",
+          "refId": "A"
+        },
+        {
+          "expr": "mlx_heuristic_refusal{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}} refusal",
+          "refId": "B"
+        },
+        {
+          "expr": "mlx_heuristic_hedging{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}} hedging",
+          "refId": "C"
+        },
+        {
+          "expr": "mlx_heuristic_ungrounded{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}} ungrounded",
+          "refId": "D"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Hallucination Flags (count)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 16,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "rate(mlx_hallucination_flag_total{macbook=\"$macbook\"}[5m])",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    }
+  ]
+}

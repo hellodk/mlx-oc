@@ -1,0 +1,173 @@
+# docker-compose.central.yml
+# Central observability stack (podman compose).
+# Runs on the central server. All edge nodes push to this stack.
+#
+# Components:
+#   victoria-metrics   - TSDB, receives remote_write from vmagent (:8428)
+#   otel-collector     - OTLP receiver for traces + logs (:4317/:4318)
+#   grafana            - Dashboards, reads VictoriaMetrics (:3000)
+#   vmalert            - Alert rule evaluation against VictoriaMetrics (:8880)
+#   alertmanager       - Alert routing, inhibition, webhooks (:9093)
+#   opik               - Self-hosted LLM tracing (Postgres + Redis + ClickHouse) (:32173)
+#
+# Usage:
+#   podman compose -f docker-compose.central.yml up -d
+#
+# Image tagging: quay.io/hellodk/hydra:central (for any custom central images)
+
+services:
+  victoria-metrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: central-victoriametrics
+    restart: unless-stopped
+    ports:
+      - "8428:8428"
+    command:
+      - -retentionPeriod=30d
+      - -storageDataPath=/victoria-metrics-data
+      - -httpListenAddr=0.0.0.0:8428
+    volumes:
+      - vm-data:/victoria-metrics-data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8428/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: central-otelcol
+    restart: unless-stopped
+    ports:
+      - "4317:4317"  # OTLP gRPC
+      - "4318:4318"  # OTLP HTTP
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./central/config/otelcol-config.yaml:/etc/otelcol/config.yaml:ro
+      - central-otel-logs:/var/log/otelcol
+    depends_on:
+      victoria-metrics:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: central-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_USERS_DEFAULT_THEME=light
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./central/config/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - ./central/config/grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
+      - ./central/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      victoria-metrics:
+        condition: service_healthy
+
+  vmalert:
+    image: victoriametrics/vmalert:latest
+    container_name: central-vmalert
+    restart: unless-stopped
+    ports:
+      - "8880:8880"
+    command:
+      - -datasource.url=http://victoria-metrics:8428
+      - -remoteWrite.url=http://victoria-metrics:8428
+      - -notifier.url=http://alertmanager:9093
+      - -rule=/etc/vmalert/rules.yml
+      - -httpListenAddr=0.0.0.0:8880
+    volumes:
+      - ./central/config/vmalert-rules.yml:/etc/vmalert/rules.yml:ro
+    depends_on:
+      victoria-metrics:
+        condition: service_healthy
+      alertmanager:
+        condition: service_healthy
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: central-alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
+    volumes:
+      - ./central/config/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+
+  # --- Opik self-hosted (LLM tracing) ---
+  # Opik server requires Postgres, Redis, and ClickHouse.
+  # These are deployed as sibling services in the same compose.
+  opik-server:
+    image: cometml/opik-server:2.2.13
+    container_name: central-opik-server
+    restart: unless-stopped
+    ports:
+      - "32173:80"
+    environment:
+      - OPIK_UI__BASE_URL=http://192.168.1.100:32173
+      - OPIK_SERVER__DATABASE__URI=postgresql://opik:opik@opik-postgres:5432/opik
+      - OPIK_SERVER__REDIS__URI=redis://opik-redis:6379/0
+      - OPIK_SERVER__CLICKHOUSE__URI=http://opik-clickhouse:8123
+    depends_on:
+      opik-postgres:
+        condition: service_healthy
+      opik-redis:
+        condition: service_healthy
+      opik-clickhouse:
+        condition: service_healthy
+
+  opik-postgres:
+    image: postgres:15
+    container_name: central-opik-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=opik
+      - POSTGRES_USER=opik
+      - POSTGRES_PASSWORD=opik
+    volumes:
+      - opik-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opik -d opik"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  opik-redis:
+    image: redis:7-alpine
+    container_name: central-opik-redis
+    restart: unless-stopped
+    volumes:
+      - opik-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  opik-clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: central-opik-clickhouse
+    restart: unless-stopped
+    ports:
+      - "8123:8123"
+    volumes:
+      - opik-clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  vm-data:
+  grafana-data:
+  central-otel-logs:
+  opik-postgres-data:
+  opik-redis-data:
+  opik-clickhouse-data:

@@ -1,0 +1,23 @@
+[Unit]
+Description=mlx monitoring bundle edge node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/path/to/mlx_monitoring_bundle/edge
+ExecStart=/usr/local/bin/python3 /path/to/mlx_monitoring_bundle/edge/mlx_monitoring_bundle.py start
+ExecStop=/usr/local/bin/python3 /path/to/mlx_monitoring_bundle/edge/mlx_monitoring_bundle.py stop
+Restart=always
+RestartSec=5
+StartLimitBurst=10
+StartLimitIntervalSec=60
+User=dk
+Group=dk
+Environment=MLX_MACBOOK_ID=dk-mac
+EnvironmentFile=/path/to/mlx_monitoring_bundle/edge/config/edge.env
+StandardOutput=append:/path/to/mlx_monitoring_bundle/edge/logs/systemd.out.log
+StandardError=append:/path/to/mlx_monitoring_bundle/edge/logs/systemd.err.log
+
+[Install]
+WantedBy=multi-user.target

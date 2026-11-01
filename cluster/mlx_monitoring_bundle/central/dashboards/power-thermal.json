@@ -1,0 +1,231 @@
+{
+  "id": null,
+  "title": "MLX Power & Thermal",
+  "tags": [
+    "mlx",
+    "power",
+    "thermal"
+  ],
+  "timezone": "Asia/Kolkata",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5m",
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_hw_gpu_power_milliwatts, macbook)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      },
+      {
+        "name": "node",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_hw_gpu_power_milliwatts, node)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "graph",
+      "title": "GPU Power (mW)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_gpu_power_milliwatts{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} {{node}} GPU",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "mW"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Package Power (CPU+GPU+ANE) (mW)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_package_power_milliwatts{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} {{node}} pkg",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "mW"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "CPU Power (mW)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_cpu_power_milliwatts{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} {{node}} CPU",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "mW"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "ANE Power (mW)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 6,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_ane_power_milliwatts{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} {{node}} ANE",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "mW"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Thermal Pressure (0..1)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_thermal_pressure{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} {{node}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "GPU Utilization (%)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 12,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_gpu_utilization_percent{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} {{node}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 100
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "GPU Frequency (MHz)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_gpu_frequency_mhz{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} {{node}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "hertz",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "GPU Active Residency (%)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 18,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_gpu_iokit_util_percent{macbook=\"$macbook\", node=\"$node\"}",
+          "legendFormat": "{{macbook}} {{node}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 100
+        }
+      }
+    }
+  ]
+}

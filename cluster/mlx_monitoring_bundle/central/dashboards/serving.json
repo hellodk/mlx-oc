@@ -1,0 +1,252 @@
+{
+  "id": null,
+  "title": "MLX Serving Health",
+  "tags": [
+    "mlx",
+    "serving"
+  ],
+  "timezone": "Asia/Kolkata",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5m",
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_server_up, macbook)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Server Up",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "mlx_server_up{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                }
+              },
+              "type": "value"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Server Ready (/v1/models)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 3,
+        "y": 0,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "mlx_server_ready{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Model Loaded",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "mlx_model_loaded{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Restarts (15m)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 9,
+        "y": 0,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "increases(mlx_server_restarts_total{macbook=\"$macbook\"}[15m])",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Server State (0=idle 1=running 2=starting 3=backoff)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_server_state{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 3
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Server Uptime",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 3,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_server_uptime_seconds{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Crashes by Reason",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_server_crashes_total{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}} {{reason}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Last Exit Code",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 9,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_server_last_exit_code{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Health Checks (ok vs fail)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 16,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_server_health_checks_total{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}} {{result}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Backoff Seconds",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 16,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_server_backoff_seconds{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

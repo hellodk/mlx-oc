@@ -1,0 +1,229 @@
+{
+  "id": null,
+  "title": "MLX KV Cache",
+  "tags": [
+    "mlx",
+    "kv-cache"
+  ],
+  "timezone": "Asia/Kolkata",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5m",
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_kv_cache_sequences, macbook)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "graph",
+      "title": "KV Cache Utilization",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_kv_cache_utilization{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Cached Sequences by Type",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_kv_cache_sequences{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}} {{type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "KV Cache Bytes by Type",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_kv_cache_bytes{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}} {{type}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Prompt Cache Ratio",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 6,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_prompt_cache_ratio{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Max Context Length",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_context_length_max_tokens{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Context Utilization",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 6,
+        "y": 12,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_context_utilization{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "KV Bytes per Token",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 4,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_kv_bytes_per_token{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Est KV Bytes for Max Context",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_kv_est_bytes_max_context{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Prompt Cached Tokens",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 18,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "rate(mlx_prompt_cached_tokens_total{macbook=\"$macbook\"}[5m])",
+          "legendFormat": "{{macbook}} {{kind}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    }
+  ]
+}

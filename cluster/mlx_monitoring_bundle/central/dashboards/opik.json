@@ -1,0 +1,138 @@
+{
+  "id": null,
+  "title": "MLX Opik Tracing",
+  "tags": [
+    "mlx",
+    "opik",
+    "tracing"
+  ],
+  "timezone": "Asia/Kolkata",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5m",
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_token_confidence_mean, macbook)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "text",
+      "title": "Opik Traces",
+      "content": "# Opik Tracing\n\nOpik traces are stored in the self-hosted Opik database (Postgres + ClickHouse), not in VictoriaMetrics.\n\nView traces in the Opik UI at:\n`http://<CENTRAL_IP>:<OPIK_PORT>`\n\nThe proxy exports each chat completion as an Opik trace with:\n- LLM span (input/output/usage/metadata)\n- Hallucination quality feedback scores\n- Token confidence feedback scores\n- OpenInference attributes (via OTLP endpoint)\n\nUse the dashboards below to correlate Opik quality signals with VM metrics.",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 4
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Token Confidence (proxy-scored, correlates with Opik traces)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_token_confidence_mean{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}} mean",
+          "refId": "A"
+        },
+        {
+          "expr": "mlx_token_confidence_min{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}} min",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Hallucination Risk (proxy-scored)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hallucination_risk{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Output Perplexity",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 12,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_output_perplexity{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Scored Completions Coverage",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 12,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "rate(mlx_confidence_scored_total{macbook=\"$macbook\"}[5m])",
+          "legendFormat": "{{macbook}} {{source}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    }
+  ]
+}

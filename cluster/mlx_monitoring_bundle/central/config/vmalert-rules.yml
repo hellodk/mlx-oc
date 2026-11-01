@@ -1,0 +1,366 @@
+# vmalert alert rules for the mlx monitoring bundle.
+#
+# One rule group per concern, grouped by macbook so alerts from different
+# Macbooks never collapse into a single firing alert. All alerts carry the
+# labels: macbook, node, serial, model (where available).
+#
+# Applied by vmalert (central stack). vmalert notifies Alertmanager via
+# -notifier.url http://alertmanager:9093/api/v1/alerts.
+#
+# Silence windows and severity can be tuned per-deployment by editing
+# this file - no container rebuild required.
+
+groups:
+  - name: mlx.macbook.down
+    rules:
+    # A Macbook is considered silent when vmagent scrapes return nothing for
+    # 5 minutes OR the mlx_hw_up gauge stays at 0 for 3 minutes.
+    - alert: MLXMacbookSilent
+      expr: absent_over_time(mlx_hw_up[3m]) == 1
+      for: 5m
+      labels:
+        severity: critical
+        category: connectivity
+      annotations:
+        summary: "Macbook {{ $labels.macbook }} silent"
+        description: |
+          No vmagent scrape from {{ $labels.macbook }} (node {{ $labels.node }},
+          serial {{ $labels.serial }}) for 3 minutes. Check network connectivity,
+          the vmagent sidecar, and whether the Macbook is powered on.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#macbook-silent"
+
+  - name: mlx.hardware
+    rules:
+    - alert: MLXHardwareExporterDown
+      expr: absent(mlx_hw_up{node="rank0"}) == 1 or absent(mlx_hw_up{node="rank1"}) == 1
+      for: 2m
+      labels:
+        severity: warning
+        category: exporter
+      annotations:
+        summary: "HW exporter down on {{ $labels.node }} ({{ $labels.macbook }})"
+        description: |
+          mlx_hw_up is not reporting for node {{ $labels.node }} on Macbook
+          {{ $labels.macbook }} (serial {{ $labels.serial }}). The mlx_hw_telemetry
+          process may have crashed or is not listening on :9102.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#hw-exporter-down"
+
+    - alert: MLXGPUHighUtilization
+      expr: mlx_hw_gpu_utilization_percent > 95
+      for: 10m
+      labels:
+        severity: warning
+        category: hardware
+      annotations:
+        summary: "GPU saturated on {{ $labels.macbook }}: {{ $value }}%"
+        description: |
+          GPU active residency has been above 95% for 10 minutes on Macbook
+          {{ $labels.macbook }} ({{ $labels.node }}). Inference throughput may
+          be throttled; check mlx_hw_gpu_power_milliwatts and thermal pressure.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#gpu-saturated"
+
+    - alert: MLXThermalThrottling
+      expr: mlx_hw_thermal_pressure > 0.7
+      for: 5m
+      labels:
+        severity: warning
+        category: hardware
+      annotations:
+        summary: "Thermal throttling on {{ $labels.macbook }}: {{ $value }} pressure"
+        description: |
+          CPU scheduler limit is below 30% (thermal pressure > 0.7) on Macbook
+          {{ $labels.macbook }} ({{ $labels.node }}). The chip is thermally
+          throttling; expect lower inference throughput. Check ambient temp
+          and airflow.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#thermal-throttling"
+
+    - alert: MLXLoadHigh
+      expr: mlx_hw_load15 > (mlx_hw_cpu_count * 0.9)
+      for: 10m
+      labels:
+        severity: warning
+        category: hardware
+      annotations:
+        summary: "High load on {{ $labels.macbook }}: {{ $value }} load15"
+        description: |
+          15-minute load average ({{ $value }}) exceeds 90% of logical CPU
+          count on Macbook {{ $labels.macbook }} ({{ $labels.node }}). Host may
+          be oversubscribed.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#high-load"
+
+    - alert: MLXMemoryPressureHigh
+      expr: mlx_hw_mem_pressure < (mlx_hw_mem_total_bytes * 0.02)
+      for: 10m
+      labels:
+        severity: warning
+        category: hardware
+      annotations:
+        summary: "Memory pressure on {{ $labels.macbook }}: <2% free pages"
+        description: |
+          Free + inactive + speculative pages are below 2% of physical RAM on
+          Macbook {{ $labels.macbook }} ({{ $labels.node }}). The node is at risk
+          of memory pressure killing the mlx_lm.server process.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#memory-pressure"
+
+    - alert: MLXDiskFull
+      expr: (mlx_hw_disk_used_bytes / mlx_hw_disk_total_bytes) > 0.85
+      for: 15m
+      labels:
+        severity: warning
+        category: hardware
+      annotations:
+        summary: "Disk full on {{ $labels.macbook }}: {{ $value }}% used"
+        description: |
+          Root volume is over 85% full on Macbook {{ $labels.macbook }}
+          ({{ $labels.node }}). The model cache lives on the boot volume; a
+          full disk will break downloads and KV cache.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#disk-full"
+
+  - name: mlx.serving
+    rules:
+    - alert: MLXServerDown
+      expr: mlx_server_up == 0
+      for: 3m
+      labels:
+        severity: critical
+        category: serving
+      annotations:
+        summary: "mlx_lm.server down on {{ $labels.macbook }}"
+        description: |
+          mlx_server_up is 0 on Macbook {{ $labels.macbook }} (serial
+          {{ $labels.serial }}). The supervisor may be restarting it; check
+          mlx_server_state and mlx_server_last_exit_code on :9105/metrics.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#server-down"
+
+    - alert: MLXServerNotReady
+      expr: mlx_server_ready == 0 and mlx_server_up == 1
+      for: 5m
+      labels:
+        severity: warning
+        category: serving
+      annotations:
+        summary: "mlx_lm.server not serving on {{ $labels.macbook }}"
+        description: |
+          Process is alive but /v1/models is not returning 200 on Macbook
+          {{ $labels.macbook }} ({{ $labels.node }}). The model may still be
+          loading or the server may be hung.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#server-not-ready"
+
+    - alert: MLXModelNotLoaded
+      expr: mlx_model_loaded == 0 and mlx_server_up == 1
+      for: 10m
+      labels:
+        severity: warning
+        category: serving
+      annotations:
+        summary: "Model not loaded on {{ $labels.macbook }}"
+        description: |
+          Server is ready but mlx_model_loaded is 0 for model {{ $labels.model }}
+          on Macbook {{ $labels.macbook }}. The health probe never observed the
+          model being served.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#model-not-loaded"
+
+    - alert: MLXServerCrashLooping
+      expr: increases(mlx_server_restarts_total[15m]) >= 3
+      labels:
+        severity: critical
+        category: serving
+      annotations:
+        summary: "mlx_lm.server crash-looping on {{ $labels.macbook }}"
+        description: |
+          mlx_lm.server restarted {{ $value }} times in 15 minutes on Macbook
+          {{ $labels.macbook }} ({{ $labels.node }}). Last reason:
+          {{ $labels.mlx_server_last_crash_reason }}. Check server.log for the
+          crash reason.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#crash-looping"
+
+    - alert: MLXServerHung
+      expr: mlx_server_state == 2 and mlx_server_up == 1
+      for: 30s
+      labels:
+        severity: warning
+        category: serving
+      annotations:
+        summary: "Server health degraded on {{ $labels.macbook }}"
+        description: |
+          mlx_lm.server is alive but not serving (/v1/models failing) on Macbook
+          {{ $labels.macbook }} ({{ $labels.node }}). The keep-alive watchdog
+          will kill and restart it after --hang-after seconds.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#server-hung"
+
+  - name: mlx.inference
+    rules:
+    - alert: MLXProxyDown
+      expr: absent(mlx_up) == 1 or mlx_up == 0
+      for: 2m
+      labels:
+        severity: critical
+        category: inference
+      annotations:
+        summary: "Proxy down on {{ $labels.macbook }}"
+        description: |
+          mlx_up is 0 (or absent) on Macbook {{ $labels.macbook }} ({{ $labels.node }}).
+          The mlx_metrics_proxy is not reachable on :8080; clients cannot reach
+          the upstream mlx_lm.server.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#proxy-down"
+
+    - alert: MLXUpstreamDown
+      expr: mlx_up == 0 and mlx_server_up == 1
+      for: 3m
+      labels:
+        severity: critical
+        category: inference
+      annotations:
+        summary: "Upstream mlx_lm.server unreachable via proxy on {{ $labels.macbook }}"
+        description: |
+          The proxy (:8080) cannot reach the upstream mlx_lm.server (:8081) even
+          though the server process is up. Check that mlx_lm.server is listening
+          on 127.0.0.1:8081 and that the proxy upstream config is correct.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#upstream-down"
+
+    - alert: MLXThroughputDrop
+      expr: rate(mlx_requests_total[5m]) < 0.1
+      for: 15m
+      labels:
+        severity: warning
+        category: inference
+      annotations:
+        summary: "Throughput drop on {{ $labels.macbook }}: {{ $value }} req/s"
+        description: |
+          Request rate has fallen below 0.1 req/s for 15 minutes on Macbook
+          {{ $labels.macbook }} ({{ $labels.node }}). Either idle (expected
+          overnight) or the serving path is degraded. Correlate with
+          MLXServerDown / MLXProxyDown.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#throughput-drop"
+
+    - alert: MLXTTFTHigh
+      expr: histogram_quantile(0.95, rate(mlx_ttft_seconds_bucket[5m])) > 5
+      for: 10m
+      labels:
+        severity: warning
+        category: inference
+      annotations:
+        summary: "High TTFT on {{ $labels.macbook }}: p95 {{ $value }}s"
+        description: |
+          95th-percentime time-to-first-token exceeds 5s on Macbook
+          {{ $labels.macbook }} ({{ $labels.node }}). Check GPU utilization,
+          memory pressure, and whether the model is evicted from cache.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#ttft-high"
+
+    - alert: MLXGenerationSlow
+      expr: histogram_quantile(0.95, rate(mlx_generation_seconds_bucket[5m])) > 60
+      for: 10m
+      labels:
+        severity: warning
+        category: inference
+      annotations:
+        summary: "Slow generation on {{ $labels.macbook }}: p95 {{ $value }}s"
+        description: |
+          95th-percentime generation time exceeds 60s on Macbook
+          {{ $labels.macbook }} ({{ $labels.node }}). Likely GPU/thermal throttling
+          or KV cache pressure.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#generation-slow"
+
+    - alert: MLXTokenRateLow
+      expr: histogram_quantile(0.5, rate(mlx_token_rate_tokens_per_second_bucket[5m])) < 5
+      for: 10m
+      labels:
+        severity: warning
+        category: inference
+      annotations:
+        summary: "Low token rate on {{ $labels.macbook }}: {{ $value }} tok/s"
+        description: |
+          Median token rate below 5 tok/s on Macbook {{ $labels.macbook }}
+          ({{ $labels.node }}). Consistent with thermal throttling or a
+          memory-bandwidth-bound generation.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#token-rate-low"
+
+  - name: mlx.quality
+    rules:
+    - alert: MLXHallucinationHigh
+      expr: mlx_hallucination_risk > 0.7
+      for: 5m
+      labels:
+        severity: warning
+        category: quality
+      annotations:
+        summary: "High hallucination risk on {{ $labels.macbook }}: {{ $value }}"
+        description: |
+          Composite hallucination risk (repetition + refusal + hedging +
+          ungrounded) is above 0.7 on Macbook {{ $labels.macbook }}
+          ({{ $labels.node }}). Review recent completions for fabricated output.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#hallucination-high"
+
+    - alert: MLXLowConfidence
+      expr: mlx_token_confidence_mean < 0.5
+      for: 10m
+      labels:
+        severity: warning
+        category: quality
+      annotations:
+        summary: "Low token confidence on {{ $labels.macbook }}: {{ $value }}"
+        description: |
+          Mean per-token confidence is below 0.5 on Macbook {{ $labels.macbook }}
+          ({{ $labels.node }}). The model is guessing on sampled tokens; check
+          temperature and whether logprobs scoring coverage is adequate.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#low-confidence"
+
+    - alert: MLXHighPerplexity
+      expr: mlx_output_perplexity > 3
+      for: 10m
+      labels:
+        severity: warning
+        category: quality
+      annotations:
+        summary: "High perplexity on {{ $labels.macbook }}: {{ $value }}"
+        description: |
+          Output perplexity exceeds 3 on Macbook {{ $labels.macbook }}
+          ({{ $labels.node }}). The model distribution is flat - it is sampling
+          from uncertain tokens more often than not.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#high-perplexity"
+
+    - alert: MLXLowConfidenceRatioHigh
+      expr: mlx_low_confidence_token_ratio > 0.3
+      for: 10m
+      labels:
+        severity: warning
+        category: quality
+      annotations:
+        summary: "High low-confidence token ratio on {{ $labels.macbook }}: {{ $value }}"
+        description: |
+          Over 30% of scored tokens fall below the low-confidence threshold on
+          Macbook {{ $labels.macbook }} ({{ $labels.node }}).
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#low-confidence-ratio"
+
+  - name: mlx.kv
+    rules:
+    - alert: MLXKVCacheFull
+      expr: mlx_kv_cache_utilization > 0.85
+      for: 10m
+      labels:
+        severity: warning
+        category: kv_cache
+      annotations:
+        summary: "KV cache near capacity on {{ $labels.macbook }}: {{ $value }}"
+        description: |
+          KV cache utilization is above 85% on Macbook {{ $labels.macbook }}
+          ({{ $labels.node }}). Expect prompt cache evictions and rising TTFT.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#kv-cache-full"
+
+  - name: mlx.slo
+    rules:
+    - alert: MLXErrorBudget
+      expr: |
+        (sum by (macbook) (rate(mlx_error_total{status=~"5.."}[1h])) /
+         sum by (macbook) (rate(mlx_requests_total[1h]))) > 0.05
+      for: 1h
+      labels:
+        severity: warning
+        category: slo
+      annotations:
+        summary: "Error budget exceeded on {{ $labels.macbook }}: {{ $value }} error rate"
+        description: |
+          5xx error rate over the last hour exceeds 5% on Macbook
+          {{ $labels.macbook }} ({{ $labels.node }}). Investigate upstream
+          failures, proxy rejections, and OOMs.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#error-budget"

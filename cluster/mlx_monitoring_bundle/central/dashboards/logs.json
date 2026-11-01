@@ -1,0 +1,205 @@
+{
+  "id": null,
+  "title": "MLX Server Logs",
+  "tags": [
+    "mlx",
+    "logs"
+  ],
+  "timezone": "Asia/Kolkata",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5m",
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_log_tailer_lines_total, macbook)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      },
+      {
+        "name": "severity",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_log_tailer_lines_total, severity)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      },
+      {
+        "name": "category",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_log_tailer_lines_total, category)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Tailer Up",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "expr": "mlx_log_tailer_up{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Lines Classified per Second",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 3,
+        "y": 0,
+        "w": 7,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "rate(mlx_log_tailer_lines_total{macbook=\"$macbook\", severity=\"$severity\", category=\"$category\"}[1m])",
+          "legendFormat": "{{macbook}} {{severity}} {{category}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Lines Shipped per Second",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "rate(mlx_log_tailer_shipped_total{macbook=\"$macbook\", severity=\"$severity\"}[1m])",
+          "legendFormat": "{{macbook}} {{severity}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Lines Dropped per Second",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 3,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "rate(mlx_log_tailer_dropped_total{macbook=\"$macbook\"}[1m])",
+          "legendFormat": "{{macbook}} {{reason}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Read Offset (bytes)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_log_tailer_file_bytes{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Export Errors",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 9,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "rate(mlx_log_tailer_errors_total{macbook=\"$macbook\"}[5m])",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Queue Depth",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_log_tailer_queue_depth{macbook=\"$macbook\"}",
+          "legendFormat": "{{macbook}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}
