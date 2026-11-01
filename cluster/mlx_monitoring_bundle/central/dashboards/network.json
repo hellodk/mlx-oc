@@ -57,7 +57,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_net_rx_bytes_total{macbook=\"$macbook\", node=\"$node\", iface=\"$iface\"}[1m])",
+          "expr": "rate(mlx_net_rx_bytes_total{macbook=\"$device\", node=\"$node\", iface=\"$iface\"}[1m])",
           "legendFormat": "{{macbook}} {{iface}} rx",
           "refId": "A"
         }
@@ -80,7 +80,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_net_tx_bytes_total{macbook=\"$macbook\", node=\"$node\", iface=\"$iface\"}[1m])",
+          "expr": "rate(mlx_net_tx_bytes_total{macbook=\"$device\", node=\"$node\", iface=\"$iface\"}[1m])",
           "legendFormat": "{{macbook}} {{iface}} tx",
           "refId": "A"
         }
@@ -103,7 +103,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_net_rx_errors_total{macbook=\"$macbook\", node=\"$node\", iface=\"$iface\"}[5m])",
+          "expr": "rate(mlx_net_rx_errors_total{macbook=\"$device\", node=\"$node\", iface=\"$iface\"}[5m])",
           "legendFormat": "{{macbook}} {{iface}} rx_err",
           "refId": "A"
         }
@@ -126,7 +126,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_net_tx_errors_total{macbook=\"$macbook\", node=\"$node\", iface=\"$iface\"}[5m])",
+          "expr": "rate(mlx_net_tx_errors_total{macbook=\"$device\", node=\"$node\", iface=\"$iface\"}[5m])",
           "legendFormat": "{{macbook}} {{iface}} tx_err",
           "refId": "A"
         }
