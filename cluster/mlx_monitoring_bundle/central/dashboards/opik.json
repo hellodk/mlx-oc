@@ -48,12 +48,12 @@
       },
       "targets": [
         {
-          "expr": "mlx_token_confidence_mean{macbook=\"$macbook\"}",
+          "expr": "mlx_token_confidence_mean{macbook=\"$device\"}",
           "legendFormat": "{{macbook}} mean",
           "refId": "A"
         },
         {
-          "expr": "mlx_token_confidence_min{macbook=\"$macbook\"}",
+          "expr": "mlx_token_confidence_min{macbook=\"$device\"}",
           "legendFormat": "{{macbook}} min",
           "refId": "B"
         }
@@ -79,7 +79,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_hallucination_risk{macbook=\"$macbook\"}",
+          "expr": "mlx_hallucination_risk{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -105,7 +105,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_output_perplexity{macbook=\"$macbook\"}",
+          "expr": "mlx_output_perplexity{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -123,7 +123,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_confidence_scored_total{macbook=\"$macbook\"}[5m])",
+          "expr": "rate(mlx_confidence_scored_total{macbook=\"$device\"}[5m])",
           "legendFormat": "{{macbook}} {{source}}",
           "refId": "A"
         }

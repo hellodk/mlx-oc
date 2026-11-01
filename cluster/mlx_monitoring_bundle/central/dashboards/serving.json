@@ -36,7 +36,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_up{macbook=\"$macbook\"}",
+          "expr": "mlx_server_up{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -75,7 +75,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_ready{macbook=\"$macbook\"}",
+          "expr": "mlx_server_ready{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -99,7 +99,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_model_loaded{macbook=\"$macbook\"}",
+          "expr": "mlx_model_loaded{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -123,7 +123,7 @@
       },
       "targets": [
         {
-          "expr": "increases(mlx_server_restarts_total{macbook=\"$macbook\"}[15m])",
+          "expr": "increases(mlx_server_restarts_total{macbook=\"$device\"}[15m])",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -141,7 +141,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_state{macbook=\"$macbook\"}",
+          "expr": "mlx_server_state{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -165,7 +165,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_uptime_seconds{macbook=\"$macbook\"}",
+          "expr": "mlx_server_uptime_seconds{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -188,7 +188,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_crashes_total{macbook=\"$macbook\"}",
+          "expr": "mlx_server_crashes_total{macbook=\"$device\"}",
           "legendFormat": "{{macbook}} {{reason}}",
           "refId": "A"
         }
@@ -206,7 +206,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_last_exit_code{macbook=\"$macbook\"}",
+          "expr": "mlx_server_last_exit_code{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -224,7 +224,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_health_checks_total{macbook=\"$macbook\"}",
+          "expr": "mlx_server_health_checks_total{macbook=\"$device\"}",
           "legendFormat": "{{macbook}} {{result}}",
           "refId": "A"
         }
@@ -242,7 +242,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_backoff_seconds{macbook=\"$macbook\"}",
+          "expr": "mlx_server_backoff_seconds{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }

@@ -46,17 +46,17 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_load1{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_load1{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} load1",
           "refId": "A"
         },
         {
-          "expr": "mlx_hw_load5{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_load5{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} load5",
           "refId": "B"
         },
         {
-          "expr": "mlx_hw_load15{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_load15{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} load15",
           "refId": "C"
         }
@@ -74,7 +74,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_cpu_count{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_cpu_count{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -92,12 +92,12 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_mem_used_bytes{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_mem_used_bytes{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} used",
           "refId": "A"
         },
         {
-          "expr": "mlx_hw_mem_total_bytes{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_mem_total_bytes{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} total",
           "refId": "B"
         }
@@ -120,7 +120,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_mem_pressure{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_mem_pressure{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -138,12 +138,12 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_disk_used_bytes{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_disk_used_bytes{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} used",
           "refId": "A"
         },
         {
-          "expr": "mlx_hw_disk_total_bytes{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_disk_total_bytes{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} total",
           "refId": "B"
         }
@@ -166,17 +166,17 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_gpu_mem_used_bytes{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_gpu_mem_used_bytes{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} used",
           "refId": "A"
         },
         {
-          "expr": "mlx_hw_gpu_mem_alloc_bytes{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_gpu_mem_alloc_bytes{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} alloc",
           "refId": "B"
         },
         {
-          "expr": "mlx_hw_gpu_mem_total_bytes{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_gpu_mem_total_bytes{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} total",
           "refId": "C"
         }
@@ -199,7 +199,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_cpu_temp_celsius{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_cpu_temp_celsius{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -222,7 +222,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_uptime_seconds{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_uptime_seconds{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -245,7 +245,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_up{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_up{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} / {{node}}",
           "refId": "A"
         }

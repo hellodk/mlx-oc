@@ -47,7 +47,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_gpu_power_milliwatts{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_gpu_power_milliwatts{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} {{node}} GPU",
           "refId": "A"
         }
@@ -70,7 +70,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_package_power_milliwatts{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_package_power_milliwatts{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} {{node}} pkg",
           "refId": "A"
         }
@@ -93,7 +93,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_cpu_power_milliwatts{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_cpu_power_milliwatts{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} {{node}} CPU",
           "refId": "A"
         }
@@ -116,7 +116,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_ane_power_milliwatts{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_ane_power_milliwatts{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} {{node}} ANE",
           "refId": "A"
         }
@@ -139,7 +139,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_thermal_pressure{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_thermal_pressure{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} {{node}}",
           "refId": "A"
         }
@@ -165,7 +165,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_gpu_utilization_percent{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_gpu_utilization_percent{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} {{node}}",
           "refId": "A"
         }
@@ -190,7 +190,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_gpu_frequency_mhz{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_gpu_frequency_mhz{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} {{node}}",
           "refId": "A"
         }
@@ -214,7 +214,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_gpu_iokit_util_percent{macbook=\"$macbook\", node=\"$node\"}",
+          "expr": "mlx_hw_gpu_iokit_util_percent{macbook=\"$device\", node=\"$node\"}",
           "legendFormat": "{{macbook}} {{node}}",
           "refId": "A"
         }

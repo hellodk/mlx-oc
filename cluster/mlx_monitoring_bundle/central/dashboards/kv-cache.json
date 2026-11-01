@@ -36,7 +36,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_kv_cache_utilization{macbook=\"$macbook\"}",
+          "expr": "mlx_kv_cache_utilization{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -62,7 +62,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_kv_cache_sequences{macbook=\"$macbook\"}",
+          "expr": "mlx_kv_cache_sequences{macbook=\"$device\"}",
           "legendFormat": "{{macbook}} {{type}}",
           "refId": "A"
         }
@@ -80,7 +80,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_kv_cache_bytes{macbook=\"$macbook\"}",
+          "expr": "mlx_kv_cache_bytes{macbook=\"$device\"}",
           "legendFormat": "{{macbook}} {{type}}",
           "refId": "A"
         }
@@ -103,7 +103,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_prompt_cache_ratio{macbook=\"$macbook\"}",
+          "expr": "mlx_prompt_cache_ratio{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -129,7 +129,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_context_length_max_tokens{macbook=\"$macbook\"}",
+          "expr": "mlx_context_length_max_tokens{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -147,7 +147,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_context_utilization{macbook=\"$macbook\"}",
+          "expr": "mlx_context_utilization{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -173,7 +173,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_kv_bytes_per_token{macbook=\"$macbook\"}",
+          "expr": "mlx_kv_bytes_per_token{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -191,7 +191,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_kv_est_bytes_max_context{macbook=\"$macbook\"}",
+          "expr": "mlx_kv_est_bytes_max_context{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -214,7 +214,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_prompt_cached_tokens_total{macbook=\"$macbook\"}[5m])",
+          "expr": "rate(mlx_prompt_cached_tokens_total{macbook=\"$device\"}[5m])",
           "legendFormat": "{{macbook}} {{kind}}",
           "refId": "A"
         }

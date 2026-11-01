@@ -56,7 +56,7 @@
       },
       "targets": [
         {
-          "expr": "ALERTS{alertname=~\"MLX.*\", macbook=~\"$macbook\", severity=~\"$severity\"}",
+          "expr": "ALERTS{alertname=~\"MLX.*\", macbook=~\"$device\", severity=~\"$severity\"}",
           "legendFormat": "{{alertname}} {{severity}} {{macbook}}",
           "refId": "A"
         }
@@ -80,7 +80,7 @@
       },
       "targets": [
         {
-          "expr": "count(ALERTS{alertname=~\"MLX.*\", macbook=~\"$macbook\", severity=\"critical\", alertstate=\"firing\"})",
+          "expr": "count(ALERTS{alertname=~\"MLX.*\", macbook=~\"$device\", severity=\"critical\", alertstate=\"firing\"})",
           "legendFormat": "critical",
           "refId": "A"
         }
@@ -98,7 +98,7 @@
       },
       "targets": [
         {
-          "expr": "count(ALERTS{alertname=~\"MLX.*\", macbook=~\"$macbook\", severity=\"warning\", alertstate=\"firing\"})",
+          "expr": "count(ALERTS{alertname=~\"MLX.*\", macbook=~\"$device\", severity=\"warning\", alertstate=\"firing\"})",
           "legendFormat": "warning",
           "refId": "A"
         }
@@ -116,7 +116,7 @@
       },
       "targets": [
         {
-          "expr": "ALERTS{alertname=~\"MLX.*\", macbook=~\"$macbook\"}",
+          "expr": "ALERTS{alertname=~\"MLX.*\", macbook=~\"$device\"}",
           "legendFormat": "{{alertname}} {{macbook}} {{alertstate}}",
           "refId": "A"
         }
@@ -140,7 +140,7 @@
       },
       "targets": [
         {
-          "expr": "ALERTS{alertname=~\"MLX.*\", macbook=~\"$macbook\", severity=~\"$severity\", alertstate=\"firing\"}",
+          "expr": "ALERTS{alertname=~\"MLX.*\", macbook=~\"$device\", severity=~\"$severity\", alertstate=\"firing\"}",
           "legendFormat": "{{alertname}}",
           "refId": "A"
         }

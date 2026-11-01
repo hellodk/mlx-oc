@@ -18,14 +18,14 @@ Per-node parameters are fetched via SSH or local inspection:
 Usage:
   # Discover the local machine
   python3 scripts/discover_nodes.py --local --role rank0 \
-      --central-victoria-metrics 192.168.1.100:8428 \
-      --central-otel 192.168.1.100:4318 \
-      --central-opik 192.168.1.100:32173 \
-      --ssh-user dk --ssh-key ~/.ssh/id_rsa \
+      --central-victoria-metrics <VM_HOST:PORT> \
+      --central-otel <OTEL_HOST:PORT> \
+      --central-opik <OPIK_HOST:PORT> \
+      --ssh-user <USER> --ssh-key <KEY_PATH> \
       > edge/config/nodes.yml
 
   # Discover a remote Macbook via SSH
-  python3 scripts/discover_nodes.py --host 192.168.1.11 --role rank1 ...
+  python3 scripts/discover_nodes.py --host <REMOTE_HOST> --role rank1 ...
 
 Output is YAML written to stdout. Review before deploying.
 """

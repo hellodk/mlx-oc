@@ -56,7 +56,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_log_tailer_up{macbook=\"$macbook\"}",
+          "expr": "mlx_log_tailer_up{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -80,7 +80,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_log_tailer_lines_total{macbook=\"$macbook\", severity=\"$severity\", category=\"$category\"}[1m])",
+          "expr": "rate(mlx_log_tailer_lines_total{macbook=\"$device\", severity=\"$severity\", category=\"$category\"}[1m])",
           "legendFormat": "{{macbook}} {{severity}} {{category}}",
           "refId": "A"
         }
@@ -103,7 +103,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_log_tailer_shipped_total{macbook=\"$macbook\", severity=\"$severity\"}[1m])",
+          "expr": "rate(mlx_log_tailer_shipped_total{macbook=\"$device\", severity=\"$severity\"}[1m])",
           "legendFormat": "{{macbook}} {{severity}}",
           "refId": "A"
         }
@@ -126,7 +126,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_log_tailer_dropped_total{macbook=\"$macbook\"}[1m])",
+          "expr": "rate(mlx_log_tailer_dropped_total{macbook=\"$device\"}[1m])",
           "legendFormat": "{{macbook}} {{reason}}",
           "refId": "A"
         }
@@ -149,7 +149,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_log_tailer_file_bytes{macbook=\"$macbook\"}",
+          "expr": "mlx_log_tailer_file_bytes{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -172,7 +172,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_log_tailer_errors_total{macbook=\"$macbook\"}[5m])",
+          "expr": "rate(mlx_log_tailer_errors_total{macbook=\"$device\"}[5m])",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }
@@ -195,7 +195,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_log_tailer_queue_depth{macbook=\"$macbook\"}",
+          "expr": "mlx_log_tailer_queue_depth{macbook=\"$device\"}",
           "legendFormat": "{{macbook}}",
           "refId": "A"
         }

@@ -51,12 +51,12 @@
           },
           "targets": [
             {
-              "expr": "mlx_hw_load15{macbook=\"$macbook\", node=\"$node\"}",
+              "expr": "mlx_hw_load15{macbook=\"$device\", node=\"$node\"}",
               "legendFormat": "{{macbook}} load15",
               "refId": "A"
             },
             {
-              "expr": "mlx_hw_cpu_count{macbook=\"$macbook\", node=\"$node\"}",
+              "expr": "mlx_hw_cpu_count{macbook=\"$device\", node=\"$node\"}",
               "legendFormat": "{{macbook}} cpu_count",
               "refId": "B"
             }
@@ -74,7 +74,7 @@
           },
           "targets": [
             {
-              "expr": "mlx_hw_mem_used_bytes{macbook=\"$macbook\", node=\"$node\"}",
+              "expr": "mlx_hw_mem_used_bytes{macbook=\"$device\", node=\"$node\"}",
               "legendFormat": "{{macbook}}",
               "refId": "A"
             }
@@ -97,7 +97,7 @@
           },
           "targets": [
             {
-              "expr": "mlx_hw_disk_used_bytes{macbook=\"$macbook\", node=\"$node\"}",
+              "expr": "mlx_hw_disk_used_bytes{macbook=\"$device\", node=\"$node\"}",
               "legendFormat": "{{macbook}}",
               "refId": "A"
             }
@@ -126,7 +126,7 @@
           },
           "targets": [
             {
-              "expr": "mlx_server_state{macbook=\"$macbook\"}",
+              "expr": "mlx_server_state{macbook=\"$device\"}",
               "legendFormat": "{{macbook}}",
               "refId": "A"
             }
@@ -150,12 +150,12 @@
           },
           "targets": [
             {
-              "expr": "mlx_server_up{macbook=\"$macbook\"}",
+              "expr": "mlx_server_up{macbook=\"$device\"}",
               "legendFormat": "{{macbook}} up",
               "refId": "A"
             },
             {
-              "expr": "mlx_server_ready{macbook=\"$macbook\"}",
+              "expr": "mlx_server_ready{macbook=\"$device\"}",
               "legendFormat": "{{macbook}} ready",
               "refId": "B"
             }
@@ -173,7 +173,7 @@
           },
           "targets": [
             {
-              "expr": "mlx_model_loaded{macbook=\"$macbook\"}",
+              "expr": "mlx_model_loaded{macbook=\"$device\"}",
               "legendFormat": "{{macbook}} {{model}}",
               "refId": "A"
             }
@@ -197,7 +197,7 @@
           },
           "targets": [
             {
-              "expr": "rate(mlx_requests_total{macbook=\"$macbook\"}[1m])",
+              "expr": "rate(mlx_requests_total{macbook=\"$device\"}[1m])",
               "legendFormat": "{{macbook}}",
               "refId": "A"
             }
@@ -220,7 +220,7 @@
           },
           "targets": [
             {
-              "expr": "histogram_quantile(0.95, rate(mlx_ttft_seconds_bucket{macbook=\"$macbook\"}[5m]))",
+              "expr": "histogram_quantile(0.95, rate(mlx_ttft_seconds_bucket{macbook=\"$device\"}[5m]))",
               "legendFormat": "{{macbook}}",
               "refId": "A"
             }
@@ -243,7 +243,7 @@
           },
           "targets": [
             {
-              "expr": "rate(mlx_token_rate_tokens_per_second_sum{macbook=\"$macbook\"}[1m]) / rate(mlx_token_rate_tokens_per_second_count{macbook=\"$macbook\"}[1m])",
+              "expr": "rate(mlx_token_rate_tokens_per_second_sum{macbook=\"$device\"}[1m]) / rate(mlx_token_rate_tokens_per_second_count{macbook=\"$device\"}[1m])",
               "legendFormat": "{{macbook}}",
               "refId": "A"
             }
@@ -272,7 +272,7 @@
           },
           "targets": [
             {
-              "expr": "mlx_hallucination_risk{macbook=\"$macbook\"}",
+              "expr": "mlx_hallucination_risk{macbook=\"$device\"}",
               "legendFormat": "{{macbook}}",
               "refId": "A"
             }
@@ -298,7 +298,7 @@
           },
           "targets": [
             {
-              "expr": "mlx_token_confidence_mean{macbook=\"$macbook\"}",
+              "expr": "mlx_token_confidence_mean{macbook=\"$device\"}",
               "legendFormat": "{{macbook}}",
               "refId": "A"
             }
@@ -324,7 +324,7 @@
           },
           "targets": [
             {
-              "expr": "mlx_output_perplexity{macbook=\"$macbook\"}",
+              "expr": "mlx_output_perplexity{macbook=\"$device\"}",
               "legendFormat": "{{macbook}}",
               "refId": "A"
             }
@@ -348,7 +348,7 @@
           },
           "targets": [
             {
-              "expr": "mlx_hw_gpu_power_milliwatts{macbook=\"$macbook\", node=\"$node\"}",
+              "expr": "mlx_hw_gpu_power_milliwatts{macbook=\"$device\", node=\"$node\"}",
               "legendFormat": "{{macbook}} {{node}}",
               "refId": "A"
             }
@@ -371,7 +371,7 @@
           },
           "targets": [
             {
-              "expr": "mlx_hw_thermal_pressure{macbook=\"$macbook\", node=\"$node\"}",
+              "expr": "mlx_hw_thermal_pressure{macbook=\"$device\", node=\"$node\"}",
               "legendFormat": "{{macbook}} {{node}}",
               "refId": "A"
             }
@@ -397,7 +397,7 @@
           },
           "targets": [
             {
-              "expr": "mlx_hw_gpu_utilization_percent{macbook=\"$macbook\", node=\"$node\"}",
+              "expr": "mlx_hw_gpu_utilization_percent{macbook=\"$device\", node=\"$node\"}",
               "legendFormat": "{{macbook}} {{node}}",
               "refId": "A"
             }
