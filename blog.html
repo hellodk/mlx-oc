@@ -678,6 +678,274 @@ open http://localhost:8428/vmui # query: mlx_requests_total
 open http://localhost:3000      # Grafana (admin/admin) → "MLX Cluster" dashboard</code></pre>
   <p>The dashboard charts requests/min, TTFT p50/p95, tokens/min, token rate, hallucination-risk heuristics, tool calls, and per-node hardware (load, memory pressure, worker RSS, CPU temp) &mdash; with a single panel showing whether all three exporters (<code>mlx-proxy</code>, <code>mlx-hw</code> rank0, rank1) are up.</p>
 
+  <h3>Data Path &mdash; Pull &amp; Push Lanes</h3>
+  <p>Five Python agents expose <code>/metrics</code> and VictoriaMetrics scrapes them. The proxy and log tailer also push traces and logs over OTLP to the collector, which remote-writes metrics to the same TSDB. The hardware exporter is pull-only by design.</p>
+<div class="figure">
+    <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">Data Path Overview — Pull &amp; Push Lanes</div>
+<svg viewBox="0 0 1080 660" role="img" aria-label="Data path overview showing pull and push lanes">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6B7280"/>
+    </marker>
+    <marker id="arb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#444CE7"/>
+    </marker>
+    <path id="busA" d="M114,193 L956,193"/>
+    <path id="dropA" d="M540,193 L540,220"/>
+    <path id="otlpUp" d="M700,400 L700,296"/>
+    <path id="opikPath" d="M139,486 L139,568 L880,568"/>
+  </defs>
+
+  <text x="24" y="42" font-size="13" font-weight="700" fill="#111827" letter-spacing=".6">Lane A — Pull · Prometheus Scrape · Every 10 s</text>
+
+  <rect x="24" y="90" width="180" height="76" rx="9" fill="#1a1a3e" stroke="#444CE7" stroke-width="1.5"/>
+  <text x="114" y="114" font-size="12.5" font-weight="600" fill="#FFFFFF" text-anchor="middle">mlx_metrics_proxy</text>
+  <text x="114" y="134" font-size="12" fill="#C7D2FE" text-anchor="middle">:8080</text>
+  <text x="114" y="153" font-size="12" fill="#A5B4FC" text-anchor="middle">RED + Quality</text>
+
+  <rect x="232" y="90" width="180" height="76" rx="9" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  <text x="322" y="114" font-size="12.5" font-weight="600" fill="#111827" text-anchor="middle">mlx_hw_telemetry</text>
+  <text x="322" y="134" font-size="12" fill="#4B5563" text-anchor="middle">:9102 · Rank 0</text>
+  <text x="322" y="153" font-size="12" fill="#4B5563" text-anchor="middle">Power · Thermal</text>
+
+  <rect x="440" y="90" width="180" height="76" rx="9" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  <text x="530" y="114" font-size="12.5" font-weight="600" fill="#111827" text-anchor="middle">mlx_hw_telemetry</text>
+  <text x="530" y="134" font-size="12" fill="#4B5563" text-anchor="middle">:9102 · Rank 1</text>
+  <text x="530" y="153" font-size="12" fill="#4B5563" text-anchor="middle">Over Thunderbolt</text>
+
+  <rect x="648" y="90" width="180" height="76" rx="9" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  <text x="738" y="114" font-size="12.5" font-weight="600" fill="#111827" text-anchor="middle">mlx_kv_cache_agent</text>
+  <text x="738" y="134" font-size="12" fill="#4B5563" text-anchor="middle">:9104</text>
+  <text x="738" y="153" font-size="12" fill="#4B5563" text-anchor="middle">Cache · Context</text>
+
+  <rect x="856" y="90" width="200" height="76" rx="9" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  <text x="956" y="114" font-size="12.5" font-weight="600" fill="#111827" text-anchor="middle">mlx_server_supervisor</text>
+  <text x="956" y="134" font-size="12" fill="#4B5563" text-anchor="middle">:9105</text>
+  <text x="956" y="153" font-size="12" fill="#4B5563" text-anchor="middle">Restart · Crash</text>
+
+  <circle cx="114" cy="128" r="30" fill="none" stroke="#444CE7" stroke-width="1.5" opacity="0">
+    <animate attributeName="r" values="30;78" dur="2.6s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.55;0" dur="2.6s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="114" cy="128" r="30" fill="none" stroke="#444CE7" stroke-width="1.5" opacity="0">
+    <animate attributeName="r" values="30;78" dur="2.6s" begin="1.3s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.55;0" dur="2.6s" begin="1.3s" repeatCount="indefinite"/>
+  </circle>
+
+  <line x1="114" y1="166" x2="114" y2="193" stroke="#6B7280" stroke-width="1.6"/>
+  <line x1="322" y1="166" x2="322" y2="193" stroke="#6B7280" stroke-width="1.6"/>
+  <line x1="530" y1="166" x2="530" y2="193" stroke="#6B7280" stroke-width="1.6"/>
+  <line x1="738" y1="166" x2="738" y2="193" stroke="#6B7280" stroke-width="1.6"/>
+  <line x1="956" y1="166" x2="956" y2="193" stroke="#6B7280" stroke-width="1.6"/>
+  <line x1="114" y1="193" x2="956" y2="193" stroke="#6B7280" stroke-width="1.6"/>
+  <line x1="540" y1="193" x2="540" y2="220" stroke="#6B7280" stroke-width="1.6" marker-end="url(#ar)"/>
+  <circle r="4" fill="#444CE7"><animateMotion dur="3.4s" repeatCount="indefinite" rotate="auto"><mpath href="#busA"/></animateMotion></circle>
+  <circle r="4" fill="#444CE7"><animateMotion dur="3.4s" begin="1.7s" repeatCount="indefinite" rotate="auto"><mpath href="#busA"/></animateMotion></circle>
+  <circle r="4" fill="#444CE7"><animateMotion dur="1.1s" repeatCount="indefinite"><mpath href="#dropA"/></animateMotion></circle>
+  <text x="556" y="185" font-size="12" fill="#4B5563">/metrics</text>
+
+  <rect x="300" y="220" width="480" height="76" rx="9" fill="#1a1a3e" stroke="#444CE7" stroke-width="1.5"/>
+  <text x="540" y="248" font-size="13" font-weight="600" fill="#FFFFFF" text-anchor="middle">VictoriaMetrics · :8428</text>
+  <text x="540" y="268" font-size="12" fill="#C7D2FE" text-anchor="middle">Single-Node TSDB · 30-Day Retention · Prometheus API</text>
+  <text x="540" y="286" font-size="12" fill="#A5B4FC" text-anchor="middle">vm-scrape.yml — 6 Jobs · 8 Targets</text>
+  <circle cx="540" cy="258" r="34" fill="none" stroke="#444CE7" stroke-width="1.5" opacity="0">
+    <animate attributeName="r" values="34;92" dur="3s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.5;0" dur="3s" repeatCount="indefinite"/>
+  </circle>
+
+  <path d="M780,258 L818,258 L818,212 L856,212" fill="none" stroke="#6B7280" stroke-width="1.6" marker-end="url(#ar)" stroke-dasharray="122"/>
+  <path d="M780,258 L818,258 L818,288 L856,288" fill="none" stroke="#6B7280" stroke-width="1.6" marker-end="url(#ar)" stroke-dasharray="106"/>
+
+  <rect x="856" y="180" width="200" height="64" rx="9" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  <text x="956" y="204" font-size="12.5" font-weight="600" fill="#111827" text-anchor="middle">Grafana · :3000</text>
+  <text x="956" y="224" font-size="12" fill="#4B5563" text-anchor="middle">12 Dashboards</text>
+
+  <rect x="856" y="256" width="200" height="64" rx="9" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  <text x="956" y="280" font-size="12.5" font-weight="600" fill="#111827" text-anchor="middle">vmalert · :8880</text>
+  <text x="956" y="300" font-size="12" fill="#4B5563" text-anchor="middle">46 Rules → Alertmanager</text>
+
+  <text x="24" y="382" font-size="13" font-weight="700" fill="#111827" letter-spacing=".6">Lane B — Push · OTLP/HTTP</text>
+
+  <rect x="24" y="410" width="230" height="76" rx="9" fill="#1a1a3e" stroke="#444CE7" stroke-width="1.5"/>
+  <text x="139" y="434" font-size="12.5" font-weight="600" fill="#FFFFFF" text-anchor="middle">mlx_metrics_proxy</text>
+  <text x="139" y="454" font-size="12" fill="#C7D2FE" text-anchor="middle">Trace Per Request</text>
+  <text x="139" y="473" font-size="12" fill="#A5B4FC" text-anchor="middle">Batch Span Processor</text>
+
+  <rect x="282" y="410" width="230" height="76" rx="9" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  <text x="397" y="434" font-size="12.5" font-weight="600" fill="#111827" text-anchor="middle">mlx_server_log_tailer</text>
+  <text x="397" y="454" font-size="12" fill="#4B5563" text-anchor="middle">:9106 · Tails server.log</text>
+  <text x="397" y="473" font-size="12" fill="#4B5563" text-anchor="middle">Shipped / Dropped Counters</text>
+
+  <line x1="254" y1="448" x2="580" y2="448" stroke="#6B7280" stroke-width="1.6" marker-end="url(#ar)"/>
+  <line x1="512" y1="448" x2="580" y2="448" stroke="#6B7280" stroke-width="1.6" marker-end="url(#ar)"/>
+
+  <rect x="580" y="400" width="240" height="96" rx="9" fill="#1a1a3e" stroke="#444CE7" stroke-width="1.5"/>
+  <text x="700" y="426" font-size="13" font-weight="600" fill="#FFFFFF" text-anchor="middle">otel-collector</text>
+  <text x="700" y="446" font-size="12" fill="#C7D2FE" text-anchor="middle">:4317 gRPC · :4318 HTTP</text>
+  <text x="700" y="466" font-size="12" fill="#A5B4FC" text-anchor="middle">One Processor: batch(128, 5 s)</text>
+  <text x="700" y="484" font-size="12" fill="#A5B4FC" text-anchor="middle">Runs As UID 0 For File Sink</text>
+  <circle cx="700" cy="448" r="30" fill="none" stroke="#444CE7" stroke-width="1.5" opacity="0">
+    <animate attributeName="r" values="30;80" dur="2.8s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.5;0" dur="2.8s" repeatCount="indefinite"/>
+  </circle>
+
+  <path d="M700,400 L700,296" fill="none" stroke="#444CE7" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#arb)"/>
+  <circle r="4" fill="#444CE7"><animateMotion dur="1.6s" repeatCount="indefinite" rotate="auto"><mpath href="#otlpUp"/></animateMotion></circle>
+  <text x="712" y="344" font-size="12" font-weight="600" fill="#3730A3">prometheus_remote_write</text>
+  <text x="712" y="362" font-size="12" fill="#4B5563">→ /api/v1/write · Metrics Pipeline</text>
+
+  <line x1="820" y1="448" x2="880" y2="448" stroke="#6B7280" stroke-width="1.6" marker-end="url(#ar)"/>
+  <rect x="880" y="410" width="176" height="76" rx="9" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  <text x="968" y="434" font-size="12.5" font-weight="600" fill="#111827" text-anchor="middle">File Exporter</text>
+  <text x="968" y="454" font-size="12" fill="#4B5563" text-anchor="middle">mlx-server-logs.jsonl</text>
+  <text x="968" y="473" font-size="12" fill="#4B5563" text-anchor="middle">50 MB × 5 Rotations</text>
+
+  <path d="M139,486 L139,568 L880,568" fill="none" stroke="#444CE7" stroke-width="1.6" stroke-dasharray="7 4" marker-end="url(#arb)"/>
+  <circle r="4.5" fill="#444CE7"><animateMotion dur="4s" repeatCount="indefinite" rotate="auto"><mpath href="#opikPath"/></animateMotion></circle>
+  <text x="152" y="536" font-size="12" font-weight="600" fill="#3730A3">Second Span Processor — Bypasses The Collector</text>
+  <rect x="880" y="530" width="176" height="76" rx="9" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  <text x="968" y="554" font-size="12.5" font-weight="600" fill="#111827" text-anchor="middle">Opik · :32173</text>
+  <text x="968" y="574" font-size="12" fill="#4B5563" text-anchor="middle">Per-Request Traces</text>
+  <text x="968" y="593" font-size="12" fill="#4B5563" text-anchor="middle">Plus SDK Trace Path</text>
+
+  <rect x="24" y="604" width="1032" height="28" rx="7" fill="#F3F4F6" stroke="#E5E7EB"/>
+  <text x="40" y="623" font-size="12" fill="#4B5563">The Traces Pipeline Exits To <tspan font-weight="600">debug</tspan> Only — Nothing Persists Them Here. Opik Is The System Of Record For Traces.</text>
+</svg>
+  </div>
+
+  <h3>Hardware Collection Internals</h3>
+  <p>Ten commands across two cadences (5 s for most metrics, 15 s for GPU/power via <code>powermetrics</code>). Two <code>powermetrics</code> invocations require passwordless sudo. Rank 1 is scraped over SSH.</p>
+<div class="figure">
+    <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">mlx_hw_telemetry.py — Command → Cadence → Exported Series</div>
+<svg viewBox="0 0 1080 580" role="img" aria-label="Hardware telemetry command to cadence to exported series">
+  <defs>
+    <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6B7280"/>
+    </marker>
+  </defs>
+
+  <text x="24" y="40" font-size="12.5" font-weight="700" fill="#111827" letter-spacing=".6">Source Commands</text>
+  <text x="380" y="40" font-size="12.5" font-weight="700" fill="#111827" letter-spacing=".6">Sampling Cadence</text>
+  <text x="660" y="40" font-size="12.5" font-weight="700" fill="#111827" letter-spacing=".6">Exported Series</text>
+
+  <rect x="24" y="64" width="300" height="44" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.4"/>
+  <text x="38" y="83" font-size="12" font-family="ui-monospace,Menlo,monospace" fill="#111827">sysctl -n kern.boottime</text>
+  <text x="38" y="99" font-size="12" fill="#15803D" font-weight="600">No Sudo</text>
+
+  <rect x="24" y="118" width="300" height="44" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.4"/>
+  <text x="38" y="137" font-size="12" font-family="ui-monospace,Menlo,monospace" fill="#111827">vm_stat</text>
+  <text x="38" y="153" font-size="12" fill="#15803D" font-weight="600">No Sudo</text>
+
+  <rect x="24" y="172" width="300" height="44" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.4"/>
+  <text x="38" y="191" font-size="12" font-family="ui-monospace,Menlo,monospace" fill="#111827">pmset -g therm</text>
+  <text x="38" y="207" font-size="12" fill="#15803D" font-weight="600">No Sudo</text>
+
+  <rect x="24" y="226" width="300" height="44" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.4"/>
+  <text x="38" y="245" font-size="12" font-family="ui-monospace,Menlo,monospace" fill="#111827">ps -axo pid=,pcpu=,rss=,command=</text>
+  <text x="38" y="261" font-size="12" fill="#15803D" font-weight="600">No Sudo</text>
+
+  <rect x="24" y="280" width="300" height="44" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.4"/>
+  <text x="38" y="299" font-size="12" font-family="ui-monospace,Menlo,monospace" fill="#111827">podman stats --no-stream</text>
+  <text x="38" y="315" font-size="12" fill="#15803D" font-weight="600">No Sudo · Rootless</text>
+
+  <rect x="24" y="334" width="300" height="44" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.4"/>
+  <text x="38" y="353" font-size="12" font-family="ui-monospace,Menlo,monospace" fill="#111827">netstat -ib -I &lt;iface&gt;</text>
+  <text x="38" y="369" font-size="12" fill="#15803D" font-weight="600">No Sudo · Thunderbolt Ring</text>
+
+  <rect x="24" y="388" width="300" height="44" rx="8" fill="#FFFFFF" stroke="#DC2626" stroke-width="1.4"/>
+  <text x="38" y="407" font-size="12" font-family="ui-monospace,Menlo,monospace" fill="#111827">sudo -n powermetrics --samplers smc</text>
+  <text x="38" y="423" font-size="12" fill="#B91C1C" font-weight="600">Requires Passwordless Sudo</text>
+
+  <rect x="24" y="442" width="300" height="44" rx="8" fill="#FFFFFF" stroke="#DC2626" stroke-width="1.4"/>
+  <text x="38" y="461" font-size="12" font-family="ui-monospace,Menlo,monospace" fill="#111827">sudo -n powermetrics cpu_power,gpu_power</text>
+  <text x="38" y="477" font-size="12" fill="#B91C1C" font-weight="600">Requires Passwordless Sudo</text>
+
+  <rect x="24" y="496" width="300" height="44" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.4"/>
+  <text x="38" y="515" font-size="12" font-family="ui-monospace,Menlo,monospace" fill="#111827">ioreg -c IOAccelerator -r -d 2</text>
+  <text x="38" y="531" font-size="12" fill="#15803D" font-weight="600">No Sudo</text>
+
+  <rect x="380" y="64" width="220" height="310" rx="10" fill="#1a1a3e" stroke="#444CE7" stroke-width="1.5"/>
+  <text x="490" y="112" font-size="13" font-weight="600" fill="#FFFFFF" text-anchor="middle">5 s Sample Loop</text>
+  <text x="490" y="136" font-size="12" fill="#A5B4FC" text-anchor="middle">--interval Flag, Floor 1.0 s</text>
+  <text x="490" y="172" font-size="12" fill="#C7D2FE" text-anchor="middle">mlx_hw_up</text>
+  <text x="490" y="192" font-size="12" fill="#C7D2FE" text-anchor="middle">mlx_hw_uptime_seconds</text>
+  <text x="490" y="212" font-size="12" fill="#C7D2FE" text-anchor="middle">mlx_hw_load1 / load5 / load15</text>
+  <text x="490" y="232" font-size="12" fill="#C7D2FE" text-anchor="middle">mlx_hw_cpu_temp_celsius</text>
+  <text x="490" y="252" font-size="12" fill="#C7D2FE" text-anchor="middle">mlx_hw_mem_pressure</text>
+  <text x="490" y="272" font-size="12" fill="#C7D2FE" text-anchor="middle">mlx_hw_thermal_pressure</text>
+  <text x="490" y="292" font-size="12" fill="#C7D2FE" text-anchor="middle">mlx_proc_cpu_percent · rss_bytes</text>
+  <text x="490" y="312" font-size="12" fill="#C7D2FE" text-anchor="middle">mlx_net_{rx,tx}_*_total</text>
+  <text x="490" y="348" font-size="12" fill="#A5B4FC" text-anchor="middle">Plus Disk, CPU Count, GPU Memory</text>
+
+  <rect x="380" y="394" width="220" height="146" rx="10" fill="#1a1a3e" stroke="#444CE7" stroke-width="1.5"/>
+  <text x="490" y="428" font-size="13" font-weight="600" fill="#FFFFFF" text-anchor="middle">15 s GPU Sampler</text>
+  <text x="490" y="450" font-size="12" fill="#A5B4FC" text-anchor="middle">Hard-Coded, No Flag</text>
+  <text x="490" y="482" font-size="12" fill="#C7D2FE" text-anchor="middle">mlx_hw_gpu_utilization_percent</text>
+  <text x="490" y="502" font-size="12" fill="#C7D2FE" text-anchor="middle">mlx_hw_gpu_frequency_mhz</text>
+  <text x="490" y="522" font-size="12" fill="#C7D2FE" text-anchor="middle">mlx_hw_{cpu,gpu,ane,package}_power</text>
+
+  <line x1="324" y1="86"  x2="380" y2="86"  stroke="#6B7280" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="324" y1="140" x2="380" y2="140" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="324" y1="194" x2="380" y2="194" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="324" y1="248" x2="380" y2="248" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="324" y1="302" x2="380" y2="302" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="324" y1="356" x2="380" y2="356" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="324" y1="410" x2="380" y2="410" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="324" y1="464" x2="380" y2="464" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="324" y1="518" x2="380" y2="518" stroke="#6B7280" stroke-width="1.5" marker-end="url(#ar3)"/>
+
+  <line x1="600" y1="219" x2="660" y2="219" stroke="#6B7280" stroke-width="1.6" marker-end="url(#ar3)"/>
+  <line x1="600" y1="467" x2="660" y2="467" stroke="#6B7280" stroke-width="1.6" marker-end="url(#ar3)"/>
+
+  <rect x="660" y="64" width="190" height="476" rx="10" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  <text x="676" y="92" font-size="12.5" font-weight="650" fill="#111827">31 Metric Families</text>
+  <text x="676" y="114" font-size="12" fill="#4B5563">All <tspan font-family="ui-monospace,Menlo,monospace">Gauge</tspan> or <tspan font-family="ui-monospace,Menlo,monospace">Counter</tspan></text>
+  <text x="676" y="132" font-size="12" fill="#4B5563">All Labelled <tspan font-family="ui-monospace,Menlo,monospace">node</tspan></text>
+  <text x="676" y="150" font-size="12" fill="#4B5563">No Histograms Here</text>
+  <text x="676" y="186" font-size="12" font-weight="600" fill="#111827">Power &amp; GPU Load</text>
+  <text x="676" y="206" font-size="12" fill="#4B5563">cpu · gpu · ane</text>
+  <text x="676" y="222" font-size="12" fill="#4B5563">package (sum)</text>
+  <text x="676" y="238" font-size="12" fill="#4B5563">gpu_util · IOKit</text>
+  <text x="676" y="252" font-size="12" font-weight="600" fill="#111827">Thermal</text>
+  <text x="676" y="272" font-size="12" fill="#4B5563">cpu_temp_celsius</text>
+  <text x="676" y="288" font-size="12" fill="#4B5563">thermal_pressure</text>
+  <text x="676" y="318" font-size="12" font-weight="600" fill="#111827">Memory</text>
+  <text x="676" y="338" font-size="12" fill="#4B5563">host used / total</text>
+  <text x="676" y="354" font-size="12" fill="#4B5563">gpu used / alloc / total</text>
+  <text x="676" y="400" font-size="12" font-weight="600" fill="#111827">Ring Interconnect</text>
+  <text x="676" y="420" font-size="12" fill="#4B5563">4 Counters, iface=auto</text>
+  <text x="676" y="436" font-size="12" fill="#4B5563">192.168.2.0/24</text>
+  <text x="676" y="466" font-size="12" font-weight="600" fill="#111827">Processes</text>
+  <text x="676" y="486" font-size="12" fill="#4B5563">5 host components</text>
+  <text x="676" y="502" font-size="12" fill="#4B5563">5 podman containers</text>
+  <text x="676" y="528" font-size="12" fill="#4B5563">First Sample Stores A</text>
+  <text x="676" y="544" font-size="12" fill="#4B5563">Baseline Only — No Fake Jump</text>
+
+  <line x1="850" y1="302" x2="890" y2="302" stroke="#6B7280" stroke-width="1.6" marker-end="url(#ar3)"/>
+
+  <rect x="890" y="64" width="166" height="476" rx="10" fill="#1a1a3e" stroke="#444CE7" stroke-width="1.5"/>
+  <text x="973" y="100" font-size="13" font-weight="600" fill="#FFFFFF" text-anchor="middle">:9102 /metrics</text>
+  <text x="973" y="124" font-size="12" fill="#A5B4FC" text-anchor="middle">ThreadingHTTPServer</text>
+  <text x="973" y="142" font-size="12" fill="#A5B4FC" text-anchor="middle">generate_latest()</text>
+  <text x="973" y="178" font-size="12" fill="#C7D2FE" text-anchor="middle">Binds 0.0.0.0</text>
+  <text x="973" y="198" font-size="12" fill="#C7D2FE" text-anchor="middle">Rank 0: Local</text>
+  <text x="973" y="218" font-size="12" fill="#C7D2FE" text-anchor="middle">Rank 1: Over SSH</text>
+  <text x="973" y="256" font-size="12" fill="#C7D2FE" text-anchor="middle">Scraped Every 10 s</text>
+  <text x="973" y="276" font-size="12" fill="#C7D2FE" text-anchor="middle">By VictoriaMetrics</text>
+  <text x="973" y="312" font-size="12" fill="#FCA5A5" text-anchor="middle">No OTLP Exporter —</text>
+  <text x="973" y="330" font-size="12" fill="#FCA5A5" text-anchor="middle">Pull-Only By Design</text>
+  <text x="973" y="368" font-size="12" fill="#C7D2FE" text-anchor="middle">Py3.14 venv On Rank 0</text>
+  <text x="973" y="388" font-size="12" fill="#C7D2FE" text-anchor="middle">Py3.12 venv On Rank 1</text>
+  <text x="973" y="406" font-size="12" fill="#C7D2FE" text-anchor="middle">For TCC Local-Network</text>
+  <circle cx="973" cy="140" r="26" fill="none" stroke="#444CE7" stroke-width="1.5" opacity="0">
+    <animate attributeName="r" values="26;70" dur="2.4s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.5;0" dur="2.4s" repeatCount="indefinite"/>
+  </circle>
+</svg>
+  </div>
+
+
+
   <div class="callout warn"><span class="ic">!</span>
     <div><b>One OTLP gotcha:</b> the exporter needs the full signal path &mdash; base endpoint <code>http://192.168.1.64:4318</code> must be expanded to <code>/v1/metrics</code> (and <code>/v1/traces</code>, <code>/v1/logs</code>) or the collector returns 404 and silently drops everything. The proxy now does this itself via <code>_sig_url()</code>.</div>
   </div>

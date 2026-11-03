@@ -44,11 +44,12 @@ from prometheus_client import (
     CONTENT_TYPE_LATEST,
 )
 
-from mlx_logging import degraded, error, info, setup_logging
+from mlx_logging import degraded, debug, error, info, setup_logging
 
 try:
     from mlx_model_info import model_info as _model_info
-except Exception:
+except Exception as exc:
+    debug(f"mlx_model_info import failed: {exc!r}", component="proxy")
     _model_info = None
 
 _OTEL = None
@@ -502,7 +503,8 @@ def score_confidence(logprobs_obj, threshold: float) -> dict:
             "margin_mean": mean_top2_margin(entries),
             "low_confidence_ratio": low,
         }
-    except Exception:
+    except Exception as exc:
+        debug(f"score_confidence failed: {exc!r}", component="proxy")
         return {}
 
 
@@ -757,8 +759,8 @@ class Proxy(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(payload)
             self.wfile.flush()
-        except Exception:
-            pass
+        except Exception as exc:
+            debug(f"_reject write failed: {exc!r}", component="proxy")
         self.close_connection = True
 
     def _forward(self):
@@ -1269,8 +1271,8 @@ class Proxy(BaseHTTPRequestHandler):
                             "exception_message": str(exc),
                         }
                     )
-                except Exception:
-                    pass
+                except Exception as exc2:
+                    debug(f"opik_span.end failed: {exc2!r}", component="proxy")
             if opik_trace is not None:
                 try:
                     opik_trace.end(
@@ -1279,8 +1281,8 @@ class Proxy(BaseHTTPRequestHandler):
                             "exception_message": str(exc),
                         }
                     )
-                except Exception:
-                    pass
+                except Exception as exc2:
+                    debug(f"opik_trace.end failed: {exc2!r}", component="proxy")
             try:
                 self.send_response(503)
                 self.send_header("Content-Type", "text/plain")
@@ -1288,21 +1290,21 @@ class Proxy(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b"mlx upstream unavailable\n")
                 self.close_connection = True
-            except Exception:
-                pass
+            except Exception as exc2:
+                debug(f"503 response write failed: {exc2!r}", component="proxy")
         finally:
             if is_chat:
                 IN_FLIGHT.labels(model).dec()
             if span is not None:
                 try:
                     span.end()
-                except Exception:
-                    pass
+                except Exception as exc2:
+                    debug(f"span.end failed: {exc2!r}", component="proxy")
             if _OPIK is not None and (opik_trace is not None or opik_span is not None):
                 try:
                     _OPIK.flush()
-                except Exception:
-                    pass
+                except Exception as exc2:
+                    debug(f"opik flush failed: {exc2!r}", component="proxy")
             conn.close()
 
     def do_GET(self):
@@ -1329,7 +1331,8 @@ def _health_watch(upstream):
             r = c.getresponse()
             UPSTREAM_UP.set(1 if r.status == 200 else 0)
             c.close()
-        except Exception:
+        except Exception as exc:
+            debug(f"health watch failed: {exc!r}", component="proxy")
             UPSTREAM_UP.set(0)
         time.sleep(15)
 

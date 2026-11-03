@@ -37,7 +37,7 @@ from pathlib import Path
 
 import yaml
 
-from mlx_logging import degraded, error, info, setup_logging
+from mlx_logging import degraded, debug, error, info, setup_logging
 
 BUNDLE_DIR = Path(__file__).resolve().parent
 CONFIG_DIR = BUNDLE_DIR / "config"
@@ -110,7 +110,8 @@ def read_pid(pfile: Path) -> int | None:
     if pfile.exists():
         try:
             return int(pfile.read_text().strip())
-        except Exception:
+        except Exception as exc:
+            debug(f"read_pid failed: {exc!r}", component="bundle")
             return None
     return None
 
@@ -338,22 +339,24 @@ class Bundle:
         if bp and pid_alive(bp):
             try:
                 os.killpg(os.getpgid(bp), signal.SIGTERM)
-            except Exception:
+            except Exception as exc:
+                debug(f"killpg bundle failed: {exc!r}", component="bundle")
                 try:
                     os.kill(bp, signal.SIGTERM)
-                except Exception:
-                    pass
+                except Exception as exc2:
+                    debug(f"kill bundle failed: {exc2!r}", component="bundle")
         for name in ["supervisor", "logtailer", "kv", "hw0", "proxy"]:
             pfile = self.pid_dir / f"{name}.pid"
             pid = read_pid(pfile)
             if pid:
                 try:
                     os.killpg(os.getpgid(pid), signal.SIGTERM)
-                except Exception:
+                except Exception as exc:
+                    debug(f"killpg {name} failed: {exc!r}", component="bundle")
                     try:
                         os.kill(pid, signal.SIGTERM)
-                    except Exception:
-                        pass
+                    except Exception as exc2:
+                        debug(f"kill {name} failed: {exc2!r}", component="bundle")
                 remove_pid(pfile)
         rank1_ip = self.node_config.get("ip", "")
         if rank1_ip and self.ssh_key:
@@ -364,8 +367,8 @@ class Bundle:
                      "pkill -f 'mlx_hw_telemetry.py' 2>/dev/null"],
                     timeout=5,
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                debug(f"ssh rank1 pkill failed: {exc!r}", component="bundle")
         remove_pid(PID_FILE)
 
     def start(self):
@@ -376,8 +379,8 @@ class Bundle:
         write_pid(PID_FILE, os.getpid())
         try:
             os.setsid()
-        except Exception:
-            pass
+        except Exception as exc:
+            debug(f"os.setsid failed: {exc!r}", component="bundle")
 
         started = []
         if self.enable_supervisor:

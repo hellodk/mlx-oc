@@ -23,7 +23,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
-from mlx_logging import degraded, error, info, setup_logging
+from mlx_logging import degraded, debug, error, info, setup_logging
 
 NODE_DEFAULT = "unknown"
 LISTEN_DEFAULT = "0.0.0.0:9102"
@@ -120,7 +120,8 @@ def _sysctl(name: str, default=None):
             ["sysctl", "-n", name], capture_output=True, text=True, timeout=3
         ).stdout.strip()
         return out or default
-    except Exception:
+    except Exception as exc:
+        debug(f"sysctl {name} failed: {exc!r}, using default", component="hw")
         return default
 
 
@@ -129,7 +130,8 @@ def _parse_page_size():
     try:
         import sysconfig
         _PAGE_SIZE = sysconfig.get_config_var("PAGESIZE") or os.sysconf("SC_PAGE_SIZE")
-    except Exception:
+    except Exception as exc:
+        debug(f"failed to parse page size: {exc!r}, using 4096", component="hw")
         _PAGE_SIZE = 4096
 
 
@@ -154,7 +156,8 @@ def _mem_info():
         free_pages = free + inactive + spec
         used = _MEM_TOTAL - free_pages * _PAGE_SIZE
         return used, free_pages
-    except Exception:
+    except Exception as exc:
+        debug(f"mem_info failed: {exc!r}", component="hw")
         return _MEM_TOTAL, 0
 
 
@@ -170,8 +173,8 @@ def _cpu_temp():
             if m:
                 return float(m.group(1))
         return float("nan")
-    except Exception:
-        degraded("CPU temperature unavailable (powermetrics/sudo)", component="hw")
+    except Exception as exc:
+        degraded(f"CPU temperature unavailable (powermetrics/sudo): {exc!r}", component="hw")
         return float("nan")
 
 
@@ -198,8 +201,8 @@ def _gpu_iokit_stats():
         m = re.search(r'"Device Utilization %"=(\d+)', out)
         if m:
             util = float(m.group(1))
-    except Exception:
-        pass
+    except Exception as exc:
+        debug(f"iostat GPU stats unavailable: {exc!r}", component="hw")
     return used, alloc, total, util
 
 
@@ -232,8 +235,8 @@ def _gpu_power_stats():
             m = re.search(r"ANE Power:\s*([\d.]+)\s*mW", line, re.I)
             if m:
                 ane_power = float(m.group(1))
-    except Exception:
-        degraded("GPU power stats unavailable (powermetrics/sudo)", component="hw")
+    except Exception as exc:
+        degraded(f"GPU power stats unavailable (powermetrics/sudo): {exc!r}", component="hw")
     gmu, ga, gmt, gui = _gpu_iokit_stats()
     with _GPU_LOCK:
         _GPU_STATS = {
@@ -256,8 +259,8 @@ def _thermal_pressure():
                 limit = int(m.group(1))
                 return max(0.0, min(1.0, (100 - limit) / 100.0))
         return 0.0
-    except Exception:
-        degraded("thermal pressure unavailable (pmset)", component="hw")
+    except Exception as exc:
+        degraded(f"thermal pressure unavailable (pmset): {exc!r}", component="hw")
         return float("nan")
 
 
@@ -291,8 +294,8 @@ def _worker_stats():
                 cpu += float(parts[1])
             except ValueError:
                 continue
-    except Exception:
-        pass
+    except Exception as exc:
+        degraded(f"worker stats collection failed: {exc!r}", component="hw")
     return cpu, rss
 
 
@@ -319,8 +322,8 @@ def _proc_stats():
                 if needle in cmd:
                     c, r = stats[name]
                     stats[name] = (c + cpu, r + rss)
-    except Exception:
-        pass
+    except Exception as exc:
+        debug(f"proc stats collection failed: {exc!r}", component="hw")
     return stats
 
 
@@ -341,8 +344,8 @@ def _container_stats():
                 if ctn == name:
                     stats[comp] = (float(cpu_pct), _mem_usage_bytes(parts[2]))
                     break
-    except Exception:
-        pass
+    except Exception as exc:
+        degraded(f"container stats collection failed: {exc!r}", component="hw")
     return stats
 
 
@@ -370,8 +373,8 @@ def _ring_iface():
             m = re.search(r"inet\s+192\.168\.2\.\d+\s", line)
             if m and cur:
                 return cur
-    except Exception:
-        pass
+    except Exception as exc:
+        debug(f"ring iface detection failed: {exc!r}", component="hw")
     return None
 
 
@@ -395,8 +398,8 @@ def _net_stats(iface: str | None):
                     )
                 except (ValueError, IndexError):
                     return None
-    except Exception:
-        pass
+    except Exception as exc:
+        degraded(f"net stats collection failed: {exc!r}", component="hw")
     return None
 
 

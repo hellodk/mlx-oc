@@ -24,7 +24,7 @@ from pathlib import Path
 
 import requests
 
-from mlx_logging import degraded, error, info, setup_logging
+from mlx_logging import degraded, debug, error, info, setup_logging
 from mlx_model_info import model_info as _model_info
 
 LISTEN_DEFAULT = "0.0.0.0:9104"
@@ -82,6 +82,7 @@ def _read_cache_stats(log_path: str) -> dict:
                         float(m.group(3)) * 1e9,
                     )
     except FileNotFoundError:
+        debug(f"log file not found yet: {log_path}", component="kv-agent")
         return {}
     return latest
 

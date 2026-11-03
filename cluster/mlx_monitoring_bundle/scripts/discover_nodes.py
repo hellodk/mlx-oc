@@ -44,7 +44,8 @@ def run_local(cmd: list[str]) -> str:
     try:
         return subprocess.run(cmd, capture_output=True, text=True,
                               timeout=10).stdout.strip()
-    except Exception:
+    except Exception as exc:
+        print(f"run_local failed: {exc!r}", file=sys.stderr)
         return ""
 
 
@@ -59,7 +60,8 @@ def run_ssh(host: str, user: str, key: str | None, cmd: str,
     try:
         return subprocess.run(ssh_cmd, capture_output=True, text=True,
                               timeout=timeout).stdout.strip()
-    except Exception:
+    except Exception as exc:
+        print(f"run_ssh to {host} failed: {exc!r}", file=sys.stderr)
         return ""
 
 
@@ -89,7 +91,8 @@ def get_ip_local() -> str:
         ip = s.getsockname()[0]
         s.close()
         return ip
-    except Exception:
+    except Exception as exc:
+        print(f"get_ip_local failed: {exc!r}", file=sys.stderr)
         return "127.0.0.1"
 
 

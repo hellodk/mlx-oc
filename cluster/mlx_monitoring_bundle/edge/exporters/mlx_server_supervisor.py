@@ -27,7 +27,7 @@ from pathlib import Path
 
 from prometheus_client import Gauge, Counter, generate_latest, CONTENT_TYPE_LATEST
 
-from mlx_logging import degraded, error, info, setup_logging
+from mlx_logging import degraded, debug, error, info, setup_logging
 
 LISTEN_DEFAULT = "0.0.0.0:9105"
 HEALTH_URL_DEFAULT = "http://127.0.0.1:8081/v1/models"
@@ -202,7 +202,8 @@ class Supervisor:
                     if resp.status == 200:
                         body = resp.read().decode("utf-8", "replace")
                         ok = json.loads(body).get("data") is not None
-            except Exception:
+            except Exception as exc:
+                debug(f"health check failed: {exc!r}", component="supervisor")
                 ok = False
             with self.health_lock:
                 alive = self.child is not None and self.child.poll() is None
@@ -229,8 +230,8 @@ class Supervisor:
                         self.hung_since = None
                         try:
                             self.child.terminate()
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            debug(f"child terminate failed: {exc!r}", component="supervisor")
                     if self.state == 1:
                         self.state = 2
                         G_STATE.set(2)

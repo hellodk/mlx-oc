@@ -25,7 +25,7 @@ from prometheus_client import (
     generate_latest,
 )
 
-from mlx_logging import degraded, error, info, setup_logging
+from mlx_logging import degraded, debug, error, info, setup_logging
 
 DEFAULT_POLL_INTERVAL = 0.5
 DEFAULT_MAX_RATE = 50.0
@@ -331,8 +331,8 @@ def main():
             if tailer._provider:
                 tailer._provider.force_flush(timeout_millis=3000)
                 tailer._provider.shutdown()
-        except Exception:
-            pass
+        except Exception as exc:
+            debug(f"opentelemetry provider shutdown failed: {exc!r}", component="log_tailer")
         server.server_close()
 
 
