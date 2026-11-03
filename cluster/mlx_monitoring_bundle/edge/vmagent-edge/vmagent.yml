@@ -9,6 +9,9 @@
 #   ${VMAGENT_MAX_SHARDS}       -> remote_write queue max shards
 #   ${VMAGENT_QUEUE_CAPACITY}   -> remote_write queue capacity
 #   ${VMAGENT_PERSISTENT_QUEUE} -> persistent queue path (empty = in-memory only)
+#
+# Note: remote_write is configured via vmagent CLI flags (-remoteWrite.url)
+# to ensure proper queue configuration. See mlx_monitoring_bundle.py start_vmagent().
 
 global:
   scrape_interval: ${VMAGENT_SCRAPE_INTERVAL:-10s}
@@ -66,20 +69,3 @@ scrape_configs:
         replacement: mlx-logtailer
       - target_label: instance
         replacement: ${MACBOOK_ID:-unknown}:9106
-
-remote_write:
-  - url: ${OTLP_SCHEME:-http}://${CENTRAL_VICTORIA_METRICS:-192.168.1.100:8428}/api/v1/write
-    queue_config:
-      max_shards: ${VMAGENT_MAX_SHARDS:-200}
-      capacity: ${VMAGENT_QUEUE_CAPACITY:-5000}
-      min_shards: 1
-      max_pending_send_buffer: 10485760
-      batch_send_deadline: 5s
-      max_batch_size: 10485760
-    # Enable persistent queue for network disconnection buffering:
-    # persistent_queue:
-    #   path: ${VMAGENT_PERSISTENT_QUEUE:-/tmp/vmagent-queue}
-    #   max_size: 10737418240  # 10GB
-    write_relabel_configs:
-      - source_labels: [__address__]
-        target_label: instance

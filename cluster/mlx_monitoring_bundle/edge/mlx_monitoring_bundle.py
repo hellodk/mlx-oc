@@ -325,15 +325,16 @@ class Bundle:
                 "VMAGENT_QUEUE_CAPACITY": config_val(self.config, "VMAGENT_QUEUE_CAPACITY", "5000"),
                 "VMAGENT_PERSISTENT_QUEUE": config_val(self.config, "VMAGENT_PERSISTENT_QUEUE", ""),
             }
-            # Simple template substitution
-            for k, v in subs.items():
-                template = template.replace(f"${{{k}}}", v).replace(f"${{{k}:-", v)
-            # Handle ${VAR:-default} patterns
+            # Single-pass substitution: replace ${VAR} and ${VAR:-default} correctly
+            # Python 3.12+ raw strings require double backslash for literal backslash
             import re
             def repl(m):
-                var, default = m.group(1).split(":-", 1) if ":-" in m.group(1) else (m.group(1), "")
-                return subs.get(var, default)
-            template = re.sub(r"\$\{([^}]+)\}", repl, template)
+                expr = m.group(1)
+                if ":-" in expr:
+                    var, default = expr.split(":-", 1)
+                    return subs.get(var, default)
+                return subs.get(expr, m.group(0))
+            template = re.sub(r"\\$\\{([^}]+)\\}", repl, template)
             self.vmagent_config_rendered.write_text(template, encoding="utf8")
             info(f"rendered vmagent config: {self.vmagent_config_rendered}", component="bundle")
             return True
@@ -346,10 +347,13 @@ class Bundle:
             return
         if not self._render_vmagent_config():
             return
+        remote_write_url = f"{self.otlp_scheme}://{self.central_vm}/api/v1/write"
         cmd = [
             self.vmagent_binary,
-            "-config", str(self.vmagent_config_rendered),
+            "-promscrape.config", str(self.vmagent_config_rendered),
             "-promscrape.configCheckInterval", "30s",
+            "-remoteWrite.url", remote_write_url,
+            "-remoteWrite.maxDiskUsagePerURL", "10GB",
         ]
         logf = open(self.log_dir / "vmagent.bundle.log", "a", encoding="utf8")
         env = dict(os.environ)
@@ -377,7 +381,7 @@ class Bundle:
             self.config, 
             "MLX_SERVER_CMD",
             f"{self.mlx_venv_python} -m mlx_lm.server --model {{model}} --host 127.0.0.1 --port {{port}} "
-            f"--chat-template-args '{{\"enable_thinking\":false}}' --prompt-cache-size 4 --prompt-cache-bytes 2g --prompt-concurrency 4"
+            f"--chat-template-args '{{{{\"enable_thinking\":false}}}}' --prompt-cache-size 4 --prompt-cache-bytes 2g --prompt-concurrency 4"
         )
         srv_cmd = server_cmd_template.format(model=self.model or "unknown", port=server_port)
         
