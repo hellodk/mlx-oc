@@ -78,13 +78,44 @@ cmd_templates() {
   fi
 }
 
+cmd_edge_all() {
+  info "starting edge bundle on all enabled nodes from nodes.yml"
+  local nodes_file="${EDGE_DIR}/config/nodes.yml"
+  if [[ ! -f "${nodes_file}" ]]; then
+    err "nodes.yml not found at ${nodes_file}"
+    exit 2
+  fi
+  # Parse nodes.yml for enabled macbook IDs
+  local macbook_ids
+  macbook_ids=$(python3 -c "
+import yaml, sys
+with open('${nodes_file}') as f:
+    data = yaml.safe_load(f)
+for nb in data.get('macbooks', []):
+    if nb.get('enabled', True):
+        print(nb['id'])
+" 2>/dev/null) || {
+    err "failed to parse nodes.yml"
+    exit 2
+  }
+  for macbook_id in ${macbook_ids}; do
+    info "starting edge bundle for ${macbook_id}"
+    export MLX_MACBOOK_ID="${macbook_id}"
+    cd "${EDGE_DIR}"
+    python3 mlx_monitoring_bundle.py start &
+  done
+  wait
+  info "all edge bundles started"
+}
+
 case "${1:-}" in
   validate) shift; cmd_validate "$@" ;;
   edge)     shift; cmd_edge "$@" ;;
+  edge-all) cmd_edge_all ;;
   central)  cmd_central ;;
   templates) cmd_templates ;;
   *)
-    err "usage: $0 {validate|edge <macbook_id>|central|templates}"
+    err "usage: $0 {validate|edge <macbook_id>|edge-all|central|templates}"
     exit 2
     ;;
 esac

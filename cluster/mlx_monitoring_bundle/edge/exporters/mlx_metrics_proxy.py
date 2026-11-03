@@ -690,6 +690,7 @@ class Proxy(BaseHTTPRequestHandler):
     api_key = ""
     rate_limit = 0
     rate_window = 10.0
+    strict_model = True
     _rate_hits = {}
 
     def _rate_limited(self, key):
@@ -815,13 +816,17 @@ class Proxy(BaseHTTPRequestHandler):
                     kind = "reasoning"
 
                 if model != _MODEL_NAME and _MODEL_NAME is not None:
-                    self._reject(
-                        400,
-                        {"error": {"message": f"model not loaded (proxy serves "
-                         f"{_MODEL_NAME})", "type": "invalid_request_error"}},
-                        model, kind,
-                    )
-                    return
+                    if self.strict_model:
+                        self._reject(
+                            400,
+                            {"error": {"message": f"model not loaded (proxy serves "
+                             f"{_MODEL_NAME})", "type": "invalid_request_error"}},
+                            model, kind,
+                        )
+                        return
+                    else:
+                        degraded(f"model mismatch: request={model} proxy={_MODEL_NAME}; serving anyway (strict_model=false)",
+                                 component="proxy")
                 prompt_tokens = sum(
                     len((m.get("content") or "") if isinstance(m.get("content"), str)
                         else json.dumps(m.get("content") or ""))
@@ -1400,6 +1405,12 @@ def main():
         type=int,
         default=int(os.environ.get("MLX_RATE_LIMIT", "0")),
     )
+    ap.add_argument(
+        "--strict-model",
+        action="store_true",
+        default=os.environ.get("MLX_PROXY_STRICT_MODEL", "true").lower() == "true",
+        help="reject requests for models not matching the proxy's model (default: true)",
+    )
     args = ap.parse_args()
 
     setup_logging(service="mlx-proxy",
@@ -1412,6 +1423,7 @@ def main():
     Proxy.logprobs_top = max(0, min(10, args.logprobs))
     Proxy.stream_sample = max(0.0, min(1.0, args.logprobs_stream_sample))
     Proxy.low_conf_threshold = args.low_confidence_threshold
+    Proxy.strict_model = args.strict_model
     Proxy.api_key = os.environ.get("MLX_API_KEY", "")
     Proxy.max_prompt_tokens = args.max_prompt_tokens
     Proxy.max_tokens_cap = args.max_tokens_cap

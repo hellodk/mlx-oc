@@ -43,7 +43,7 @@ services:
       - "4318:4318"  # OTLP HTTP
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
-      - ./central/config/otelcol-config.yaml:/etc/otelcol/config.yaml:ro
+      - ./config/otelcol-config.yaml:/etc/otelcol/config.yaml:ro
       - central-otel-logs:/var/log/otelcol
     depends_on:
       victoria-metrics:
@@ -56,16 +56,16 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme}
+      - GF_AUTH_ANONYMOUS_ENABLED=${GRAFANA_ANONYMOUS_ENABLED:-false}
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
       - GF_USERS_DEFAULT_THEME=light
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./central/config/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
-      - ./central/config/grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
-      - ./central/dashboards:/var/lib/grafana/dashboards:ro
+      - ./config/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - ./config/grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
+      - ./dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       victoria-metrics:
         condition: service_healthy
@@ -83,7 +83,7 @@ services:
       - -rule=/etc/vmalert/rules.yml
       - -httpListenAddr=0.0.0.0:8880
     volumes:
-      - ./central/config/vmalert-rules.yml:/etc/vmalert/rules.yml:ro
+      - ./config/vmalert-rules.yml:/etc/vmalert/rules.yml:ro
     depends_on:
       victoria-metrics:
         condition: service_healthy
@@ -98,7 +98,7 @@ services:
       - "9093:9093"
     command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
     volumes:
-      - ./central/config/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
 
   # --- Opik self-hosted (LLM tracing) ---
   # Opik server requires Postgres, Redis, and ClickHouse.

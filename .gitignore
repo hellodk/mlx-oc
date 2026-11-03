@@ -14,3 +14,4 @@ sglang/logs/*.log
 test-reports/
 .pytest_cache/
 opencode-session
+cluster/mlx_monitoring_bundle/edge/config/nodes.yml

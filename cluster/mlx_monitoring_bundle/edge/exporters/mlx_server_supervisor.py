@@ -180,11 +180,13 @@ class Supervisor:
             degraded("no rank1 SSH target configured; skipping remote rank cleanup",
                      component="supervisor")
             return
+        ssh_cmd = ["ssh", "-o", f"ConnectTimeout={self.args.ssh_timeout}"]
+        if self.args.rank1_ssh_key:
+            ssh_cmd += ["-i", self.args.rank1_ssh_key]
+        ssh_cmd += [rank1, "pkill -f 'mlx_lm.server'; pkill -f 'mlx.launch'"]
         try:
             subprocess.run(
-                ["ssh", "-o", f"ConnectTimeout={self.args.ssh_timeout}",
-                 rank1,
-                 "pkill -f 'mlx_lm.server'; pkill -f 'mlx.launch'"],
+                ssh_cmd,
                 capture_output=True, timeout=15,
             )
         except Exception as exc:
@@ -285,6 +287,8 @@ def main():
     ap.add_argument("--backoff-reset", type=float, default=120.0)
     ap.add_argument("--rank1-ssh-target", default=os.environ.get("RANK1_SSH_TARGET", ""),
                     help="ssh user@host for rank1 cleanup (optional)")
+    ap.add_argument("--rank1-ssh-key", default=os.environ.get("RANK1_SSH_KEY", ""),
+                    help="ssh private key for rank1 cleanup (optional)")
     ap.add_argument("--ssh-timeout", type=float, default=5.0)
     args = ap.parse_args()
 

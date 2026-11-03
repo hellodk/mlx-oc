@@ -32,16 +32,16 @@ groups:
   - name: mlx.hardware
     rules:
     - alert: MLXHardwareExporterDown
-      expr: absent(mlx_hw_up{node="rank0"}) == 1 or absent(mlx_hw_up{node="rank1"}) == 1
+      expr: absent(mlx_hw_up) == 1
       for: 2m
       labels:
         severity: warning
         category: exporter
       annotations:
-        summary: "HW exporter down on {{ $labels.node }} ({{ $labels.macbook }})"
+        summary: "HW exporter down on {{ $labels.macbook }} ({{ $labels.node }})"
         description: |
-          mlx_hw_up is not reporting for node {{ $labels.node }} on Macbook
-          {{ $labels.macbook }} (serial {{ $labels.serial }}). The mlx_hw_telemetry
+          mlx_hw_up is not reporting for Macbook {{ $labels.macbook }}
+          (node {{ $labels.node }}, serial {{ $labels.serial }}). The mlx_hw_telemetry
           process may have crashed or is not listening on :9102.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#hw-exporter-down"
 
@@ -89,15 +89,15 @@ groups:
         runbook: "https://docs.example.com/mlx-monitoring/runbook#high-load"
 
     - alert: MLXMemoryPressureHigh
-      expr: mlx_hw_mem_pressure < (mlx_hw_mem_total_bytes * 0.02)
+      expr: (mlx_hw_mem_pressure * 4096) / mlx_hw_mem_total_bytes < 0.02
       for: 10m
       labels:
         severity: warning
         category: hardware
       annotations:
-        summary: "Memory pressure on {{ $labels.macbook }}: <2% free pages"
+        summary: "Memory pressure on {{ $labels.macbook }}: <2% free RAM"
         description: |
-          Free + inactive + speculative pages are below 2% of physical RAM on
+          Free memory (pages * 4096) is below 2% of physical RAM on
           Macbook {{ $labels.macbook }} ({{ $labels.node }}). The node is at risk
           of memory pressure killing the mlx_lm.server process.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#memory-pressure"

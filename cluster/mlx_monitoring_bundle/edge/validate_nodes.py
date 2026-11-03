@@ -39,12 +39,14 @@ def load_nodes(path: Path) -> dict:
         sys.exit(2)
 
 
-def check_node(node: dict, timeout: int, password_cache: dict) -> tuple[bool, str]:
+def check_node(node: dict, timeout: int, password_cache: dict, verify_host_keys: bool = False) -> tuple[bool, str]:
     """Return (reachable, message) for one macbook node entry."""
     node_id = node.get("id", "unknown")
     ip = node.get("ip")
     ssh_user = node.get("ssh_user")
     ssh_key = node.get("ssh_key")
+    if ssh_key:
+        ssh_key = str(Path(ssh_key).expanduser())
     node_timeout = int(node.get("ssh_connect_timeout", timeout))
 
     if not ip:
@@ -64,11 +66,16 @@ def check_node(node: dict, timeout: int, password_cache: dict) -> tuple[bool, st
             )
         password = password_cache[cache_key]
 
+    host_key_args = []
+    if not verify_host_keys:
+        host_key_args = [
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+        ]
     cmd = [
         "ssh",
         "-o", "BatchMode=no",
-        "-o", "StrictHostKeyChecking=no",
-        "-o", "UserKnownHostsFile=/dev/null",
+        *host_key_args,
         "-o", f"ConnectTimeout={node_timeout}",
         *key_arg,
         f"{ssh_user}@{ip}",
@@ -116,6 +123,8 @@ def main() -> int:
                     help="path to nodes.yml (default: config/nodes.yml)")
     ap.add_argument("--timeout", type=int, default=5,
                     help="default SSH connect timeout in seconds (default: 5)")
+    ap.add_argument("--verify-host-keys", action="store_true",
+                    help="enable SSH host key verification (default: disabled for initial validation)")
     args = ap.parse_args()
 
     nodes_path = Path(args.nodes)
@@ -137,7 +146,7 @@ def main() -> int:
         if not node.get("enabled", True):
             print(f"SKIP  {node.get('id','unknown')} (disabled)")
             continue
-        ok, msg = check_node(node, args.timeout, password_cache)
+        ok, msg = check_node(node, args.timeout, password_cache, args.verify_host_keys)
         results.append((node, ok, msg))
         if ok:
             print(f"OK    {msg}")

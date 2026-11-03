@@ -30,8 +30,11 @@ macbooks:
     ssh_connect_timeout: 5          # OPTIONAL: SSH connect timeout in seconds
     role: "rank0"                   # REQUIRED: rank0 | rank1 (determines which exporters run)
     enabled: true                   # OPTIONAL: set false to skip this node
-    model: "mlx-community/Qwen3.5-4B-MLX-8bit"  # OPTIONAL: pinned model. If omitted,
+    model: "mlx-community/Qwen3.5-4B-MLX-4bit"  # OPTIONAL: pinned model. If omitted,
                                     #         discovered from upstream GET /v1/models.
+    model_aliases: []               # OPTIONAL: list of acceptable model IDs for proxy guard
+    mlx_server_port: 11234          # OPTIONAL: mlx_lm.server port (default 11234)
+    mlx_server_cmd: ""              # OPTIONAL: full server cmd template; if empty, uses default
 
   # --- Example node: rank1 (hardware telemetry via SSH from rank0) ---
   - id: "ashu-mac"
@@ -42,4 +45,7 @@ macbooks:
     ssh_connect_timeout: 5
     role: "rank1"
     enabled: true
-    model: "mlx-community/Qwen3-14B-8bit"
+    model: "mlx-community/Qwen3-14B-4bit"
+    model_aliases: []
+    mlx_server_port: 11234
+    mlx_server_cmd: ""

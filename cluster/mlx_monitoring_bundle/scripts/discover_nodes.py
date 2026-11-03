@@ -158,7 +158,8 @@ def main() -> int:
     if user:
         node["ssh_user"] = user
     if key:
-        node["ssh_key"] = key
+        from pathlib import Path
+        node["ssh_key"] = str(Path(key).expanduser())
     if args.model:
         node["model"] = args.model
 
