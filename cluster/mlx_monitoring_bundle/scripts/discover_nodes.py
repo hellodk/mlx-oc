@@ -80,16 +80,23 @@ def get_serial_local() -> str:
     return m.group(1) if m else "unknown"
 
 
-def get_ip_ssh(host, user, key) -> str:
+def get_ip_ssh(host, user, key, target_network="192.168.1.") -> str:
+    # First search for IP in the preferred target network, otherwise fallback to any 192.168.x IP
+    prefix = target_network.replace(".", r"\.")
     out = run_ssh(host, user, key,
-                  r"ifconfig | awk '/inet 192\.168\./{print $2; exit}'")
+                  f"ifconfig | awk '/inet {prefix}/{{print $2; exit}}'")
+    if not out:
+        out = run_ssh(host, user, key,
+                      r"ifconfig | awk '/inet 192\.168\./{print $2; exit}'")
     return out or host
 
 
-def get_ip_local() -> str:
+def get_ip_local(target_host: str = "192.168.1.1") -> str:
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
+        # Connect towards target_host (or 8.8.8.8) to determine the routing source interface
+        probe_host = target_host.split(":")[0] if target_host else "8.8.8.8"
+        s.connect((probe_host, 80))
         ip = s.getsockname()[0]
         s.close()
         return ip
@@ -126,12 +133,14 @@ def main() -> int:
                     help="Opik host:port (required, no default)")
     args = ap.parse_args()
 
+    target_vm_host = args.central_victoria_metrics.split(":")[0] if args.central_victoria_metrics else ""
+
     if args.local:
-        host = args.host or get_ip_local()
+        host = args.host or get_ip_local(target_vm_host)
         user = args.ssh_user or os.environ.get("USER", "dk")
         key = args.ssh_key
         serial = get_serial_local()
-        ip = get_ip_local()
+        ip = get_ip_local(target_vm_host)
         node_id = get_hostname_local()
     else:
         if not args.host:
@@ -144,7 +153,7 @@ def main() -> int:
         user = args.ssh_user
         key = args.ssh_key
         serial = get_serial_ssh(host, user, key)
-        ip = get_ip_ssh(host, user, key)
+        ip = get_ip_ssh(host, user, key, target_network=target_vm_host.rsplit(".", 1)[0] + "." if "." in target_vm_host else "192.168.1.")
         node_id = get_hostname_ssh(host, user, key)
 
     node = {

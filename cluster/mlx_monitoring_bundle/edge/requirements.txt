@@ -1,7 +1,7 @@
-prometheus-client>=0.17
-opentelemetry-sdk>=1.19
-opentelemetry-exporter-otlp-proto-http>=1.19
-opentelemetry-exporter-otlp-proto-grpc>=1.19
-pyyaml>=6.0
-requests>=2.31
-opik>=1.4
+prometheus-client==0.26.0
+opentelemetry-api==1.45.1
+opentelemetry-sdk==1.45.1
+opentelemetry-exporter-otlp-proto-http==1.45.1
+pyyaml==6.0.3
+requests==2.34.2
+opik==2.2.103
