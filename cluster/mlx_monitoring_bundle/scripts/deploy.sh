@@ -88,8 +88,10 @@ cmd_validate() {
     --nodes "${EDGE_DIR}/config/nodes.yml" "$@"
 }
 
+VMAGENT_VERSION="${VMAGENT_VERSION:-v1.155.0}"
+
 _detect_vmagent_url() {
-  local os_type arch
+  local os_type arch version="${VMAGENT_VERSION}"
   os_type="$(uname -s | tr '[:upper:]' '[:lower:]')"
   arch="$(uname -m)"
   case "${arch}" in
@@ -98,8 +100,8 @@ _detect_vmagent_url() {
     *) die "unsupported system architecture: ${arch}" ;;
   esac
   case "${os_type}" in
-    darwin) printf 'https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/v1.155.0/vmutils-darwin-%s-v1.155.0.tar.gz' "${arch}" ;;
-    linux)  printf 'https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/v1.155.0/vmutils-linux-%s-v1.155.0.tar.gz' "${arch}" ;;
+    darwin) printf 'https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/%s/vmutils-darwin-%s-%s.tar.gz' "${version}" "${arch}" "${version}" ;;
+    linux)  printf 'https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/%s/vmutils-linux-%s-%s.tar.gz' "${version}" "${arch}" "${version}" ;;
     *) die "unsupported operating system: ${os_type}" ;;
   esac
 }
