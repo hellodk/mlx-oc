@@ -7,6 +7,8 @@ __pycache__/
 # Runtime directories (not source)
 logs/
 bin/
+edge/vmagent-remotewrite-data/
+*.bundle.log
 
 # Runtime config (generated per machine)
 edge/config/edge.env
