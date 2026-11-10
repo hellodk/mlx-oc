@@ -29,6 +29,28 @@ EDGE_DIR="${BUNDLE_DIR}/edge"
 CENTRAL_DIR="${BUNDLE_DIR}/central"
 ENV_FILE="${EDGE_DIR}/config/edge.env"
 
+_ensure_git_latest() {
+  # If SKIP_GIT_PULL=1 is set, bypass auto-update
+  if [[ "${SKIP_GIT_PULL:-0}" == "1" ]]; then
+    return 0
+  fi
+
+  local git_root
+  if command -v git >/dev/null 2>&1; then
+    git_root="$(git -C "${BUNDLE_DIR}" rev-parse --show-toplevel 2>/dev/null || true)"
+    if [[ -n "${git_root}" && -d "${git_root}/.git" ]]; then
+      local current_branch
+      current_branch="$(git -C "${git_root}" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+      if [[ -n "${current_branch}" && "${current_branch}" != "HEAD" ]]; then
+        info "checking for repository updates on branch '${current_branch}'..."
+        if ! git -C "${git_root}" pull --ff-only origin "${current_branch}" >&2; then
+          warn "git pull failed or branch has diverged; continuing with local files"
+        fi
+      fi
+    fi
+  fi
+}
+
 info()  { printf '\033[1;34m[deploy]\033[0m %s\n' "$*" >&2; }
 warn()  { printf '\033[1;33m[deploy]\033[0m %s\n' "$*" >&2; }
 err()   { printf '\033[1;31m[deploy][ERR]\033[0m %s\n' "$*" >&2; }
@@ -454,6 +476,16 @@ EOF
 }
 
 main() {
+  case "${1:-}" in
+    help|-h|--help)
+      usage
+      return 0
+      ;;
+  esac
+
+  # Ensure working copy is updated before any operation
+  _ensure_git_latest
+
   case "${1:-}" in
     validate)   shift; cmd_validate "$@" ;;
     setup-edge) shift; cmd_setup_edge "$@" ;;
