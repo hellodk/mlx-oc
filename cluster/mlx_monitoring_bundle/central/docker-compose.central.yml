@@ -211,24 +211,40 @@ services:
       - opik-zookeeper:/data
 
   minio:
-    image: bitnamilegacy/minio:2025.4.22
-    container_name: central-opik-minio
+    image: rustfs/rustfs:latest
+    container_name: central-opik-rustfs
     restart: unless-stopped
     profiles: ["opik"]
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-opik}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-opik12345}
-      # The Bitnami entrypoint creates this bucket on first start, which is
-      # what the upstream `mc` one-shot container did.
-      MINIO_DEFAULT_BUCKETS: public
+      RUSTFS_ACCESS_KEY: ${MINIO_ROOT_USER:-opik}
+      RUSTFS_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-opik12345}
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ENABLE: "false"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
       interval: 5s
       timeout: 10s
       retries: 30
       start_period: 5s
     volumes:
-      - opik-minio:/bitnami/minio/data
+      - opik-storage:/data
+    command: ["/data"]
+
+  # One-shot bucket init for Opik's public trace bucket
+  opik-init-bucket:
+    image: alpine:3.20
+    container_name: central-opik-init-bucket
+    profiles: ["opik"]
+    depends_on:
+      minio:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -c
+      - |
+        apk add --no-cache curl >/dev/null 2>&1
+        curl -s -X PUT http://minio:9000/public >/dev/null 2>&1 || true
+        exit 0
 
   backend:
     image: ghcr.io/comet-ml/opik/opik-backend:${OPIK_VERSION:-2.2.13}
@@ -347,4 +363,4 @@ volumes:
   opik-clickhouse-log:
   opik-clickhouse-config:
   opik-zookeeper:
-  opik-minio:
+  opik-storage:
