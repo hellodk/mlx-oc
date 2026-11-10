@@ -515,129 +515,79 @@ when a device or proxy is down.
 
 ## Commands & Execution
 
-### Prerequisites
+The primary entrypoint for all bundle operations is **`scripts/deploy.sh`**.
+It operates in two modes:
+1. **Interactive Menu**: Run `./scripts/deploy.sh` with no arguments to get an interactive numbered menu.
+2. **Direct CLI**: Pass the desired command directly (`setup-edge`, `edge [start|daemon|stop|status]`, `validate`, `central`).
 
-On each Mac:
+Before performing any action, `deploy.sh` automatically performs a fast-forward pull from `git` to keep your environment current.
+
+### Step 1: Automated Edge Setup
+
+Run the interactive setup on the Mac (no root access required):
 ```bash
-pip install -r edge/requirements.txt
+./scripts/deploy.sh setup-edge
+```
+Or pass parameters directly:
+```bash
+./scripts/deploy.sh setup-edge <CENTRAL_IP> [MODEL_ID] [MODEL_PATH]
 ```
 
-On the central server:
-```bash
-# Base stack (VictoriaMetrics, OTel, Grafana, vmalert, alertmanager)
-docker compose -f central/docker-compose.central.yml up -d
+**What this automatically does:**
+1. **Installs `vmagent`**: Detects OS and CPU architecture (Apple Silicon `darwin-arm64`, Intel `darwin-amd64`, or Linux), downloads the official pinned binary to `~/mlx-monitoring/bin/vmagent`, and adds it to your shell profile (`~/.zshrc` or `~/.bashrc`).
+2. **Prepares Python Virtualenv**: Detects your existing monitoring venv or automatically creates `~/mlx-monitoring/venv` with all pinned dependencies installed.
+3. **Discovers Hardware & Subnet**: Generates `edge/config/nodes.yml` with your Mac's serial number, hostname, and the correct LAN IP routing towards the Central IP.
+4. **Generates Runtime Config**: Creates `edge/config/edge.env` mapping to your local venvs and `vmagent`.
+5. **Validates Setup**: Runs `validate_nodes.py` to ensure everything is functional.
 
-# With self-hosted Opik
-docker compose -f central/docker-compose.central.yml --profile opik up -d
+### Step 2: Manage the Edge Daemon
+
+Start the edge bundle as a background daemon:
+```bash
+./scripts/deploy.sh edge daemon
 ```
 
-Always pass `-f central/docker-compose.central.yml` explicitly; otherwise Compose
-may walk up and merge an unrelated parent `docker-compose.yaml`.
-
-### Step 1: Generate nodes.yml
-
-**Option A — Auto-discover local machine:**
+Check process health and active PID table:
 ```bash
-cd scripts
-python3 discover_nodes.py --local \
-    --central-victoria-metrics <VM_HOST:PORT> \
-    --central-otel <OTEL_HOST:PORT> \
-    --central-opik <OPIK_HOST:PORT> \
-    --model-path <MODEL_DIR> \
-    > ../edge/config/nodes.yml
+./scripts/deploy.sh edge status
 ```
 
-**Option B — Copy template and edit:**
+Inspect live exporter logs:
 ```bash
-cp edge/config/nodes.yml.template edge/config/nodes.yml
-# edit edge/config/nodes.yml
+tail -f edge/logs/deploy.log
+tail -f edge/logs/vmagent.bundle.log
 ```
 
-**Option C — Discover remote host via SSH:**
+Stop the edge bundle cleanly:
 ```bash
-python3 discover_nodes.py --host <REMOTE_HOST> \
-    --ssh-user <USER> --ssh-key <KEY_PATH> \
-    --central-victoria-metrics <VM_HOST:PORT> \
-    --central-otel <OTEL_HOST:PORT> \
-    --central-opik <OPIK_HOST:PORT> \
-    --model-path <MODEL_DIR> \
-    >> ../edge/config/nodes.yml
+./scripts/deploy.sh edge stop
 ```
 
-### Step 2: Validate Configuration
+*(To run attached in foreground instead: `./scripts/deploy.sh edge start`)*
+
+### Step 3: Deploy Central Observability Stack
+
+On the central server (supports both **Docker** and **Podman**):
 
 ```bash
-cd scripts
-./deploy.sh validate
+# Standard stack: VictoriaMetrics + Grafana + vmalert + Alertmanager + OTel Collector
+./scripts/deploy.sh central
+
+# Extended stack with self-hosted Opik LLM tracing (includes ClickHouse & RustFS)
+./scripts/deploy.sh central --opik
 ```
 
-Checks central endpoints, node selection, model path, Python executables, and
-required packages. Add `--check-ports` to detect already-bound exporter ports.
+**Interactive Image Pull Gate:**
+`deploy.sh central` will print the full list of container images to be pulled and prompt for explicit confirmation `(y/N)` before pulling or launching containers.
 
-### Step 3: Configure edge.env
+**Web Endpoints:**
+- **Grafana**: `http://<central-ip>:3000` (provisioned with 13 pre-configured dashboards in IST)
+- **VictoriaMetrics**: `http://<central-ip>:8428`
+- **vmalert**: `http://<central-ip>:8880`
+- **Alertmanager**: `http://<central-ip>:9093`
+- **Opik UI**: `http://<central-ip>:32173` (when deployed with `--opik`)
 
-```bash
-cp edge/config/edge.env.template edge/config/edge.env
-# edit edge/config/edge.env (feature flags, listen ports, venv paths)
-```
-
-### Step 4: Start the Edge Bundle
-
-**Via launchd (macOS):**
-```bash
-cp edge/com.mlx.monitoring.bundle.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.mlx.monitoring.bundle.plist
-launchctl start com.mlx.monitoring.bundle
-```
-
-**Via systemd (Linux):**
-```bash
-sudo cp edge/com.mlx.monitoring-bundle.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now com.mlx.monitoring-bundle
-```
-
-**Manually:**
-```bash
-cd edge
-./../scripts/deploy.sh edge          # single enabled node is selected
-# or, with several nodes:
-MLX_MACBOOK_ID=mm python3 mlx_monitoring_bundle.py start
-```
-
-**Check status:**
-```bash
-python3 mlx_monitoring_bundle.py status
-```
-
-**Stop:**
-```bash
-python3 mlx_monitoring_bundle.py stop
-```
-
-### Step 5: Deploy Central Stack
-
-```bash
-cd scripts
-./deploy.sh central          # base stack
-./deploy.sh central --opik   # base stack + Opik
-```
-
-Access:
-- Grafana: http://<central-ip>:3000
-- VictoriaMetrics: http://<central-ip>:8428
-- vmalert: http://<central-ip>:8880
-- Alertmanager: http://<central-ip>:9093
-- Opik: http://<central-ip>:32173 (with `--opik`)
-
-### Step 6: vmagent Config (Automatic)
-
-`edge/vmagent-edge/vmagent.yml` uses `${VAR}` placeholders for the central
-VictoriaMetrics URL, node labels, and queue tuning. `mlx_monitoring_bundle.py`
-renders it to `edge/bin/vmagent.yml` at start time from `nodes.yml` and `edge.env`
-and passes the remote-write URL on the `vmagent` command line. No manual
-rendering step is needed. Set `VMAGENT_BINARY` in `edge.env` when `vmagent` is
-not on `PATH`.
+---
 
 ---
 
