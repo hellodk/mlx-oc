@@ -276,9 +276,9 @@ cmd_setup_edge() {
     mlx_python="$(_prompt_input "Path to MLX Python binary (press Enter to use monitoring python)" "${mon_python}")"
   fi
 
-  # Generate nodes.yml
+  # Generate nodes.yml using the monitoring python (which has pyyaml)
   local disc_cmd=(
-    python3 "${SCRIPT_DIR}/discover_nodes.py" --local
+    "${mon_python}" "${SCRIPT_DIR}/discover_nodes.py" --local
     --central-victoria-metrics "${central_ip}:8428"
     --central-otel "${central_ip}:4318"
     --central-opik "${central_ip}:32173"
