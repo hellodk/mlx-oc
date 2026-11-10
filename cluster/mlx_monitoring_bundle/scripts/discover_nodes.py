@@ -80,29 +80,40 @@ def get_serial_local() -> str:
     return m.group(1) if m else "unknown"
 
 
-def get_ip_ssh(host, user, key, target_network="192.168.1.") -> str:
-    # First search for IP in the preferred target network, otherwise fallback to any 192.168.x IP
-    prefix = target_network.replace(".", r"\.")
-    out = run_ssh(host, user, key,
-                  f"ifconfig | awk '/inet {prefix}/{{print $2; exit}}'")
-    if not out:
+def _strip_scheme(endpoint: str) -> str:
+    if "://" in endpoint:
+        endpoint = endpoint.split("://", 1)[1]
+    return endpoint.split("/")[0]
+
+
+def get_ip_ssh(host, user, key, target_network: str | None = None) -> str:
+    if target_network:
+        prefix = target_network.replace(".", r"\.")
         out = run_ssh(host, user, key,
-                      r"ifconfig | awk '/inet 192\.168\./{print $2; exit}'")
+                      f"ifconfig | awk '/inet {prefix}/{{print $2; exit}}'")
+        if out:
+            return out
+    # Fallback to any non-loopback IPv4 address
+    out = run_ssh(host, user, key,
+                  r"ifconfig | awk '/inet / && !/127\.0\.0\.1/{print $2; exit}'")
     return out or host
 
 
-def get_ip_local(target_host: str = "192.168.1.1") -> str:
+def get_ip_local(target_host: str | None = None) -> str:
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # Connect towards target_host (or 8.8.8.8) to determine the routing source interface
-        probe_host = target_host.split(":")[0] if target_host else "8.8.8.8"
+        # Probe host to determine routing source interface
+        probe_host = _strip_scheme(target_host).split(":")[0] if target_host else "8.8.8.8"
         s.connect((probe_host, 80))
         ip = s.getsockname()[0]
         s.close()
         return ip
-    except Exception as exc:
-        print(f"get_ip_local failed: {exc!r}", file=sys.stderr)
-        return "127.0.0.1"
+    except Exception:
+        # Fallback to local hostname lookup
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except Exception:
+            return "127.0.0.1"
 
 
 def get_hostname_ssh(host, user, key) -> str:
@@ -133,7 +144,11 @@ def main() -> int:
                     help="Opik host:port (required, no default)")
     args = ap.parse_args()
 
-    target_vm_host = args.central_victoria_metrics.split(":")[0] if args.central_victoria_metrics else ""
+    vm_clean = _strip_scheme(args.central_victoria_metrics)
+    otel_clean = _strip_scheme(args.central_otel)
+    opik_clean = _strip_scheme(args.central_opik)
+
+    target_vm_host = vm_clean.split(":")[0] if vm_clean else ""
 
     if args.local:
         host = args.host or get_ip_local(target_vm_host)
@@ -153,7 +168,8 @@ def main() -> int:
         user = args.ssh_user
         key = args.ssh_key
         serial = get_serial_ssh(host, user, key)
-        ip = get_ip_ssh(host, user, key, target_network=target_vm_host.rsplit(".", 1)[0] + "." if "." in target_vm_host else "192.168.1.")
+        network_prefix = target_vm_host.rsplit(".", 1)[0] + "." if "." in target_vm_host else None
+        ip = get_ip_ssh(host, user, key, target_network=network_prefix)
         node_id = get_hostname_ssh(host, user, key)
 
     node = {
@@ -169,9 +185,9 @@ def main() -> int:
 
     doc = {
         "central": {
-            "victoria_metrics": args.central_victoria_metrics,
-            "otel": args.central_otel,
-            "opik": args.central_opik,
+            "victoria_metrics": vm_clean,
+            "otel": otel_clean,
+            "opik": opik_clean,
         },
         "macbooks": [node],
     }

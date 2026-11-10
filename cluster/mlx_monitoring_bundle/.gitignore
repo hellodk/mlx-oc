@@ -8,6 +8,10 @@ __pycache__/
 logs/
 bin/
 
+# Runtime config (generated per machine)
+edge/config/edge.env
+edge/config/nodes.yml
+
 # OS
 .DS_Store
 

@@ -29,8 +29,45 @@ EDGE_DIR="${BUNDLE_DIR}/edge"
 CENTRAL_DIR="${BUNDLE_DIR}/central"
 ENV_FILE="${EDGE_DIR}/config/edge.env"
 
-info() { printf '[deploy] %s\n' "$*" >&2; }
-err()  { printf '[deploy][ERR] %s\n' "$*" >&2; }
+info()  { printf '\033[1;34m[deploy]\033[0m %s\n' "$*" >&2; }
+warn()  { printf '\033[1;33m[deploy]\033[0m %s\n' "$*" >&2; }
+err()   { printf '\033[1;31m[deploy][ERR]\033[0m %s\n' "$*" >&2; }
+die()   { printf '\033[1;31m[deploy][ERR]\033[0m %s\n' "$*" >&2; exit 1; }
+
+_prompt_input() {
+  local prompt="$1" default="${2:-}" val=""
+  if [[ -n "${default}" ]]; then
+    printf '%s [%s]: ' "${prompt}" "${default}" >&2
+  else
+    printf '%s: ' "${prompt}" >&2
+  fi
+  read -r val
+  if [[ -z "${val}" ]]; then
+    printf '%s' "${default}"
+  else
+    printf '%s' "${val}"
+  fi
+}
+
+_prompt_select() {
+  local prompt="$1"; shift
+  local i=1
+  printf '%s\n' "$prompt" >&2
+  for item in "$@"; do printf '  %2d) %s\n' "$i" "$item" >&2; i=$((i+1)); done
+  printf 'Select [1-%d]: ' "$#" >&2
+  local choice; read -r choice
+  [ -z "$choice" ] && return 1
+  case "$choice" in ''|*[!0-9]*) return 1;; esac
+  [ "$choice" -lt 1 ] || [ "$choice" -gt "$#" ] && return 1
+  eval "echo \${$choice}"
+}
+
+prompt_confirm_word() {
+  local verb="$1" expect="$2"
+  printf 'Type "%s" to confirm %s: ' "$expect" "$verb" >&2
+  local answer; read -r answer
+  [ "$answer" = "$expect" ] || die "aborted (confirmation word mismatch)"
+}
 
 # The bundle imports PyYAML, so prefer the monitoring venv from edge.env when
 # it exists. System Python on macOS does not ship PyYAML.
@@ -51,7 +88,21 @@ cmd_validate() {
     --nodes "${EDGE_DIR}/config/nodes.yml" "$@"
 }
 
-VMAGENT_RELEASE_URL="https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/v1.155.0/vmutils-darwin-arm64-v1.155.0.tar.gz"
+_detect_vmagent_url() {
+  local os_type arch
+  os_type="$(uname -s | tr '[:upper:]' '[:lower:]')"
+  arch="$(uname -m)"
+  case "${arch}" in
+    x86_64|amd64) arch="amd64" ;;
+    arm64|aarch64) arch="arm64" ;;
+    *) die "unsupported system architecture: ${arch}" ;;
+  esac
+  case "${os_type}" in
+    darwin) printf 'https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/v1.155.0/vmutils-darwin-%s-v1.155.0.tar.gz' "${arch}" ;;
+    linux)  printf 'https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/v1.155.0/vmutils-linux-%s-v1.155.0.tar.gz' "${arch}" ;;
+    *) die "unsupported operating system: ${os_type}" ;;
+  esac
+}
 
 ensure_vmagent() {
   local target="${1:-${HOME}/bin/vmagent}"
@@ -64,11 +115,13 @@ ensure_vmagent() {
     return 0
   fi
 
-  info "vmagent not found. Downloading official Darwin arm64 release..."
+  local download_url
+  download_url="$(_detect_vmagent_url)"
+  info "vmagent not found. Downloading official release from ${download_url}..."
   mkdir -p "$(dirname "${target}")"
   local tmp_dir
   tmp_dir="$(mktemp -d)"
-  curl -fsSL "${VMAGENT_RELEASE_URL}" -o "${tmp_dir}/vmutils.tar.gz"
+  curl -fsSL "${download_url}" -o "${tmp_dir}/vmutils.tar.gz"
   tar -xzf "${tmp_dir}/vmutils.tar.gz" -C "${tmp_dir}"
   mv "${tmp_dir}/vmagent-prod" "${target}"
   chmod +x "${target}"
@@ -76,10 +129,56 @@ ensure_vmagent() {
   info "vmagent successfully installed to: ${target}"
 }
 
+_detect_venv() {
+  local candidates=(
+    "${VENV_PYTHON:-}"
+    "${HOME}/bench/venv-mon/bin/python"
+    "${HOME}/mlx-monitoring-venv/bin/python"
+    "${HOME}/.venv/bin/python"
+    "${BUNDLE_DIR}/.venv/bin/python"
+  )
+  for c in "${candidates[@]}"; do
+    if [[ -n "${c}" && -x "${c}" ]]; then
+      printf '%s' "${c}"
+      return 0
+    fi
+  done
+  # Fallback to system python3 if it has required dependencies
+  if command -v python3 >/dev/null 2>&1; then
+    if python3 -c 'import yaml, prometheus_client' >/dev/null 2>&1; then
+      command -v python3
+      return 0
+    fi
+  fi
+  return 1
+}
+
+_detect_mlx_venv() {
+  local candidates=(
+    "${MLX_VENV_PYTHON:-}"
+    "${HOME}/venvs/mlx/bin/python"
+    "${HOME}/mlx-venv/bin/python"
+    "${HOME}/.venv-mlx/bin/python"
+  )
+  for c in "${candidates[@]}"; do
+    if [[ -n "${c}" && -x "${c}" ]]; then
+      printf '%s' "${c}"
+      return 0
+    fi
+  done
+  if command -v python3 >/dev/null 2>&1; then
+    if python3 -c 'import mlx_lm' >/dev/null 2>&1; then
+      command -v python3
+      return 0
+    fi
+  fi
+  return 1
+}
+
 cmd_setup_edge() {
-  local central_ip="${1:-192.168.1.10}"
-  local model_id="${2:-Qwen3.5-4B-MLX-4bit}"
-  local model_path="${3:-${HOME}/mlx-models/${model_id}}"
+  local central_ip="${1:-}"
+  local model_id="${2:-}"
+  local model_path="${3:-}"
   local vmagent_bin="${HOME}/bin/vmagent"
 
   info "setting up edge monitoring bundle on local machine"
@@ -89,32 +188,59 @@ cmd_setup_edge() {
   mkdir -p "${EDGE_DIR}/logs"
   mkdir -p "${EDGE_DIR}/bin"
 
-  # Find local python virtualenvs
-  local mon_venv="${HOME}/bench/venv-mon"
-  if [[ ! -d "${mon_venv}" && -d "${HOME}/mlx-monitoring-venv" ]]; then
-    mon_venv="${HOME}/mlx-monitoring-venv"
-  fi
-  local mlx_venv="${HOME}/venvs/mlx"
-  if [[ ! -d "${mlx_venv}" && -d "${HOME}/mlx-venv" ]]; then
-    mlx_venv="${HOME}/mlx-venv"
+  # Interactive prompt if parameters are omitted and not provided in environment
+  if [[ -z "${central_ip}" ]]; then
+    central_ip="$(_prompt_input "Central VictoriaMetrics IP / Host (e.g. 192.168.1.10)")"
+    [[ -n "${central_ip}" ]] || die "central_ip is required"
   fi
 
-  if [[ ! -f "${EDGE_DIR}/config/nodes.yml" ]]; then
-    info "generating ${EDGE_DIR}/config/nodes.yml via discover_nodes.py"
-    python3 "${SCRIPT_DIR}/discover_nodes.py" --local \
-      --central-victoria-metrics "${central_ip}:8428" \
-      --central-otel "${central_ip}:4318" \
-      --central-opik "${central_ip}:32173" \
-      --model "${model_id}" \
-      --model-path "${model_path}" \
-      > "${EDGE_DIR}/config/nodes.yml"
-  else
-    info "${EDGE_DIR}/config/nodes.yml already exists; preserving"
+  if [[ -z "${model_id}" ]]; then
+    model_id="$(_prompt_input "Model ID (press Enter to skip or specify served model)")"
   fi
 
-  if [[ ! -f "${ENV_FILE}" ]]; then
-    info "generating ${ENV_FILE}"
-    cat <<EOF > "${ENV_FILE}"
+  if [[ -n "${model_id}" && -z "${model_path}" ]]; then
+    local default_mpath=""
+    if [[ -d "${HOME}/mlx-models/${model_id}" ]]; then
+      default_mpath="${HOME}/mlx-models/${model_id}"
+    elif [[ -d "${HOME}/.cache/huggingface/hub" ]]; then
+      default_mpath="${HOME}/.cache/huggingface/hub"
+    fi
+    model_path="$(_prompt_input "Local Model Directory Path" "${default_mpath}")"
+  fi
+
+  # Detect virtualenvs dynamically
+  local mon_python mlx_python
+  mon_python="$(_detect_venv || true)"
+  if [[ -z "${mon_python}" ]]; then
+    warn "Could not auto-detect a virtualenv with pyyaml and prometheus_client."
+    mon_python="$(_prompt_input "Path to Monitoring Python binary" "$(command -v python3)")"
+  fi
+
+  mlx_python="$(_detect_mlx_venv || true)"
+  if [[ -z "${mlx_python}" ]]; then
+    warn "Could not auto-detect a virtualenv with mlx_lm installed."
+    mlx_python="$(_prompt_input "Path to MLX Python binary (press Enter to use same python)" "${mon_python}")"
+  fi
+
+  # Generate nodes.yml
+  local disc_cmd=(
+    python3 "${SCRIPT_DIR}/discover_nodes.py" --local
+    --central-victoria-metrics "${central_ip}:8428"
+    --central-otel "${central_ip}:4318"
+    --central-opik "${central_ip}:32173"
+  )
+  if [[ -n "${model_id}" ]]; then
+    disc_cmd+=(--model "${model_id}")
+  fi
+  if [[ -n "${model_path}" ]]; then
+    disc_cmd+=(--model-path "${model_path}")
+  fi
+
+  info "generating ${EDGE_DIR}/config/nodes.yml via discover_nodes.py"
+  "${disc_cmd[@]}" > "${EDGE_DIR}/config/nodes.yml"
+
+  info "generating ${ENV_FILE}"
+  cat <<EOF > "${ENV_FILE}"
 ENABLE_PROXY=true
 ENABLE_HW_TELEMETRY=true
 ENABLE_KV_AGENT=true
@@ -130,8 +256,8 @@ LOG_DIR=./logs
 PID_DIR=./bin
 CONFIG_DIR=./config
 
-VENV_PYTHON=${mon_venv}/bin/python
-MLX_VENV_PYTHON=${mlx_venv}/bin/python
+VENV_PYTHON=${mon_python}
+MLX_VENV_PYTHON=${mlx_python}
 
 MLX_UPSTREAM=http://127.0.0.1:11234
 MLX_SERVER_PORT=11234
@@ -152,9 +278,6 @@ VMAGENT_PERSISTENT_QUEUE=
 
 OTLP_VERIFY_TLS=false
 EOF
-  else
-    info "${ENV_FILE} already exists; preserving"
-  fi
 
   info "edge setup complete; validating configuration"
   cmd_validate
@@ -252,14 +375,69 @@ cmd_central() {
   info "central stack started"
 }
 
-case "${1:-}" in
-  validate)   shift; cmd_validate "$@" ;;
-  setup-edge) shift; cmd_setup_edge "$@" ;;
-  edge)       shift; cmd_edge "$@" ;;
-  edge-all)   shift; cmd_edge "$@" ;;
-  central)    shift; cmd_central "$@" ;;
-  *)
-    err "usage: $0 {validate|setup-edge [central_ip] [model_id] [model_path]|edge [start|daemon|stop|status] [macbook_id]|edge-all|central [--opik]}"
-    exit 2
-    ;;
-esac
+usage() {
+  cat >&2 <<EOF
+scripts/deploy.sh — unified CLI for mlx monitoring bundle operations
+
+Usage:
+  ./scripts/deploy.sh                             interactive menu
+  ./scripts/deploy.sh setup-edge [args]           interactive or parameterized edge setup
+  ./scripts/deploy.sh edge [start|daemon|stop|status] [node_id]  manage edge services
+  ./scripts/deploy.sh validate                    validate edge configuration
+  ./scripts/deploy.sh central [--opik]            deploy central Docker/Podman stack
+
+Setup-edge arguments:
+  ./scripts/deploy.sh setup-edge <central_ip> [model_id] [model_path]
+  If arguments are omitted, the script asks interactively.
+
+Edge arguments:
+  ./scripts/deploy.sh edge start                  start in foreground
+  ./scripts/deploy.sh edge daemon                 start in background
+  ./scripts/deploy.sh edge status                 show process table and central targets
+  ./scripts/deploy.sh edge stop                   cleanly stop all edge exporters
+
+EOF
+}
+
+main() {
+  case "${1:-}" in
+    validate)   shift; cmd_validate "$@" ;;
+    setup-edge) shift; cmd_setup_edge "$@" ;;
+    edge)       shift; cmd_edge "$@" ;;
+    edge-all)   shift; cmd_edge "$@" ;;
+    central)    shift; cmd_central "$@" ;;
+    help|-h|--help) usage ;;
+    "")
+      # Interactive menu mode (following scripts/avika pattern)
+      local choice
+      choice=$(_prompt_select "MLX Monitoring Bundle operations:" \
+        "setup-edge     — setup edge node (detect venvs, vmagent, generate config)" \
+        "edge daemon    — start edge monitoring stack in background" \
+        "edge status    — check running status of edge exporters" \
+        "edge stop      — stop edge monitoring bundle" \
+        "edge start     — start edge bundle in foreground" \
+        "validate       — validate nodes.yml and edge.env" \
+        "central        — deploy central observability stack" \
+        "central --opik — deploy central observability stack with Opik" \
+        "quit") || die "bye"
+
+      case "${choice}" in
+        setup-edge*) cmd_setup_edge ;;
+        "edge daemon"*) cmd_edge daemon ;;
+        "edge status"*) cmd_edge status ;;
+        "edge stop"*) cmd_edge stop ;;
+        "edge start"*) cmd_edge start ;;
+        validate*) cmd_validate ;;
+        "central --opik"*) cmd_central --opik ;;
+        central*) cmd_central ;;
+        quit) die "bye" ;;
+      esac
+      ;;
+    *)
+      usage
+      die "unknown command: $1"
+      ;;
+  esac
+}
+
+main "$@"
