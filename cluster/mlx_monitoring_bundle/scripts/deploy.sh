@@ -89,6 +89,7 @@ cmd_validate() {
 }
 
 VMAGENT_VERSION="${VMAGENT_VERSION:-v1.155.0}"
+MLX_MONITORING_DIR="${HOME}/mlx-monitoring"
 
 _detect_vmagent_url() {
   local os_type arch version="${VMAGENT_VERSION}"
@@ -106,21 +107,55 @@ _detect_vmagent_url() {
   esac
 }
 
+_add_path_to_shell_profile() {
+  local bin_dir="$1"
+  local line="export PATH=\"${bin_dir}:\$PATH\""
+
+  # Update ~/.zshrc if zsh exists or is user shell
+  if [[ -f "${HOME}/.zshrc" || "${SHELL:-}" == *"zsh"* ]]; then
+    if ! grep -qs "${bin_dir}" "${HOME}/.zshrc" 2>/dev/null; then
+      printf '\n# mlx-monitoring binary path\n%s\n' "${line}" >> "${HOME}/.zshrc"
+      info "added ${bin_dir} to ${HOME}/.zshrc"
+    fi
+  fi
+
+  # Update ~/.bashrc or ~/.bash_profile
+  local bash_profile="${HOME}/.bashrc"
+  if [[ "$(uname -s)" == "Darwin" && -f "${HOME}/.bash_profile" ]]; then
+    bash_profile="${HOME}/.bash_profile"
+  fi
+  if ! grep -qs "${bin_dir}" "${bash_profile}" 2>/dev/null; then
+    printf '\n# mlx-monitoring binary path\n%s\n' "${line}" >> "${bash_profile}"
+    info "added ${bin_dir} to ${bash_profile}"
+  fi
+}
+
 ensure_vmagent() {
-  local target="${1:-${HOME}/bin/vmagent}"
+  local bin_dir="${MLX_MONITORING_DIR}/bin"
+  local target="${1:-${bin_dir}/vmagent}"
+
   if command -v vmagent >/dev/null 2>&1; then
     info "vmagent binary found in PATH: $(command -v vmagent)"
     return 0
   fi
   if [[ -x "${target}" ]]; then
     info "vmagent binary found at: ${target}"
+    _add_path_to_shell_profile "${bin_dir}"
+    return 0
+  fi
+  # Also check legacy ~/bin/vmagent
+  if [[ -x "${HOME}/bin/vmagent" ]]; then
+    info "vmagent binary found at legacy path: ${HOME}/bin/vmagent"
+    mkdir -p "${bin_dir}"
+    cp "${HOME}/bin/vmagent" "${target}"
+    _add_path_to_shell_profile "${bin_dir}"
     return 0
   fi
 
   local download_url
   download_url="$(_detect_vmagent_url)"
   info "vmagent not found. Downloading official release from ${download_url}..."
-  mkdir -p "$(dirname "${target}")"
+  mkdir -p "${bin_dir}"
   local tmp_dir
   tmp_dir="$(mktemp -d)"
   curl -fsSL "${download_url}" -o "${tmp_dir}/vmutils.tar.gz"
@@ -128,12 +163,37 @@ ensure_vmagent() {
   mv "${tmp_dir}/vmagent-prod" "${target}"
   chmod +x "${target}"
   rm -rf "${tmp_dir}"
-  info "vmagent successfully installed to: ${target}"
+  _add_path_to_shell_profile "${bin_dir}"
+  info "vmagent successfully installed to: ${target} (no root required)"
+}
+
+ensure_monitoring_venv() {
+  local venv_dir="${MLX_MONITORING_DIR}/venv"
+  local venv_python="${venv_dir}/bin/python"
+
+  # First check if an existing functional venv is available
+  local existing
+  existing="$(_detect_venv || true)"
+  if [[ -n "${existing}" && -x "${existing}" ]]; then
+    printf '%s' "${existing}"
+    return 0
+  fi
+
+  # Otherwise create the default venv in ~/mlx-monitoring/venv
+  info "creating default monitoring virtualenv at ${venv_dir}..."
+  mkdir -p "${MLX_MONITORING_DIR}"
+  python3 -m venv "${venv_dir}"
+  info "installing pinned monitoring dependencies into ${venv_dir}..."
+  "${venv_python}" -m pip install --quiet --upgrade pip
+  "${venv_python}" -m pip install --quiet -r "${EDGE_DIR}/requirements.txt"
+  info "monitoring virtualenv ready at ${venv_python}"
+  printf '%s' "${venv_python}"
 }
 
 _detect_venv() {
   local candidates=(
     "${VENV_PYTHON:-}"
+    "${MLX_MONITORING_DIR}/venv/bin/python"
     "${HOME}/bench/venv-mon/bin/python"
     "${HOME}/mlx-monitoring-venv/bin/python"
     "${HOME}/.venv/bin/python"
@@ -141,17 +201,12 @@ _detect_venv() {
   )
   for c in "${candidates[@]}"; do
     if [[ -n "${c}" && -x "${c}" ]]; then
-      printf '%s' "${c}"
-      return 0
+      if "${c}" -c 'import yaml, prometheus_client' >/dev/null 2>&1; then
+        printf '%s' "${c}"
+        return 0
+      fi
     fi
   done
-  # Fallback to system python3 if it has required dependencies
-  if command -v python3 >/dev/null 2>&1; then
-    if python3 -c 'import yaml, prometheus_client' >/dev/null 2>&1; then
-      command -v python3
-      return 0
-    fi
-  fi
   return 1
 }
 
@@ -181,9 +236,10 @@ cmd_setup_edge() {
   local central_ip="${1:-}"
   local model_id="${2:-}"
   local model_path="${3:-}"
-  local vmagent_bin="${HOME}/bin/vmagent"
+  local vmagent_bin="${MLX_MONITORING_DIR}/bin/vmagent"
 
   info "setting up edge monitoring bundle on local machine"
+  mkdir -p "${MLX_MONITORING_DIR}"
   ensure_vmagent "${vmagent_bin}"
 
   mkdir -p "${EDGE_DIR}/config"
@@ -210,18 +266,14 @@ cmd_setup_edge() {
     model_path="$(_prompt_input "Local Model Directory Path" "${default_mpath}")"
   fi
 
-  # Detect virtualenvs dynamically
+  # Ensure virtualenv (creates ~/mlx-monitoring/venv if none exists)
   local mon_python mlx_python
-  mon_python="$(_detect_venv || true)"
-  if [[ -z "${mon_python}" ]]; then
-    warn "Could not auto-detect a virtualenv with pyyaml and prometheus_client."
-    mon_python="$(_prompt_input "Path to Monitoring Python binary" "$(command -v python3)")"
-  fi
+  mon_python="$(ensure_monitoring_venv)"
 
   mlx_python="$(_detect_mlx_venv || true)"
   if [[ -z "${mlx_python}" ]]; then
     warn "Could not auto-detect a virtualenv with mlx_lm installed."
-    mlx_python="$(_prompt_input "Path to MLX Python binary (press Enter to use same python)" "${mon_python}")"
+    mlx_python="$(_prompt_input "Path to MLX Python binary (press Enter to use monitoring python)" "${mon_python}")"
   fi
 
   # Generate nodes.yml
