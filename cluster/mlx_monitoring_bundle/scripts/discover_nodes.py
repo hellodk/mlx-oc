@@ -32,6 +32,8 @@ Usage:
 Output is YAML written to stdout. Review before deploying.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import os
