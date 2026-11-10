@@ -440,15 +440,51 @@ cmd_central() {
   fi
   render_alertmanager_config
   cd "${CENTRAL_DIR}"
+
+  local compose_args=(-f docker-compose.central.yml)
   if [[ "${with_opik}" == "1" ]]; then
-    info "deploying central observability stack with Opik"
-    "${engine}" compose --profile opik -f docker-compose.central.yml up -d
+    compose_args=(--profile opik "${compose_args[@]}")
+  fi
+
+  # 1. Print the exact container images required by the compose stack
+  info "The following container images are required for the central stack:"
+  local images=()
+  while IFS= read -r img; do
+    images+=("${img}")
+    printf '  - %s\n' "${img}" >&2
+  done < <(grep -E '^\s*image:' docker-compose.central.yml | awk '{print $2}' | sed "s/\${OPIK_VERSION:-2.2.13}/2.2.13/g" | sort -u)
+
+  if [[ "${with_opik}" != "1" ]]; then
+    info "(Opik profile images are excluded since --opik was not specified)"
+  fi
+
+  # 2. Ask for explicit user confirmation before pulling/deploying
+  local confirm
+  confirm="$(_prompt_input "Proceed to pull images and deploy the central stack? (y/N)" "N")"
+  case "${confirm}" in
+    y|Y|yes|YES) ;;
+    *)
+      info "Deployment aborted by user."
+      return 0
+      ;;
+  esac
+
+  # 3. Pull images explicitly with progress
+  info "Pulling container images using ${engine} compose..."
+  "${engine}" compose "${compose_args[@]}" pull
+
+  # 4. Bring up the stack
+  if [[ "${with_opik}" == "1" ]]; then
+    info "starting central observability stack with Opik"
   else
-    info "deploying central observability stack"
-    "${engine}" compose -f docker-compose.central.yml up -d
+    info "starting central observability stack"
+  fi
+  "${engine}" compose "${compose_args[@]}" up -d
+
+  if [[ "${with_opik}" != "1" ]]; then
     info "Opik is available with: $0 central --opik"
   fi
-  info "central stack started"
+  info "central stack started successfully"
 }
 
 usage() {
