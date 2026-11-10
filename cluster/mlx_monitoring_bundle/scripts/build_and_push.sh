@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # build_and_push.sh
 # =================
-# Build and push the quay.io/hellodk/hydra central image.
+# Build and push the quay.io/hellodk/hydra central config image.
 #
 # The edge bundle is native Python (no container), so only the central
-# observability stack image is built here.
+# observability stack config image is built here.
 #
 # Usage:
 #   ./build_and_push.sh                    # build & push central image
@@ -18,8 +18,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUNDLE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CENTRAL_DIR="${BUNDLE_DIR}/central"
 
-REGISTRY="quay.io/hellodk"
-REPO="hydra"
+REGISTRY="${QUAY_REGISTRY:-quay.io/hellodk}"
+REPO="${QUAY_REPO:-hydra}"
+TAG="${QUAY_TAG:-central}"
 
 DRY_RUN=0
 if [[ "${1:-}" == "--dry-run" ]]; then
@@ -51,7 +52,7 @@ login() {
   "${ENGINE}" login quay.io || true
 }
 
-full="${REGISTRY}/${REPO}:central"
+full="${REGISTRY}/${REPO}:${TAG}"
 info "building ${full} from ${CENTRAL_DIR}/Dockerfile.central"
 "${ENGINE}" build --tag "${full}" \
   --file "${CENTRAL_DIR}/Dockerfile.central" \

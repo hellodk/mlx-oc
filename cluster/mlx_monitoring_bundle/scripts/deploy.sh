@@ -3,18 +3,21 @@
 # =========
 # One-command deployment of the mlx monitoring bundle.
 #
-# Edge (native Python, runs on each Macbook/Linux):
-#   - validate: SSH connectivity check for config/nodes.yml
-#   - edge:     start the bundle via mlx_monitoring_bundle.py (or plist/systemd)
+# Edge (native Python, runs on each Mac):
+#   - validate: check config/nodes.yml and local prerequisites
+#   - edge:     start the bundle via mlx_monitoring_bundle.py
 #
 # Central (containers, runs on the observability server):
-#   - central:  start VictoriaMetrics, OTel, Grafana, Opik, etc.
+#   - central:  start VictoriaMetrics, OTel, Grafana, vmalert, alertmanager
+#   - central --opik: also start the self-hosted Opik services
+#
+# Every Mac is a standalone node. Run `edge` on each Mac; no SSH or rank
+# orchestration is involved.
 #
 # Usage:
-#   ./deploy.sh validate              # validate SSH connectivity to nodes
-#   ./deploy.sh edge <macbook_id>     # start edge bundle on a Macbook
-#   ./deploy.sh central               # deploy central observability stack
-#   ./deploy.sh templates             # substitute template vars in vmagent.yml + otelcol-config.yaml
+#   ./deploy.sh validate
+#   ./deploy.sh edge [macbook_id]
+#   ./deploy.sh central [--opik]
 #
 # No files outside cluster/mlx_monitoring_bundle/ are modified.
 
@@ -24,98 +27,104 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUNDLE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 EDGE_DIR="${BUNDLE_DIR}/edge"
 CENTRAL_DIR="${BUNDLE_DIR}/central"
+ENV_FILE="${EDGE_DIR}/config/edge.env"
 
 info() { printf '[deploy] %s\n' "$*" >&2; }
 err()  { printf '[deploy][ERR] %s\n' "$*" >&2; }
 
+# The bundle imports PyYAML, so prefer the monitoring venv from edge.env when
+# it exists. System Python on macOS does not ship PyYAML.
+bundle_python() {
+  local candidate=""
+  if [[ -f "${ENV_FILE}" ]]; then
+    candidate="$(sed -n 's/^VENV_PYTHON=//p' "${ENV_FILE}" | tail -1 | tr -d '"')"
+  fi
+  if [[ -n "${candidate}" && -x "${candidate}" ]]; then
+    printf '%s' "${candidate}"
+    return
+  fi
+  printf '%s' "python3"
+}
+
 cmd_validate() {
-  python3 "${EDGE_DIR}/validate_nodes.py" \
+  "$(bundle_python)" "${EDGE_DIR}/validate_nodes.py" \
     --nodes "${EDGE_DIR}/config/nodes.yml" "$@"
 }
 
 cmd_edge() {
   local macbook_id="${1:-}"
-  if [[ -z "${macbook_id}" ]]; then
-    err "usage: $0 edge <macbook_id>"
-    exit 2
+  if [[ -n "${macbook_id}" ]]; then
+    export MLX_MACBOOK_ID="${macbook_id}"
+    info "starting edge bundle for ${macbook_id}"
+  else
+    info "starting edge bundle (single enabled node is selected automatically)"
   fi
-  info "starting edge bundle for ${macbook_id}"
-  export MLX_MACBOOK_ID="${macbook_id}"
   cd "${EDGE_DIR}"
-  python3 mlx_monitoring_bundle.py start
+  exec "$(bundle_python)" mlx_monitoring_bundle.py start
+}
+
+render_alertmanager_config() {
+  local tpl="${CENTRAL_DIR}/config/alertmanager.yml.template"
+  local dst="${CENTRAL_DIR}/config/alertmanager.yml"
+  if [[ ! -f "${tpl}" ]]; then
+    return 0
+  fi
+
+  local oncall_url="${ONCALL_WEBHOOK_URL:-${ALERT_WEBHOOK_URL:-}}"
+  local default_url="${ALERT_WEBHOOK_URL:-}"
+
+  local oncall_cfg="webhook_configs: []"
+  if [[ -n "${oncall_url}" ]]; then
+    oncall_cfg="webhook_configs:\n      - url: \"${oncall_url}\"\n        send_resolved: true"
+  fi
+
+  local default_cfg="webhook_configs: []"
+  if [[ -n "${default_url}" ]]; then
+    default_cfg="webhook_configs:\n      - url: \"${default_url}\"\n        send_resolved: true"
+  fi
+
+  python3 -c "
+import sys
+tpl = open('${tpl}', 'r').read()
+tpl = tpl.replace('{{ONCALL_WEBHOOK_CONFIG}}', '''${oncall_cfg}''')
+tpl = tpl.replace('{{DEFAULT_WEBHOOK_CONFIG}}', '''${default_cfg}''')
+open('${dst}', 'w').write(tpl)
+"
 }
 
 cmd_central() {
-  info "deploying central observability stack"
+  local with_opik=0
+  if [[ "${1:-}" == "--opik" ]]; then
+    with_opik=1
+  fi
+  if ! command -v docker >/dev/null 2>&1 && ! command -v podman >/dev/null 2>&1; then
+    err "docker or podman is required for the central stack"
+    exit 2
+  fi
+  local engine="docker"
+  if ! command -v docker >/dev/null 2>&1; then
+    engine="podman"
+  fi
+  render_alertmanager_config
   cd "${CENTRAL_DIR}"
-  docker compose -f docker-compose.central.yml up -d 2>/dev/null || \
-  podman compose -f docker-compose.central.yml up -d
+  if [[ "${with_opik}" == "1" ]]; then
+    info "deploying central observability stack with Opik"
+    "${engine}" compose --profile opik -f docker-compose.central.yml up -d
+  else
+    info "deploying central observability stack"
+    "${engine}" compose -f docker-compose.central.yml up -d
+    info "Opik is available with: $0 central --opik"
+  fi
   info "central stack started"
-}
-
-cmd_templates() {
-  info "substituting template variables in vmagent.yml and otelcol-config.yaml"
-  cd "${BUNDLE_DIR}"
-
-  # Substitute in edge vmagent config
-  if [[ -f "${EDGE_DIR}/vmagent-edge/vmagent.yml" ]]; then
-    envsubst < "${EDGE_DIR}/vmagent-edge/vmagent.yml" \
-      > "${EDGE_DIR}/vmagent-edge/vmagent.yml.rendered" 2>/dev/null || {
-      err "envsubst not found; install gettext or set vars manually"
-      exit 1
-    }
-    info "rendered ${EDGE_DIR}/vmagent-edge/vmagent.yml.rendered"
-  fi
-
-  # Substitute in central otelcol config
-  if [[ -f "${CENTRAL_DIR}/config/otelcol-config.yaml" ]]; then
-    envsubst < "${CENTRAL_DIR}/config/otelcol-config.yaml" \
-      > "${CENTRAL_DIR}/config/otelcol-config.yaml.rendered" 2>/dev/null || {
-      err "envsubst not found; install gettext or set vars manually"
-      exit 1
-    }
-    info "rendered ${CENTRAL_DIR}/config/otelcol-config.yaml.rendered"
-  fi
-}
-
-cmd_edge_all() {
-  info "starting edge bundle on all enabled nodes from nodes.yml"
-  local nodes_file="${EDGE_DIR}/config/nodes.yml"
-  if [[ ! -f "${nodes_file}" ]]; then
-    err "nodes.yml not found at ${nodes_file}"
-    exit 2
-  fi
-  # Parse nodes.yml for enabled macbook IDs
-  local macbook_ids
-  macbook_ids=$(python3 -c "
-import yaml, sys
-with open('${nodes_file}') as f:
-    data = yaml.safe_load(f)
-for nb in data.get('macbooks', []):
-    if nb.get('enabled', True):
-        print(nb['id'])
-" 2>/dev/null) || {
-    err "failed to parse nodes.yml"
-    exit 2
-  }
-  for macbook_id in ${macbook_ids}; do
-    info "starting edge bundle for ${macbook_id}"
-    export MLX_MACBOOK_ID="${macbook_id}"
-    cd "${EDGE_DIR}"
-    python3 mlx_monitoring_bundle.py start &
-  done
-  wait
-  info "all edge bundles started"
 }
 
 case "${1:-}" in
   validate) shift; cmd_validate "$@" ;;
   edge)     shift; cmd_edge "$@" ;;
-  edge-all) cmd_edge_all ;;
-  central)  cmd_central ;;
-  templates) cmd_templates ;;
+  edge-all) shift; cmd_edge "$@" ;;
+  central)  shift; cmd_central "$@" ;;
   *)
-    err "usage: $0 {validate|edge <macbook_id>|edge-all|central|templates}"
+    err "usage: $0 {validate|edge [macbook_id]|edge-all|central [--opik]}"
     exit 2
     ;;
 esac

@@ -1,0 +1,54 @@
+# Alertmanager configuration for central observability stack.
+# vmalert sends fired alerts here via -notifier.url.
+#
+# Routing:
+#   critical   -> oncall receiver
+#   everything -> default receiver
+#
+# Inhibit rules suppress cascade alerts when a node/proxy is down.
+# group_by includes macbook so alerts from different Macbooks don't collapse.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ["alertname", "macbook", "model"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: "default"
+  routes:
+    - matchers:
+        - severity = critical
+      receiver: "oncall"
+
+receivers:
+  - name: "oncall"
+    # Webhook receiver for critical alerts.
+    # Set ONCALL_WEBHOOK_URL or ALERT_WEBHOOK_URL to configure.
+    # Use LAN IP, FQDN, or compose service name.
+    {{ONCALL_WEBHOOK_CONFIG}}
+
+  - name: "default"
+    # Default receiver for warning/info alerts.
+    # Set ALERT_WEBHOOK_URL to configure.
+    {{DEFAULT_WEBHOOK_CONFIG}}
+
+inhibit_rules:
+  - source_matchers:
+      - alertname = "MLXProxyDown"
+    target_matchers:
+      - alertname =~ "MLXUpstreamDown|MLXThroughputDrop|MLXInferenceStalled"
+    equal: ["macbook"]
+
+  - source_matchers:
+      - alertname =~ "MLXHardwareExporterDown"
+    target_matchers:
+      - alertname =~ "MLXGPUHighUtilization|MLXThermalThrottling|MLXLoadHigh"
+    equal: ["macbook"]
+
+  - source_matchers:
+      - alertname = "MLXMacbookSilent"
+    target_matchers:
+      - alertname =~ "MLX.*"
+    equal: ["macbook"]

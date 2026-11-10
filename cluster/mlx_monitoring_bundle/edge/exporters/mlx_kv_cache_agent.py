@@ -27,7 +27,7 @@ import requests
 from mlx_logging import degraded, debug, error, info, setup_logging
 from mlx_model_info import model_info as _model_info
 
-LISTEN_DEFAULT = "0.0.0.0:9104"
+LISTEN_DEFAULT = "127.0.0.1:9104"
 POLL_INTERVAL_DEFAULT = 5.0
 MAX_SEQ_DEFAULT = 10  # mlx_lm server LRUPromptCache default
 
@@ -48,8 +48,6 @@ G_BYTES = Gauge(
     ["type"],
 )
 G_MAX_SEQ = Gauge("mlx_kv_cache_max_sequences", "LRU prompt-cache depth")
-G_CTX_MAX = Gauge("mlx_context_length_max_tokens", "Model max context length (tokens)")
-G_KV_PER_TOKEN = Gauge("mlx_kv_bytes_per_token", "Approx KV cache bytes per token")
 G_KV_MAX_CTX = Gauge(
     "mlx_kv_est_bytes_max_context",
     "Approx KV bytes for one full-length context sequence",
@@ -87,36 +85,73 @@ def _read_cache_stats(log_path: str) -> dict:
     return latest
 
 
-def _discover_model_from_upstream(upstream_url: str) -> str | None:
+def _pick_served_model(models: list, model_path: str | None) -> str | None:
+    """Pick the model actually served by mlx_lm.server from /v1/models.
+
+    mlx_lm.server appends the explicit ``--model`` path (as an absolute path)
+    after any Hugging Face cache entries. Prefer that entry and return the
+    basename, which matches the id used in API requests.
+    """
+    ids = [
+        m.get("id") for m in models
+        if isinstance(m, dict) and m.get("id")
+    ]
+    if not ids:
+        return None
+
+    if model_path:
+        target_name = Path(model_path.rstrip("/")).name
+        for mid in reversed(ids):
+            if str(mid).rstrip("/") == str(model_path).rstrip("/"):
+                return target_name
+            if Path(str(mid)).name == target_name:
+                return target_name
+
+    for mid in reversed(ids):
+        if str(mid).startswith("/"):
+            return Path(str(mid)).name
+    return ids[0]
+
+
+def _discover_model_from_upstream(upstream_url: str,
+                                  model_path: str | None = None) -> str | None:
     """Query upstream mlx_lm.server GET /v1/models to discover the loaded model."""
     try:
         resp = requests.get(f"{upstream_url.rstrip('/')}/v1/models", timeout=5)
         resp.raise_for_status()
         data = resp.json()
         models = data.get("data") or []
-        if models:
-            return models[0].get("id")
+        return _pick_served_model(models, model_path)
     except Exception as exc:
         error(f"failed to discover model from upstream {upstream_url}: {exc!r}",
               component="kv-agent")
     return None
 
 
-def _resolve_model(args_model: str | None, upstream_url: str) -> str | None:
-    """Resolve the model name: config > upstream discovery > None (degraded)."""
+def _resolve_model(args_model: str | None, upstream_url: str,
+                   model_path: str | None) -> str | None:
+    """Resolve the model name: config > upstream discovery > model path."""
     if args_model:
+        if args_model.startswith(("/", "~", "./", "../")):
+            return Path(args_model.rstrip("/")).name
         return args_model
-    discovered = _discover_model_from_upstream(upstream_url)
+    discovered = _discover_model_from_upstream(upstream_url, model_path)
     if discovered:
         info(f"model auto-discovered from upstream: {discovered}",
              component="kv-agent")
         return discovered
-    degraded("MLX_MODEL not set and upstream discovery failed; skipping "
-             "model-specific gauges", component="kv-agent")
+    if model_path:
+        name = Path(model_path.rstrip("/")).name
+        info(f"model id derived from MLX_MODEL_PATH: {name}", component="kv-agent")
+        return name
+    degraded("MLX_MODEL/MLX_MODEL_PATH not set and upstream discovery failed; "
+             "skipping model-specific gauges", component="kv-agent")
     return None
 
 
-def _update_gauges(log_path: str, model_name: str | None) -> None:
+def _update_gauges(log_path: str, model_name: str | None,
+                   model_path: str | None = None,
+                   upstream_url: str | None = None) -> None:
     stats = _read_cache_stats(log_path)
 
     for label in ("total", "assistant", "user", "system"):
@@ -130,18 +165,20 @@ def _update_gauges(log_path: str, model_name: str | None) -> None:
 
     G_MAX_SEQ.set(MAX_SEQ_DEFAULT)
 
-    if model_name:
+    info_obj = None
+    if model_name or model_path:
         try:
-            info = _model_info(model_name)
-            G_CTX_MAX.set(info.max_context_tokens)
-            G_KV_PER_TOKEN.set(info.kv_bytes_per_token)
-            G_KV_MAX_CTX.set(info.kv_bytes_for_max_context)
+            info_obj = _model_info(
+                model_name,
+                model_path=model_path,
+                upstream_url=upstream_url,
+            )
         except Exception as exc:
             degraded(f"could not resolve model info for '{model_name}': {exc!r}",
                      component="kv-agent")
+    if info_obj is not None:
+        G_KV_MAX_CTX.set(info_obj.kv_bytes_for_max_context)
     else:
-        G_CTX_MAX.set(0)
-        G_KV_PER_TOKEN.set(0)
         G_KV_MAX_CTX.set(0)
 
     total_bytes = stats.get("total", (0, 0))[1]
@@ -172,6 +209,7 @@ def main():
     ap = argparse.ArgumentParser(description="MLX KV-cache / context metrics agent")
     ap.add_argument("--log-file", default=os.environ.get("MLX_SERVER_LOG"))
     ap.add_argument("--model", default=os.environ.get("MLX_MODEL"))
+    ap.add_argument("--model-path", default=os.environ.get("MLX_MODEL_PATH"))
     ap.add_argument("--upstream", default=os.environ.get("MLX_UPSTREAM",
              "http://127.0.0.1:8081"),
              help="upstream mlx_lm.server base URL for model discovery")
@@ -188,16 +226,22 @@ def main():
     setup_logging(service="mlx-kv-agent",
                   macbook=os.environ.get("MLX_MACBOOK_ID", "unknown"))
 
-    model_name = _resolve_model(args.model, args.upstream)
+    model_name = _resolve_model(args.model, args.upstream, args.model_path)
 
     G_UP.set(1)
     info(f"log_file={args.log_file} model={model_name or '<skipped>'} "
+         f"model_path={args.model_path or '<unset>'} "
          f"-> metrics on {args.listen}", component="kv-agent")
 
     def _poll():
         while True:
             try:
-                _update_gauges(args.log_file, model_name)
+                _update_gauges(
+                    args.log_file,
+                    model_name,
+                    model_path=args.model_path,
+                    upstream_url=args.upstream,
+                )
             except Exception as exc:
                 error(f"poll error: {exc!r}", component="kv-agent")
             time.sleep(args.interval)

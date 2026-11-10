@@ -13,36 +13,51 @@
 groups:
   - name: mlx.macbook.down
     rules:
-    # A Macbook is considered silent when vmagent scrapes return nothing for
-    # 5 minutes OR the mlx_hw_up gauge stays at 0 for 3 minutes.
+    # A Macbook is considered silent when no telemetry has been received for >3m.
     - alert: MLXMacbookSilent
-      expr: absent_over_time(mlx_hw_up[3m]) == 1
-      for: 5m
+      # Evaluates per-macbook: fires when a device that previously reported has sent no telemetry for > 3m.
+      expr: time() - max_over_time(timestamp(up{job="mlx-hw"})[1h]) > 180
+      for: 2m
       labels:
         severity: critical
         category: connectivity
       annotations:
         summary: "Macbook {{ $labels.macbook }} silent"
         description: |
-          No vmagent scrape from {{ $labels.macbook }} (node {{ $labels.node }},
-          serial {{ $labels.serial }}) for 3 minutes. Check network connectivity,
-          the vmagent sidecar, and whether the Macbook is powered on.
+          No telemetry received from Macbook {{ $labels.macbook }} (target {{ $labels.instance }},
+          serial {{ $labels.serial }}) for >3 minutes. Check network connectivity,
+          the vmagent sidecar, or whether the device is powered off.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#macbook-silent"
+
+    - alert: MLXClusterSilent
+      # Fires when no hardware scrape target is reporting at all across the cluster.
+      expr: absent(up{job="mlx-hw"}) == 1
+      for: 5m
+      labels:
+        severity: critical
+        category: connectivity
+      annotations:
+        summary: "All Macbooks silent / no telemetry reporting"
+        description: "No hardware telemetry is reporting from any Macbook to central VictoriaMetrics."
         runbook: "https://docs.example.com/mlx-monitoring/runbook#macbook-silent"
 
   - name: mlx.hardware
     rules:
     - alert: MLXHardwareExporterDown
-      expr: absent(mlx_hw_up) == 1
+      # `up` is emitted per scrape target by vmagent, so this is per-node
+      # and does not require hard-coding node names.
+      expr: up{job="mlx-hw"} == 0
       for: 2m
       labels:
         severity: warning
         category: exporter
       annotations:
-        summary: "HW exporter down on {{ $labels.macbook }} ({{ $labels.node }})"
+        summary: "HW exporter down on {{ $labels.macbook }} ({{ $labels.instance }})"
         description: |
-          mlx_hw_up is not reporting for Macbook {{ $labels.macbook }}
-          (node {{ $labels.node }}, serial {{ $labels.serial }}). The mlx_hw_telemetry
-          process may have crashed or is not listening on :9102.
+          vmagent cannot scrape the hardware exporter for Macbook
+          {{ $labels.macbook }} (target {{ $labels.instance }}, serial
+          {{ $labels.serial }}). The mlx_hw_telemetry process may have crashed
+          or is not listening on :9102.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#hw-exporter-down"
 
     - alert: MLXGPUHighUtilization
@@ -89,17 +104,21 @@ groups:
         runbook: "https://docs.example.com/mlx-monitoring/runbook#high-load"
 
     - alert: MLXMemoryPressureHigh
-      expr: (mlx_hw_mem_pressure * 4096) / mlx_hw_mem_total_bytes < 0.02
+      # mlx_hw_mem_available_bytes is computed by the exporter using the
+      # runtime page size (16384 on Apple Silicon), so this rule has no
+      # hard-coded page-size assumption.
+      expr: mlx_hw_mem_available_bytes / mlx_hw_mem_total_bytes < 0.02
       for: 10m
       labels:
         severity: warning
         category: hardware
       annotations:
-        summary: "Memory pressure on {{ $labels.macbook }}: <2% free RAM"
+        summary: "Memory pressure on {{ $labels.macbook }}: <2% available RAM"
         description: |
-          Free memory (pages * 4096) is below 2% of physical RAM on
-          Macbook {{ $labels.macbook }} ({{ $labels.node }}). The node is at risk
-          of memory pressure killing the mlx_lm.server process.
+          Available memory (free + inactive + speculative) is below 2% of
+          physical RAM on Macbook {{ $labels.macbook }} ({{ $labels.node }}).
+          The node is at risk of memory pressure killing the mlx_lm.server
+          process.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#memory-pressure"
 
     - alert: MLXDiskFull
@@ -161,7 +180,7 @@ groups:
         runbook: "https://docs.example.com/mlx-monitoring/runbook#model-not-loaded"
 
     - alert: MLXServerCrashLooping
-      expr: increases(mlx_server_restarts_total[15m]) >= 3
+      expr: increase(mlx_server_restarts_total[15m]) >= 3
       labels:
         severity: critical
         category: serving
@@ -191,7 +210,7 @@ groups:
   - name: mlx.inference
     rules:
     - alert: MLXProxyDown
-      expr: absent(mlx_up) == 1 or mlx_up == 0
+      expr: up{job="mlx-proxy"} == 0
       for: 2m
       labels:
         severity: critical
@@ -199,13 +218,12 @@ groups:
       annotations:
         summary: "Proxy down on {{ $labels.macbook }}"
         description: |
-          mlx_up is 0 (or absent) on Macbook {{ $labels.macbook }} ({{ $labels.node }}).
-          The mlx_metrics_proxy is not reachable on :8080; clients cannot reach
-          the upstream mlx_lm.server.
+          vmagent cannot scrape mlx_metrics_proxy on Macbook {{ $labels.macbook }} ({{ $labels.node }}).
+          The proxy is not listening on :8080; clients cannot reach the server.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#proxy-down"
 
     - alert: MLXUpstreamDown
-      expr: mlx_up == 0 and mlx_server_up == 1
+      expr: mlx_up == 0 and up{job="mlx-proxy"} == 1
       for: 3m
       labels:
         severity: critical
@@ -213,13 +231,12 @@ groups:
       annotations:
         summary: "Upstream mlx_lm.server unreachable via proxy on {{ $labels.macbook }}"
         description: |
-          The proxy (:8080) cannot reach the upstream mlx_lm.server (:8081) even
-          though the server process is up. Check that mlx_lm.server is listening
-          on 127.0.0.1:8081 and that the proxy upstream config is correct.
+          The proxy (:8080) cannot reach the upstream mlx_lm.server on {{ $labels.macbook }}.
+          Check that mlx_lm.server is listening and healthy.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#upstream-down"
 
     - alert: MLXThroughputDrop
-      expr: rate(mlx_requests_total[5m]) < 0.1
+      expr: (rate(mlx_requests_total[5m]) < 0.1) and (rate(mlx_requests_total[1h]) > 0)
       for: 15m
       labels:
         severity: warning

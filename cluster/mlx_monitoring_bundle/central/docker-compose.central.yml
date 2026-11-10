@@ -1,6 +1,11 @@
 # docker-compose.central.yml
-# Central observability stack (podman compose).
-# Runs on the central server. All edge nodes push to this stack.
+# Central observability stack (Docker or Podman Compose).
+#
+# Bring up the full stack (monitoring + self-hosted Opik):
+#   docker compose --profile opik -f docker-compose.central.yml up -d
+#
+# Bring up only the monitoring stack (no Opik):
+#   docker compose -f docker-compose.central.yml up -d
 #
 # Components:
 #   victoria-metrics   - TSDB, receives remote_write from vmagent (:8428)
@@ -8,12 +13,16 @@
 #   grafana            - Dashboards, reads VictoriaMetrics (:3000)
 #   vmalert            - Alert rule evaluation against VictoriaMetrics (:8880)
 #   alertmanager       - Alert routing, inhibition, webhooks (:9093)
-#   opik               - Self-hosted LLM tracing (Postgres + Redis + ClickHouse) (:32173)
+#   opik-*             - Self-hosted LLM tracing (profile: opik) (:32173)
 #
-# Usage:
-#   podman compose -f docker-compose.central.yml up -d
+# Opik images are multi-arch (linux/amd64 and linux/arm64), so this stack runs
+# natively on both Intel/AMD and Apple Silicon hosts. Every image is pinned to
+# a release that publishes both architectures.
 #
-# Image tagging: quay.io/hellodk/hydra:central (for any custom central images)
+# There is no custom image to build. All configuration is mounted from this
+# directory, which keeps the deployment reproducible from a git checkout.
+
+name: mlx-central
 
 services:
   victoria-metrics:
@@ -35,19 +44,16 @@ services:
       retries: 20
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
+    image: otel/opentelemetry-collector-contrib:0.139.0
     container_name: central-otelcol
     restart: unless-stopped
     ports:
       - "4317:4317"  # OTLP gRPC
       - "4318:4318"  # OTLP HTTP
-    command: ["--config=/etc/otelcol/config.yaml"]
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
-      - ./config/otelcol-config.yaml:/etc/otelcol/config.yaml:ro
+      - ./config/otelcol-config.yaml:/etc/otelcol-contrib/config.yaml:ro
       - central-otel-logs:/var/log/otelcol
-    depends_on:
-      victoria-metrics:
-        condition: service_healthy
 
   grafana:
     image: grafana/grafana:latest
@@ -99,75 +105,246 @@ services:
     command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
     volumes:
       - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-
-  # --- Opik self-hosted (LLM tracing) ---
-  # Opik server requires Postgres, Redis, and ClickHouse.
-  # These are deployed as sibling services in the same compose.
-  opik-server:
-    image: cometml/opik-server:2.2.13
-    container_name: central-opik-server
-    restart: unless-stopped
-    ports:
-      - "32173:80"
-    environment:
-      - OPIK_UI__BASE_URL=http://192.168.1.100:32173
-      - OPIK_SERVER__DATABASE__URI=postgresql://opik:opik@opik-postgres:5432/opik
-      - OPIK_SERVER__REDIS__URI=redis://opik-redis:6379/0
-      - OPIK_SERVER__CLICKHOUSE__URI=http://opik-clickhouse:8123
-    depends_on:
-      opik-postgres:
-        condition: service_healthy
-      opik-redis:
-        condition: service_healthy
-      opik-clickhouse:
-        condition: service_healthy
-
-  opik-postgres:
-    image: postgres:15
-    container_name: central-opik-postgres
-    restart: unless-stopped
-    environment:
-      - POSTGRES_DB=opik
-      - POSTGRES_USER=opik
-      - POSTGRES_PASSWORD=opik
-    volumes:
-      - opik-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U opik -d opik"]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:9093/-/healthy"]
       interval: 5s
       timeout: 3s
       retries: 20
 
-  opik-redis:
-    image: redis:7-alpine
+  # --------------------------------------------------------------------------
+  # Opik self-hosted (profile: opik)
+  # --------------------------------------------------------------------------
+  # The service topology and environment below follow the official Opik
+  # 2.2.13 compose file. MinIO is served from bitnamilegacy because the
+  # upstream minio/minio Docker Hub repository is no longer pullable without
+  # credentials; the Bitnami image contains the same MinIO server binary and
+  # is published for both amd64 and arm64.
+  mysql:
+    image: mysql:8.4.2
+    container_name: central-opik-mysql
+    restart: unless-stopped
+    profiles: ["opik"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${OPIK_DB_PASSWORD:-opik}
+      MYSQL_DATABASE: opik
+      MYSQL_USER: opik
+      MYSQL_PASSWORD: ${OPIK_DB_PASSWORD:-opik}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      timeout: 5s
+      interval: 5s
+      retries: 60
+    volumes:
+      - opik-mysql:/var/lib/mysql
+
+  redis:
+    image: redis:7.2.4-alpine3.19
     container_name: central-opik-redis
     restart: unless-stopped
-    volumes:
-      - opik-redis-data:/data
+    profiles: ["opik"]
+    command: redis-server --requirepass ${OPIK_DB_PASSWORD:-opik}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
+      test: ["CMD", "nc", "-z", "localhost", "6379"]
+      interval: 2s
+      timeout: 4s
+      retries: 30
+      start_period: 10s
+    volumes:
+      - opik-redis:/data
 
-  opik-clickhouse:
-    image: clickhouse/clickhouse-server:latest
+  clickhouse-init:
+    image: alpine:3.20
+    container_name: central-opik-clickhouse-init
+    profiles: ["opik"]
+    restart: "no"
+    volumes:
+      - ./opik/clickhouse_config:/clickhouse_config_files:ro
+      - opik-clickhouse-config:/config
+    command: |
+      sh -c "cp -r /clickhouse_config_files/* /config/ && chown -R 1000:1000 /config"
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.3.16.16-alpine
     container_name: central-opik-clickhouse
     restart: unless-stopped
-    ports:
-      - "8123:8123"
+    profiles: ["opik"]
+    environment:
+      CLICKHOUSE_DB: opik
+      CLICKHOUSE_USER: opik
+      CLICKHOUSE_PASSWORD: ${OPIK_DB_PASSWORD:-opik}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
-      - opik-clickhouse-data:/var/lib/clickhouse
+      - opik-clickhouse:/var/lib/clickhouse
+      - opik-clickhouse-log:/var/log/clickhouse-server
+      - opik-clickhouse-config:/etc/clickhouse-server/config.d
+      - ./opik/clickhouse_config/additional_config.xml:/etc/clickhouse-server/config.d/additional_config.xml:ro
+      - ./opik/clickhouse_config/users.d/enable_time_type.xml:/etc/clickhouse-server/users.d/enable_time_type.xml:ro
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8123/ping"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8123/ping"]
       interval: 5s
-      timeout: 3s
-      retries: 20
+      timeout: 5s
+      retries: 60
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+      clickhouse-init:
+        condition: service_completed_successfully
+
+  zookeeper:
+    image: zookeeper:3.9.4
+    container_name: central-opik-zookeeper
+    restart: unless-stopped
+    profiles: ["opik"]
+    environment:
+      JVMFLAGS: "-Xmx512m"
+      ZOO_4LW_COMMANDS_WHITELIST: "srvr,ruok"
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep -q imok"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+    volumes:
+      - opik-zookeeper:/data
+
+  minio:
+    image: bitnamilegacy/minio:2025.4.22
+    container_name: central-opik-minio
+    restart: unless-stopped
+    profiles: ["opik"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-opik}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-opik12345}
+      # The Bitnami entrypoint creates this bucket on first start, which is
+      # what the upstream `mc` one-shot container did.
+      MINIO_DEFAULT_BUCKETS: public
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 5s
+    volumes:
+      - opik-minio:/bitnami/minio/data
+
+  backend:
+    image: ghcr.io/comet-ml/opik/opik-backend:${OPIK_VERSION:-2.2.13}
+    container_name: central-opik-backend
+    restart: unless-stopped
+    profiles: ["opik"]
+    command: ["bash", "-c", "./run_db_migrations.sh && ./provision_agent_insights_readonly_user.sh && ./entrypoint.sh"]
+    environment:
+      DOCKER_BUILDKIT: 1
+      STATE_DB_PROTOCOL: "jdbc:mysql://"
+      STATE_DB_URL: "mysql:3306/opik?createDatabaseIfNotExist=true&rewriteBatchedStatements=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true"
+      STATE_DB_DATABASE_NAME: opik
+      STATE_DB_USER: opik
+      STATE_DB_PASS: ${OPIK_DB_PASSWORD:-opik}
+      ANALYTICS_DB_MIGRATIONS_URL: "jdbc:clickhouse://clickhouse:8123"
+      ANALYTICS_DB_MIGRATIONS_USER: opik
+      ANALYTICS_DB_MIGRATIONS_PASS: ${OPIK_DB_PASSWORD:-opik}
+      ANALYTICS_DB_PROTOCOL: "HTTP"
+      ANALYTICS_DB_HOST: "clickhouse"
+      ANALYTICS_DB_PORT: 8123
+      ANALYTICS_DB_DATABASE_NAME: opik
+      ANALYTICS_DB_USERNAME: opik
+      ANALYTICS_DB_PASS: ${OPIK_DB_PASSWORD:-opik}
+      REDIS_URL: redis://:${OPIK_DB_PASSWORD:-opik}@redis:6379/
+      JAVA_OPTS: "-Dliquibase.propertySubstitutionEnabled=true -XX:+UseG1GC -XX:MaxRAMPercentage=80.0"
+      OPIK_OTEL_SDK_ENABLED: "false"
+      OPIK_USAGE_REPORT_ENABLED: "false"
+      OPIK_LOG_LEVEL: ${OPIK_LOG_LEVEL:-INFO}
+      TOGGLE_OLLIE_ENABLED: "false"
+      TOGGLE_OPIK_AI_ENABLED: "false"
+      TOGGLE_GUARDRAILS_ENABLED: "false"
+      TOGGLE_WELCOME_WIZARD_ENABLED: "true"
+      TOGGLE_FORCE_WORKSPACE_VERSION: "version_2"
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-opik}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-opik12345}
+      IS_MINIO: "true"
+      S3_URL: "http://minio:9000"
+      PYTHON_EVALUATOR_URL: "http://python-backend:8000"
+      CORS: "false"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health-check"]
+      interval: 10s
+      timeout: 10s
+      retries: 120
+      start_period: 120s
+    tmpfs:
+      - /tmp
+
+  python-backend:
+    image: ghcr.io/comet-ml/opik/opik-python-backend:${OPIK_VERSION:-2.2.13}
+    container_name: central-opik-python-backend
+    restart: unless-stopped
+    profiles: ["opik"]
+    environment:
+      OPIK_OTEL_SDK_ENABLED: "false"
+      PYTHON_CODE_EXECUTOR_STRATEGY: "process"
+      PYTHON_CODE_EXECUTOR_CONTAINERS_NUM: 2
+      PYTHON_CODE_EXECUTOR_EXEC_TIMEOUT_IN_SECS: 10
+      PYTHON_CODE_EXECUTOR_ALLOW_NETWORK: "false"
+      PYTHON_CODE_EXECUTOR_CPU_SHARES: 512
+      PYTHON_CODE_EXECUTOR_MEM_LIMIT: "256m"
+      OPIK_VERSION: ${OPIK_VERSION:-2.2.13}
+      OPIK_REVERSE_PROXY_URL: "http://frontend:${NGINX_PORT:-32173}/api"
+      PYTHON_BACKEND_PORT: 8000
+      REDIS_URL: redis://:${OPIK_DB_PASSWORD:-opik}@redis:6379/0
+      RQ_WORKER_ENABLED: "true"
+      OPIK_URL_OVERRIDE: "http://backend:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8000/healthcheck"]
+      interval: 5s
+      timeout: 30s
+      retries: 30
+      start_period: 10s
+    tmpfs:
+      - /var/lib/docker
+
+  frontend:
+    image: ghcr.io/comet-ml/opik/opik-frontend:${OPIK_VERSION:-2.2.13}
+    container_name: central-opik-frontend
+    restart: unless-stopped
+    profiles: ["opik"]
+    ports:
+      - "${NGINX_PORT:-32173}:${NGINX_PORT:-32173}"
+    volumes:
+      - ./opik/nginx_default_local.conf:/etc/nginx/templates/default.conf.template:ro
+    environment:
+      OPIK_VERSION: ${OPIK_VERSION:-2.2.13}
+      NGINX_PORT: ${NGINX_PORT:-32173}
+      NGINX_CONF_SUFFIX: local
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --fail-early http://localhost:${NGINX_PORT:-32173}/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 5s
 
 volumes:
   vm-data:
   grafana-data:
   central-otel-logs:
-  opik-postgres-data:
-  opik-redis-data:
-  opik-clickhouse-data:
+  opik-mysql:
+  opik-redis:
+  opik-clickhouse:
+  opik-clickhouse-log:
+  opik-clickhouse-config:
+  opik-zookeeper:
+  opik-minio:

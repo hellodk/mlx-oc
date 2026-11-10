@@ -1,14 +1,14 @@
 # vmagent scrape configuration for mlx monitoring bundle edge node.
 #
 # Template variables substituted at deploy time:
-#   ${CENTRAL_VICTORIA_METRICS} -> host:port of central VictoriaMetrics
-#   ${OTLP_SCHEME}              -> http | https
-#   ${MACBOOK_ID}               -> node identifier from config/nodes.yml
-#   ${MACBOOK_SERIAL}           -> hardware serial from config/nodes.yml
-#   ${VMAGENT_SCRAPE_INTERVAL}  -> scrape interval (default 10s)
-#   ${VMAGENT_MAX_SHARDS}       -> remote_write queue max shards
-#   ${VMAGENT_QUEUE_CAPACITY}   -> remote_write queue capacity
-#   ${VMAGENT_PERSISTENT_QUEUE} -> persistent queue path (empty = in-memory only)
+#   CENTRAL_VICTORIA_METRICS -> host:port of central VictoriaMetrics
+#   OTLP_SCHEME              -> http | https
+#   MACBOOK_ID               -> node identifier from config/nodes.yml
+#   MACBOOK_SERIAL           -> hardware serial from config/nodes.yml
+#   VMAGENT_SCRAPE_INTERVAL  -> scrape interval (default 10s)
+#   VMAGENT_MAX_SHARDS       -> remote_write queue max shards
+#   VMAGENT_QUEUE_CAPACITY   -> remote_write queue capacity
+#   VMAGENT_PERSISTENT_QUEUE -> persistent queue path (empty = in-memory only)
 #
 # Note: remote_write is configured via vmagent CLI flags (-remoteWrite.url)
 # to ensure proper queue configuration. See mlx_monitoring_bundle.py start_vmagent().

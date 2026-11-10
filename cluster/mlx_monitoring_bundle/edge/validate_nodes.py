@@ -2,33 +2,38 @@
 """
 validate_nodes.py
 =================
-SSH connectivity validation for config/nodes.yml entries.
+Validate config/nodes.yml and local edge prerequisites.
 
-Short-lived tool: prompts for SSH password via getpass if no ssh_key is
-configured. The password is held in memory only for the lifetime of this
-process and is forgotten on exit. No credentials are stored on disk.
+The bundle is push-based and every Mac is a standalone node, so no SSH
+connectivity check is needed. This tool verifies:
 
-Reads config/nodes.yml and, for each enabled macbook entry, attempts an SSH
-connectivity check (a no-op `true` command over SSH). Reports which nodes are
-reachable and which are not. Exit code 0 = all reachable, 1 = one or more
-unreachable.
+  - central VictoriaMetrics and OTel endpoints are configured
+  - at least one enabled macbook entry exists
+  - a node can be selected (MLX_MACBOOK_ID or exactly one enabled entry)
+  - model_path (when set) contains a readable config.json
+  - VENV_PYTHON and MLX_VENV_PYTHON point at executables
+  - required Python packages import in the monitoring venv
+  - optionally, that the exporter ports are free
+
+Exit code 0 = valid, 1 = one or more errors.
 """
 
 import argparse
-import getpass
-import shlex
-import subprocess
+import os
+import socket
 import sys
-import time
 from pathlib import Path
 
 import yaml
 
 BUNDLE_DIR = Path(__file__).resolve().parent
 DEFAULT_NODES_FILE = BUNDLE_DIR / "config" / "nodes.yml"
+DEFAULT_ENV_FILE = BUNDLE_DIR / "config" / "edge.env"
+
+REQUIRED_MODULES = ("yaml", "prometheus_client", "requests")
 
 
-def load_nodes(path: Path) -> dict:
+def load_yaml(path: Path) -> dict:
     try:
         return yaml.safe_load(path.read_text(encoding="utf8")) or {}
     except FileNotFoundError:
@@ -39,133 +44,164 @@ def load_nodes(path: Path) -> dict:
         sys.exit(2)
 
 
-def check_node(node: dict, timeout: int, password_cache: dict, verify_host_keys: bool = False) -> tuple[bool, str]:
-    """Return (reachable, message) for one macbook node entry."""
-    node_id = node.get("id", "unknown")
-    ip = node.get("ip")
-    ssh_user = node.get("ssh_user")
-    ssh_key = node.get("ssh_key")
-    if ssh_key:
-        ssh_key = str(Path(ssh_key).expanduser())
-    node_timeout = int(node.get("ssh_connect_timeout", timeout))
+def load_env_file(path: Path) -> dict:
+    env = {}
+    if not path.exists():
+        return env
+    for line in path.read_text(encoding="utf8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        env[key.strip()] = value.strip().strip('"').strip("'")
+    return env
 
-    if not ip:
-        return False, f"{node_id}: no ip configured"
-    if not ssh_user:
-        return False, f"{node_id}: no ssh_user configured"
 
-    key_arg = []
-    password = None
-    if ssh_key:
-        key_arg = ["-i", ssh_key]
-    else:
-        cache_key = f"{ssh_user}@{ip}"
-        if cache_key not in password_cache:
-            password_cache[cache_key] = getpass.getpass(
-                f"SSH password for {ssh_user}@{ip}: "
-            )
-        password = password_cache[cache_key]
-
-    host_key_args = []
-    if not verify_host_keys:
-        host_key_args = [
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "UserKnownHostsFile=/dev/null",
-        ]
-    cmd = [
-        "ssh",
-        "-o", "BatchMode=no",
-        *host_key_args,
-        "-o", f"ConnectTimeout={node_timeout}",
-        *key_arg,
-        f"{ssh_user}@{ip}",
-        "true",
+def select_node(data: dict, explicit: str | None) -> dict:
+    macbooks = [
+        nb for nb in (data.get("macbooks") or [])
+        if isinstance(nb, dict) and nb.get("enabled", True)
     ]
+    if explicit:
+        for nb in macbooks:
+            if nb.get("id") == explicit:
+                return nb
+        return {}
+    if len(macbooks) == 1:
+        return macbooks[0]
+    return {}
 
-    env = dict(os.environ)
-    if password is not None:
-        env["SSH_ASKPASS"] = "/dev/null"
-        # Use sshpass-style via expect is complex; instead pass password to
-        # ssh via a helper. paramiko would be cleaner but we avoid extra deps.
-        # Here we rely on ssh's built-in password prompt; since BatchMode=no,
-        # ssh will prompt on the terminal. For non-interactive validation,
-        # ssh_key is strongly recommended.
 
-    t0 = time.monotonic()
+def module_available(python: str, module: str) -> bool:
     try:
+        import subprocess
+
         proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=node_timeout + 3,
-            env=env,
+            [python, "-c", f"import {module}"],
+            capture_output=True, text=True, timeout=15,
         )
-        elapsed = time.monotonic() - t0
-        if proc.returncode == 0:
-            return True, f"{node_id} ({ip}) reachable in {elapsed:.1f}s"
-        return False, (
-            f"{node_id} ({ip}): SSH exited {proc.returncode}; "
-            f"stderr={(proc.stderr or '').strip()[:120]}"
-        )
-    except subprocess.TimeoutExpired:
-        return False, f"{node_id} ({ip}): SSH connect timeout after {node_timeout}s"
-    except FileNotFoundError:
-        return False, f"{node_id} ({ip}): ssh binary not found on PATH"
-    except Exception as exc:
-        return False, f"{node_id} ({ip}): {exc!r}"
+        return proc.returncode == 0
+    except Exception:
+        return False
+
+
+def port_free(port: int) -> bool:
+    # Do not set SO_REUSEADDR: on macOS it lets a second bind to 127.0.0.1
+    # succeed even while another process listens on 0.0.0.0, producing a
+    # false "free" result.
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind(("127.0.0.1", port))
+            return True
+        except OSError:
+            return False
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(
-        description="Validate SSH connectivity for nodes.yml entries"
-    )
-    ap.add_argument("--nodes", default="config/nodes.yml",
+    ap = argparse.ArgumentParser(description="Validate nodes.yml and edge prerequisites")
+    ap.add_argument("--nodes", default=str(DEFAULT_NODES_FILE),
                     help="path to nodes.yml (default: config/nodes.yml)")
-    ap.add_argument("--timeout", type=int, default=5,
-                    help="default SSH connect timeout in seconds (default: 5)")
-    ap.add_argument("--verify-host-keys", action="store_true",
-                    help="enable SSH host key verification (default: disabled for initial validation)")
+    ap.add_argument("--env-file", default=str(DEFAULT_ENV_FILE),
+                    help="path to edge.env (default: config/edge.env)")
+    ap.add_argument("--node", default=os.environ.get("MLX_MACBOOK_ID"),
+                    help="node id to validate (default: auto-select single enabled node)")
+    ap.add_argument("--check-ports", action="store_true",
+                    help="warn when exporter ports are already in use")
     args = ap.parse_args()
 
     nodes_path = Path(args.nodes)
     if not nodes_path.is_absolute():
         nodes_path = BUNDLE_DIR / nodes_path
+    data = load_yaml(nodes_path)
+    env = load_env_file(Path(args.env_file))
 
-    data = load_nodes(nodes_path)
-    macbooks = data.get("macbooks", []) or []
+    errors: list[str] = []
+    warnings: list[str] = []
 
+    central = data.get("central") or {}
+    for key, env_key in (
+        ("victoria_metrics", "CENTRAL_VICTORIA_METRICS"),
+        ("otel", "CENTRAL_OTEL"),
+    ):
+        if not (central.get(key) or env.get(env_key)):
+            errors.append(f"central.{key} is not configured (or set {env_key})")
+    if not (central.get("opik") or env.get("CENTRAL_OPIK")):
+        warnings.append("central.opik is not configured; Opik tracing will be skipped")
+
+    macbooks = [
+        nb for nb in (data.get("macbooks") or [])
+        if isinstance(nb, dict) and nb.get("enabled", True)
+    ]
     if not macbooks:
-        print("no macbook entries found in nodes.yml", file=sys.stderr)
-        return 1
+        errors.append("no enabled macbook entries in nodes.yml")
+    elif not args.node and len(macbooks) > 1:
+        errors.append(
+            "multiple enabled macbooks: pass --node or set MLX_MACBOOK_ID"
+        )
 
-    results = []
-    unreachable = 0
-    password_cache: dict[str, str] = {}
-
-    for node in macbooks:
-        if not node.get("enabled", True):
-            print(f"SKIP  {node.get('id','unknown')} (disabled)")
-            continue
-        ok, msg = check_node(node, args.timeout, password_cache, args.verify_host_keys)
-        results.append((node, ok, msg))
-        if ok:
-            print(f"OK    {msg}")
+    node = select_node(data, args.node)
+    if macbooks and not node:
+        errors.append(
+            f"node '{args.node}' not found among enabled macbooks"
+            if args.node else "could not select a node"
+        )
+    elif node:
+        print(f"node     : {node.get('id', 'unknown')} "
+              f"({node.get('ip', 'no ip')})")
+        model = env.get("MLX_MODEL") or node.get("model")
+        model_path = env.get("MLX_MODEL_PATH") or node.get("model_path")
+        if model:
+            print(f"model    : {model}")
+        elif node.get("model_path"):
+            print("model    : <discovered from model_path>")
         else:
-            unreachable += 1
-            print(f"FAIL  {msg}")
+            warnings.append("no model or model_path set; model gauges will be skipped")
+        if model_path:
+            cfg = Path(model_path).expanduser() / "config.json"
+            if cfg.is_file():
+                print(f"config   : {cfg}")
+            else:
+                errors.append(f"model_path does not contain config.json: {cfg}")
+        elif model and model.startswith(("/", "~", "./", "../")):
+            cfg = Path(model).expanduser() / "config.json"
+            if cfg.is_file():
+                print(f"config   : {cfg}")
+            else:
+                errors.append(f"model path does not contain config.json: {cfg}")
 
-    total = len(results)
-    print()
-    print(f"validated {total} node(s): {total - unreachable} reachable, {unreachable} unreachable")
+    venv_python = env.get("VENV_PYTHON", "python3")
+    mlx_python = env.get("MLX_VENV_PYTHON", venv_python)
+    for label, executable in (
+        ("VENV_PYTHON", venv_python),
+        ("MLX_VENV_PYTHON", mlx_python),
+    ):
+        path = Path(executable).expanduser()
+        if not (path.is_file() and os.access(path, os.X_OK)):
+            errors.append(f"{label} is not executable: {path}")
+        else:
+            print(f"{label:16}: {path}")
 
-    # Clear password cache from memory
-    for k in list(password_cache.keys()):
-        password_cache[k] = ""
-    password_cache.clear()
+    if Path(venv_python).is_file():
+        for module in REQUIRED_MODULES:
+            if not module_available(venv_python, module):
+                errors.append(f"{module} is not importable in {venv_python}")
 
-    return 1 if unreachable else 0
+    if args.check_ports:
+        for port in (8080, 9102, 9104, 9105, 9106):
+            if not port_free(port):
+                warnings.append(f"port {port} is already in use")
+
+    for warning in warnings:
+        print(f"WARN  {warning}")
+    for error in errors:
+        print(f"FAIL  {error}")
+
+    if errors:
+        print(f"\n{len(errors)} error(s), {len(warnings)} warning(s)")
+        return 1
+    print(f"\nOK ({len(warnings)} warning(s))")
+    return 0
 
 
 if __name__ == "__main__":
-    import os
     sys.exit(main())

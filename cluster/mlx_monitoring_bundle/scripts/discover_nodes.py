@@ -9,23 +9,25 @@ Common parameters (same for all nodes) are provided via flags:
   --ssh-user, --ssh-key
 
 Per-node parameters are fetched via SSH or local inspection:
-  - id: hostname (or serial-derived)
+  - id: hostname
   - serial: `system_profiler SPHardwareDataType` (macOS)
   - ip: local interface IP
-  - role: rank0/rank1 (from --role flag or hosts.json)
-  - model: optional pinned model
+  - model: optional pinned model id
+  - model_path: optional local model directory
+
+Every Mac is a standalone node; there are no rank0/rank1 roles.
 
 Usage:
   # Discover the local machine
-  python3 scripts/discover_nodes.py --local --role rank0 \
+  python3 scripts/discover_nodes.py --local \
       --central-victoria-metrics <VM_HOST:PORT> \
       --central-otel <OTEL_HOST:PORT> \
       --central-opik <OPIK_HOST:PORT> \
-      --ssh-user <USER> --ssh-key <KEY_PATH> \
+      --model-path <MODEL_DIR> \
       > edge/config/nodes.yml
 
   # Discover a remote Macbook via SSH
-  python3 scripts/discover_nodes.py --host <REMOTE_HOST> --role rank1 ...
+  python3 scripts/discover_nodes.py --host <REMOTE_HOST> --ssh-user <USER> ...
 
 Output is YAML written to stdout. Review before deploying.
 """
@@ -112,9 +114,8 @@ def main() -> int:
     ap.add_argument("--host", help="remote host to discover via SSH")
     ap.add_argument("--ssh-user", help="SSH user for remote discovery")
     ap.add_argument("--ssh-key", help="SSH private key for remote discovery")
-    ap.add_argument("--role", choices=["rank0", "rank1"], required=True,
-                    help="node role")
-    ap.add_argument("--model", help="pinned model (optional, auto-discovered if unset)")
+    ap.add_argument("--model", help="pinned model id (optional, auto-discovered if unset)")
+    ap.add_argument("--model-path", help="local model directory (optional)")
     ap.add_argument("--enabled", action="store_true", default=True,
                     help="mark node as enabled (default: true)")
     ap.add_argument("--central-victoria-metrics", required=True,
@@ -123,7 +124,6 @@ def main() -> int:
                     help="OTel collector host:port (required, no default)")
     ap.add_argument("--central-opik", required=True,
                     help="Opik host:port (required, no default)")
-    ap.add_argument("--ssh-connect-timeout", type=int, default=5)
     args = ap.parse_args()
 
     if args.local:
@@ -151,17 +151,12 @@ def main() -> int:
         "id": node_id,
         "serial": serial,
         "ip": ip,
-        "role": args.role,
         "enabled": args.enabled,
-        "ssh_connect_timeout": args.ssh_connect_timeout,
     }
-    if user:
-        node["ssh_user"] = user
-    if key:
-        from pathlib import Path
-        node["ssh_key"] = str(Path(key).expanduser())
     if args.model:
         node["model"] = args.model
+    if args.model_path:
+        node["model_path"] = str(Path(args.model_path).expanduser())
 
     doc = {
         "central": {

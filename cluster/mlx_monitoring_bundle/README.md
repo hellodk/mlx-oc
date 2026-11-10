@@ -39,7 +39,7 @@ No Prometheus scraping — devices initiate all outbound connections.
    - [Step 3: Configure edge.env](#step-3-configure-edgeenv)
    - [Step 4: Start the Edge Bundle](#step-4-start-the-edge-bundle)
    - [Step 5: Deploy Central Stack](#step-5-deploy-central-stack)
-   - [Step 6: Render Template Configs](#step-6-render-template-configs)
+   - [Step 6: vmagent Config (Automatic)](#step-6-vmagent-config-automatic)
 8. [Opik SDK Tracing](#opik-sdk-tracing)
 9. [Security](#security)
 10. [Troubleshooting](#troubleshooting)
@@ -120,7 +120,7 @@ cluster/mlx_monitoring_bundle/
 │   ├── vmagent-edge/
 │   │   └── vmagent.yml                            # vmagent scrape config (template vars)
 │   ├── mlx_monitoring_bundle.py                   # Edge entrypoint (start\|stop\|status\|restart)
-│   ├── validate_nodes.py                          # SSH connectivity validator
+│   ├── validate_nodes.py                          # Config + prerequisite validator
 │   ├── requirements.txt                           # pip dependencies
 │   ├── com.mlx.monitoring.bundle.plist            # launchd agent (macOS, auto-restart)
 │   └── com.mlx.monitoring-bundle.service          # systemd unit (Linux, auto-restart)
@@ -134,12 +134,11 @@ cluster/mlx_monitoring_bundle/
 │   │       ├── datasources.yaml                   # VictoriaMetrics datasource
 │   │       └── dashboards.yaml                    # Grafana file provisioning
 │   ├── dashboards/                                # 12 Grafana dashboards (device + IST + 5m)
-│   ├── docker-compose.central.yml                 # Central stack composition
-│   └── Dockerfile.central                         # Central config image
+│   ├── docker-compose.central.yml                 # Central stack composition (+ Opik profile)
+│   └── opik/                                      # Vendored Opik config (NGINX + ClickHouse)
 │
 ├── scripts/                                       # === SHARED, NODE-AGNOSTIC ===
-│   ├── deploy.sh                                  # validate / edge / central / templates
-│   ├── build_and_push.sh                          # Build central image (quay.io/hellodk/hydra:central)
+│   ├── deploy.sh                                  # validate / edge / central [--opik]
 │   └── discover_nodes.py                          # Auto-generate nodes.yml via SSH / local inspection
 │
 └── logs/                                          # Runtime rotating file logs (gitignored)
@@ -155,23 +154,30 @@ cluster/mlx_monitoring_bundle/
 `edge/config/nodes.yml` is the single source of truth for node identity and shared
 central endpoints. It is read by `mlx_monitoring_bundle.py` and `validate_nodes.py`.
 
+Every Mac is a standalone node. Run the edge bundle locally on each machine;
+no SSH or rank orchestration is involved. When exactly one enabled macbook is
+listed it is selected automatically, so a single-Mac setup needs no per-host
+flags. Set `MLX_MACBOOK_ID` only when the file lists more than one node.
+
 ```yaml
 central:
-  victoria_metrics: "192.168.1.100:8428"   # host:port of central VictoriaMetrics
-  otel: "192.168.1.100:4318"                # host:port of central OTel collector
-  opik: "192.168.1.100:32173"               # host:port of central Opik server
+  victoria_metrics: "192.168.1.10:8428"    # host:port of central VictoriaMetrics
+  otel: "192.168.1.10:4318"                # host:port of central OTel collector
+  opik: "192.168.1.10:32173"               # host:port of central Opik server
 
 macbooks:
-  - id: "dk-mac"                            # REQUIRED: unique device identifier
-    serial: "ASHU1343"                      # OPTIONAL: hardware serial
-    ip: "192.168.1.10"                      # REQUIRED: device IP address
-    ssh_user: "dk"                          # OPTIONAL: SSH user
-    ssh_key: "~/.ssh/id_rsa"                # OPTIONAL: SSH key (omit to use password prompt)
-    ssh_connect_timeout: 5                  # OPTIONAL: SSH connect timeout (seconds)
-    role: "rank0"                           # REQUIRED: rank0 | rank1
-    enabled: true                           # OPTIONAL: false to skip this node
-    model: "mlx-community/Qwen3.5-4B-MLX-8bit"  # OPTIONAL: pinned model (auto-discovered if unset)
+  - id: "mm"                               # REQUIRED: unique device identifier
+    serial: "HM225L205P"                   # OPTIONAL: hardware serial
+    ip: "192.168.1.64"                     # REQUIRED: device IP address
+    enabled: true                          # OPTIONAL: false to skip this node
+    model: "Qwen3.5-4B-MLX-4bit"           # OPTIONAL: model id (else auto-discovered)
+    model_path: "/Users/dk/mlx-models/Qwen3.5-4B-MLX-4bit"  # OPTIONAL: model directory
 ```
+
+`model_path` lets the exporters read `config.json` directly instead of guessing
+architecture values. When it is set, the supervisor starts `mlx_lm.server` from
+the model's parent directory and passes the basename as `--model`, so request
+model ids stay stable.
 
 ### edge.env (Runtime Overrides)
 
@@ -185,6 +191,7 @@ ENABLE_HW_TELEMETRY=true
 ENABLE_KV_AGENT=true
 ENABLE_SUPERVISOR=true
 ENABLE_LOGTAILER=true
+ENABLE_VMAGENT=true
 
 # Listen ports
 PROXY_LISTEN=0.0.0.0:8080
@@ -213,29 +220,45 @@ PID_DIR=./bin
 CONFIG_DIR=./config
 
 # Python venvs
-VENV_PYTHON=/home/dk/.venv/bin/python
-MLX_VENV_PYTHON=/home/dk/venvs/mlx/bin/python
-MLX_LAUNCH=/home/dk/venvs/mlx/bin/mlx.launch
+VENV_PYTHON=/Users/dk/bench/venv-mon/bin/python
+MLX_VENV_PYTHON=/Users/dk/venvs/mlx/bin/python
+
+# Upstream mlx_lm.server endpoint consumed by the proxy / KV agent
+MLX_UPSTREAM=http://127.0.0.1:11234
+MLX_SERVER_PORT=11234
+
+# Adopt an already-healthy server instead of spawning a duplicate
+SUPERVISOR_ATTACH_HEALTHY=true
+
+# Reject requests whose model id does not match the served model
+MLX_PROXY_STRICT_MODEL=true
+
+# Empty = default-route interface (en1 on Wi-Fi, en0 on Ethernet)
+MLX_NET_IFACE=
+
+# Podman stats are meaningless on a Mac without podman
+ENABLE_CONTAINER_STATS=false
 
 # VM agent
 VMAGENT_SCRAPE_INTERVAL=10s
 VMAGENT_QUEUE_CAPACITY=5000
 VMAGENT_MAX_SHARDS=200
+VMAGENT_BINARY=vmagent
 
 # OTLP transport
 OTLP_SCHEME=http
 OTLP_VERIFY_TLS=false
-
-# MLX model (optional; auto-discovered from upstream /v1/models if unset)
-# MLX_MODEL=mlx-community/Qwen3.5-4B-MLX-8bit
 ```
+
+The model id and model directory belong in `nodes.yml`; `MLX_MODEL` and
+`MLX_MODEL_PATH` can still be set in the environment to override them.
 
 ### Variable Precedence
 
 Configuration is resolved in this order (lowest → highest priority):
 
 1. **Code defaults** — listen ports, intervals, timeouts (documented in each exporter)
-2. **`config/nodes.yml`** — node identity (`id`, `serial`, `ip`, `ssh_*`, `role`, `model`) + shared central endpoints
+2. **`config/nodes.yml`** — node identity (`id`, `serial`, `ip`, `model`, `model_path`) + shared central endpoints
 3. **`config/edge.env`** — per-deployment runtime overrides
 4. **Actual environment variables** — highest priority; override everything
 
@@ -248,8 +271,10 @@ Configuration is resolved in this order (lowest → highest priority):
 | `CENTRAL_OPIK` | nodes.yml central section | host:port of Opik server |
 | `OTLP_SCHEME` | edge.env / env | `http` \| `https` |
 | `OTLP_VERIFY_TLS` | edge.env / env | `true` \| `false` |
-| `MLX_MODEL` | nodes.yml per-node / edge.env | Pinned model (optional) |
-| `MLX_MACBOOK_ID` | env | Device identifier (set by launcher) |
+| `MLX_MODEL` | nodes.yml per-node / edge.env | Pinned model id (optional) |
+| `MLX_MODEL_PATH` | nodes.yml per-node / edge.env | Model directory containing `config.json` (optional) |
+| `MLX_UPSTREAM` | edge.env / env | Upstream `mlx_lm.server` base URL (default `http://127.0.0.1:11234`) |
+| `MLX_MACBOOK_ID` | env | Device identifier (auto-selected when only one node is enabled) |
 | `ENABLE_*` | edge.env | Feature toggles per exporter |
 | `*_LISTEN` | edge.env | Listen address per exporter |
 | `LOG_DIR`, `PID_DIR` | edge.env | Log and PID file directories |
@@ -283,16 +308,16 @@ Single entrypoint with four actions: `start`, `stop`, `status`, `restart`.
 
 - **start**: Spawns enabled exporters as subprocesses with `start_new_session=True`,
   writes PID files to `edge/bin/`, then blocks waiting for signals.
-- **stop**: Sends SIGTERM to the process group and all exporter PIDs, plus
-  rank1 hw telemetry via SSH.
-- **status**: Prints JSON of running PIDs.
+- **stop**: Sends SIGTERM to the process group and all exporter PIDs. Leaves an
+  adopted (externally started) `mlx_lm.server` running.
+- **status**: Prints JSON of running PIDs, node identity, model path, and central endpoints.
 - **restart**: stop → wait 2s → start.
 
-Spawn order: supervisor → kv → logtailer → proxy → hw(rank0) → hw(rank1 via SSH).
+Spawn order: supervisor → kv → logtailer → proxy → hw.
 
 ### Proxy (`mlx_metrics_proxy.py`)
 
-The proxy sits between clients and `mlx_lm.server` (`:8081`), listening on `:8080`.
+The proxy sits between clients and `mlx_lm.server` (`:11234` by default), listening on `:8080`.
 
 **Metrics collected** (Prometheus text format on `/metrics`):
 - `mlx_requests_total` — requests by model, streaming, kind
@@ -311,8 +336,12 @@ non-streaming requests that didn't ask for them, then strips them from the
 response. For streaming requests, a sampled fraction (`MLX_LOGPROBS_STREAM_SAMPLE`)
 are de-streamed (run non-streamed) to collect logprobs.
 
-**Model resolution:** `MLX_MODEL` (config) → upstream `GET /v1/models` → skip
-model gauges with `[degraded]` log if both fail.
+**Model resolution:** `MLX_MODEL` (config) → `MLX_MODEL_PATH` basename →
+upstream `GET /v1/models` (preferring the served absolute path) → skip model
+gauges with a `[degraded]` log if all fail. Architecture metadata comes from
+the model's own `config.json`; nothing is hardcoded. `--no-strict-model`
+(env `MLX_PROXY_STRICT_MODEL=false`) forwards any model id instead of rejecting
+mismatches.
 
 **Opik tracing:** Each chat completion becomes an Opik trace with an LLM span
 (input/output/usage/metadata), hallucination quality feedback scores, and token
@@ -323,16 +352,18 @@ confidence feedback scores. Requires `--opik-endpoint` and `opik>=1.4`.
 Runs on each device, listens on `:9102`. Collects:
 
 - CPU load (1/5/15min), CPU count, CPU temperature (powermetrics)
-- Memory used/total/pressure (vm_stat)
+- Memory used/total/free/available (vm_stat; available = free + inactive +
+  speculative + purgeable pages), page size
 - Disk used/total (root volume)
 - GPU power, package power, CPU power, ANE power (powermetrics, slow 15s cadence)
 - GPU memory (IOKit), GPU utilization, thermal pressure (pmset)
 - Process CPU/RSS for stack components (mlx_lm.server, proxy, kv, tailer, supervisor)
-- Container stats via `podman stats` (for central stack components)
-- Ring interconnect network bytes/errors (ifconfig + netstat)
+- Optional container stats via `podman stats` (`ENABLE_CONTAINER_STATS=true`)
+- Network RX/TX bytes and errors on the default-route interface
+  (`MLX_NET_IFACE` overrides)
 
-All gauges carry the `node` label. Rank1 telemetry is collected via SSH from
-the rank0 device.
+All gauges carry the `node` label. Each Mac reports only its own telemetry;
+there is no SSH fan-out.
 
 ### KV Cache Agent (`mlx_kv_cache_agent.py`)
 
@@ -346,15 +377,21 @@ Metrics:
 - `mlx_context_length_max_tokens` — from `mlx_model_info` (skipped if model unknown)
 - `mlx_kv_bytes_per_token` — from `mlx_model_info` (skipped if model unknown)
 
-**Graceful degradation:** If `MLX_MODEL` is unset and upstream `/v1/models`
-discovery fails, model-specific gauges are set to 0 and a `[degraded]` log is
-emitted. Throughput and other metrics continue unaffected.
+**Graceful degradation:** If `MLX_MODEL`/`MLX_MODEL_PATH` are unset and upstream
+`/v1/models` discovery fails, model-specific gauges are set to 0 and a
+`[degraded]` log is emitted. Throughput and other metrics continue unaffected.
 
 ### Server Supervisor (`mlx_server_supervisor.py`)
 
-Spawns `mlx_lm.server` via `mlx.launch`, watches the child process, and
-restarts with exponential backoff on crash. Probes `/v1/models` to distinguish
-"process alive" from "serving ready."
+Starts `mlx_lm.server`, watches the child process, and restarts with
+exponential backoff on crash. Probes `/v1/models` to distinguish "process alive"
+from "serving ready."
+
+If a healthy server is already answering when the supervisor starts, it adopts
+that process instead of spawning a duplicate (`SUPERVISOR_ATTACH_HEALTHY=true`,
+disable with `--no-attach`). When `model_path` is configured the server is
+launched from the model's parent directory with the basename as `--model`, so
+request model ids stay stable.
 
 Metrics:
 - `mlx_server_state` (0=idle, 1=running, 2=starting, 3=backoff)
@@ -384,14 +421,18 @@ queue depth.
 
 ### Node Validator (`validate_nodes.py`)
 
-Short-lived tool. For each enabled node in `nodes.yml`, runs `ssh user@ip true`
-to verify connectivity. If no `ssh_key` is configured, prompts for password via
-`getpass` — held in memory only, cleared on exit. No credentials stored on disk.
+Short-lived tool. Validates `nodes.yml` and local edge prerequisites: central
+endpoints are configured, at least one node is enabled and selectable,
+`model_path` contains a readable `config.json`, the configured Python
+executables exist, and `yaml`/`prometheus_client`/`requests` import in the
+monitoring venv. `--check-ports` warns when exporter ports are already in use.
+No SSH or password handling.
 
 ### Node Discovery (`discover_nodes.py`)
 
 Auto-generates `nodes.yml` by inspecting the local machine or a remote host via
-SSH. Collects: hostname (id), serial (`system_profiler`), IP, role (from flag).
+SSH. Collects: hostname (id), serial (`system_profiler`), IP, and optional
+`model` / `model_path`.
 
 **No hardcoded IPs:** All central endpoints (`--central-victoria-metrics`,
 `--central-otel`, `--central-opik`) are required flags with no defaults.
@@ -476,28 +517,33 @@ when a device or proxy is down.
 
 ### Prerequisites
 
-On each device:
+On each Mac:
 ```bash
 pip install -r edge/requirements.txt
 ```
 
-On central server:
+On the central server:
 ```bash
+# Base stack (VictoriaMetrics, OTel, Grafana, vmalert, alertmanager)
 docker compose -f central/docker-compose.central.yml up -d
-# or
-podman compose -f central/docker-compose.central.yml up -d
+
+# With self-hosted Opik
+docker compose -f central/docker-compose.central.yml --profile opik up -d
 ```
+
+Always pass `-f central/docker-compose.central.yml` explicitly; otherwise Compose
+may walk up and merge an unrelated parent `docker-compose.yaml`.
 
 ### Step 1: Generate nodes.yml
 
 **Option A — Auto-discover local machine:**
 ```bash
 cd scripts
-python3 discover_nodes.py --local --role rank0 \
+python3 discover_nodes.py --local \
     --central-victoria-metrics <VM_HOST:PORT> \
     --central-otel <OTEL_HOST:PORT> \
     --central-opik <OPIK_HOST:PORT> \
-    --ssh-user <USER> --ssh-key <KEY_PATH> \
+    --model-path <MODEL_DIR> \
     > ../edge/config/nodes.yml
 ```
 
@@ -509,28 +555,30 @@ cp edge/config/nodes.yml.template edge/config/nodes.yml
 
 **Option C — Discover remote host via SSH:**
 ```bash
-python3 discover_nodes.py --host <REMOTE_HOST> --role rank1 \
+python3 discover_nodes.py --host <REMOTE_HOST> \
     --ssh-user <USER> --ssh-key <KEY_PATH> \
     --central-victoria-metrics <VM_HOST:PORT> \
     --central-otel <OTEL_HOST:PORT> \
     --central-opik <OPIK_HOST:PORT> \
+    --model-path <MODEL_DIR> \
     >> ../edge/config/nodes.yml
 ```
 
-### Step 2: Validate SSH Connectivity
+### Step 2: Validate Configuration
 
 ```bash
 cd scripts
 ./deploy.sh validate
 ```
 
-All nodes must report `OK` before deploying.
+Checks central endpoints, node selection, model path, Python executables, and
+required packages. Add `--check-ports` to detect already-bound exporter ports.
 
 ### Step 3: Configure edge.env
 
 ```bash
 cp edge/config/edge.env.template edge/config/edge.env
-# edit edge/config/edge.env (feature flags, listen ports, log paths)
+# edit edge/config/edge.env (feature flags, listen ports, venv paths)
 ```
 
 ### Step 4: Start the Edge Bundle
@@ -552,8 +600,9 @@ sudo systemctl enable --now com.mlx.monitoring-bundle
 **Manually:**
 ```bash
 cd edge
-export MLX_MACBOOK_ID=dk-mac
-python3 mlx_monitoring_bundle.py start
+./../scripts/deploy.sh edge          # single enabled node is selected
+# or, with several nodes:
+MLX_MACBOOK_ID=mm python3 mlx_monitoring_bundle.py start
 ```
 
 **Check status:**
@@ -570,29 +619,25 @@ python3 mlx_monitoring_bundle.py stop
 
 ```bash
 cd scripts
-./deploy.sh central
+./deploy.sh central          # base stack
+./deploy.sh central --opik   # base stack + Opik
 ```
 
 Access:
 - Grafana: http://<central-ip>:3000
 - VictoriaMetrics: http://<central-ip>:8428
-- Opik: http://<central-ip>:32173
+- vmalert: http://<central-ip>:8880
+- Alertmanager: http://<central-ip>:9093
+- Opik: http://<central-ip>:32173 (with `--opik`)
 
-### Step 6: Render Template Configs
+### Step 6: vmagent Config (Automatic)
 
-vmagent.yml and otelcol-config.yaml use `${VAR}` placeholders:
-
-```bash
-export CENTRAL_VICTORIA_METRICS=192.168.1.100:8428
-export CENTRAL_OTEL=192.168.1.100:4318
-export CENTRAL_OPIK=192.168.1.100:32173
-export OTLP_SCHEME=http
-export MACBOOK_ID=dk-mac
-export MACBOOK_SERIAL=ASHU1343
-./deploy.sh templates
-```
-
-This produces `vmagent.yml.rendered` and `otelcol-config.yaml.rendered`.
+`edge/vmagent-edge/vmagent.yml` uses `${VAR}` placeholders for the central
+VictoriaMetrics URL, node labels, and queue tuning. `mlx_monitoring_bundle.py`
+renders it to `edge/bin/vmagent.yml` at start time from `nodes.yml` and `edge.env`
+and passes the remote-write URL on the `vmagent` command line. No manual
+rendering step is needed. Set `VMAGENT_BINARY` in `edge.env` when `vmagent` is
+not on `PATH`.
 
 ---
 
@@ -605,28 +650,28 @@ LLM span (input/output/usage/metadata), hallucination quality feedback scores
 (0..1), and token confidence feedback scores.
 
 **What you need to do:**
-1. Run Opik server on the central host (part of `docker-compose.central.yml`):
+1. Start Opik on the central host (profile in `docker-compose.central.yml`):
    ```bash
    cd central
-   docker compose up -d opik-server opik-postgres opik-redis opik-clickhouse
+   docker compose -f docker-compose.central.yml --profile opik up -d
    ```
-2. Set `CENTRAL_OPIK=<host:port>` in `nodes.yml` (default port 32173).
-3. Start the edge bundle with `--opik-endpoint http://<CENTRAL_OPIK>` or set
-   `OPIK_ENDPOINT` env var.
-4. The proxy automatically creates traces in the "mlx" project. View them in
-   the Opik UI at http://<central-ip>:32173.
+2. Set `central.opik: "<host>:32173"` in `nodes.yml`.
+3. Start the edge bundle. It derives `OPIK_ENDPOINT` and the Opik OTLP endpoint
+   from `central.opik`, and the proxy initializes the Opik SDK automatically.
+4. Traces appear in the "mlx" project in the Opik UI at
+   http://<central-ip>:32173.
 
-**No code changes needed** — the proxy already initializes the Opik SDK when
-`--opik-endpoint` is provided.
+**No code changes needed** — the proxy initializes the Opik SDK whenever an
+Opik endpoint is configured.
 
 ---
 
 ## Security
 
-- **No credentials on disk:** SSH keys are optional; passwords are prompted
-  via `getpass` only in the short-lived `validate_nodes.py` and cleared from
-  memory on exit. Long-running daemons require `ssh_key` in `nodes.yml`.
-- **No hardcoded IPs:** All central endpoints come from `nodes.yml` or flags.
+- **No credentials on disk:** There is no SSH orchestration and no password
+  handling. Every Mac runs the edge bundle locally.
+- **No hardcoded IPs:** All central endpoints come from `nodes.yml` or environment
+  variables.
 - **OTLP TLS:** `OTLP_SCHEME=http` and `OTLP_VERIFY_TLS=false` by default.
   For production, set `OTLP_SCHEME=https` and `OTLP_VERIFY_TLS=true` with
   proper CA certificates.
@@ -639,10 +684,12 @@ LLM span (input/output/usage/metadata), hallucination quality feedback scores
 
 | Symptom | Likely Cause | Fix |
 |---------|-------------|-----|
-| No metrics in VictoriaMetrics | vmagent not rendering template vars | Run `./deploy.sh templates` with `CENTRAL_VICTORIA_METRICS` set |
-| `MLX_DEVICE_SILENT` firing | hw exporter not running or vmagent can't scrape | Check `:9102/metrics` on device; verify vmagent config |
-| Model gauges at 0 | `MLX_MODEL` unset and `/v1/models` unreachable | Set `MLX_MODEL` in `nodes.yml` or ensure upstream is reachable |
-| Opik traces missing | `OPIK_ENDPOINT` not set or Opik server down | Set `OPIK_ENDPOINT=http://<CENTRAL_OPIK>`; verify Opik server |
+| No metrics in VictoriaMetrics | vmagent not running or cannot reach central | Check `status`, the rendered `bin/vmagent.yml`, and `CENTRAL_VICTORIA_METRICS` |
+| `MLXDeviceSilent` firing | hw exporter not running or vmagent can't scrape | Check `:9102/metrics` on the device; verify vmagent config |
+| Model gauges at 0 | no `MLX_MODEL`/`MLX_MODEL_PATH` and `/v1/models` unreachable | Set `model_path` in `nodes.yml` or ensure upstream is reachable |
+| Opik traces missing | `central.opik` not set or Opik profile not running | Start with `deploy.sh central --opik`; verify port 32173 |
+| Proxy rejects model id | strict model matching | Send the served model id or set `MLX_PROXY_STRICT_MODEL=false` |
+| Duplicate `mlx_lm.server` | attach mode disabled while a server was already up | Keep `SUPERVISOR_ATTACH_HEALTHY=true` or stop the old process first |
 | Crash loop on restart | Server dying repeatedly | Check `server.log` and `mlx_server_crashes_total{reason}` |
 | Permission denied on logs | `LOG_DIR` not writable | Set `LOG_DIR` to a user-writable path in `edge.env` |
 

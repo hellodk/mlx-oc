@@ -1,16 +1,16 @@
 # OpenTelemetry Collector config for the central observability stack.
 #
-# Template variables substituted at deploy time:
-#   ${CENTRAL_VICTORIA_METRICS} -> host:port of central VictoriaMetrics
-#   ${OTLP_SCHEME}              -> http | https
-#
 # Pipelines:
-#   metrics  -> VictoriaMetrics via Prometheus remote_write
-#   logs     -> JSONL file (durable) + debug stdout
-#   traces   -> debug stdout (edge proxies send traces directly to Opik)
+#   logs    -> JSONL file (durable) + debug stdout
+#   traces  -> debug stdout (edge proxies send traces directly to Opik)
 #
-# Metrics are scrape-only from vmagent; OTLP metrics are NOT accepted here
-# to avoid duplicate mlx_* series in VictoriaMetrics.
+# Metrics are intentionally NOT accepted here. All mlx_* metrics are scraped
+# by the edge vmagent and pushed straight to VictoriaMetrics with
+# remote_write. Keeping a second OTLP metrics path would create duplicate
+# series with different labels.
+#
+# The collector runs inside the compose network, so the file exporter path is
+# a named volume and no host substitution is required.
 
 receivers:
   otlp:
@@ -26,10 +26,6 @@ processors:
     timeout: 5s
 
 exporters:
-  prometheus_remote_write:
-    endpoint: ${OTLP_SCHEME:-http}://${CENTRAL_VICTORIA_METRICS:-192.168.1.100:8428}/api/v1/write
-    resource_to_telemetry_conversion:
-      enabled: true
   debug:
     verbosity: basic
     sampling_initial: 2
@@ -42,10 +38,6 @@ exporters:
 
 service:
   pipelines:
-    metrics:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [prometheus_remote_write, debug]
     traces:
       receivers: [otlp]
       processors: [batch]

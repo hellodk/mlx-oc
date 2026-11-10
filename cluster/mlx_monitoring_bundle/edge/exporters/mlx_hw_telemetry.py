@@ -26,7 +26,7 @@ from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATE
 from mlx_logging import degraded, debug, error, info, setup_logging
 
 NODE_DEFAULT = "unknown"
-LISTEN_DEFAULT = "0.0.0.0:9102"
+LISTEN_DEFAULT = "127.0.0.1:9102"
 SAMPLE_INTERVAL_DEFAULT = 5.0
 GPU_SAMPLE_INTERVAL_DEFAULT = 15.0
 
@@ -39,7 +39,14 @@ G_CPU_COUNT = Gauge("mlx_hw_cpu_count", "Logical CPU count", ["node"])
 G_CPU_TEMP = Gauge("mlx_hw_cpu_temp_celsius", "CPU temperature", ["node"])
 G_MEM_TOTAL = Gauge("mlx_hw_mem_total_bytes", "Total physical memory", ["node"])
 G_MEM_USED = Gauge("mlx_hw_mem_used_bytes", "Used physical memory", ["node"])
+G_MEM_FREE = Gauge("mlx_hw_mem_free_bytes", "Completely free physical memory", ["node"])
+G_MEM_AVAILABLE = Gauge(
+    "mlx_hw_mem_available_bytes",
+    "Memory available to new processes (free + inactive + speculative + purgeable)",
+    ["node"],
+)
 G_MEM_PRESSURE = Gauge("mlx_hw_mem_pressure", "Free page count", ["node"])
+G_PAGE_SIZE = Gauge("mlx_hw_page_size_bytes", "Virtual memory page size", ["node"])
 G_DISK_TOTAL = Gauge("mlx_hw_disk_total_bytes", "Root volume total size", ["node"])
 G_DISK_USED = Gauge("mlx_hw_disk_used_bytes", "Root volume used size", ["node"])
 G_WORKER_CPU = Gauge("mlx_worker_cpu_percent", "mlx_lm.server CPU %", ["node"])
@@ -105,6 +112,8 @@ _CONTAINER_COMPONENTS = {
 _PAGE_SIZE = 0
 _MEM_TOTAL = 0
 _PROC_MATCH = None
+_NET_IFACE = ""
+_CONTAINER_STATS = False
 
 _GPU_LOCK = threading.Lock()
 _GPU_STATS = {"util": float("nan"), "freq": float("nan"),
@@ -136,29 +145,46 @@ def _parse_page_size():
 
 
 def _mem_info():
+    """Return memory accounting in bytes from vm_stat.
+
+    ``available`` mirrors what macOS considers reclaimable for new processes:
+    free + inactive + speculative + purgeable pages. ``free`` is strictly the
+    Pages free counter, which is why the old exporter reported 0 B available
+    on an otherwise healthy machine.
+    """
     try:
         out = subprocess.run(
             ["vm_stat"], capture_output=True, text=True, timeout=5
         ).stdout
-        free = inactive = spec = 0
+        pages = {}
         for line in out.splitlines():
-            m = re.search(r"Pages free:\s+(\d+)", line)
+            m = re.match(r"([^:]+):\s+(\d+)", line.strip())
             if m:
-                free = int(m.group(1))
-                continue
-            m = re.search(r"Pages inactive:\s+(\d+)", line)
-            if m:
-                inactive = int(m.group(1))
-                continue
-            m = re.search(r"Pages speculative:\s+(\d+)", line)
-            if m:
-                spec = int(m.group(1))
-        free_pages = free + inactive + spec
-        used = _MEM_TOTAL - free_pages * _PAGE_SIZE
-        return used, free_pages
+                pages[m.group(1).strip().lower()] = int(m.group(2))
+        page_size = _PAGE_SIZE or 4096
+        free = pages.get("pages free", 0)
+        inactive = pages.get("pages inactive", 0)
+        spec = pages.get("pages speculative", 0)
+        purgeable = pages.get("pages purgeable", 0)
+        free_bytes = free * page_size
+        available_bytes = (free + inactive + spec + purgeable) * page_size
+        used = max(0, _MEM_TOTAL - available_bytes)
+        return {
+            "used": used,
+            "free": free_bytes,
+            "available": available_bytes,
+            "free_pages": free,
+            "page_size": page_size,
+        }
     except Exception as exc:
         debug(f"mem_info failed: {exc!r}", component="hw")
-        return _MEM_TOTAL, 0
+        return {
+            "used": _MEM_TOTAL,
+            "free": 0,
+            "available": 0,
+            "free_pages": 0,
+            "page_size": _PAGE_SIZE or 0,
+        }
 
 
 def _cpu_temp():
@@ -329,6 +355,8 @@ def _proc_stats():
 
 def _container_stats():
     stats = {}
+    if not shutil.which("podman"):
+        return stats
     try:
         out = subprocess.run(
             ["podman", "stats", "--no-stream",
@@ -359,7 +387,25 @@ def _mem_usage_bytes(usage: str) -> int:
     return int(num * mult.get(unit, 1))
 
 
-def _ring_iface():
+def _net_iface():
+    """Return the interface to monitor.
+
+    An explicit MLX_NET_IFACE / --net-iface always wins. Otherwise use the
+    default-route interface (en1 on Wi-Fi, en0 on Ethernet), which works on
+    any subnet instead of the old hardcoded 192.168.2.x ring range.
+    """
+    if _NET_IFACE:
+        return _NET_IFACE
+    try:
+        out = subprocess.run(
+            ["route", "-n", "get", "default"],
+            capture_output=True, text=True, timeout=3,
+        ).stdout
+        m = re.search(r"interface:\s*(\S+)", out)
+        if m:
+            return m.group(1)
+    except Exception as exc:
+        debug(f"default route detection failed: {exc!r}", component="hw")
     try:
         out = subprocess.run(
             ["ifconfig"], capture_output=True, text=True, timeout=3
@@ -370,11 +416,10 @@ def _ring_iface():
             if m:
                 cur = m.group(1)
                 continue
-            m = re.search(r"inet\s+192\.168\.2\.\d+\s", line)
-            if m and cur:
+            if cur and cur != "lo0" and re.search(r"inet\s+\d+\.\d+\.\d+\.\d+\s", line):
                 return cur
     except Exception as exc:
-        debug(f"ring iface detection failed: {exc!r}", component="hw")
+        debug(f"iface fallback detection failed: {exc!r}", component="hw")
     return None
 
 
@@ -406,8 +451,7 @@ def _net_stats(iface: str | None):
 _NET_LAST = {}
 
 
-def _ring_net_since(counters):
-    iface = _ring_iface()
+def _ring_net_since(iface, counters):
     rx, tx, rx_err, tx_err = counters
     node = NODE  # set at startup
     prev = _NET_LAST.get(node, {}).get(iface)
@@ -428,7 +472,7 @@ def _ring_net_since(counters):
 
 def _sample():
     load1, load5, load15 = os.getloadavg()
-    used, free_pages = _mem_info()
+    mem = _mem_info()
     disk = shutil.disk_usage("/")
 
     G_UP.labels(NODE).set(1)
@@ -457,8 +501,11 @@ def _sample():
     G_GPU_MEM_TOTAL.labels(NODE).set(stats["gpu_mem_total"])
     G_GPU_UTIL_IOKIT.labels(NODE).set(stats["gpu_util_iokit"])
     G_MEM_TOTAL.labels(NODE).set(_MEM_TOTAL)
-    G_MEM_USED.labels(NODE).set(used)
-    G_MEM_PRESSURE.labels(NODE).set(free_pages)
+    G_MEM_USED.labels(NODE).set(mem["used"])
+    G_MEM_FREE.labels(NODE).set(mem["free"])
+    G_MEM_AVAILABLE.labels(NODE).set(mem["available"])
+    G_MEM_PRESSURE.labels(NODE).set(mem["free_pages"])
+    G_PAGE_SIZE.labels(NODE).set(mem["page_size"])
     G_DISK_TOTAL.labels(NODE).set(disk.total)
     G_DISK_USED.labels(NODE).set(disk.used)
 
@@ -470,13 +517,15 @@ def _sample():
         G_PROC_CPU.labels(NODE, name).set(cpu)
         G_PROC_RSS.labels(NODE, name).set(rss)
 
-    for name, (cpu, rss) in _container_stats().items():
-        G_PROC_CPU.labels(NODE, name).set(cpu)
-        G_PROC_RSS.labels(NODE, name).set(rss)
+    if _CONTAINER_STATS:
+        for name, (cpu, rss) in _container_stats().items():
+            G_PROC_CPU.labels(NODE, name).set(cpu)
+            G_PROC_RSS.labels(NODE, name).set(rss)
 
-    net = _net_stats(_ring_iface())
+    iface = _net_iface()
+    net = _net_stats(iface)
     if net:
-        _ring_net_since(net)
+        _ring_net_since(iface, net)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -501,6 +550,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     global NODE, LISTEN, _MEM_TOTAL, _PROC_MATCH, SAMPLE_INTERVAL
+    global _NET_IFACE, _CONTAINER_STATS
 
     ap = argparse.ArgumentParser(description="MLX hardware telemetry agent")
     ap.add_argument("--node-name", default=os.environ.get("MLX_MACBOOK_ID",
@@ -509,6 +559,11 @@ def main():
     ap.add_argument("--interval", type=float,
              default=float(os.environ.get("MLX_HW_INTERVAL", SAMPLE_INTERVAL_DEFAULT)))
     ap.add_argument("--worker-match", default="mlx_lm.server")
+    ap.add_argument("--net-iface", default=os.environ.get("MLX_NET_IFACE", ""),
+             help="interface to monitor (default: default-route interface)")
+    ap.add_argument("--container-stats", action="store_true",
+             default=os.environ.get("ENABLE_CONTAINER_STATS", "false").lower() == "true",
+             help="include podman container CPU/RSS (default: off)")
     ap.add_argument("--gpu-interval", type=float,
              default=float(os.environ.get("MLX_HW_GPU_INTERVAL",
                                           str(GPU_SAMPLE_INTERVAL_DEFAULT))))
@@ -519,6 +574,8 @@ def main():
               int(args.listen.rsplit(":", 1)[1]))
     SAMPLE_INTERVAL = max(1.0, args.interval)
     _PROC_MATCH = args.worker_match
+    _NET_IFACE = args.net_iface or ""
+    _CONTAINER_STATS = bool(args.container_stats)
     _MEM_TOTAL = int(_sysctl("hw.memsize", "0") or 0)
     _parse_page_size()
 

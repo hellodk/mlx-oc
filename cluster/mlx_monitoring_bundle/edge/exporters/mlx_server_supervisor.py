@@ -29,7 +29,7 @@ from prometheus_client import Gauge, Counter, generate_latest, CONTENT_TYPE_LATE
 
 from mlx_logging import degraded, debug, error, info, setup_logging
 
-LISTEN_DEFAULT = "0.0.0.0:9105"
+LISTEN_DEFAULT = "127.0.0.1:9105"
 HEALTH_URL_DEFAULT = "http://127.0.0.1:8081/v1/models"
 
 CRASH_REASONS = [
@@ -91,7 +91,10 @@ class Supervisor:
         self.health_lock = threading.Lock()
         self.hung_since = None
         self.last_ready = 0.0
+        self.ready_since = 0.0
         self.forced_reason = None
+        self.attached = False
+        self.attached_since = 0.0
 
     def _spawn(self):
         cmd = shlex.split(self.args.command)
@@ -107,10 +110,55 @@ class Supervisor:
             stderr=subprocess.STDOUT,
         )
 
+    def _probe_health(self) -> bool:
+        import urllib.request
+
+        try:
+            with urllib.request.urlopen(self.args.health, timeout=3) as resp:
+                if resp.status == 200:
+                    body = resp.read().decode("utf-8", "replace")
+                    return json.loads(body).get("data") is not None
+        except Exception as exc:
+            debug(f"health check failed: {exc!r}", component="supervisor")
+        return False
+
+    def _monitor_attached(self) -> bool:
+        """Monitor an external server. Return False when it stops serving."""
+        self.attached = True
+        self.attached_since = time.monotonic()
+        self.state = 1
+        G_STATE.set(1)
+        G_UP.set(1)
+        self._log("attached to already-healthy server; not spawning")
+        while not self.stop_event.is_set():
+            self.stop_event.wait(self.args.probe_interval)
+            ok = self._probe_health()
+            G_CHECKS.labels(result="ok" if ok else "fail").inc()
+            G_READY.set(1 if ok else 0)
+            if ok:
+                self.hung_since = None
+                if self.state != 1:
+                    self.ready_since = time.monotonic()
+                self.last_ready = time.monotonic()
+                G_MODEL.labels(model=self.args.model).set(1)
+                G_UPTIME.set(max(0, time.monotonic() - self.attached_since))
+            else:
+                self._log("attached server stopped responding; taking over")
+                self.attached = False
+                G_UP.set(0)
+                G_READY.set(0)
+                G_MODEL.labels(model=self.args.model).set(0)
+                G_UPTIME.set(0)
+                return False
+        return True
+
     def run(self):
         G_STATE.set(0)
         self.backoff = self.args.backoff
         first = True
+        if self.args.attach_if_healthy and self._probe_health():
+            if self._monitor_attached():
+                return
         while not self.stop_event.is_set():
             self.child = self._spawn()
             G_UP.set(1)
@@ -136,7 +184,7 @@ class Supervisor:
                 break
             G_RESTARTS.inc()
 
-            stable = time.monotonic() - self.last_ready if self.last_ready else 0.0
+            stable = time.monotonic() - self.ready_since if self.ready_since else 0.0
             if first or stable >= self.args.backoff_reset:
                 if not first:
                     self._log(
@@ -164,59 +212,40 @@ class Supervisor:
         self._log("supervisor stopped")
 
     def stop(self):
-        self._log("supervisor shutting down, terminating server")
         self.stop_event.set()
+        if self.attached:
+            self._log("detaching from external server; leaving it running")
+            return
         if self.child and self.child.poll() is None:
+            self._log("supervisor shutting down, terminating server")
             self.child.terminate()
             try:
                 self.child.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 self.child.kill()
-        self._kill_remote_rank()
-
-    def _kill_remote_rank(self):
-        rank1 = self.args.rank1_ssh_target
-        if not rank1:
-            degraded("no rank1 SSH target configured; skipping remote rank cleanup",
-                     component="supervisor")
-            return
-        ssh_cmd = ["ssh", "-o", f"ConnectTimeout={self.args.ssh_timeout}"]
-        if self.args.rank1_ssh_key:
-            ssh_cmd += ["-i", self.args.rank1_ssh_key]
-        ssh_cmd += [rank1, "pkill -f 'mlx_lm.server'; pkill -f 'mlx.launch'"]
-        try:
-            subprocess.run(
-                ssh_cmd,
-                capture_output=True, timeout=15,
-            )
-        except Exception as exc:
-            error(f"remote rank cleanup failed: {exc!r}", component="supervisor")
-        for pat in ("mlx_lm.server", "mlx.launch"):
-            subprocess.run(["pkill", "-f", pat], capture_output=True)
 
     def health_loop(self):
-        import urllib.request
         while not self.stop_event.is_set():
             self.stop_event.wait(self.args.probe_interval)
-            ok = False
-            try:
-                with urllib.request.urlopen(self.args.health, timeout=3) as resp:
-                    if resp.status == 200:
-                        body = resp.read().decode("utf-8", "replace")
-                        ok = json.loads(body).get("data") is not None
-            except Exception as exc:
-                debug(f"health check failed: {exc!r}", component="supervisor")
-                ok = False
+            ok = self._probe_health()
             with self.health_lock:
-                alive = self.child is not None and self.child.poll() is None
+                alive = self.attached or (
+                    self.child is not None and self.child.poll() is None
+                )
                 G_CHECKS.labels(result="ok" if ok else "fail").inc()
                 G_READY.set(1 if ok else 0)
                 if ok:
                     self.hung_since = None
+                    if self.state != 1:
+                        self.ready_since = time.monotonic()
                     self.last_ready = time.monotonic()
                     G_MODEL.labels(model=self.args.model).set(1)
                     if alive:
-                        G_UPTIME.set(max(0, time.monotonic() - self.child_started))
+                        started = (
+                            self.attached_since if self.attached
+                            else self.child_started
+                        )
+                        G_UPTIME.set(max(0, time.monotonic() - started))
                         if self.state != 1:
                             self.state = 1
                             G_STATE.set(1)
@@ -285,11 +314,19 @@ def main():
     ap.add_argument("--backoff-max", type=float, default=30.0)
     ap.add_argument("--hang-after", type=float, default=20.0)
     ap.add_argument("--backoff-reset", type=float, default=120.0)
-    ap.add_argument("--rank1-ssh-target", default=os.environ.get("RANK1_SSH_TARGET", ""),
-                    help="ssh user@host for rank1 cleanup (optional)")
-    ap.add_argument("--rank1-ssh-key", default=os.environ.get("RANK1_SSH_KEY", ""),
-                    help="ssh private key for rank1 cleanup (optional)")
-    ap.add_argument("--ssh-timeout", type=float, default=5.0)
+    ap.add_argument(
+        "--attach-if-healthy",
+        dest="attach_if_healthy",
+        action="store_true",
+        default=os.environ.get("SUPERVISOR_ATTACH_HEALTHY", "true").lower() == "true",
+        help="adopt an already-healthy server instead of spawning a second one",
+    )
+    ap.add_argument(
+        "--no-attach",
+        dest="attach_if_healthy",
+        action="store_false",
+        help="always spawn and supervise a new server process",
+    )
     args = ap.parse_args()
 
     if not args.server_log:

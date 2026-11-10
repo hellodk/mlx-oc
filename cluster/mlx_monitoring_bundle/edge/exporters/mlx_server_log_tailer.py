@@ -263,7 +263,10 @@ def main():
     ap.add_argument("--otlp-endpoint", default=os.environ.get("MLX_OTLP_ENDPOINT"))
     ap.add_argument("--project", default=os.environ.get("OPIK_PROJECT", "mlx"))
     ap.add_argument("--listen", default=os.environ.get("MLX_LOGTAILER_LISTEN",
-             "0.0.0.0:9106"))
+             "127.0.0.1:9106"))
+    ap.add_argument("--otlp-verify-tls", action="store_true",
+             default=os.environ.get("OTLP_VERIFY_TLS", "false").lower() == "true",
+             help="verify TLS certificates for OTLP endpoints")
     ap.add_argument("--max-rate", type=float,
              default=float(os.environ.get("MLX_LOGTAILER_MAX_RATE",
                                           str(DEFAULT_MAX_RATE))),

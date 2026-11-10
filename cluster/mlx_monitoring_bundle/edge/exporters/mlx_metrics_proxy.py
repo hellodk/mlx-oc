@@ -16,8 +16,10 @@ All configuration comes from environment variables and config/nodes.yml -
 nothing is hardcoded.
 
 MLX_MODEL is optional. If unset, the model name is discovered from the
-upstream mlx_lm server GET /v1/models endpoint. If discovery fails,
-model-specific gauges are skipped with a degraded log entry.
+upstream mlx_lm server GET /v1/models endpoint, or from MLX_MODEL_PATH.
+Model architecture metadata is read from the model's own config.json; if that
+file cannot be found, model-specific gauges are skipped with a degraded log
+entry.
 """
 
 import argparse
@@ -33,6 +35,7 @@ import threading
 import time
 import http.client
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 import requests
 
@@ -648,32 +651,72 @@ class _StreamParser:
         return len(self.content.split())
 
 
-def _discover_model_from_upstream(upstream_url: str) -> str | None:
+def _pick_served_model(models: list, model_path: str | None) -> str | None:
+    """Pick the model actually served by mlx_lm.server from /v1/models.
+
+    mlx_lm.server lists every MLX model in the Hugging Face cache and appends
+    the explicit ``--model`` path (as an absolute path) when one was given.
+    That appended entry is the served model, so it is preferred over cache
+    entries. The returned id is the basename, which matches the model id used
+    in API requests when the server is started from the model directory.
+    """
+    ids = [
+        m.get("id") for m in models
+        if isinstance(m, dict) and m.get("id")
+    ]
+    if not ids:
+        return None
+
+    target_name = None
+    if model_path:
+        target_name = Path(model_path.rstrip("/")).name
+        for mid in reversed(ids):
+            if str(mid).rstrip("/") == str(model_path).rstrip("/"):
+                return target_name
+            if Path(str(mid)).name == target_name:
+                return target_name
+
+    # The served model path is appended last and is absolute. Prefer it over
+    # arbitrary Hugging Face cache repository ids.
+    for mid in reversed(ids):
+        if str(mid).startswith("/"):
+            return Path(str(mid)).name
+    return ids[0]
+
+
+def _discover_model_from_upstream(upstream_url: str,
+                                  model_path: str | None = None) -> str | None:
     """Query upstream mlx_lm.server GET /v1/models to discover the loaded model."""
     try:
         resp = requests.get(f"{upstream_url.rstrip('/')}/v1/models", timeout=5)
         resp.raise_for_status()
         data = resp.json()
         models = data.get("data") or []
-        if models:
-            return models[0].get("id")
+        return _pick_served_model(models, model_path)
     except Exception as exc:
         error(f"failed to discover model from upstream {upstream_url}: {exc!r}",
               component="proxy")
     return None
 
 
-def _resolve_model(args_model: str | None, upstream_url: str) -> str | None:
-    """Resolve model: config > upstream discovery > None (degraded)."""
+def _resolve_model(args_model: str | None, upstream_url: str,
+                   model_path: str | None) -> str | None:
+    """Resolve model: config > upstream discovery > model path > None."""
     if args_model:
+        if args_model.startswith(("/", "~", "./", "../")):
+            return Path(args_model.rstrip("/")).name
         return args_model
-    discovered = _discover_model_from_upstream(upstream_url)
+    discovered = _discover_model_from_upstream(upstream_url, model_path)
     if discovered:
         info(f"model auto-discovered from upstream: {discovered}",
              component="proxy")
         return discovered
-    degraded("MLX_MODEL not set and upstream discovery failed; skipping "
-             "model-specific gauges", component="proxy")
+    if model_path:
+        name = Path(model_path.rstrip("/")).name
+        info(f"model id derived from MLX_MODEL_PATH: {name}", component="proxy")
+        return name
+    degraded("MLX_MODEL/MLX_MODEL_PATH not set and upstream discovery failed; "
+             "skipping model-specific gauges", component="proxy")
     return None
 
 
@@ -691,6 +734,7 @@ class Proxy(BaseHTTPRequestHandler):
     rate_limit = 0
     rate_window = 10.0
     strict_model = True
+    model_aliases = []
     _rate_hits = {}
 
     def _rate_limited(self, key):
@@ -815,7 +859,7 @@ class Proxy(BaseHTTPRequestHandler):
                 if bool(req.get("enable_thinking", False)):
                     kind = "reasoning"
 
-                if model != _MODEL_NAME and _MODEL_NAME is not None:
+                if model != _MODEL_NAME and _MODEL_NAME is not None and model not in self.model_aliases:
                     if self.strict_model:
                         self._reject(
                             400,
@@ -1345,9 +1389,15 @@ def _health_watch(upstream):
 def main():
     global _OTEL, _OPIK, _OPIK_OTLP, _NODE_NAME, _MODEL_NAME, _CTX_MAX_TOKENS
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--listen", default=os.environ.get("MLX_PROXY_LISTEN", "0.0.0.0:8080"))
+    ap.add_argument("--listen", default=os.environ.get("MLX_PROXY_LISTEN", "127.0.0.1:8080"))
     ap.add_argument("--upstream", default=os.environ.get("MLX_UPSTREAM", "127.0.0.1:8081"))
     ap.add_argument("--metrics-path", default=os.environ.get("MLX_METRICS_PATH", "/metrics"))
+    ap.add_argument(
+        "--otlp-verify-tls",
+        action="store_true",
+        default=os.environ.get("OTLP_VERIFY_TLS", "false").lower() == "true",
+        help="verify TLS certificates for OTLP endpoints",
+    )
     ap.add_argument(
         "--logprobs",
         type=int,
@@ -1368,6 +1418,11 @@ def main():
         "--model",
         default=os.environ.get("MLX_MODEL"),
         help="model id (optional; if omitted, discovered from upstream /v1/models)",
+    )
+    ap.add_argument(
+        "--model-path",
+        default=os.environ.get("MLX_MODEL_PATH"),
+        help="model directory or config.json path used to read architecture metadata",
     )
     ap.add_argument(
         "--otlp-endpoint",
@@ -1407,9 +1462,16 @@ def main():
     )
     ap.add_argument(
         "--strict-model",
+        dest="strict_model",
         action="store_true",
         default=os.environ.get("MLX_PROXY_STRICT_MODEL", "true").lower() == "true",
         help="reject requests for models not matching the proxy's model (default: true)",
+    )
+    ap.add_argument(
+        "--no-strict-model",
+        dest="strict_model",
+        action="store_false",
+        help="forward requests for any model id instead of rejecting mismatches",
     )
     args = ap.parse_args()
 
@@ -1429,9 +1491,11 @@ def main():
     Proxy.max_tokens_cap = args.max_tokens_cap
     Proxy.max_body_bytes = args.max_body_bytes
     Proxy.rate_limit = args.rate_limit
+    aliases_raw = os.environ.get("MLX_MODEL_ALIASES", "")
+    Proxy.model_aliases = [a.strip() for a in aliases_raw.split(",") if a.strip()]
 
     upstream_url = f"http://{Proxy.upstream[0]}:{Proxy.upstream[1]}"
-    _MODEL_NAME = _resolve_model(args.model, upstream_url)
+    _MODEL_NAME = _resolve_model(args.model, upstream_url, args.model_path)
 
     TOOL_CALLS.labels(model=_MODEL_NAME or "unknown", kind="", tool="", type="").inc(0)
     FLAGS.labels(model=_MODEL_NAME or "unknown").inc(0)
@@ -1455,17 +1519,30 @@ def main():
         info(f"opik OTLP -> {args.opik_otlp_endpoint} (project=mlx)", component="proxy")
 
     try:
-        info_obj = _model_info(_MODEL_NAME) if _model_info and _MODEL_NAME else None
+        info_obj = (
+            _model_info(_MODEL_NAME, args.model_path, upstream_url)
+            if _model_info and (_MODEL_NAME or args.model_path)
+            else None
+        )
         if info_obj:
+            # config.json discovery can resolve a path-like MLX_MODEL to a
+            # canonical model id; use that id for request matching and labels.
+            if not _MODEL_NAME or _MODEL_NAME.startswith(("/", "~", "./", "../")):
+                _MODEL_NAME = info_obj.model_id
+
             _CTX_MAX_TOKENS = info_obj.max_context_tokens
             CONTEXT_MAX.labels(model=_MODEL_NAME).set(info_obj.max_context_tokens)
             KV_BYTES_PER_TOKEN.labels(model=_MODEL_NAME).set(info_obj.kv_bytes_per_token)
             for attr, val in (
-                ("layer_count", info_obj.layers),
-                ("kv_heads", info_obj.kv_heads),
+                ("max_context_tokens", info_obj.max_context_tokens),
+                ("kv_bytes_per_token", info_obj.kv_bytes_per_token),
+                ("layer_count", info_obj.num_layers),
+                ("attention_layers", info_obj.attention_layers),
+                ("linear_layers", info_obj.linear_layers),
+                ("kv_heads", info_obj.num_key_value_heads),
                 ("head_dim", info_obj.head_dim),
                 ("hidden_size", info_obj.hidden_size),
-                ("attention_heads", info_obj.attention_heads),
+                ("attention_heads", info_obj.num_attention_heads),
                 ("vocab_size", info_obj.vocab_size),
                 ("intermediate_size", info_obj.intermediate_size),
                 ("quant_bits", info_obj.quant_bits),
@@ -1486,7 +1563,13 @@ def main():
                 ).set(1)
             info(
                 f"model ctx={info_obj.max_context_tokens} kv={info_obj.kv_bytes_per_token} B/tok "
-                f"layers={info_obj.layers} hidden={info_obj.hidden_size}",
+                f"layers={info_obj.num_layers} attention_layers={info_obj.attention_layers} "
+                f"hidden={info_obj.hidden_size} source={info_obj.source}",
+                component="proxy",
+            )
+        else:
+            degraded(
+                "model config.json not found; skipping model-specific gauges",
                 component="proxy",
             )
     except Exception as exc:
