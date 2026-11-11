@@ -475,7 +475,7 @@ try:
             print(img)
 except Exception:
     pass
-" "${with_opik}" | sort -u)
+" "${with_opik}" 2>/dev/null | sort -u)
   fi
 
   if [[ ${#raw_images[@]} -eq 0 ]]; then
@@ -487,21 +487,27 @@ except Exception:
   # 2. Check each image in local container storage
   local cached_images=()
   local missing_images=()
-  for img in "${raw_images[@]}"; do
-    if "${engine}" image inspect "${img}" >/dev/null 2>&1; then
-      cached_images+=("${img}")
-    else
-      missing_images+=("${img}")
-    fi
-  done
+  if [[ ${#raw_images[@]} -gt 0 ]]; then
+    for img in "${raw_images[@]}"; do
+      if "${engine}" image inspect "${img}" >/dev/null 2>&1; then
+        cached_images+=("${img}")
+      else
+        missing_images+=("${img}")
+      fi
+    done
+  fi
 
   info "Container image status in local ${engine} storage:"
-  for img in "${cached_images[@]}"; do
-    printf '  [cached]   %s\n' "${img}" >&2
-  done
-  for img in "${missing_images[@]}"; do
-    printf '  [missing]  %s\n' "${img}" >&2
-  done
+  if [[ ${#cached_images[@]} -gt 0 ]]; then
+    for img in "${cached_images[@]}"; do
+      printf '  [cached]   %s\n' "${img}" >&2
+    done
+  fi
+  if [[ ${#missing_images[@]} -gt 0 ]]; then
+    for img in "${missing_images[@]}"; do
+      printf '  [missing]  %s\n' "${img}" >&2
+    done
+  fi
 
   # 3. Confirmation gate
   local force_pull=0
