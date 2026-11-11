@@ -25,6 +25,8 @@ Push-only model: the edge initiates all outbound connections. No inbound
 ports required on the Mac.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import logging

@@ -12,6 +12,8 @@ All configuration comes from environment variables and config/nodes.yml -
 nothing is hardcoded.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import os

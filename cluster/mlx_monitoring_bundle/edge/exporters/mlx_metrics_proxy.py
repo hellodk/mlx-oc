@@ -22,6 +22,8 @@ file cannot be found, model-specific gauges are skipped with a degraded log
 entry.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import logging

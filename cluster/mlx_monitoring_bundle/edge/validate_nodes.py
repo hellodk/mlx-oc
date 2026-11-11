@@ -18,6 +18,8 @@ connectivity check is needed. This tool verifies:
 Exit code 0 = valid, 1 = one or more errors.
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 import socket

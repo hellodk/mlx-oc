@@ -19,6 +19,8 @@ Usage:
     degraded("MLX_MODEL not set; falling back to upstream /v1/models", component="kv-agent")
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import logging.handlers

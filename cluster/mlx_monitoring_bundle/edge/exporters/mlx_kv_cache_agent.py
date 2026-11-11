@@ -14,6 +14,8 @@ model-specific gauges are skipped with a degraded log entry - all other
 monitoring continues unaffected.
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 import re

@@ -430,13 +430,17 @@ cmd_central() {
   if [[ "${1:-}" == "--opik" ]]; then
     with_opik=1
   fi
-  if ! command -v docker >/dev/null 2>&1 && ! command -v podman >/dev/null 2>&1; then
-    err "docker or podman is required for the central stack"
-    exit 2
-  fi
-  local engine="docker"
-  if ! command -v docker >/dev/null 2>&1; then
+  local engine=""
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    engine="docker"
+  elif command -v podman >/dev/null 2>&1 && podman info >/dev/null 2>&1; then
     engine="podman"
+  elif command -v docker >/dev/null 2>&1; then
+    engine="docker"
+  elif command -v podman >/dev/null 2>&1; then
+    engine="podman"
+  else
+    die "docker or podman is required for the central stack"
   fi
   render_alertmanager_config
   cd "${CENTRAL_DIR}"
