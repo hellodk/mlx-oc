@@ -146,3 +146,43 @@ def test_no_magic_container_domains():
             assert "host.docker.internal" not in content, f"Found host.docker.internal in {path}"
             assert "host.containers.internal" not in content, f"Found host.containers.internal in {path}"
 
+
+def test_central_compose_image_resolution_and_profiles():
+    """Verify compose images are correctly partitioned by profile and use rustfs."""
+    compose_path = BUNDLE_DIR / "central" / "docker-compose.central.yml"
+    assert compose_path.exists()
+    doc = yaml.safe_load(compose_path.read_text(encoding="utf8"))
+    services = doc.get("services", {})
+
+    base_images = set()
+    opik_images = set()
+
+    for sname, sdata in services.items():
+        profiles = sdata.get("profiles", [])
+        img = sdata.get("image", "").replace("${OPIK_VERSION:-2.2.13}", "2.2.13")
+        assert img, f"Service {sname} missing image declaration"
+        assert "minio" not in img, f"Service {sname} references legacy minio image: {img}"
+        if "opik" in profiles:
+            opik_images.add(img)
+        else:
+            base_images.add(img)
+
+    # Base profile: 5 monitoring containers
+    expected_base = {
+        "victoriametrics/victoria-metrics:latest",
+        "otel/opentelemetry-collector-contrib:0.139.0",
+        "grafana/grafana:latest",
+        "victoriametrics/vmalert:latest",
+        "prom/alertmanager:latest",
+    }
+    assert base_images == expected_base
+
+    # Opik profile must include rustfs and not bitnami minio
+    assert "rustfs/rustfs:latest" in opik_images
+
+    # Backend must depend on opik-init-bucket completing successfully
+    backend_deps = services["backend"].get("depends_on", {})
+    assert "opik-init-bucket" in backend_deps
+    assert backend_deps["opik-init-bucket"]["condition"] == "service_completed_successfully"
+
+

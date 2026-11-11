@@ -63,7 +63,7 @@ _prompt_input() {
   else
     printf '%s: ' "${prompt}" >&2
   fi
-  read -r val
+  read -r val || true
   if [[ -z "${val}" ]]; then
     printf '%s' "${default}"
   else
@@ -77,7 +77,7 @@ _prompt_select() {
   printf '%s\n' "$prompt" >&2
   for item in "$@"; do printf '  %2d) %s\n' "$i" "$item" >&2; i=$((i+1)); done
   printf 'Select [1-%d]: ' "$#" >&2
-  local choice; read -r choice
+  local choice; read -r choice || true
   [ -z "$choice" ] && return 1
   case "$choice" in ''|*[!0-9]*) return 1;; esac
   [ "$choice" -lt 1 ] || [ "$choice" -gt "$#" ] && return 1
@@ -87,7 +87,7 @@ _prompt_select() {
 prompt_confirm_word() {
   local verb="$1" expect="$2"
   printf 'Type "%s" to confirm %s: ' "$expect" "$verb" >&2
-  local answer; read -r answer
+  local answer; read -r answer || true
   [ "$answer" = "$expect" ] || die "aborted (confirmation word mismatch)"
 }
 
@@ -457,6 +457,25 @@ cmd_central() {
   if [[ ${#raw_images[@]} -eq 0 ]]; then
     while IFS= read -r img; do
       [[ -n "${img}" ]] && raw_images+=("${img}")
+    done < <(python3 -c "
+import sys, yaml
+with_opik = sys.argv[1] == '1'
+try:
+    doc = yaml.safe_load(open('docker-compose.central.yml'))
+    for s in doc.get('services', {}).values():
+        if 'opik' in s.get('profiles', []) and not with_opik:
+            continue
+        img = s.get('image', '').replace('\${OPIK_VERSION:-2.2.13}', '2.2.13')
+        if img:
+            print(img)
+except Exception:
+    pass
+" "${with_opik}" | sort -u)
+  fi
+
+  if [[ ${#raw_images[@]} -eq 0 ]]; then
+    while IFS= read -r img; do
+      [[ -n "${img}" ]] && raw_images+=("${img}")
     done < <(grep -E '^\s*image:' docker-compose.central.yml | awk '{print $2}' | sed "s/\${OPIK_VERSION:-2.2.13}/2.2.13/g" | sort -u)
   fi
 
@@ -484,8 +503,11 @@ cmd_central() {
   if [[ ${#missing_images[@]} -gt 0 ]]; then
     info "${#cached_images[@]} image(s) cached locally; ${#missing_images[@]} missing image(s) will be downloaded."
     local confirm
-    confirm="$(_prompt_input "Proceed to download missing images and deploy the central stack? (y/N)" "N")"
+    confirm="$(_prompt_input "Proceed to download missing images and deploy the central stack? (y/N) [or enter 'pull' to re-pull all images]" "N")"
     case "${confirm}" in
+      pull|PULL)
+        force_pull=1
+        ;;
       y|Y|yes|YES) ;;
       *)
         info "Deployment aborted by user."
@@ -495,7 +517,7 @@ cmd_central() {
   else
     info "All ${#cached_images[@]} image(s) are already cached locally in ${engine} storage (no downloads required)."
     local confirm
-    confirm="$(_prompt_input "Proceed to deploy the central stack? (y/N) [enter 'pull' to force re-download]" "y")"
+    confirm="$(_prompt_input "Proceed to deploy the central stack? (y/N) [enter 'pull' to force re-download]" "N")"
     case "${confirm}" in
       pull|PULL)
         force_pull=1
@@ -511,24 +533,30 @@ cmd_central() {
   # 4. Pull only missing images unless user explicitly requested force pull
   if [[ "${force_pull}" == "1" ]]; then
     info "Force-pulling all ${#raw_images[@]} container images using ${engine}..."
-    "${engine}" compose "${compose_args[@]}" pull
+    if ! "${engine}" compose "${compose_args[@]}" pull; then
+      die "failed to pull container images"
+    fi
   elif [[ ${#missing_images[@]} -gt 0 ]]; then
     info "Pulling ${#missing_images[@]} missing container image(s) using ${engine}..."
     for img in "${missing_images[@]}"; do
       info "pulling ${img}..."
-      "${engine}" pull "${img}"
+      if ! "${engine}" pull "${img}"; then
+        die "failed to pull image: ${img}"
+      fi
     done
   else
     info "Skipping download as all images are already cached locally."
   fi
 
-  # 4. Bring up the stack
+  # 5. Bring up the stack
   if [[ "${with_opik}" == "1" ]]; then
     info "starting central observability stack with Opik"
   else
     info "starting central observability stack"
   fi
-  "${engine}" compose "${compose_args[@]}" up -d
+  if ! "${engine}" compose "${compose_args[@]}" up -d; then
+    die "failed to start central container stack"
+  fi
 
   if [[ "${with_opik}" != "1" ]]; then
     info "Opik is available with: $0 central --opik"

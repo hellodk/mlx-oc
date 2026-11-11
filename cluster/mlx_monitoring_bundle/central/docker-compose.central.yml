@@ -115,10 +115,8 @@ services:
   # Opik self-hosted (profile: opik)
   # --------------------------------------------------------------------------
   # The service topology and environment below follow the official Opik
-  # 2.2.13 compose file. MinIO is served from bitnamilegacy because the
-  # upstream minio/minio Docker Hub repository is no longer pullable without
-  # credentials; the Bitnami image contains the same MinIO server binary and
-  # is published for both amd64 and arm64.
+  # 2.2.13 compose file. S3 object storage is provided by RustFS (rustfs/rustfs),
+  # an open-source Rust-based S3-compatible server published for both amd64 and arm64.
   mysql:
     image: mysql:8.4.2
     container_name: central-opik-mysql
@@ -293,6 +291,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      opik-init-bucket:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health-check"]
       interval: 10s
