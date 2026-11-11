@@ -418,11 +418,12 @@ render_alertmanager_config() {
 
   python3 -c "
 import sys
-tpl = open('${tpl}', 'r').read()
-tpl = tpl.replace('{{ONCALL_WEBHOOK_CONFIG}}', '''${oncall_cfg}''')
-tpl = tpl.replace('{{DEFAULT_WEBHOOK_CONFIG}}', '''${default_cfg}''')
-open('${dst}', 'w').write(tpl)
-"
+tpl_path, dst_path, oncall_cfg, default_cfg = sys.argv[1:5]
+tpl = open(tpl_path, 'r', encoding='utf-8').read()
+tpl = tpl.replace('{{ONCALL_WEBHOOK_CONFIG}}', oncall_cfg)
+tpl = tpl.replace('{{DEFAULT_WEBHOOK_CONFIG}}', default_cfg)
+open(dst_path, 'w', encoding='utf-8').write(tpl)
+" "${tpl}" "${dst}" "${oncall_cfg}" "${default_cfg}"
 }
 
 cmd_central() {

@@ -1392,7 +1392,7 @@ def main():
     global _OTEL, _OPIK, _OPIK_OTLP, _NODE_NAME, _MODEL_NAME, _CTX_MAX_TOKENS
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--listen", default=os.environ.get("MLX_PROXY_LISTEN", "127.0.0.1:8080"))
-    ap.add_argument("--upstream", default=os.environ.get("MLX_UPSTREAM", "127.0.0.1:8081"))
+    ap.add_argument("--upstream", default=os.environ.get("MLX_UPSTREAM", "127.0.0.1:11234"))
     ap.add_argument("--metrics-path", default=os.environ.get("MLX_METRICS_PATH", "/metrics"))
     ap.add_argument(
         "--otlp-verify-tls",

@@ -400,6 +400,11 @@ class Bundle:
                 "VMAGENT_MAX_SHARDS": config_val(self.config, "VMAGENT_MAX_SHARDS", "200"),
                 "VMAGENT_QUEUE_CAPACITY": config_val(self.config, "VMAGENT_QUEUE_CAPACITY", "5000"),
                 "VMAGENT_PERSISTENT_QUEUE": config_val(self.config, "VMAGENT_PERSISTENT_QUEUE", ""),
+                "PROXY_LISTEN": config_val(self.config, "PROXY_LISTEN", "127.0.0.1:8080"),
+                "HW_LISTEN": config_val(self.config, "HW_LISTEN", "127.0.0.1:9102"),
+                "KV_LISTEN": config_val(self.config, "KV_LISTEN", "127.0.0.1:9104"),
+                "SUPERVISOR_LISTEN": config_val(self.config, "SUPERVISOR_LISTEN", "127.0.0.1:9105"),
+                "LOGTAILER_LISTEN": config_val(self.config, "LOGTAILER_LISTEN", "127.0.0.1:9106"),
             }
             # Single-pass substitution: replace ${VAR} and ${VAR:-default}.
             import re
@@ -584,11 +589,21 @@ class Bundle:
             self.start_vmagent(); started.append("vmagent")
 
         info(f"started: {', '.join(started)}", component="bundle")
+
+        def _handle_exit(signum, frame):
+            self.stop()
+            sys.exit(0)
+
+        signal.signal(signal.SIGTERM, _handle_exit)
+        signal.signal(signal.SIGINT, _handle_exit)
+
         try:
             while True:
                 time.sleep(10)
         except KeyboardInterrupt:
             pass
+        finally:
+            self.stop()
 
 
 def config_val(config: dict, key: str, default: str) -> str:

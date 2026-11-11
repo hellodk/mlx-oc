@@ -180,9 +180,45 @@ def test_central_compose_image_resolution_and_profiles():
     # Opik profile must include rustfs and not bitnami minio
     assert "rustfs/rustfs:latest" in opik_images
 
-    # Backend must depend on opik-init-bucket completing successfully
+    # Backend and MinIO must depend on opik-init-bucket completing successfully
     backend_deps = services["backend"].get("depends_on", {})
     assert "opik-init-bucket" in backend_deps
     assert backend_deps["opik-init-bucket"]["condition"] == "service_completed_successfully"
+
+    minio_deps = services["minio"].get("depends_on", {})
+    assert "opik-init-bucket" in minio_deps
+    assert minio_deps["opik-init-bucket"]["condition"] == "service_completed_successfully"
+
+
+def test_vmagent_custom_listen_ports_rendering():
+    """Verify vmagent.yml renders custom exporter listen ports properly."""
+    template_path = EDGE_DIR / "vmagent-edge" / "vmagent.yml"
+    template = template_path.read_text(encoding="utf8")
+    subs = {
+        "PROXY_LISTEN": "127.0.0.1:18080",
+        "HW_LISTEN": "127.0.0.1:19102",
+        "KV_LISTEN": "127.0.0.1:19104",
+        "SUPERVISOR_LISTEN": "127.0.0.1:19105",
+        "LOGTAILER_LISTEN": "127.0.0.1:19106",
+    }
+
+    def repl(m):
+        expr = m.group(1)
+        if ":-" in expr:
+            var, default = expr.split(":-", 1)
+            return subs.get(var, default)
+        if expr in subs:
+            return subs[expr]
+        return ""
+
+    rendered = re.sub(r"\$\{([^}]+)\}", repl, template)
+    data = yaml.safe_load(rendered)
+    targets = {cfg["job_name"]: cfg["static_configs"][0]["targets"][0] for cfg in data["scrape_configs"]}
+    assert targets["mlx-proxy"] == "127.0.0.1:18080"
+    assert targets["mlx-hw"] == "127.0.0.1:19102"
+    assert targets["mlx-kv"] == "127.0.0.1:19104"
+    assert targets["mlx-supervisor"] == "127.0.0.1:19105"
+    assert targets["mlx-logtailer"] == "127.0.0.1:19106"
+
 
 

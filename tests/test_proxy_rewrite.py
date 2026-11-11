@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cluster"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cluster" / "mlx_monitoring_bundle" / "edge" / "exporters"))
 
 import mlx_metrics_proxy as p  # noqa: E402
 
@@ -154,6 +154,8 @@ def stack():
     p.Proxy.logprobs_top = 2
     p.Proxy.stream_sample = 0.0
     p.Proxy.low_conf_threshold = 0.5
+    p.Proxy.strict_model = False
+    p._MODEL_NAME = MODEL
 
     proxy = ThreadingHTTPServer(("127.0.0.1", 0), p.Proxy)
     threading.Thread(target=proxy.serve_forever, daemon=True).start()

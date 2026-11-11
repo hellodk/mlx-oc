@@ -410,6 +410,16 @@ def _net_iface():
         debug(f"default route detection failed: {exc!r}", component="hw")
     try:
         out = subprocess.run(
+            ["ip", "route", "show", "default"],
+            capture_output=True, text=True, timeout=3,
+        ).stdout
+        m = re.search(r"dev\s+(\S+)", out)
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
+    try:
+        out = subprocess.run(
             ["ifconfig"], capture_output=True, text=True, timeout=3
         ).stdout
         cur = None
@@ -418,7 +428,7 @@ def _net_iface():
             if m:
                 cur = m.group(1)
                 continue
-            if cur and cur != "lo0" and re.search(r"inet\s+\d+\.\d+\.\d+\.\d+\s", line):
+            if cur and not cur.startswith("lo") and re.search(r"inet\s+\d+\.\d+\.\d+\.\d+\s", line):
                 return cur
     except Exception as exc:
         debug(f"iface fallback detection failed: {exc!r}", component="hw")

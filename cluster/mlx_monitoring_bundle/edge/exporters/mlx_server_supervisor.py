@@ -32,7 +32,7 @@ from prometheus_client import Gauge, Counter, generate_latest, CONTENT_TYPE_LATE
 from mlx_logging import degraded, debug, error, info, setup_logging
 
 LISTEN_DEFAULT = "127.0.0.1:9105"
-HEALTH_URL_DEFAULT = "http://127.0.0.1:8081/v1/models"
+HEALTH_URL_DEFAULT = os.environ.get("MLX_HEALTH_URL", "http://127.0.0.1:11234/v1/models")
 
 CRASH_REASONS = [
     (re.compile(r"\[METAL\].*(Command buffer execution failed|GPU errors)", re.I),

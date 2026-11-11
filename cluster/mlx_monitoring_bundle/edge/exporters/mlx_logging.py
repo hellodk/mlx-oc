@@ -107,6 +107,8 @@ def log(level: str, msg: str, component: str = "general",
     """Emit one structured JSON log record."""
     logger = _logger()
     level_no = getattr(logging, level.upper(), logging.INFO)
+    if not logger.isEnabledFor(level_no):
+        return
     record = logging.LogRecord(
         name=f"mlx.{SERVICE}",
         level=level_no,
