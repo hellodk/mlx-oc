@@ -446,32 +446,81 @@ cmd_central() {
     compose_args=(--profile opik "${compose_args[@]}")
   fi
 
-  # 1. Print the exact container images required by the compose stack
-  info "The following container images are required for the central stack:"
-  local images=()
-  while IFS= read -r img; do
-    images+=("${img}")
-    printf '  - %s\n' "${img}" >&2
-  done < <(grep -E '^\s*image:' docker-compose.central.yml | awk '{print $2}' | sed "s/\${OPIK_VERSION:-2.2.13}/2.2.13/g" | sort -u)
-
-  if [[ "${with_opik}" != "1" ]]; then
-    info "(Opik profile images are excluded since --opik was not specified)"
+  # 1. Determine container images required for this configuration
+  local raw_images=()
+  if "${engine}" compose "${compose_args[@]}" config --images >/dev/null 2>&1; then
+    while IFS= read -r img; do
+      [[ -n "${img}" ]] && raw_images+=("${img}")
+    done < <("${engine}" compose "${compose_args[@]}" config --images | sort -u)
   fi
 
-  # 2. Ask for explicit user confirmation before pulling/deploying
-  local confirm
-  confirm="$(_prompt_input "Proceed to pull images and deploy the central stack? (y/N)" "N")"
-  case "${confirm}" in
-    y|Y|yes|YES) ;;
-    *)
-      info "Deployment aborted by user."
-      return 0
-      ;;
-  esac
+  if [[ ${#raw_images[@]} -eq 0 ]]; then
+    while IFS= read -r img; do
+      [[ -n "${img}" ]] && raw_images+=("${img}")
+    done < <(grep -E '^\s*image:' docker-compose.central.yml | awk '{print $2}' | sed "s/\${OPIK_VERSION:-2.2.13}/2.2.13/g" | sort -u)
+  fi
 
-  # 3. Pull images explicitly with progress
-  info "Pulling container images using ${engine} compose..."
-  "${engine}" compose "${compose_args[@]}" pull
+  # 2. Check each image in local container storage
+  local cached_images=()
+  local missing_images=()
+  for img in "${raw_images[@]}"; do
+    if "${engine}" image inspect "${img}" >/dev/null 2>&1; then
+      cached_images+=("${img}")
+    else
+      missing_images+=("${img}")
+    fi
+  done
+
+  info "Container image status in local ${engine} storage:"
+  for img in "${cached_images[@]}"; do
+    printf '  [cached]   %s\n' "${img}" >&2
+  done
+  for img in "${missing_images[@]}"; do
+    printf '  [missing]  %s\n' "${img}" >&2
+  done
+
+  # 3. Confirmation gate
+  local force_pull=0
+  if [[ ${#missing_images[@]} -gt 0 ]]; then
+    info "${#cached_images[@]} image(s) cached locally; ${#missing_images[@]} missing image(s) will be downloaded."
+    local confirm
+    confirm="$(_prompt_input "Proceed to download missing images and deploy the central stack? (y/N)" "N")"
+    case "${confirm}" in
+      y|Y|yes|YES) ;;
+      *)
+        info "Deployment aborted by user."
+        return 0
+        ;;
+    esac
+  else
+    info "All ${#cached_images[@]} image(s) are already cached locally in ${engine} storage (no downloads required)."
+    local confirm
+    confirm="$(_prompt_input "Proceed to deploy the central stack? (y/N) [enter 'pull' to force re-download]" "y")"
+    case "${confirm}" in
+      pull|PULL)
+        force_pull=1
+        ;;
+      y|Y|yes|YES) ;;
+      *)
+        info "Deployment aborted by user."
+        return 0
+        ;;
+    esac
+  fi
+
+  # 4. Pull only missing images unless user explicitly requested force pull
+  if [[ "${force_pull}" == "1" ]]; then
+    info "Force-pulling all ${#raw_images[@]} container images using ${engine}..."
+    "${engine}" compose "${compose_args[@]}" pull
+  elif [[ ${#missing_images[@]} -gt 0 ]]; then
+    info "Pulling ${#missing_images[@]} missing container image(s) using ${engine}..."
+    for img in "${missing_images[@]}"; do
+      info "pulling ${img}..."
+      "${engine}" pull "${img}"
+    done
+  else
+    info "Skipping download as all images are already cached locally."
+  fi
 
   # 4. Bring up the stack
   if [[ "${with_opik}" == "1" ]]; then
