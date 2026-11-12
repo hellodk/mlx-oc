@@ -134,6 +134,12 @@ services:
     container_name: central-opik-mysql
     restart: unless-stopped
     profiles: ["opik"]
+    command:
+      - mysqld
+      - --innodb-buffer-pool-size=64M
+      - --innodb-log-buffer-size=8M
+      - --max-connections=50
+      - --performance-schema=OFF
     environment:
       MYSQL_ROOT_PASSWORD: ${OPIK_DB_PASSWORD:-opik}
       MYSQL_DATABASE: opik
@@ -274,7 +280,7 @@ services:
       ANALYTICS_DB_USERNAME: opik
       ANALYTICS_DB_PASS: ${OPIK_DB_PASSWORD:-opik}
       REDIS_URL: redis://:${OPIK_DB_PASSWORD:-opik}@redis:6379/
-      JAVA_OPTS: "-Dliquibase.propertySubstitutionEnabled=true -XX:+UseG1GC -XX:MaxRAMPercentage=80.0"
+      JAVA_OPTS: "-Dliquibase.propertySubstitutionEnabled=true -XX:+UseG1GC -Xmx384m"
       OPIK_VERSION: ${OPIK_VERSION:-2.2.13}
       OPIK_OTEL_SDK_ENABLED: "false"
       OPIK_USAGE_REPORT_ENABLED: "false"
