@@ -514,12 +514,12 @@ def cmd_review_central(args: argparse.Namespace) -> int:
     print("-" * 76)
 
     services = [
-        ("VictoriaMetrics", "central-victoriametrics", cfg["cvm"], "/health", 200),
-        ("Grafana", "central-grafana", cfg["cgrafana"], "/api/health", 200),
-        ("vmalert", "central-vmalert", cfg["cvmalert"], "/health", 200),
-        ("Alertmanager", "central-alertmanager", cfg["calertmanager"], "/-/healthy", 200),
-        ("OTel Collector", ["central-otelcol", "central-otel-collector"], cfg["cotel"], "", None),
-        ("Opik Gateway", "central-opik-frontend", cfg["copik"], "/health", 200),
+        ("VictoriaMetrics", ["central-victoriametrics", "victoria-metrics"], cfg["cvm"], "/health", 200),
+        ("Grafana", ["central-grafana", "grafana"], cfg["cgrafana"], "/api/health", 200),
+        ("vmalert", ["central-vmalert", "vmalert"], cfg["cvmalert"], "/health", 200),
+        ("Alertmanager", ["central-alertmanager", "alertmanager"], cfg["calertmanager"], "/-/healthy", 200),
+        ("OTel Collector", ["central-otelcol", "central-otel-collector", "otel-collector"], cfg["cotel"], "", None),
+        ("Opik Gateway", ["central-opik-frontend", "opik-frontend", "frontend"], cfg["copik"], "/health", 200),
     ]
 
     all_ok = True
@@ -665,7 +665,7 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
 def cmd_review_vm(args: argparse.Namespace) -> int:
     cfg = load_config()
     engine, eng_ver, daemon_ok = detect_container_engine()
-    cinfo = inspect_container(engine, "central-victoriametrics")
+    cinfo = inspect_container(engine, ["central-victoriametrics", "victoria-metrics"])
     
     print("=" * 76)
     print("               VictoriaMetrics TSDB Configuration & Health")
@@ -711,7 +711,7 @@ def cmd_review_vm(args: argparse.Namespace) -> int:
 def cmd_review_alertmanager(args: argparse.Namespace) -> int:
     cfg = load_config()
     engine, _, _ = detect_container_engine()
-    cinfo = inspect_container(engine, "central-alertmanager")
+    cinfo = inspect_container(engine, ["central-alertmanager", "alertmanager"])
 
     print("=" * 76)
     print("                  Alertmanager Configuration & Health")
@@ -745,7 +745,7 @@ def cmd_review_alertmanager(args: argparse.Namespace) -> int:
 def cmd_review_vmalert(args: argparse.Namespace) -> int:
     cfg = load_config()
     engine, _, _ = detect_container_engine()
-    cinfo = inspect_container(engine, "central-vmalert")
+    cinfo = inspect_container(engine, ["central-vmalert", "vmalert"])
 
     print("=" * 76)
     print("                      vmalert Configuration & Health")
@@ -792,7 +792,7 @@ def cmd_review_vmalert(args: argparse.Namespace) -> int:
 def cmd_review_otel(args: argparse.Namespace) -> int:
     cfg = load_config()
     engine, _, _ = detect_container_engine()
-    cinfo = inspect_container(engine, ["central-otelcol", "central-otel-collector"])
+    cinfo = inspect_container(engine, ["central-otelcol", "central-otel-collector", "otel-collector"])
 
     print("=" * 76)
     print("              OpenTelemetry Collector Configuration & Health")

@@ -112,11 +112,11 @@ _PROC_COMPONENTS = {
 # component name -> podman container name (the rest of the stack is
 # containerized, so host ps cannot see it; podman stats can)
 _CONTAINER_COMPONENTS = {
-    "otel_collector": "otel-collector",
-    "victoria_metrics": "victoria-metrics",
-    "grafana": "grafana",
-    "alertmanager": "alertmanager",
-    "vmalert": "vmalert",
+    "otel_collector": ("central-otelcol", "central-otel-collector", "otel-collector"),
+    "victoria_metrics": ("central-victoriametrics", "victoria-metrics"),
+    "grafana": ("central-grafana", "grafana"),
+    "alertmanager": ("central-alertmanager", "alertmanager"),
+    "vmalert": ("central-vmalert", "vmalert"),
 }
 
 _PAGE_SIZE = 0
@@ -373,8 +373,10 @@ def _container_stats():
             if len(parts) < 3:
                 continue
             name, cpu_pct = parts[0], parts[1].rstrip("%")
-            for comp, ctn in _CONTAINER_COMPONENTS.items():
-                if ctn == name:
+            for comp, aliases in _CONTAINER_COMPONENTS.items():
+                if isinstance(aliases, str):
+                    aliases = (aliases,)
+                if name in aliases:
                     stats[comp] = (float(cpu_pct), _mem_usage_bytes(parts[2]))
                     break
     except Exception:

@@ -724,16 +724,18 @@ container_status = 'NOT DEPLOYED'
 container_uptime = ''
 container_running = False
 if daemon_ok and engine:
-    try:
-        p = subprocess.run([engine, 'inspect', 'central-grafana', '--format', '{{.State.Status}}|{{.State.Running}}|{{.State.StartedAt}}'],
-                           capture_output=True, text=True, timeout=5)
-        if p.returncode == 0 and p.stdout.strip():
-            status, running, started = p.stdout.strip().split('|', 2)
-            container_status = status.upper()
-            container_running = running.lower() == 'true'
-            container_uptime = format_ist(started)
-    except Exception:
-        pass
+    for cname in ['central-grafana', 'grafana']:
+        try:
+            p = subprocess.run([engine, 'inspect', cname, '--format', '{{.State.Status}}|{{.State.Running}}|{{.State.StartedAt}}'],
+                               capture_output=True, text=True, timeout=5)
+            if p.returncode == 0 and p.stdout.strip():
+                status, running, started = p.stdout.strip().split('|', 2)
+                container_status = status.upper()
+                container_running = running.lower() == 'true'
+                container_uptime = format_ist(started)
+                break
+        except Exception:
+            pass
 
 api_healthy = False
 api_info = {}
@@ -902,8 +904,16 @@ EOF
       info "Updated credentials in ${env_file} (mode 0600)"
 
       # If container is running, live-sync the database
-      if [[ -n "${engine}" ]] && "${engine}" ps --format '{{.Names}}' 2>/dev/null | grep -q '^central-grafana$'; then
-        if "${engine}" exec central-grafana grafana cli admin reset-admin-password "${new_pass}" >/dev/null 2>&1; then
+      local gf_cname=""
+      if [[ -n "${engine}" ]]; then
+        if "${engine}" ps --format '{{.Names}}' 2>/dev/null | grep -q '^central-grafana$'; then
+          gf_cname="central-grafana"
+        elif "${engine}" ps --format '{{.Names}}' 2>/dev/null | grep -q '^grafana$'; then
+          gf_cname="grafana"
+        fi
+      fi
+      if [[ -n "${gf_cname}" ]]; then
+        if "${engine}" exec "${gf_cname}" grafana cli admin reset-admin-password "${new_pass}" >/dev/null 2>&1; then
           info "Successfully synchronized admin password in running Grafana internal database."
         else
           warn "Failed to live-sync password inside container. Restart container with './scripts/deploy.sh central'."
@@ -1190,10 +1200,16 @@ except Exception:
   fi
 
   # 6. Synchronize admin password with Grafana internal DB
+  local sync_cname=""
   if "${engine}" ps --format '{{.Names}}' | grep -q '^central-grafana$'; then
+    sync_cname="central-grafana"
+  elif "${engine}" ps --format '{{.Names}}' | grep -q '^grafana$'; then
+    sync_cname="grafana"
+  fi
+  if [[ -n "${sync_cname}" ]]; then
     local retries=15
     while [[ ${retries} -gt 0 ]]; do
-      if "${engine}" exec central-grafana grafana cli admin reset-admin-password "${GRAFANA_ADMIN_PASSWORD}" >/dev/null 2>&1; then
+      if "${engine}" exec "${sync_cname}" grafana cli admin reset-admin-password "${GRAFANA_ADMIN_PASSWORD}" >/dev/null 2>&1; then
         break
       fi
       sleep 1
