@@ -552,6 +552,11 @@ Check process health and active PID table:
 ./scripts/deploy.sh edge status
 ```
 
+Review vmagent edge configuration and target health:
+```bash
+./scripts/deploy.sh review-vmagent
+```
+
 Inspect live exporter logs:
 ```bash
 tail -f edge/logs/deploy.log
@@ -575,6 +580,9 @@ On the central server (supports both **Docker** and **Podman**):
 
 # Extended stack with self-hosted Opik LLM tracing (includes ClickHouse & RustFS)
 ./scripts/deploy.sh central --opik
+
+# Review Grafana credentials, configuration and health checks
+./scripts/deploy.sh review-grafana
 ```
 
 **Interactive Image Pull Gate:**

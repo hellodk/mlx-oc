@@ -438,10 +438,10 @@ cmd_review_vmagent() {
 
   cd "${EDGE_DIR}"
   "${py_bin}" -c "
-import os, sys, yaml
+import os, sys, yaml, socket, subprocess, shutil
 from pathlib import Path
 
-edge_dir = Path('${EDGE_DIR}')
+edge_dir = Path('${EDGE_DIR}').resolve()
 env_path = edge_dir / 'config' / 'edge.env'
 nodes_path = edge_dir / 'config' / 'nodes.yml'
 
@@ -468,31 +468,48 @@ capacity = env.get('VMAGENT_QUEUE_CAPACITY', '5000')
 shards = env.get('VMAGENT_MAX_SHARDS', '200')
 enabled = env.get('ENABLE_VMAGENT', 'true')
 
-import subprocess
+def probe_target(host, port, timeout=0.5):
+    try:
+        with socket.create_connection((host, int(port)), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+# 1. Binary check
+expanded_bin = Path(os.path.expanduser(vmagent_bin))
+binary_found = expanded_bin.is_file() or shutil.which(vmagent_bin) is not None
 vmagent_ver = 'not installed / not in PATH'
-try:
-    p = subprocess.run([os.path.expanduser(vmagent_bin), '--version'], capture_output=True, text=True, timeout=5)
-    vmagent_ver = p.stdout.strip() or p.stderr.strip()
-except Exception:
-    pass
+binary_ok = False
+if binary_found:
+    cmd_path = str(expanded_bin) if expanded_bin.is_file() else shutil.which(vmagent_bin)
+    try:
+        p = subprocess.run([cmd_path, '--version'], capture_output=True, text=True, timeout=5)
+        if p.returncode == 0:
+            vmagent_ver = p.stdout.strip() or p.stderr.strip()
+            binary_ok = True
+        else:
+            vmagent_ver = f'execution error (exit code {p.returncode})'
+    except Exception as e:
+        vmagent_ver = f'execution error: {e}'
 
-remote_url = f'{otlp_scheme}://{central_vm}/api/v1/write'
+# 2. Process check
+pid_file = edge_dir / 'bin' / 'vmagent.pid'
+process_running = False
+stale_pid = False
+pid_val = None
+if pid_file.is_file():
+    try:
+        pid_val = int(pid_file.read_text().strip())
+        os.kill(pid_val, 0)
+        ps_out = subprocess.run(['ps', '-p', str(pid_val), '-o', 'comm='], capture_output=True, text=True).stdout.strip()
+        if 'vmagent' in ps_out or not ps_out:
+            process_running = True
+        else:
+            stale_pid = True
+    except (ValueError, OSError):
+        stale_pid = True
 
-print('=' * 72)
-print('                  vmagent Edge Configuration Review')
-print('=' * 72)
-print(f'Status            : {\"ENABLED\" if enabled.lower() == \"true\" else \"DISABLED\"} (ENABLE_VMAGENT={enabled})')
-print(f'Binary Path       : {vmagent_bin}')
-print(f'Binary Version    : {vmagent_ver}')
-print(f'Central VM Target : {central_vm}')
-print(f'Remote Write URL  : {remote_url}')
-print(f'Scrape Interval   : {scrape_interval}')
-print(f'Persistent Queue  : {pq if pq else \"[disabled / in-memory buffer]\"}')
-print(f'Queue Capacity    : {capacity} records')
-print(f'Max Shards        : {shards}')
-print(f'External Labels   : macbook={macbook_id}, serial={serial}')
-print('-' * 72)
-print('Scrape Targets (Local Exporters):')
+# 3. Targets probe
 targets = [
     ('mlx-proxy', env.get('PROXY_LISTEN', '127.0.0.1:8080'), '/metrics'),
     ('mlx-hw', env.get('HW_LISTEN', '127.0.0.1:9102'), '/metrics'),
@@ -500,9 +517,49 @@ targets = [
     ('mlx-supervisor', env.get('SUPERVISOR_LISTEN', '127.0.0.1:9105'), '/metrics'),
     ('mlx-logtailer', env.get('LOGTAILER_LISTEN', '127.0.0.1:9106'), '/metrics'),
 ]
+target_rows = []
+up_count = 0
 for job, listen, path in targets:
-    print(f'  • {job:<15} -> http://{listen}{path}')
-print('-' * 72)
+    thost, tport = listen.split(':') if ':' in listen else ('127.0.0.1', listen)
+    is_up = probe_target(thost, tport, timeout=0.3)
+    if is_up:
+        up_count += 1
+    target_rows.append((job, listen, path, is_up))
+
+# 4. Central VM probe
+cvm_host, cvm_port = central_vm.split(':') if ':' in central_vm else (central_vm, 8428)
+cvm_reachable = probe_target(cvm_host, cvm_port, timeout=1.0)
+
+remote_url = f'{otlp_scheme}://{central_vm}/api/v1/write'
+
+print('=' * 74)
+print('                  vmagent Edge Configuration Review')
+print('=' * 74)
+status_str = 'ENABLED' if enabled.lower() == 'true' else 'DISABLED'
+print(f'Status            : {status_str} (ENABLE_VMAGENT={enabled})')
+bin_status = 'INSTALLED' if binary_ok else 'NOT FOUND / NOT EXECUTABLE'
+print(f'Binary Status     : {bin_status} ({vmagent_ver})')
+print(f'Binary Path       : {vmagent_bin}')
+if process_running:
+    print(f'Process Status    : RUNNING (PID {pid_val})')
+elif stale_pid:
+    print(f'Process Status    : STOPPED (stale PID file: {pid_val})')
+else:
+    print('Process Status    : STOPPED (not running)')
+cvm_status = 'REACHABLE' if cvm_reachable else 'UNREACHABLE'
+print(f'Central VM Target : {central_vm} [{cvm_status}]')
+print(f'Remote Write URL  : {remote_url}')
+print(f'Scrape Interval   : {scrape_interval}')
+print(f'Persistent Queue  : {pq if pq else \"[disabled / in-memory buffer]\"}')
+print(f'Queue Capacity    : {capacity} records')
+print(f'Max Shards        : {shards}')
+print(f'External Labels   : macbook={macbook_id}, serial={serial}')
+print('-' * 74)
+print('Scrape Targets (Local Exporters):')
+for job, listen, path, is_up in target_rows:
+    stat = '[UP]' if is_up else '[DOWN: port not listening]'
+    print(f'  • {job:<15} -> http://{listen}{path:<10} {stat}')
+print('-' * 74)
 print('CLI Launch Command:')
 pq_flags = f' -remoteWrite.persistentQueue=true -remoteWrite.persistentQueueDir={pq}' if pq else ''
 print('  ' + vmagent_bin + ' \\\\')
@@ -510,7 +567,31 @@ print('    -promscrape.config logs/vmagent.yml \\\\')
 print('    -promscrape.configCheckInterval 30s \\\\')
 print('    -remoteWrite.url ' + remote_url + ' \\\\')
 print('    -remoteWrite.maxDiskUsagePerURL 10GB' + pq_flags)
-print('=' * 72)
+print('-' * 74)
+print('Fail Checks & Health:')
+if binary_ok:
+    print(f'  [OK] vmagent binary is executable ({vmagent_ver}).')
+else:
+    print(f'  [FAIL] vmagent binary not found or not executable at {vmagent_bin}.')
+    print('         Run \"./scripts/deploy.sh setup-edge\" to download and install it.')
+
+if process_running:
+    print(f'  [OK] vmagent process is RUNNING (PID {pid_val}).')
+elif stale_pid:
+    print(f'  [FAIL] vmagent PID file exists (PID {pid_val}) but process is dead (stale PID).')
+else:
+    print('  [WARN] vmagent process is NOT RUNNING (start with \"./scripts/deploy.sh edge daemon\").')
+
+if cvm_reachable:
+    print(f'  [OK] Central VictoriaMetrics is REACHABLE at {central_vm}.')
+else:
+    print(f'  [FAIL] Central VictoriaMetrics at {central_vm} is UNREACHABLE (check IP/firewall).')
+
+if up_count == len(targets):
+    print(f'  [OK] All {len(targets)} local exporter scrape targets are UP.')
+else:
+    print(f'  [WARN] {len(targets) - up_count} of {len(targets)} local exporter scrape targets are DOWN.')
+print('=' * 74)
 "
 
   if [[ -t 0 ]]; then
@@ -557,6 +638,274 @@ open(env_path, 'w', encoding='utf-8').writelines(new_lines)
       info "Updated ${ENV_FILE}"
       "${py_bin}" mlx_monitoring_bundle.py vmagent-config >/dev/null 2>&1 || true
       info "Re-rendered logs/vmagent.yml with new settings."
+    fi
+  fi
+}
+
+cmd_review_grafana() {
+  local py_bin
+  py_bin="$(bundle_python)"
+  if [[ -z "${py_bin}" ]] || ! command -v "${py_bin}" >/dev/null 2>&1; then
+    py_bin="python3"
+  fi
+
+  local engine=""
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    engine="docker"
+  elif command -v podman >/dev/null 2>&1 && podman info >/dev/null 2>&1; then
+    engine="podman"
+  elif command -v docker >/dev/null 2>&1; then
+    engine="docker"
+  elif command -v podman >/dev/null 2>&1; then
+    engine="podman"
+  fi
+
+  cd "${CENTRAL_DIR}"
+  "${py_bin}" -c "
+import os, sys, yaml, socket, subprocess, urllib.request, json
+from pathlib import Path
+from datetime import datetime, timezone, timedelta
+
+central_dir = Path('${CENTRAL_DIR}').resolve()
+env_file = central_dir / '.env'
+compose_file = central_dir / 'docker-compose.central.yml'
+datasources_file = central_dir / 'config' / 'grafana' / 'datasources.yaml'
+dashboards_dir = central_dir / 'dashboards'
+engine_arg = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else None
+
+def format_ist(iso_ts):
+    try:
+        dt = datetime.fromisoformat(iso_ts.replace('Z', '+00:00'))
+        ist = dt.astimezone(timezone(timedelta(hours=5, minutes=30)))
+        return ist.strftime('%d %b %Y, %H:%M:%S IST')
+    except Exception:
+        return iso_ts
+
+def get_lan_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('192.168.1.1', 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return '127.0.0.1'
+
+env = {}
+if env_file.is_file():
+    for line in env_file.read_text(encoding='utf-8').splitlines():
+        line = line.strip()
+        if line and not line.startswith('#') and '=' in line:
+            k, v = line.split('=', 1)
+            env[k.strip()] = v.strip().strip('\"\'')
+
+user = os.environ.get('GRAFANA_ADMIN_USER') or env.get('GRAFANA_ADMIN_USER', 'admin')
+password = os.environ.get('GRAFANA_ADMIN_PASSWORD') or env.get('GRAFANA_ADMIN_PASSWORD', 'changeme')
+anon = os.environ.get('GRAFANA_ANONYMOUS_ENABLED') or env.get('GRAFANA_ANONYMOUS_ENABLED', 'false')
+
+engine = engine_arg
+engine_ver = 'not installed'
+daemon_ok = False
+if engine:
+    try:
+        p = subprocess.run([engine, 'info', '--format', '{{.ServerVersion}}'], capture_output=True, text=True, timeout=5)
+        if p.returncode == 0:
+            daemon_ok = True
+            engine_ver = p.stdout.strip()
+        else:
+            engine_ver = f'daemon not responding: {p.stderr.strip()}'
+    except Exception as e:
+        engine_ver = f'error: {e}'
+
+container_status = 'NOT DEPLOYED'
+container_uptime = ''
+container_running = False
+if daemon_ok and engine:
+    try:
+        p = subprocess.run([engine, 'inspect', 'central-grafana', '--format', '{{.State.Status}}|{{.State.Running}}|{{.State.StartedAt}}'],
+                           capture_output=True, text=True, timeout=5)
+        if p.returncode == 0 and p.stdout.strip():
+            status, running, started = p.stdout.strip().split('|', 2)
+            container_status = status.upper()
+            container_running = running.lower() == 'true'
+            container_uptime = format_ist(started)
+    except Exception:
+        pass
+
+api_healthy = False
+api_info = {}
+try:
+    req = urllib.request.Request('http://127.0.0.1:3000/api/health')
+    with urllib.request.urlopen(req, timeout=2) as resp:
+        if resp.status == 200:
+            api_healthy = True
+            api_info = json.loads(resp.read().decode('utf-8'))
+except Exception as e:
+    api_info = {'error': str(e)}
+
+auth_status = 'UNKNOWN'
+auth_ok = False
+if api_healthy:
+    import base64
+    auth_header = 'Basic ' + base64.b64encode(f'{user}:{password}'.encode('utf-8')).decode('utf-8')
+    req = urllib.request.Request('http://127.0.0.1:3000/api/users', headers={'Authorization': auth_header})
+    try:
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            if resp.status == 200:
+                auth_status = 'VERIFIED (HTTP 200)'
+                auth_ok = True
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            auth_status = 'FAILED (HTTP 401 Unauthorized)'
+        else:
+            auth_status = f'HTTP Error {e.code}'
+    except Exception as e:
+        auth_status = f'Error: {e}'
+
+datasources = []
+if datasources_file.is_file():
+    try:
+        ds_data = yaml.safe_load(datasources_file.read_text(encoding='utf-8'))
+        for ds in ds_data.get('datasources', []):
+            datasources.append(f\"{ds.get('name', 'unknown')} ({ds.get('url', '')})\")
+    except Exception:
+        pass
+
+dashboards = []
+if dashboards_dir.is_dir():
+    dashboards = sorted([f.stem for f in dashboards_dir.glob('*.json')])
+
+env_perms = 'missing'
+env_mode_ok = False
+if env_file.is_file():
+    mode = oct(env_file.stat().st_mode & 0o777)
+    env_perms = f'{mode} ({oct(env_file.stat().st_mode)[-3:]})'
+    env_mode_ok = (env_file.stat().st_mode & 0o077) == 0
+
+lan_ip = get_lan_ip()
+
+print('=' * 74)
+print('                 Grafana Central Configuration Review')
+print('=' * 74)
+print(f'Container Engine  : {engine.capitalize() if engine else \"None\"} ({engine_ver})')
+print(f'Container Status  : {container_status}' + (f' (Started: {container_uptime})' if container_uptime else ''))
+if api_healthy:
+    db_status = api_info.get('database', 'unknown')
+    g_ver = api_info.get('version', 'unknown')
+    print(f'HTTP API Health   : HEALTHY (HTTP 200, database: {db_status}, version: {g_ver})')
+else:
+    print('HTTP API Health   : UNHEALTHY / NOT RESPONDING')
+print(f'Authentication    : {auth_status}')
+print(f'Config File       : {env_file} (mode: {env_perms})')
+print('-' * 74)
+print('Credentials & Security:')
+print(f'  • Admin Username  : {user}')
+pw_note = ''
+if not password:
+    pw_note = ' [FAIL: Password is empty]'
+elif password == 'changeme':
+    pw_note = ' [WARN: Using default password changeme]'
+print(f'  • Admin Password  : {password}{pw_note}')
+print(f'  • Anonymous Auth  : {\"ENABLED\" if anon.lower() == \"true\" else \"DISABLED\"} (GF_AUTH_ANONYMOUS_ENABLED={anon})')
+print('Access Endpoints:')
+print(f'  • Localhost       : http://127.0.0.1:3000')
+print(f'  • LAN / Direct IP : http://{lan_ip}:3000')
+print('Storage & Resources:')
+print('  • Volume          : grafana-data (persistent SQLite /var/lib/grafana/grafana.db)')
+print('  • Datasources     : ' + (', '.join(datasources) if datasources else 'None found'))
+print(f'  • Dashboards ({len(dashboards)}) : ' + (', '.join(dashboards[:6]) + f' (+{len(dashboards)-6} more)' if len(dashboards) > 6 else ', '.join(dashboards)))
+print('-' * 74)
+print('Fail Checks & Health:')
+if not engine:
+    print('  [FAIL] Container engine (docker or podman) is NOT installed.')
+elif not daemon_ok:
+    print(f'  [FAIL] {engine.capitalize()} daemon is NOT running or socket is inaccessible.')
+else:
+    print(f'  [OK] Container engine ({engine}) is installed and daemon is active.')
+
+if container_running:
+    print('  [OK] central-grafana container is RUNNING.')
+else:
+    print(f'  [FAIL] central-grafana container is {container_status}. Run \"./scripts/deploy.sh central\" to start.')
+
+if api_healthy:
+    print('  [OK] Grafana HTTP service is responding on port 3000.')
+else:
+    print('  [FAIL] Grafana HTTP service is NOT responding on port 3000.')
+
+if auth_ok:
+    print('  [OK] Configured admin credentials authenticate successfully.')
+elif api_healthy:
+    print('  [FAIL] Configured password does NOT authenticate with Grafana (HTTP 401).')
+
+if not password:
+    print('  [FAIL] GRAFANA_ADMIN_PASSWORD is empty.')
+elif password == 'changeme':
+    print('  [WARN] Admin password is set to default \"changeme\". Change it to a secure password.')
+else:
+    print('  [OK] Admin password is non-default.')
+
+if env_file.is_file() and env_mode_ok:
+    print(f'  [OK] Config file permissions are restricted ({env_perms}).')
+elif env_file.is_file():
+    print(f'  [WARN] Config file permissions are too open ({env_perms}). Recommended: 0600.')
+print('=' * 74)
+" "${engine}"
+
+  if [[ -t 0 ]]; then
+    local cur_user cur_pass
+    local env_file="${CENTRAL_DIR}/.env"
+    cur_user="$(grep -E '^GRAFANA_ADMIN_USER=' "${env_file}" 2>/dev/null | cut -d= -f2- | tr -d '\"' || echo "admin")"
+    cur_pass="$(grep -E '^GRAFANA_ADMIN_PASSWORD=' "${env_file}" 2>/dev/null | cut -d= -f2- | tr -d '\"' || echo "")"
+    [[ -z "${cur_user}" ]] && cur_user="admin"
+
+    local modify
+    modify="$(_prompt_input "Would you like to change/sync Grafana admin credentials? (y/N)" "N")"
+    if [[ "${modify}" =~ ^[yY] ]]; then
+      local new_user new_pass
+      new_user="$(_prompt_input "Grafana Admin Username" "${cur_user}")"
+      while true; do
+        local p1 p2
+        p1="$(_prompt_password "Grafana Admin Password")"
+        if [[ -z "${p1}" || "${p1}" == "changeme" ]]; then
+          warn "Password cannot be empty or 'changeme'. Please enter a secure password."
+          continue
+        fi
+        p2="$(_prompt_password "Confirm Grafana Admin Password")"
+        if [[ "${p1}" != "${p2}" ]]; then
+          warn "Passwords do not match. Please try again."
+          continue
+        fi
+        new_pass="${p1}"
+        break
+      done
+
+      export GRAFANA_ADMIN_USER="${new_user}"
+      export GRAFANA_ADMIN_PASSWORD="${new_pass}"
+
+      local tmp_env="${env_file}.tmp.$$"
+      (
+        umask 077
+        cat > "${tmp_env}" <<EOF
+# Central Monitoring Stack Environment
+# Generated by scripts/deploy.sh on $(date -u '+%Y-%m-%dT%H:%M:%SZ')
+GRAFANA_ADMIN_USER=${new_user}
+GRAFANA_ADMIN_PASSWORD=${new_pass}
+GRAFANA_ANONYMOUS_ENABLED=${GRAFANA_ANONYMOUS_ENABLED:-false}
+EOF
+        mv -f "${tmp_env}" "${env_file}"
+        chmod 600 "${env_file}"
+      )
+      info "Updated credentials in ${env_file} (mode 0600)"
+
+      # If container is running, live-sync the database
+      if [[ -n "${engine}" ]] && "${engine}" ps --format '{{.Names}}' 2>/dev/null | grep -q '^central-grafana$'; then
+        if "${engine}" exec central-grafana grafana cli admin reset-admin-password "${new_pass}" >/dev/null 2>&1; then
+          info "Successfully synchronized admin password in running Grafana internal database."
+        else
+          warn "Failed to live-sync password inside container. Restart container with './scripts/deploy.sh central'."
+        fi
+      fi
     fi
   fi
 }
@@ -829,6 +1178,14 @@ except Exception:
     info "Opik is available with: $0 central --opik"
   fi
   info "central stack started successfully"
+
+  if [[ -t 0 ]]; then
+    local review
+    review="$(_prompt_input "Review Grafana configuration and credentials now? (y/N)" "N")"
+    if [[ "${review}" =~ ^[yY] ]]; then
+      cmd_review_grafana
+    fi
+  fi
 }
 
 usage() {
@@ -839,6 +1196,7 @@ Usage:
   ./scripts/deploy.sh                             interactive menu
   ./scripts/deploy.sh setup-edge [args]           interactive or parameterized edge setup
   ./scripts/deploy.sh review-vmagent              review and adjust vmagent edge configuration
+  ./scripts/deploy.sh review-grafana              review Grafana configuration, credentials and health
   ./scripts/deploy.sh edge [start|daemon|stop|status] [node_id]  manage edge services
   ./scripts/deploy.sh validate                    validate edge configuration
   ./scripts/deploy.sh central [--opik]            deploy central Docker/Podman stack
@@ -872,6 +1230,7 @@ main() {
     validate)   shift; cmd_validate "$@" ;;
     setup-edge) shift; cmd_setup_edge "$@" ;;
     review-vmagent|vmagent-config) shift; cmd_review_vmagent "$@" ;;
+    review-grafana|grafana-config) shift; cmd_review_grafana "$@" ;;
     edge)       shift; cmd_edge "$@" ;;
     edge-all)   shift; cmd_edge "$@" ;;
     central)    shift; cmd_central "$@" ;;
@@ -886,6 +1245,7 @@ main() {
         "edge stop      — stop edge monitoring bundle" \
         "edge start     — start edge bundle in foreground" \
         "review-vmagent — review and adjust vmagent edge configuration" \
+        "review-grafana — review Grafana configuration, credentials and health" \
         "validate       — validate nodes.yml and edge.env" \
         "central        — deploy central observability stack" \
         "central --opik — deploy central observability stack with Opik" \
@@ -898,6 +1258,7 @@ main() {
         "edge stop"*) cmd_edge stop ;;
         "edge start"*) cmd_edge start ;;
         review-vmagent*) cmd_review_vmagent ;;
+        review-grafana*) cmd_review_grafana ;;
         validate*) cmd_validate ;;
         "central --opik"*) cmd_central --opik ;;
         central*) cmd_central ;;

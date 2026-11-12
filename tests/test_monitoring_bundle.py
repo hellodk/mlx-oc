@@ -238,5 +238,47 @@ def test_vmagent_config_cli_action():
     assert "job_name: mlx-hw" in proc.stdout
 
 
+def test_deploy_review_vmagent_command():
+    """Verify deploy.sh review-vmagent runs cleanly and displays status/health checks."""
+    import subprocess
+    deploy_sh = BUNDLE_DIR / "scripts" / "deploy.sh"
+    env = dict(os.environ, SKIP_GIT_PULL="1")
+    proc = subprocess.run(
+        [str(deploy_sh), "review-vmagent"],
+        capture_output=True,
+        text=True,
+        cwd=str(REPO_ROOT),
+        stdin=subprocess.DEVNULL,
+        env=env,
+        timeout=15,
+    )
+    assert proc.returncode == 0, f"deploy.sh review-vmagent failed: {proc.stderr}"
+    assert "vmagent Edge Configuration Review" in proc.stdout
+    assert "Fail Checks & Health:" in proc.stdout
+    assert "Scrape Targets (Local Exporters):" in proc.stdout
+
+
+def test_deploy_review_grafana_command():
+    """Verify deploy.sh review-grafana runs cleanly and displays credentials/health checks."""
+    import subprocess
+    deploy_sh = BUNDLE_DIR / "scripts" / "deploy.sh"
+    env = dict(os.environ, SKIP_GIT_PULL="1")
+    proc = subprocess.run(
+        [str(deploy_sh), "review-grafana"],
+        capture_output=True,
+        text=True,
+        cwd=str(REPO_ROOT),
+        stdin=subprocess.DEVNULL,
+        env=env,
+        timeout=15,
+    )
+    assert proc.returncode == 0, f"deploy.sh review-grafana failed: {proc.stderr}"
+    assert "Grafana Central Configuration Review" in proc.stdout
+    assert "Credentials & Security:" in proc.stdout
+    assert "Admin Password" in proc.stdout
+    assert "Fail Checks & Health:" in proc.stdout
+
+
+
 
 
