@@ -279,6 +279,105 @@ def test_deploy_review_grafana_command():
     assert "Fail Checks & Health:" in proc.stdout
 
 
+def test_diagnostics_doctor_command():
+    """Verify diagnostics doctor runs end-to-end pipeline traceroute."""
+    import subprocess
+    diag_script = BUNDLE_DIR / "scripts" / "diagnostics.py"
+    proc = subprocess.run(
+        [sys.executable, str(diag_script), "doctor"],
+        capture_output=True,
+        text=True,
+        cwd=str(BUNDLE_DIR),
+        timeout=15,
+    )
+    assert proc.returncode == 0, f"diagnostics doctor failed: {proc.stderr}"
+    assert "MLX Observability Pipeline Doctor" in proc.stdout
+    assert "[Stage 1/5] Central TSDB Ingestion" in proc.stdout
+    assert "[Stage 2/5] Edge Exporters & Nodes" in proc.stdout
+    assert "[Stage 3/5] Alerting & Rule Engine" in proc.stdout
+    assert "[Stage 4/5] OTel Logs & Opik Traces" in proc.stdout
+    assert "[Stage 5/5] Grafana & Query Pipeline" in proc.stdout
+
+
+def test_diagnostics_review_central_command():
+    """Verify review-central audits all central services."""
+    import subprocess
+    diag_script = BUNDLE_DIR / "scripts" / "diagnostics.py"
+    proc = subprocess.run(
+        [sys.executable, str(diag_script), "review-central"],
+        capture_output=True,
+        text=True,
+        cwd=str(BUNDLE_DIR),
+        timeout=15,
+    )
+    assert proc.returncode == 0, f"review-central failed: {proc.stderr}"
+    assert "Central Observability Stack Health & Config Audit" in proc.stdout
+    assert "VictoriaMetrics" in proc.stdout
+    assert "Grafana" in proc.stdout
+    assert "Alertmanager" in proc.stdout
+
+
+def test_diagnostics_review_edge_command():
+    """Verify review-edge audits edge nodes and exporters."""
+    import subprocess
+    diag_script = BUNDLE_DIR / "scripts" / "diagnostics.py"
+    proc = subprocess.run(
+        [sys.executable, str(diag_script), "review-edge"],
+        capture_output=True,
+        text=True,
+        cwd=str(BUNDLE_DIR),
+        timeout=15,
+    )
+    assert proc.returncode == 0, f"review-edge failed: {proc.stderr}"
+    assert "Edge Monitoring Stack Health & Config Audit" in proc.stdout
+    assert "mlx-proxy" in proc.stdout
+    assert "mlx-hw" in proc.stdout
+    assert "mlx-server" in proc.stdout
+
+
+def test_diagnostics_granular_service_reviews():
+    """Verify granular review commands for VM, Alertmanager, vmalert, OTel, and Opik."""
+    import subprocess
+    diag_script = BUNDLE_DIR / "scripts" / "diagnostics.py"
+    subcommands = [
+        ("review-vm", "VictoriaMetrics TSDB Configuration & Health"),
+        ("review-alertmanager", "Alertmanager Configuration & Health"),
+        ("review-vmalert", "vmalert Configuration & Health"),
+        ("review-otel", "OpenTelemetry Collector Configuration & Health"),
+        ("review-opik", "Opik Tracing Suite Health & Config"),
+    ]
+    for subcmd, expected_header in subcommands:
+        proc = subprocess.run(
+            [sys.executable, str(diag_script), subcmd],
+            capture_output=True,
+            text=True,
+            cwd=str(BUNDLE_DIR),
+            timeout=15,
+        )
+        assert proc.returncode == 0, f"{subcmd} failed: {proc.stderr}"
+        assert expected_header in proc.stdout, f"{subcmd} missing header {expected_header}"
+
+
+def test_deploy_sh_cli_dispatcher_doctor():
+    """Verify deploy.sh doctor CLI subcommand dispatches to diagnostics.py."""
+    import subprocess
+    deploy_sh = BUNDLE_DIR / "scripts" / "deploy.sh"
+    env = dict(os.environ, SKIP_GIT_PULL="1")
+    proc = subprocess.run(
+        [str(deploy_sh), "doctor"],
+        capture_output=True,
+        text=True,
+        cwd=str(REPO_ROOT),
+        stdin=subprocess.DEVNULL,
+        env=env,
+        timeout=15,
+    )
+    assert proc.returncode == 0, f"deploy.sh doctor failed: {proc.stderr}"
+    assert "MLX Observability Pipeline Doctor" in proc.stdout
+    assert "ALL PIPELINE GATES PASSED" in proc.stdout
+
+
+
 
 
 

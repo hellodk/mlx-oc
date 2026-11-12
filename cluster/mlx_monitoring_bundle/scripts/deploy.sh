@@ -414,6 +414,9 @@ cmd_edge() {
     vmagent-config|review-vmagent)
       cmd_review_vmagent
       ;;
+    review-edge|review)
+      cmd_diagnostics review-edge "$@"
+      ;;
     *)
       # Backwards compatibility: ./deploy.sh edge [macbook_id]
       export MLX_MACBOOK_ID="${action}"
@@ -910,6 +913,17 @@ EOF
   fi
 }
 
+cmd_diagnostics() {
+  local subcmd="$1"
+  shift
+  local py_bin
+  py_bin="$(bundle_python)"
+  if [[ -z "${py_bin}" ]] || ! command -v "${py_bin}" >/dev/null 2>&1; then
+    py_bin="python3"
+  fi
+  "${py_bin}" "${SCRIPT_DIR}/diagnostics.py" "${subcmd}" "$@"
+}
+
 render_alertmanager_config() {
   local tpl="${CENTRAL_DIR}/config/alertmanager.yml.template"
   local dst="${CENTRAL_DIR}/config/alertmanager.yml"
@@ -1195,8 +1209,16 @@ scripts/deploy.sh — unified CLI for mlx monitoring bundle operations
 Usage:
   ./scripts/deploy.sh                             interactive menu
   ./scripts/deploy.sh setup-edge [args]           interactive or parameterized edge setup
+  ./scripts/deploy.sh doctor                      automated end-to-end data pipeline traceroute
+  ./scripts/deploy.sh review-central              audit all central observability services
+  ./scripts/deploy.sh review-edge [node_id]       audit edge exporters and upstream server
   ./scripts/deploy.sh review-vmagent              review and adjust vmagent edge configuration
   ./scripts/deploy.sh review-grafana              review Grafana configuration, credentials and health
+  ./scripts/deploy.sh review-vm                   audit VictoriaMetrics TSDB
+  ./scripts/deploy.sh review-alertmanager         audit Alertmanager notification routing
+  ./scripts/deploy.sh review-vmalert              audit vmalert rule evaluation
+  ./scripts/deploy.sh review-otel                 audit OTel Collector pipelines & buffer
+  ./scripts/deploy.sh review-opik                 audit Opik LLM observability suite
   ./scripts/deploy.sh edge [start|daemon|stop|status] [node_id]  manage edge services
   ./scripts/deploy.sh validate                    validate edge configuration
   ./scripts/deploy.sh central [--opik]            deploy central Docker/Podman stack
@@ -1211,6 +1233,7 @@ Edge arguments:
   ./scripts/deploy.sh edge status                 show process table and central targets
   ./scripts/deploy.sh edge stop                   cleanly stop all edge exporters
   ./scripts/deploy.sh edge review-vmagent         preview rendered vmagent config and scrape targets
+  ./scripts/deploy.sh edge review-edge            audit edge exporters and upstream server
 
 EOF
 }
@@ -1229,6 +1252,14 @@ main() {
   case "${1:-}" in
     validate)   shift; cmd_validate "$@" ;;
     setup-edge) shift; cmd_setup_edge "$@" ;;
+    doctor)     shift; cmd_diagnostics doctor "$@" ;;
+    review-central) shift; cmd_diagnostics review-central "$@" ;;
+    review-edge) shift; cmd_diagnostics review-edge "$@" ;;
+    review-vm) shift; cmd_diagnostics review-vm "$@" ;;
+    review-alertmanager) shift; cmd_diagnostics review-alertmanager "$@" ;;
+    review-vmalert) shift; cmd_diagnostics review-vmalert "$@" ;;
+    review-otel) shift; cmd_diagnostics review-otel "$@" ;;
+    review-opik) shift; cmd_diagnostics review-opik "$@" ;;
     review-vmagent|vmagent-config) shift; cmd_review_vmagent "$@" ;;
     review-grafana|grafana-config) shift; cmd_review_grafana "$@" ;;
     edge)       shift; cmd_edge "$@" ;;
@@ -1244,8 +1275,16 @@ main() {
         "edge status    — check running status of edge exporters" \
         "edge stop      — stop edge monitoring bundle" \
         "edge start     — start edge bundle in foreground" \
+        "doctor         — automated end-to-end data pipeline traceroute & diagnostics" \
+        "review-central — comprehensive review of all central services" \
+        "review-edge    — comprehensive review of edge exporters & server" \
         "review-vmagent — review and adjust vmagent edge configuration" \
         "review-grafana — review Grafana configuration, credentials and health" \
+        "review-vm      — granular review of VictoriaMetrics TSDB" \
+        "review-vmalert — granular review of vmalert alert evaluation engine" \
+        "review-alertmanager — granular review of Alertmanager notification routing" \
+        "review-otel    — granular review of OTel Collector pipelines" \
+        "review-opik    — granular review of Opik tracing platform" \
         "validate       — validate nodes.yml and edge.env" \
         "central        — deploy central observability stack" \
         "central --opik — deploy central observability stack with Opik" \
@@ -1257,8 +1296,16 @@ main() {
         "edge status"*) cmd_edge status ;;
         "edge stop"*) cmd_edge stop ;;
         "edge start"*) cmd_edge start ;;
+        doctor*) cmd_diagnostics doctor ;;
+        review-central*) cmd_diagnostics review-central ;;
+        review-edge*) cmd_diagnostics review-edge ;;
         review-vmagent*) cmd_review_vmagent ;;
         review-grafana*) cmd_review_grafana ;;
+        review-vm*) cmd_diagnostics review-vm ;;
+        review-vmalert*) cmd_diagnostics review-vmalert ;;
+        review-alertmanager*) cmd_diagnostics review-alertmanager ;;
+        review-otel*) cmd_diagnostics review-otel ;;
+        review-opik*) cmd_diagnostics review-opik ;;
         validate*) cmd_validate ;;
         "central --opik"*) cmd_central --opik ;;
         central*) cmd_central ;;

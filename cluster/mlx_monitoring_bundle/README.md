@@ -597,6 +597,32 @@ On the central server (supports both **Docker** and **Podman**):
 
 ---
 
+### Step 4: End-to-End Pipeline Diagnostics & Service Reviews
+
+When you deploy the stack and want to verify telemetry flow or troubleshoot missing metrics/logs/traces, use the automated diagnostics suite:
+
+```bash
+# 1. Automated Pipeline Doctor (Data Flow Traceroute)
+./scripts/deploy.sh doctor
+
+# 2. Comprehensive Central Stack Audit
+./scripts/deploy.sh review-central
+
+# 3. Comprehensive Edge Node Exporter Audit
+./scripts/deploy.sh review-edge [node_id]
+
+# 4. Granular Component Reviews
+./scripts/deploy.sh review-vm             # VictoriaMetrics TSDB storage & ingestion rates
+./scripts/deploy.sh review-grafana        # Grafana health, auth, datasources & credentials
+./scripts/deploy.sh review-alertmanager   # Alertmanager notification routing & webhook status
+./scripts/deploy.sh review-vmalert        # vmalert rule evaluation engine & firing alerts
+./scripts/deploy.sh review-otel           # OpenTelemetry Collector receiver & pipelines
+./scripts/deploy.sh review-opik           # Opik LLM tracing backend, frontend & storage
+./scripts/deploy.sh review-vmagent        # Edge vmagent scrape targets & persistent queue
+```
+
+---
+
 ---
 
 ## Opik SDK Tracing
@@ -640,12 +666,31 @@ Opik endpoint is configured.
 
 ## Troubleshooting
 
+### Automated Pipeline Doctor (`deploy.sh doctor`)
+
+When you deploy the monitoring stack and find that **no data is being populated in Grafana**, do not manually inspect individual containers or grep logs. Run:
+
+```bash
+./scripts/deploy.sh doctor
+```
+
+The Doctor executes a 5-stage telemetry traceroute that isolates the failure domain in seconds:
+
+1. **Stage 1 (Central TSDB Ingestion Gate)**: Checks TCP reachability, HTTP `/health`, and total active time-series count in VictoriaMetrics. If this fails, the central TSDB is stopped or unreachable.
+2. **Stage 2 (Edge Telemetry Ingestion Gate)**: Queries VictoriaMetrics for live `up{macbook="<node_id>"}` gauges across all 5 exporters (`mlx-proxy`, `mlx-hw`, `mlx-kv`, `mlx-supervisor`, `mlx-logtailer`) and measures sample recency (`time() - max(timestamp(up))`). If samples are >60s old or missing, vmagent on that edge Mac is down or blocked by network/firewall.
+3. **Stage 3 (Alerting & Rule Engine Gate)**: Verifies `vmalert` rule execution and `alertmanager` notification routing.
+4. **Stage 4 (Logs & Traces Ingestion Gate)**: Verifies OTLP HTTP receiver (`:4318`) and Opik Gateway (`:32173`).
+5. **Stage 5 (Grafana & Query Pipeline Gate)**: Validates Grafana HTTP health, credentials/auth, VictoriaMetrics datasource registration, and executes an active datasource proxy query (`count(up)`).
+
+### Common Failure Modes & Quick Fixes
+
 | Symptom | Likely Cause | Fix |
 |---------|-------------|-----|
-| No metrics in VictoriaMetrics | vmagent not running or cannot reach central | Check `status`, the rendered `bin/vmagent.yml`, and `CENTRAL_VICTORIA_METRICS` |
-| `MLXDeviceSilent` firing | hw exporter not running or vmagent can't scrape | Check `:9102/metrics` on the device; verify vmagent config |
+| No data in Grafana | Pipeline broken at one of the 5 stages | Run `./scripts/deploy.sh doctor` to identify exact broken stage |
+| No metrics in VictoriaMetrics | vmagent not running or cannot reach central | Run `./scripts/deploy.sh review-vmagent` on edge; check `CENTRAL_VICTORIA_METRICS` |
+| `MLXDeviceSilent` firing | hw exporter not running or vmagent can't scrape | Run `./scripts/deploy.sh review-edge` to check exporter ports and process table |
 | Model gauges at 0 | no `MLX_MODEL`/`MLX_MODEL_PATH` and `/v1/models` unreachable | Set `model_path` in `nodes.yml` or ensure upstream is reachable |
-| Opik traces missing | `central.opik` not set or Opik profile not running | Start with `deploy.sh central --opik`; verify port 32173 |
+| Opik traces missing | `central.opik` not set or Opik profile not running | Run `./scripts/deploy.sh review-opik`; start with `deploy.sh central --opik` |
 | Proxy rejects model id | strict model matching | Send the served model id or set `MLX_PROXY_STRICT_MODEL=false` |
 | Duplicate `mlx_lm.server` | attach mode disabled while a server was already up | Keep `SUPERVISOR_ATTACH_HEALTHY=true` or stop the old process first |
 | Crash loop on restart | Server dying repeatedly | Check `server.log` and `mlx_server_crashes_total{reason}` |
