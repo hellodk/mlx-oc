@@ -47,6 +47,7 @@ services:
     image: otel/opentelemetry-collector-contrib:0.139.0
     container_name: central-otelcol
     restart: unless-stopped
+    user: "0:0"
     ports:
       - "4317:4317"  # OTLP gRPC
       - "4318:4318"  # OTLP HTTP
@@ -164,8 +165,7 @@ services:
     volumes:
       - ./opik/clickhouse_config:/clickhouse_config_files:ro
       - opik-clickhouse-config:/config
-    command: |
-      sh -c "cp -r /clickhouse_config_files/* /config/ && chown -R 1000:1000 /config"
+    command: ["sh", "-c", "cp -r /clickhouse_config_files/* /config/ && chmod -R a+rX /config && (chown -R 1000:1000 /config 2>/dev/null || true)"]
 
   clickhouse:
     image: clickhouse/clickhouse-server:26.3.16.16-alpine
@@ -181,7 +181,6 @@ services:
       - opik-clickhouse:/var/lib/clickhouse
       - opik-clickhouse-log:/var/log/clickhouse-server
       - opik-clickhouse-config:/etc/clickhouse-server/config.d
-      - ./opik/clickhouse_config/additional_config.xml:/etc/clickhouse-server/config.d/additional_config.xml:ro
       - ./opik/clickhouse_config/users.d/enable_time_type.xml:/etc/clickhouse-server/users.d/enable_time_type.xml:ro
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8123/ping"]
@@ -190,8 +189,8 @@ services:
       retries: 60
     ulimits:
       nofile:
-        soft: 262144
-        hard: 262144
+        soft: 65536
+        hard: 65536
     depends_on:
       zookeeper:
         condition: service_healthy
@@ -222,7 +221,7 @@ services:
     restart: "no"
     volumes:
       - opik-storage:/data
-    command: ["mkdir", "-p", "/data/public"]
+    command: ["sh", "-c", "mkdir -p /data/public && chmod -R 777 /data"]
 
   minio:
     image: rustfs/rustfs:latest

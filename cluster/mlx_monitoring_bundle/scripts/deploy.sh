@@ -1064,12 +1064,19 @@ cmd_central() {
     compose_args=(--profile opik "${compose_args[@]}")
   fi
 
+  local compose_cmd=("${engine}" "compose")
+  if [[ "${engine}" == "podman" ]]; then
+    if ! podman compose version >/dev/null 2>&1 && command -v podman-compose >/dev/null 2>&1; then
+      compose_cmd=("podman-compose")
+    fi
+  fi
+
   # 1. Determine container images required for this configuration
   local raw_images=()
-  if "${engine}" compose "${compose_args[@]}" config --images >/dev/null 2>&1; then
+  if "${compose_cmd[@]}" "${compose_args[@]}" config --images >/dev/null 2>&1; then
     while IFS= read -r img; do
       [[ -n "${img}" ]] && raw_images+=("${img}")
-    done < <("${engine}" compose "${compose_args[@]}" config --images | sort -u)
+    done < <("${compose_cmd[@]}" "${compose_args[@]}" config --images | sort -u)
   fi
 
   if [[ ${#raw_images[@]} -eq 0 ]]; then
@@ -1157,7 +1164,7 @@ except Exception:
   # 4. Pull only missing images unless user explicitly requested force pull
   if [[ "${force_pull}" == "1" ]]; then
     info "Force-pulling all ${#raw_images[@]} container images using ${engine}..."
-    if ! "${engine}" compose "${compose_args[@]}" pull; then
+    if ! "${compose_cmd[@]}" "${compose_args[@]}" pull; then
       die "failed to pull container images"
     fi
   elif [[ ${#missing_images[@]} -gt 0 ]]; then
@@ -1178,13 +1185,13 @@ except Exception:
   else
     info "starting central observability stack"
   fi
-  if ! "${engine}" compose "${compose_args[@]}" up -d; then
+  if ! "${compose_cmd[@]}" "${compose_args[@]}" up -d; then
     die "failed to start central container stack"
   fi
 
   # 6. Synchronize admin password with Grafana internal DB
   if "${engine}" ps --format '{{.Names}}' | grep -q '^central-grafana$'; then
-    local retries=5
+    local retries=15
     while [[ ${retries} -gt 0 ]]; do
       if "${engine}" exec central-grafana grafana cli admin reset-admin-password "${GRAFANA_ADMIN_PASSWORD}" >/dev/null 2>&1; then
         break
