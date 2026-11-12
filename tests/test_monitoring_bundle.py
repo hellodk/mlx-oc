@@ -221,4 +221,22 @@ def test_vmagent_custom_listen_ports_rendering():
     assert targets["mlx-logtailer"] == "127.0.0.1:19106"
 
 
+def test_vmagent_config_cli_action():
+    """Verify mlx_monitoring_bundle.py vmagent-config renders and outputs YAML."""
+    import subprocess
+    bundle_script = EDGE_DIR / "mlx_monitoring_bundle.py"
+    proc = subprocess.run(
+        [sys.executable, str(bundle_script), "vmagent-config"],
+        capture_output=True,
+        text=True,
+        cwd=str(BUNDLE_DIR),
+        timeout=10,
+    )
+    assert proc.returncode == 0, f"vmagent-config failed: {proc.stderr}"
+    assert "scrape_configs:" in proc.stdout
+    assert "job_name: mlx-proxy" in proc.stdout
+    assert "job_name: mlx-hw" in proc.stdout
+
+
+
 

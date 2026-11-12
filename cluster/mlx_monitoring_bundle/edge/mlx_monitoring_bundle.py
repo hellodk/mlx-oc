@@ -612,7 +612,7 @@ def config_val(config: dict, key: str, default: str) -> str:
 
 def main():
     ap = argparse.ArgumentParser(description="mlx monitoring bundle entrypoint")
-    ap.add_argument("action", choices=["start", "stop", "status", "restart"])
+    ap.add_argument("action", choices=["start", "stop", "status", "restart", "vmagent-config"])
     args = ap.parse_args()
 
     config = merge_config()
@@ -621,6 +621,11 @@ def main():
     setup_logging(service="mlx-bundle",
                   macbook=bundle.macbook,
                   log_dir=bundle.log_dir)
+
+    if args.action == "vmagent-config":
+        if bundle._render_vmagent_config() and bundle.vmagent_config_rendered.exists():
+            print(bundle.vmagent_config_rendered.read_text(encoding="utf8"))
+        return
 
     if args.action == "status":
         print(json.dumps(bundle.status(), indent=2))

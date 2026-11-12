@@ -373,6 +373,14 @@ EOF
 
   info "edge setup complete; validating configuration"
   cmd_validate
+
+  if [[ -t 0 ]]; then
+    local review
+    review="$(_prompt_input "Review vmagent configuration now? (y/N)" "N")"
+    if [[ "${review}" =~ ^[yY] ]]; then
+      cmd_review_vmagent
+    fi
+  fi
 }
 
 cmd_edge() {
@@ -403,6 +411,9 @@ cmd_edge() {
     status)
       "$(bundle_python)" mlx_monitoring_bundle.py status
       ;;
+    vmagent-config|review-vmagent)
+      cmd_review_vmagent
+      ;;
     *)
       # Backwards compatibility: ./deploy.sh edge [macbook_id]
       export MLX_MACBOOK_ID="${action}"
@@ -410,6 +421,144 @@ cmd_edge() {
       exec "$(bundle_python)" mlx_monitoring_bundle.py start
       ;;
   esac
+}
+
+cmd_review_vmagent() {
+  local py_bin
+  py_bin="$(bundle_python)"
+  if [[ -z "${py_bin}" ]] || ! command -v "${py_bin}" >/dev/null 2>&1; then
+    py_bin="python3"
+  fi
+
+  if [[ ! -f "${ENV_FILE}" || ! -f "${EDGE_DIR}/config/nodes.yml" ]]; then
+    warn "Edge configuration files not found (${ENV_FILE} or ${EDGE_DIR}/config/nodes.yml)."
+    warn "Run './scripts/deploy.sh setup-edge' first."
+    return 1
+  fi
+
+  cd "${EDGE_DIR}"
+  "${py_bin}" -c "
+import os, sys, yaml
+from pathlib import Path
+
+edge_dir = Path('${EDGE_DIR}')
+env_path = edge_dir / 'config' / 'edge.env'
+nodes_path = edge_dir / 'config' / 'nodes.yml'
+
+env = {}
+for line in env_path.read_text(encoding='utf-8').splitlines():
+    line = line.strip()
+    if line and not line.startswith('#') and '=' in line:
+        k, v = line.split('=', 1)
+        env[k.strip()] = v.strip().strip('\"\'')
+
+nodes = yaml.safe_load(nodes_path.read_text(encoding='utf-8')) or {}
+central_vm = nodes.get('central', {}).get('victoria_metrics', env.get('CENTRAL_VICTORIA_METRICS', '127.0.0.1:8428'))
+otlp_scheme = env.get('OTLP_SCHEME', 'http')
+
+macbooks = [nb for nb in nodes.get('macbooks', []) if nb.get('enabled', True)]
+macbook = macbooks[0] if macbooks else {}
+macbook_id = os.environ.get('MLX_MACBOOK_ID') or macbook.get('id', 'unknown')
+serial = macbook.get('serial', 'unknown')
+
+vmagent_bin = env.get('VMAGENT_BINARY', 'vmagent')
+scrape_interval = env.get('VMAGENT_SCRAPE_INTERVAL', '10s')
+pq = env.get('VMAGENT_PERSISTENT_QUEUE', '')
+capacity = env.get('VMAGENT_QUEUE_CAPACITY', '5000')
+shards = env.get('VMAGENT_MAX_SHARDS', '200')
+enabled = env.get('ENABLE_VMAGENT', 'true')
+
+import subprocess
+vmagent_ver = 'not installed / not in PATH'
+try:
+    p = subprocess.run([os.path.expanduser(vmagent_bin), '--version'], capture_output=True, text=True, timeout=5)
+    vmagent_ver = p.stdout.strip() or p.stderr.strip()
+except Exception:
+    pass
+
+remote_url = f'{otlp_scheme}://{central_vm}/api/v1/write'
+
+print('=' * 72)
+print('                  vmagent Edge Configuration Review')
+print('=' * 72)
+print(f'Status            : {\"ENABLED\" if enabled.lower() == \"true\" else \"DISABLED\"} (ENABLE_VMAGENT={enabled})')
+print(f'Binary Path       : {vmagent_bin}')
+print(f'Binary Version    : {vmagent_ver}')
+print(f'Central VM Target : {central_vm}')
+print(f'Remote Write URL  : {remote_url}')
+print(f'Scrape Interval   : {scrape_interval}')
+print(f'Persistent Queue  : {pq if pq else \"[disabled / in-memory buffer]\"}')
+print(f'Queue Capacity    : {capacity} records')
+print(f'Max Shards        : {shards}')
+print(f'External Labels   : macbook={macbook_id}, serial={serial}')
+print('-' * 72)
+print('Scrape Targets (Local Exporters):')
+targets = [
+    ('mlx-proxy', env.get('PROXY_LISTEN', '127.0.0.1:8080'), '/metrics'),
+    ('mlx-hw', env.get('HW_LISTEN', '127.0.0.1:9102'), '/metrics'),
+    ('mlx-kv', env.get('KV_LISTEN', '127.0.0.1:9104'), '/metrics'),
+    ('mlx-supervisor', env.get('SUPERVISOR_LISTEN', '127.0.0.1:9105'), '/metrics'),
+    ('mlx-logtailer', env.get('LOGTAILER_LISTEN', '127.0.0.1:9106'), '/metrics'),
+]
+for job, listen, path in targets:
+    print(f'  • {job:<15} -> http://{listen}{path}')
+print('-' * 72)
+print('CLI Launch Command:')
+pq_flags = f' -remoteWrite.persistentQueue=true -remoteWrite.persistentQueueDir={pq}' if pq else ''
+print('  ' + vmagent_bin + ' \\\\')
+print('    -promscrape.config logs/vmagent.yml \\\\')
+print('    -promscrape.configCheckInterval 30s \\\\')
+print('    -remoteWrite.url ' + remote_url + ' \\\\')
+print('    -remoteWrite.maxDiskUsagePerURL 10GB' + pq_flags)
+print('=' * 72)
+"
+
+  if [[ -t 0 ]]; then
+    local show_yaml
+    show_yaml="$(_prompt_input "Display full rendered vmagent.yml scrape configuration? (y/N)" "N")"
+    if [[ "${show_yaml}" =~ ^[yY] ]]; then
+      info "Rendered vmagent.yml:"
+      "${py_bin}" mlx_monitoring_bundle.py vmagent-config | grep -v '^{"ts"' || true
+    fi
+
+    local modify
+    modify="$(_prompt_input "Would you like to adjust vmagent settings in edge.env? (y/N)" "N")"
+    if [[ "${modify}" =~ ^[yY] ]]; then
+      local cur_interval cur_pq cur_enable
+      cur_interval="$(grep -E '^VMAGENT_SCRAPE_INTERVAL=' "${ENV_FILE}" | cut -d= -f2- | tr -d '\"' || echo "10s")"
+      cur_pq="$(grep -E '^VMAGENT_PERSISTENT_QUEUE=' "${ENV_FILE}" | cut -d= -f2- | tr -d '\"' || echo "")"
+      cur_enable="$(grep -E '^ENABLE_VMAGENT=' "${ENV_FILE}" | cut -d= -f2- | tr -d '\"' || echo "true")"
+
+      local new_interval new_pq new_enable
+      new_interval="$(_prompt_input "Scrape Interval" "${cur_interval:-10s}")"
+      new_pq="$(_prompt_input "Persistent Queue Directory (leave blank for in-memory)" "${cur_pq}")"
+      new_enable="$(_prompt_input "Enable vmagent (true/false)" "${cur_enable:-true}")"
+
+      "${py_bin}" -c "
+import sys
+env_path = sys.argv[1]
+kvs = {'VMAGENT_SCRAPE_INTERVAL': sys.argv[2], 'VMAGENT_PERSISTENT_QUEUE': sys.argv[3], 'ENABLE_VMAGENT': sys.argv[4]}
+lines = open(env_path, 'r', encoding='utf-8').readlines()
+new_lines = []
+for line in lines:
+    matched = False
+    for k in list(kvs.keys()):
+        if line.strip().startswith(f'{k}='):
+            new_lines.append(f'{k}={kvs[k]}\n')
+            del kvs[k]
+            matched = True
+            break
+    if not matched:
+        new_lines.append(line)
+for k, v in kvs.items():
+    new_lines.append(f'{k}={v}\n')
+open(env_path, 'w', encoding='utf-8').writelines(new_lines)
+" "${ENV_FILE}" "${new_interval}" "${new_pq}" "${new_enable}"
+      info "Updated ${ENV_FILE}"
+      "${py_bin}" mlx_monitoring_bundle.py vmagent-config >/dev/null 2>&1 || true
+      info "Re-rendered logs/vmagent.yml with new settings."
+    fi
+  fi
 }
 
 render_alertmanager_config() {
@@ -689,6 +838,7 @@ scripts/deploy.sh — unified CLI for mlx monitoring bundle operations
 Usage:
   ./scripts/deploy.sh                             interactive menu
   ./scripts/deploy.sh setup-edge [args]           interactive or parameterized edge setup
+  ./scripts/deploy.sh review-vmagent              review and adjust vmagent edge configuration
   ./scripts/deploy.sh edge [start|daemon|stop|status] [node_id]  manage edge services
   ./scripts/deploy.sh validate                    validate edge configuration
   ./scripts/deploy.sh central [--opik]            deploy central Docker/Podman stack
@@ -702,6 +852,7 @@ Edge arguments:
   ./scripts/deploy.sh edge daemon                 start in background
   ./scripts/deploy.sh edge status                 show process table and central targets
   ./scripts/deploy.sh edge stop                   cleanly stop all edge exporters
+  ./scripts/deploy.sh edge review-vmagent         preview rendered vmagent config and scrape targets
 
 EOF
 }
@@ -720,6 +871,7 @@ main() {
   case "${1:-}" in
     validate)   shift; cmd_validate "$@" ;;
     setup-edge) shift; cmd_setup_edge "$@" ;;
+    review-vmagent|vmagent-config) shift; cmd_review_vmagent "$@" ;;
     edge)       shift; cmd_edge "$@" ;;
     edge-all)   shift; cmd_edge "$@" ;;
     central)    shift; cmd_central "$@" ;;
@@ -733,6 +885,7 @@ main() {
         "edge status    — check running status of edge exporters" \
         "edge stop      — stop edge monitoring bundle" \
         "edge start     — start edge bundle in foreground" \
+        "review-vmagent — review and adjust vmagent edge configuration" \
         "validate       — validate nodes.yml and edge.env" \
         "central        — deploy central observability stack" \
         "central --opik — deploy central observability stack with Opik" \
@@ -744,6 +897,7 @@ main() {
         "edge status"*) cmd_edge status ;;
         "edge stop"*) cmd_edge stop ;;
         "edge start"*) cmd_edge start ;;
+        review-vmagent*) cmd_review_vmagent ;;
         validate*) cmd_validate ;;
         "central --opik"*) cmd_central --opik ;;
         central*) cmd_central ;;
