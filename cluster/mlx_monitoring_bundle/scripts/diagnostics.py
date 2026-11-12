@@ -445,6 +445,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                     try:
                         ds_info = json.loads(ds_body)
                         ds_uid = ds_info.get("uid")
+                        ds_url = ds_info.get("url", "http://victoria-metrics:8428")
                         dh_code, dh_body = probe_http(f"http://{cfg['cgrafana']}/api/datasources/uid/{ds_uid}/health", headers={"Authorization": auth_header})
                         if dh_code == 200 and json.loads(dh_body).get("status") == "OK":
                             stage5_notes.append("Datasource VictoriaMetrics OK")
@@ -453,9 +454,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                             stages_passed = False
                             breaks.append({
                                 "stage": "Stage 5: Grafana VictoriaMetrics Datasource",
-                                "issue": f"Grafana cannot query VictoriaMetrics inside container network ({dh_body}).",
+                                "issue": f"Grafana cannot query VictoriaMetrics inside container network ({dh_body}). Configured URL: {ds_url}.",
                                 "impact": "All panels in all dashboards will show 'No Data'.",
-                                "fix": "Verify docker network: 'docker network inspect central_default' and datasources.yaml."
+                                "fix": f"Add 'links: - victoria-metrics' to central-grafana in docker-compose.central.yml, or set VICTORIAMETRICS_URL=http://{cfg['cvm']} in central/.env and recreate Grafana."
                             })
                     except Exception:
                         pass

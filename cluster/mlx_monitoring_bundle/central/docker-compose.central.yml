@@ -67,11 +67,14 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=${GRAFANA_ANONYMOUS_ENABLED:-false}
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
       - GF_USERS_DEFAULT_THEME=light
+      - VICTORIAMETRICS_URL=${VICTORIAMETRICS_URL:-http://victoria-metrics:8428}
     volumes:
       - grafana-data:/var/lib/grafana
       - ./config/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
       - ./config/grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
       - ./dashboards:/var/lib/grafana/dashboards:ro
+    links:
+      - victoria-metrics
     depends_on:
       victoria-metrics:
         condition: service_healthy
@@ -90,6 +93,9 @@ services:
       - -httpListenAddr=0.0.0.0:8880
     volumes:
       - ./config/vmalert-rules.yml:/etc/vmalert/rules.yml:ro
+    links:
+      - victoria-metrics
+      - alertmanager
     depends_on:
       victoria-metrics:
         condition: service_healthy

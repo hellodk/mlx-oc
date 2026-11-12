@@ -960,6 +960,7 @@ ensure_central_env() {
   local current_user="${GRAFANA_ADMIN_USER:-}"
   local current_password="${GRAFANA_ADMIN_PASSWORD:-}"
   local current_anon="${GRAFANA_ANONYMOUS_ENABLED:-}"
+  local current_vm_url="${VICTORIAMETRICS_URL:-}"
 
   # 1. Load existing central/.env if present
   if [[ -f "${env_file}" ]]; then
@@ -973,12 +974,15 @@ ensure_central_env() {
         current_password="${val}"
       elif [[ "${key}" == "GRAFANA_ANONYMOUS_ENABLED" && -z "${current_anon}" ]]; then
         current_anon="${val}"
+      elif [[ "${key}" == "VICTORIAMETRICS_URL" && -z "${current_vm_url}" ]]; then
+        current_vm_url="${val}"
       fi
     done < "${env_file}"
   fi
 
   [[ -z "${current_user}" ]] && current_user="admin"
   [[ -z "${current_anon}" ]] && current_anon="false"
+  [[ -z "${current_vm_url}" ]] && current_vm_url="http://victoria-metrics:8428"
 
   # 2. Check if password needs to be prompted
   if [[ -z "${current_password}" || "${current_password}" == "changeme" ]]; then
@@ -1012,6 +1016,7 @@ ensure_central_env() {
   export GRAFANA_ADMIN_USER="${current_user}"
   export GRAFANA_ADMIN_PASSWORD="${current_password}"
   export GRAFANA_ANONYMOUS_ENABLED="${current_anon}"
+  export VICTORIAMETRICS_URL="${current_vm_url}"
 
   # 3. Atomically write central/.env with strict permissions (0600)
   local tmp_env="${env_file}.tmp.$$"
@@ -1023,6 +1028,7 @@ ensure_central_env() {
 GRAFANA_ADMIN_USER=${current_user}
 GRAFANA_ADMIN_PASSWORD=${current_password}
 GRAFANA_ANONYMOUS_ENABLED=${current_anon}
+VICTORIAMETRICS_URL=${current_vm_url}
 EOF
     mv -f "${tmp_env}" "${env_file}"
     chmod 600 "${env_file}"
