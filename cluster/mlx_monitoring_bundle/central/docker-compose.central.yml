@@ -74,8 +74,6 @@ services:
       - ./config/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
       - ./config/grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
       - ./dashboards:/var/lib/grafana/dashboards:ro
-    links:
-      - victoria-metrics
     depends_on:
       victoria-metrics:
         condition: service_healthy
@@ -99,9 +97,6 @@ services:
       - -httpListenAddr=0.0.0.0:8880
     volumes:
       - ./config/vmalert-rules.yml:/etc/vmalert/rules.yml:ro
-    links:
-      - victoria-metrics
-      - alertmanager
     depends_on:
       victoria-metrics:
         condition: service_healthy

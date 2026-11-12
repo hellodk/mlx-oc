@@ -462,7 +462,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                                 "stage": "Stage 5: Grafana VictoriaMetrics Datasource",
                                 "issue": f"Grafana cannot query VictoriaMetrics inside container network ({dh_body}). Configured URL: {ds_url}.",
                                 "impact": "All panels in all dashboards will show 'No Data'.",
-                                "fix": f"Add 'links: - victoria-metrics' to central-grafana in docker-compose.central.yml, or set VICTORIAMETRICS_URL=http://{cfg['cvm']} in central/.env and recreate Grafana."
+                                "fix": f"Set VICTORIAMETRICS_URL=http://{cfg['cvm']} in central/.env and recreate Grafana."
                             })
                     except Exception:
                         pass
