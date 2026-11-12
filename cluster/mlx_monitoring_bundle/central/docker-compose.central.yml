@@ -79,6 +79,11 @@ services:
     depends_on:
       victoria-metrics:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   vmalert:
     image: victoriametrics/vmalert:latest
@@ -87,8 +92,8 @@ services:
     ports:
       - "8880:8880"
     command:
-      - -datasource.url=http://victoria-metrics:8428
-      - -remoteWrite.url=http://victoria-metrics:8428
+      - -datasource.url=${VICTORIAMETRICS_URL:-http://victoria-metrics:8428}
+      - -remoteWrite.url=${VICTORIAMETRICS_URL:-http://victoria-metrics:8428}
       - -notifier.url=http://alertmanager:9093
       - -rule=/etc/vmalert/rules.yml
       - -httpListenAddr=0.0.0.0:8880
@@ -102,6 +107,11 @@ services:
         condition: service_healthy
       alertmanager:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8880/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   alertmanager:
     image: prom/alertmanager:latest
@@ -322,6 +332,9 @@ services:
       REDIS_URL: redis://:${OPIK_DB_PASSWORD:-opik}@redis:6379/0
       RQ_WORKER_ENABLED: "true"
       OPIK_URL_OVERRIDE: "http://backend:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8000/healthcheck"]
       interval: 5s

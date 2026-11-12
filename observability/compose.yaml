@@ -30,7 +30,7 @@ services:
     restart: unless-stopped
     # The file-exporter volume is root-owned inside the podman VM; run as root
     # so the logs pipeline can append its JSONL file (ephemeral stack).
-    user: "0"
+    user: "0:0"
     ports:
       - "4317:4317"        # OTLP gRPC
       - "4318:4318"        # OTLP HTTP
@@ -46,15 +46,26 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_AUTH_ANONYMOUS_ENABLED=${GRAFANA_ANONYMOUS_ENABLED:-true}
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
       - GF_USERS_DEFAULT_THEME=light
+      - VICTORIAMETRICS_URL=${VICTORIAMETRICS_URL:-http://victoria-metrics:8428}
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    links:
+      - victoria-metrics
+    depends_on:
+      victoria-metrics:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   # Alerting: vmalert evaluates the rule groups against VictoriaMetrics and
   # forwards fired alerts to Alertmanager. Active alerts are written back to
@@ -66,16 +77,26 @@ services:
     ports:
       - "8880:8880"        # vmalert UI: /api/v1/alerts, /api/v1/rules
     command:
-      - -datasource.url=http://victoria-metrics:8428
-      - -remoteWrite.url=http://victoria-metrics:8428
+      - -datasource.url=${VICTORIAMETRICS_URL:-http://victoria-metrics:8428}
+      - -remoteWrite.url=${VICTORIAMETRICS_URL:-http://victoria-metrics:8428}
       - -notifier.url=http://alertmanager:9093
       - -rule=/etc/vmalert/rules.yml
       - -httpListenAddr=:8880
     volumes:
       - ./vmalert/rules.yml:/etc/vmalert/rules.yml:ro
-    depends_on:
+    links:
       - victoria-metrics
       - alertmanager
+    depends_on:
+      victoria-metrics:
+        condition: service_healthy
+      alertmanager:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8880/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   alertmanager:
     image: docker.io/prom/alertmanager:latest
@@ -86,6 +107,11 @@ services:
     command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
     volumes:
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:9093/-/healthy"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
 volumes:
   vm-data:

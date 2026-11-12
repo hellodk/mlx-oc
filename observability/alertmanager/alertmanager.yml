@@ -24,15 +24,10 @@ route:
 
 receivers:
   - name: "oncall"
-    webhook_configs:
-      # Replace with your own endpoint (e.g. Slack/Teams/PagerDuty bridge).
-      - url: "http://host.containers.internal:9000/hooks/oncall"
-        send_resolved: true
+    webhook_configs: []
 
   - name: "default"
-    webhook_configs:
-      - url: "http://host.containers.internal:9000/hooks/alert"
-        send_resolved: true
+    webhook_configs: []
 
 inhibit_rules:
   - source_matchers:

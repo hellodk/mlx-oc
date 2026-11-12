@@ -381,8 +381,14 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     if opik_ok:
         opik_h, _ = probe_http(f"http://{cfg['copik']}/health")
         if opik_h == 200:
-            stage4_notes.append("Opik UI 200 OK")
+            api_h, _ = probe_http(f"http://{cfg['copik']}/api/health-check")
+            if api_h == 200:
+                stage4_notes.append("Opik UI & API 200 OK")
+            else:
+                stage4_status = "WARN"
+                stage4_notes.append(f"Opik UI 200 OK, API HTTP {api_h}")
         else:
+            stage4_status = "WARN"
             stage4_notes.append(f"Opik HTTP {opik_h}")
     else:
         stage4_notes.append("Opik not active (use --opik to enable)")
