@@ -271,6 +271,7 @@ services:
       ANALYTICS_DB_PASS: ${OPIK_DB_PASSWORD:-opik}
       REDIS_URL: redis://:${OPIK_DB_PASSWORD:-opik}@redis:6379/
       JAVA_OPTS: "-Dliquibase.propertySubstitutionEnabled=true -XX:+UseG1GC -XX:MaxRAMPercentage=80.0"
+      OPIK_VERSION: ${OPIK_VERSION:-2.2.13}
       OPIK_OTEL_SDK_ENABLED: "false"
       OPIK_USAGE_REPORT_ENABLED: "false"
       OPIK_LOG_LEVEL: ${OPIK_LOG_LEVEL:-INFO}
@@ -302,8 +303,6 @@ services:
       timeout: 10s
       retries: 120
       start_period: 120s
-    tmpfs:
-      - /tmp
 
   python-backend:
     image: ghcr.io/comet-ml/opik/opik-python-backend:${OPIK_VERSION:-2.2.13}
@@ -330,8 +329,6 @@ services:
       timeout: 30s
       retries: 30
       start_period: 10s
-    tmpfs:
-      - /var/lib/docker
 
   frontend:
     image: ghcr.io/comet-ml/opik/opik-frontend:${OPIK_VERSION:-2.2.13}
