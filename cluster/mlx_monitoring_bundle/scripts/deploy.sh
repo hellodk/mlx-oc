@@ -942,6 +942,68 @@ cmd_diagnostics() {
   "${py_bin}" "${SCRIPT_DIR}/diagnostics.py" "${subcmd}" "$@"
 }
 
+_get_podman_machine_memory_mb() {
+  if ! command -v podman >/dev/null 2>&1; then
+    echo "0"
+    return 0
+  fi
+  local mem=""
+  mem="$(podman machine inspect --format '{{.Resources.Memory}}' 2>/dev/null || true)"
+  if [[ -n "${mem}" && "${mem}" =~ ^[0-9]+$ && "${mem}" -gt 0 ]]; then
+    echo "${mem}"
+    return 0
+  fi
+  mem="$(python3 -c "
+import subprocess, json
+try:
+    out = subprocess.check_output(['podman', 'machine', 'inspect'], stderr=subprocess.DEVNULL)
+    data = json.loads(out)
+    if isinstance(data, list) and len(data) > 0:
+        val = data[0].get('Resources', {}).get('Memory', 0)
+        print(int(val))
+    else:
+        print(0)
+except Exception:
+    print(0)
+" 2>/dev/null || echo 0)"
+  echo "${mem:-0}"
+}
+
+_check_podman_machine_size() {
+  local with_opik="${1:-0}"
+  local force="${2:-${FORCE_DEPLOY:-0}}"
+  local min_mb=2048
+  local stack_desc="Central stack"
+
+  if [[ "${with_opik}" == "1" ]]; then
+    min_mb=4096
+    stack_desc="Central stack with Opik"
+  fi
+
+  local actual_mb
+  actual_mb="$(_get_podman_machine_memory_mb)"
+
+  if [[ -z "${actual_mb}" || ! "${actual_mb}" =~ ^[0-9]+$ || "${actual_mb}" -le 0 ]]; then
+    return 0
+  fi
+
+  if [[ "${actual_mb}" -lt "${min_mb}" ]]; then
+    printf '\n[ERROR] Podman machine memory (%d MB) is insufficient for %s (requires at least %d MB).\n' \
+      "${actual_mb}" "${stack_desc}" "${min_mb}" >&2
+    printf 'To increase Podman machine memory, run:\n' >&2
+    printf '  podman machine stop\n' >&2
+    printf '  podman machine set --memory %d\n' "${min_mb}" >&2
+    printf '  podman machine start\n\n' >&2
+    if [[ "${force}" == "1" ]]; then
+      printf '[WARN] Proceeding anyway due to force flag.\n' >&2
+      return 0
+    fi
+    return 1
+  fi
+
+  return 0
+}
+
 render_alertmanager_config() {
   local tpl="${CENTRAL_DIR}/config/alertmanager.yml.template"
   local dst="${CENTRAL_DIR}/config/alertmanager.yml"
@@ -970,6 +1032,24 @@ tpl = tpl.replace('{{ONCALL_WEBHOOK_CONFIG}}', oncall_cfg)
 tpl = tpl.replace('{{DEFAULT_WEBHOOK_CONFIG}}', default_cfg)
 open(dst_path, 'w', encoding='utf-8').write(tpl)
 " "${tpl}" "${dst}" "${oncall_cfg}" "${default_cfg}"
+}
+
+render_grafana_datasource_config() {
+  local tpl="${CENTRAL_DIR}/config/grafana/datasources.yaml.template"
+  local dst="${CENTRAL_DIR}/config/grafana/datasources.yaml"
+  if [[ ! -f "${tpl}" ]]; then
+    return 0
+  fi
+
+  local vm_url="${VICTORIAMETRICS_URL:-http://victoria-metrics:8428}"
+
+  python3 -c "
+import sys
+tpl_path, dst_path, vm_url = sys.argv[1:4]
+tpl = open(tpl_path, 'r', encoding='utf-8').read()
+tpl = tpl.replace('{{VICTORIAMETRICS_URL}}', vm_url)
+open(dst_path, 'w', encoding='utf-8').write(tpl)
+" "${tpl}" "${dst}" "${vm_url}"
 }
 
 ensure_central_env() {
@@ -1073,8 +1153,14 @@ cmd_central() {
   else
     die "docker or podman is required for the central stack"
   fi
+  if [[ "${engine}" == "podman" ]]; then
+    if ! _check_podman_machine_size "${with_opik}" "${FORCE_DEPLOY:-0}"; then
+      die "Podman machine size check failed. Increase VM memory or pass --force."
+    fi
+  fi
   ensure_central_env
   render_alertmanager_config
+  render_grafana_datasource_config
   cd "${CENTRAL_DIR}"
 
   local compose_args=(-f docker-compose.central.yml)
@@ -1360,6 +1446,10 @@ clean_central() {
     if [[ -f "${CENTRAL_DIR}/config/alertmanager.yml" ]]; then
       rm -f "${CENTRAL_DIR}/config/alertmanager.yml"
       info "removed rendered alertmanager.yml"
+    fi
+    if [[ -f "${CENTRAL_DIR}/config/grafana/datasources.yaml" ]]; then
+      rm -f "${CENTRAL_DIR}/config/grafana/datasources.yaml"
+      info "removed rendered datasources.yaml"
     fi
   else
     info "preserving existing central configuration (${CENTRAL_DIR}/.env)"

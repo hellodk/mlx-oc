@@ -24,6 +24,9 @@
         <path>/clickhouse/task_queue/ddl</path>
     </distributed_ddl>
 
+    <!-- Prevent ClickHouse from exhausting host/VM memory on startup -->
+    <max_server_memory_usage_to_ram_ratio>0.7</max_server_memory_usage_to_ram_ratio>
+
     <!-- Mirrors the Helm cluster definition (clickhouse.shardsCount / replicasCount): one shard, one
          replica, internal_replication on. Compose runs a single replica, so internal_replication has
          nothing to fan out to and is a no-op here — it is set to keep the single-node cluster

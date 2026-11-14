@@ -549,6 +549,101 @@ def test_reinstall_cli_aliases_and_flags():
         assert "Usage: ./scripts/deploy.sh reinstall" in out
 
 
+def test_compose_central_resource_limits():
+    """Verify all services in docker-compose.central.yml have memory resource limits."""
+    compose_path = BUNDLE_DIR / "central" / "docker-compose.central.yml"
+    assert compose_path.is_file(), "docker-compose.central.yml must exist"
+    doc = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
+    services = doc.get("services", {})
+    assert len(services) >= 10, "Expected at least 10 services in central stack"
+
+    for sname, scfg in services.items():
+        # One-shot init containers don't need persistent limits
+        if sname in ("clickhouse-init", "opik-init-bucket"):
+            continue
+        # Verify memory limit is set under deploy.resources.limits.memory or mem_limit
+        mem_limit = None
+        deploy_cfg = scfg.get("deploy", {})
+        if isinstance(deploy_cfg, dict):
+            limits = deploy_cfg.get("resources", {}).get("limits", {})
+            if isinstance(limits, dict):
+                mem_limit = limits.get("memory")
+        if not mem_limit:
+            mem_limit = scfg.get("mem_limit")
+        assert mem_limit is not None, f"Service '{sname}' must have a memory limit configured"
+
+    # Specific bounds on memory-heavy services
+    ch_limits = services["clickhouse"]["deploy"]["resources"]["limits"]["memory"]
+    assert "M" in ch_limits or "G" in ch_limits
+    mysql_limits = services["mysql"]["deploy"]["resources"]["limits"]["memory"]
+    assert "M" in mysql_limits or "G" in mysql_limits
+    backend_limits = services["backend"]["deploy"]["resources"]["limits"]["memory"]
+    assert "M" in backend_limits or "G" in backend_limits
+
+
+def test_grafana_datasource_url_not_empty_or_broken_syntax():
+    """Verify datasources.yaml has valid URL and does not contain broken ':-' syntax."""
+    ds_path = BUNDLE_DIR / "central" / "config" / "grafana" / "datasources.yaml"
+    assert ds_path.is_file(), "datasources.yaml must exist"
+    raw_text = ds_path.read_text(encoding="utf-8")
+    assert ":-" not in raw_text, "datasources.yaml must not contain unsupported ':-' default expansion syntax"
+
+    doc = yaml.safe_load(raw_text)
+    datasources = doc.get("datasources", [])
+    assert len(datasources) >= 1
+    vm_ds = datasources[0]
+    assert vm_ds["name"] == "VictoriaMetrics"
+    assert vm_ds["url"], "Datasource URL must not be empty"
+
+
+def test_podman_machine_size_check_logic():
+    """Verify _check_podman_machine_size enforces 2GB for central and 4GB for opik."""
+    import subprocess
+    deploy_sh = BUNDLE_DIR / "scripts" / "deploy.sh"
+
+    # 1. 2048 MB with Opik should fail
+    script_2g_opik = f"""
+    export SKIP_GIT_PULL=1
+    source "{deploy_sh}"
+    _get_podman_machine_memory_mb() {{ echo 2048; }}
+    _check_podman_machine_size 1 0
+    """
+    res = subprocess.run(["bash", "-c", script_2g_opik], capture_output=True, text=True)
+    assert res.returncode != 0, "2048 MB should fail for Opik"
+    assert "requires at least 4096 MB" in res.stderr
+
+    # 2. 4096 MB with Opik should succeed
+    script_4g_opik = f"""
+    export SKIP_GIT_PULL=1
+    source "{deploy_sh}"
+    _get_podman_machine_memory_mb() {{ echo 4096; }}
+    _check_podman_machine_size 1 0
+    """
+    res = subprocess.run(["bash", "-c", script_4g_opik], capture_output=True, text=True)
+    assert res.returncode == 0, f"4096 MB should pass for Opik: {res.stderr}"
+
+    # 3. 2048 MB without Opik should succeed
+    script_2g_std = f"""
+    export SKIP_GIT_PULL=1
+    source "{deploy_sh}"
+    _get_podman_machine_memory_mb() {{ echo 2048; }}
+    _check_podman_machine_size 0 0
+    """
+    res = subprocess.run(["bash", "-c", script_2g_std], capture_output=True, text=True)
+    assert res.returncode == 0, f"2048 MB should pass for standard central: {res.stderr}"
+
+    # 4. 1024 MB without Opik should fail
+    script_1g_std = f"""
+    export SKIP_GIT_PULL=1
+    source "{deploy_sh}"
+    _get_podman_machine_memory_mb() {{ echo 1024; }}
+    _check_podman_machine_size 0 0
+    """
+    res = subprocess.run(["bash", "-c", script_1g_std], capture_output=True, text=True)
+    assert res.returncode != 0, "1024 MB should fail for standard central"
+
+
+
 
 
 

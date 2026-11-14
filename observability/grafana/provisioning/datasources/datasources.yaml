@@ -3,8 +3,9 @@ datasources:
   - name: VictoriaMetrics
     type: prometheus
     access: proxy
-    url: ${VICTORIAMETRICS_URL:-http://victoria-metrics:8428}
+    url: http://victoria-metrics:8428
     isDefault: true
     editable: true
     jsonData:
       timeInterval: 5s
+    version: 2

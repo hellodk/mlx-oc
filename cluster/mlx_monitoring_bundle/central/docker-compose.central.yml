@@ -37,6 +37,10 @@ services:
       - -httpListenAddr=0.0.0.0:8428
     volumes:
       - vm-data:/victoria-metrics-data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8428/health"]
       interval: 5s
@@ -55,6 +59,10 @@ services:
     volumes:
       - ./config/otelcol-config.yaml:/etc/otelcol-contrib/config.yaml:ro
       - central-otel-logs:/var/log/otelcol
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   grafana:
     image: grafana/grafana:latest
@@ -74,6 +82,10 @@ services:
       - ./config/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
       - ./config/grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
       - ./dashboards:/var/lib/grafana/dashboards:ro
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     depends_on:
       victoria-metrics:
         condition: service_healthy
@@ -97,6 +109,10 @@ services:
       - -httpListenAddr=0.0.0.0:8880
     volumes:
       - ./config/vmalert-rules.yml:/etc/vmalert/rules.yml:ro
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     depends_on:
       victoria-metrics:
         condition: service_healthy
@@ -117,6 +133,10 @@ services:
     command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
     volumes:
       - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:9093/-/healthy"]
       interval: 5s
@@ -152,6 +172,10 @@ services:
       retries: 60
     volumes:
       - opik-mysql:/var/lib/mysql
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   redis:
     image: redis:7.2.4-alpine3.19
@@ -167,6 +191,10 @@ services:
       start_period: 10s
     volumes:
       - opik-redis:/data
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   clickhouse-init:
     image: alpine:3.20
@@ -193,6 +221,10 @@ services:
       - opik-clickhouse-log:/var/log/clickhouse-server
       - opik-clickhouse-config:/etc/clickhouse-server/config.d
       - ./opik/clickhouse_config/users.d/enable_time_type.xml:/etc/clickhouse-server/users.d/enable_time_type.xml:ro
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8123/ping"]
       interval: 5s
@@ -214,8 +246,12 @@ services:
     restart: unless-stopped
     profiles: ["opik"]
     environment:
-      JVMFLAGS: "-Xmx512m"
+      JVMFLAGS: "-Xmx256m"
       ZOO_4LW_COMMANDS_WHITELIST: "srvr,ruok"
+    deploy:
+      resources:
+        limits:
+          memory: 384M
     healthcheck:
       test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep -q imok"]
       interval: 5s
@@ -253,6 +289,10 @@ services:
     volumes:
       - opik-storage:/data
     command: ["/data"]
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     depends_on:
       opik-init-bucket:
         condition: service_completed_successfully
@@ -263,6 +303,10 @@ services:
     restart: unless-stopped
     profiles: ["opik"]
     command: ["bash", "-c", "./run_db_migrations.sh && ./provision_agent_insights_readonly_user.sh && ./entrypoint.sh"]
+    deploy:
+      resources:
+        limits:
+          memory: 768M
     environment:
       DOCKER_BUILDKIT: 1
       STATE_DB_PROTOCOL: "jdbc:mysql://"
@@ -319,6 +363,10 @@ services:
     container_name: central-opik-python-backend
     restart: unless-stopped
     profiles: ["opik"]
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     environment:
       OPIK_OTEL_SDK_ENABLED: "false"
       PYTHON_CODE_EXECUTOR_STRATEGY: "process"
@@ -348,6 +396,10 @@ services:
     container_name: central-opik-frontend
     restart: unless-stopped
     profiles: ["opik"]
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     ports:
       - "${NGINX_PORT:-32173}:${NGINX_PORT:-32173}"
     volumes:
