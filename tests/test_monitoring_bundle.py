@@ -687,6 +687,91 @@ def test_podman_machine_memory_unit_conversion():
     assert res.stdout.strip() == "2048", f"Expected 2048 MB from 2GiB, got '{res.stdout.strip()}'"
 
 
+def test_podman_compose_provider_in_pod_flag_detection():
+    """Verify deploy.sh correctly sets --in-pod false only when podman-compose is the provider."""
+    import subprocess
+    deploy_sh = BUNDLE_DIR / "scripts" / "deploy.sh"
+
+    # Scenario A: podman compose delegates to podman-compose -> --in-pod false should be present
+    script_podman_compose = f"""
+    export SKIP_GIT_PULL=1
+    source "{deploy_sh}"
+    engine="podman"
+    compose_cmd=("${{engine}}" "compose")
+    is_podman_compose=0
+    podman() {{
+        if [[ "$1" == "compose" && "$2" == "version" ]]; then
+            echo '>>>> Executing external compose provider "/opt/homebrew/bin/podman-compose". <<<<'
+            echo 'podman-compose version: 1.2.0'
+            return 0
+        fi
+        return 1
+    }}
+    prov_out=$(podman compose version 2>&1 || true)
+    if echo "${{prov_out}}" | grep -qi "podman-compose"; then
+        is_podman_compose=1
+    fi
+    compose_args=(-f docker-compose.central.yml)
+    if [[ "${{is_podman_compose}}" -eq 1 ]]; then
+        compose_args=(--in-pod false "${{compose_args[@]}}")
+    fi
+    echo "${{compose_args[*]}}"
+    """
+    res_a = subprocess.run(["bash", "-c", script_podman_compose], capture_output=True, text=True)
+    assert res_a.returncode == 0
+    assert "--in-pod false" in res_a.stdout
+
+    # Scenario B: podman compose delegates to docker-compose -> --in-pod false must NOT be added
+    script_docker_compose = f"""
+    export SKIP_GIT_PULL=1
+    source "{deploy_sh}"
+    engine="podman"
+    compose_cmd=("${{engine}}" "compose")
+    is_podman_compose=0
+    podman() {{
+        if [[ "$1" == "compose" && "$2" == "version" ]]; then
+            echo '>>>> Executing external compose provider "/usr/local/bin/docker-compose". <<<<'
+            echo 'Docker Compose version v2.32.2'
+            return 0
+        fi
+        return 1
+    }}
+    prov_out=$(podman compose version 2>&1 || true)
+    if echo "${{prov_out}}" | grep -qi "podman-compose"; then
+        is_podman_compose=1
+    fi
+    compose_args=(-f docker-compose.central.yml)
+    if [[ "${{is_podman_compose}}" -eq 1 ]]; then
+        compose_args=(--in-pod false "${{compose_args[@]}}")
+    fi
+    echo "${{compose_args[*]}}"
+    """
+    res_b = subprocess.run(["bash", "-c", script_docker_compose], capture_output=True, text=True)
+    assert res_b.returncode == 0
+    assert "--in-pod false" not in res_b.stdout
+
+    # Scenario C: docker engine -> --in-pod false must NOT be added
+    script_docker_engine = f"""
+    export SKIP_GIT_PULL=1
+    source "{deploy_sh}"
+    engine="docker"
+    compose_cmd=("${{engine}}" "compose")
+    is_podman_compose=0
+    if [[ "${{compose_cmd[0]}}" == "podman-compose" ]]; then
+        is_podman_compose=1
+    fi
+    compose_args=(-f docker-compose.central.yml)
+    if [[ "${{is_podman_compose}}" -eq 1 ]]; then
+        compose_args=(--in-pod false "${{compose_args[@]}}")
+    fi
+    echo "${{compose_args[*]}}"
+    """
+    res_c = subprocess.run(["bash", "-c", script_docker_engine], capture_output=True, text=True)
+    assert res_c.returncode == 0
+    assert "--in-pod false" not in res_c.stdout
+
+
+
 
 
 

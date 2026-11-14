@@ -1211,13 +1211,29 @@ cmd_central() {
   fi
 
   local compose_cmd=("${engine}" "compose")
+  local is_podman_compose=0
   if [[ "${engine}" == "podman" ]]; then
     if ! podman compose version >/dev/null 2>&1 && command -v podman-compose >/dev/null 2>&1; then
       compose_cmd=("podman-compose")
+      is_podman_compose=1
+    else
+      local prov_out
+      prov_out=$(podman compose version 2>&1 || true)
+      if echo "${prov_out}" | grep -qi "podman-compose"; then
+        is_podman_compose=1
+      fi
     fi
+  elif [[ "${compose_cmd[0]}" == "podman-compose" ]]; then
+    is_podman_compose=1
   fi
-  if [[ "${compose_cmd[0]}" == "podman-compose" ]]; then
+  if [[ "${is_podman_compose}" -eq 1 ]]; then
     compose_args=(--in-pod false "${compose_args[@]}")
+    for old_pod in "mlx-central_pod" "central_pod"; do
+      if podman pod exists "${old_pod}" 2>/dev/null; then
+        info "removing legacy compose pod: ${old_pod} to transition to bridge network mode"
+        podman pod rm -f "${old_pod}" >/dev/null 2>&1 || true
+      fi
+    done
   fi
 
   # 1. Determine container images required for this configuration
@@ -1415,10 +1431,20 @@ clean_central() {
 
   if [[ -n "${engine}" ]]; then
     local compose_cmd=("${engine}" "compose")
+    local is_podman_compose=0
     if [[ "${engine}" == "podman" ]]; then
       if ! podman compose version >/dev/null 2>&1 && command -v podman-compose >/dev/null 2>&1; then
         compose_cmd=("podman-compose")
+        is_podman_compose=1
+      else
+        local prov_out
+        prov_out=$(podman compose version 2>&1 || true)
+        if echo "${prov_out}" | grep -qi "podman-compose"; then
+          is_podman_compose=1
+        fi
       fi
+    elif [[ "${compose_cmd[0]}" == "podman-compose" ]]; then
+      is_podman_compose=1
     fi
 
     cd "${CENTRAL_DIR}"
@@ -1427,12 +1453,21 @@ clean_central() {
       compose_args=(--env-file "${CENTRAL_DIR}/.env" "${compose_args[@]}")
     fi
     compose_args=(--profile opik "${compose_args[@]}")
-    if [[ "${compose_cmd[0]}" == "podman-compose" ]]; then
+    if [[ "${is_podman_compose}" -eq 1 ]]; then
       compose_args=(--in-pod false "${compose_args[@]}")
     fi
 
     info "tearing down compose services and removing volumes..."
     "${compose_cmd[@]}" "${compose_args[@]}" down -v --remove-orphans 2>&1 || true
+
+    if [[ "${engine}" == "podman" ]]; then
+      local orphan_pods
+      orphan_pods=$(podman pod ps --filter "name=mlx-central" --filter "name=central" -q 2>/dev/null || true)
+      if [[ -n "${orphan_pods}" ]]; then
+        info "removing leftover central pods..."
+        podman pod rm -f ${orphan_pods} >/dev/null 2>&1 || true
+      fi
+    fi
 
     # Clean any leftover or stopped containers
     local central_containers=(
