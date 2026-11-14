@@ -354,7 +354,11 @@ def test_diagnostics_granular_service_reviews():
             cwd=str(BUNDLE_DIR),
             timeout=15,
         )
-        assert proc.returncode == 0, f"{subcmd} failed: {proc.stderr}"
+        if subcmd == "review-opik":
+            # Opik is an optional compose profile (--opik)
+            assert proc.returncode in (0, 1), f"{subcmd} failed unexpectedly: {proc.stderr}"
+        else:
+            assert proc.returncode == 0, f"{subcmd} failed: {proc.stderr}"
         assert expected_header in proc.stdout, f"{subcmd} missing header {expected_header}"
 
 
@@ -641,6 +645,48 @@ def test_podman_machine_size_check_logic():
     """
     res = subprocess.run(["bash", "-c", script_1g_std], capture_output=True, text=True)
     assert res.returncode != 0, "1024 MB should fail for standard central"
+
+
+def test_clean_central_container_names_cover_compose():
+    """Verify clean_central in deploy.sh cleans all container_name values in docker-compose.central.yml."""
+    compose_path = BUNDLE_DIR / "central" / "docker-compose.central.yml"
+    doc = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
+    compose_containers = set()
+    for sname, scfg in doc.get("services", {}).items():
+        cname = scfg.get("container_name")
+        if cname:
+            compose_containers.add(cname)
+
+    assert len(compose_containers) >= 10, "Expected at least 10 named containers in compose"
+
+    deploy_sh_text = (BUNDLE_DIR / "scripts" / "deploy.sh").read_text(encoding="utf-8")
+    for cname in compose_containers:
+        assert f'"{cname}"' in deploy_sh_text, f"Container '{cname}' from compose missing in clean_central cleanup array"
+
+
+def test_podman_machine_memory_unit_conversion():
+    """Verify _get_podman_machine_memory_mb handles unit string conversions from podman machine list."""
+    import subprocess
+    deploy_sh = BUNDLE_DIR / "scripts" / "deploy.sh"
+
+    script = f"""
+    export SKIP_GIT_PULL=1
+    source "{deploy_sh}"
+    podman() {{
+        if [[ "$1" == "machine" && "$2" == "inspect" ]]; then
+            return 1
+        fi
+        if [[ "$1" == "machine" && "$2" == "list" ]]; then
+            echo "2GiB"
+            return 0
+        fi
+        return 1
+    }}
+    _get_podman_machine_memory_mb
+    """
+    res = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+    assert res.returncode == 0
+    assert res.stdout.strip() == "2048", f"Expected 2048 MB from 2GiB, got '{res.stdout.strip()}'"
 
 
 

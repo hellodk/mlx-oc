@@ -475,7 +475,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                                 "stage": "Stage 5: Grafana VictoriaMetrics Datasource",
                                 "issue": f"Grafana cannot query VictoriaMetrics inside container network ({dh_body}). Configured URL: {ds_url}.",
                                 "impact": "All panels in all dashboards will show 'No Data'.",
-                                "fix": f"Set VICTORIAMETRICS_URL=http://{cfg['cvm']} in central/.env and recreate Grafana."
+                                "fix": "Ensure VICTORIAMETRICS_URL=http://victoria-metrics:8428 in central/.env and recreate Grafana with './scripts/deploy.sh central'."
                             })
                     except Exception:
                         pass

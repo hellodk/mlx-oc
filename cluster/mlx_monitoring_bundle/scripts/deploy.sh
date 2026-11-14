@@ -955,24 +955,56 @@ _get_podman_machine_memory_mb() {
     return 0
   fi
   local mem=""
-  mem="$(podman machine inspect --format '{{.Resources.Memory}}' 2>/dev/null || true)"
+  mem="$(podman machine inspect --format '{{.Resources.Memory}}' 2>/dev/null | grep -E '^[0-9]+$' | head -n 1 || true)"
   if [[ -n "${mem}" && "${mem}" =~ ^[0-9]+$ && "${mem}" -gt 0 ]]; then
     echo "${mem}"
     return 0
   fi
-  mem="$(python3 -c "
-import subprocess, json
+
+  local inspect_json=""
+  inspect_json="$(podman machine inspect 2>/dev/null || true)"
+  if [[ -n "${inspect_json}" ]]; then
+    mem="$(python3 -c "
+import sys, json
 try:
-    out = subprocess.check_output(['podman', 'machine', 'inspect'], stderr=subprocess.DEVNULL)
-    data = json.loads(out)
+    data = json.loads(sys.stdin.read())
     if isinstance(data, list) and len(data) > 0:
-        val = data[0].get('Resources', {}).get('Memory', 0)
+        running_vm = next((m for m in data if m.get('State') == 'running' or m.get('Running')), data[0])
+        val = running_vm.get('Resources', {}).get('Memory', 0)
         print(int(val))
     else:
         print(0)
 except Exception:
     print(0)
-" 2>/dev/null || echo 0)"
+" <<< "${inspect_json}" 2>/dev/null || echo 0)"
+  fi
+
+  if [[ -z "${mem}" || "${mem}" == "0" ]]; then
+    local raw_list=""
+    raw_list="$(podman machine list --format '{{.Memory}}' 2>/dev/null || true)"
+    if [[ -n "${raw_list}" ]]; then
+      mem="$(python3 -c "
+import sys, re
+def parse_mem(s):
+    if not s:
+        return 0
+    m = re.match(r'^([0-9]+(?:\.[0-9]+)?)\s*(gib|gb|g|mib|mb|m)?$', s.strip(), re.I)
+    if not m:
+        return 0
+    val, unit = float(m.group(1)), (m.group(2) or 'mb').lower()
+    return int(val * 1024) if unit in ('gib', 'gb', 'g') else int(val)
+
+for line in sys.stdin:
+    v = parse_mem(line)
+    if v > 0:
+        print(v)
+        break
+else:
+    print(0)
+" <<< "${raw_list}" 2>/dev/null || echo 0)"
+    fi
+  fi
+
   echo "${mem:-0}"
 }
 
@@ -1399,17 +1431,20 @@ clean_central() {
     # Clean any leftover or stopped containers
     local central_containers=(
       "central-grafana" "grafana"
-      "central-victoria-metrics" "victoria-metrics"
+      "central-victoriametrics" "central-victoria-metrics" "victoria-metrics"
       "central-vmalert" "vmalert"
       "central-alertmanager" "alertmanager"
-      "central-otel-collector" "otel-collector"
+      "central-otelcol" "central-otel-collector" "otel-collector"
       "central-opik-backend" "opik-backend"
       "central-opik-frontend" "opik-frontend"
       "central-opik-mysql" "opik-mysql"
       "central-opik-clickhouse" "opik-clickhouse"
+      "central-opik-clickhouse-init" "opik-clickhouse-init"
       "central-opik-redis" "opik-redis"
       "central-opik-python-backend" "opik-python-backend"
-      "central-opik-storage" "opik-storage"
+      "central-opik-rustfs" "central-opik-storage" "opik-storage"
+      "central-opik-zookeeper" "opik-zookeeper"
+      "central-opik-init-bucket" "opik-init-bucket"
     )
     for cname in "${central_containers[@]}"; do
       if "${engine}" inspect "${cname}" >/dev/null 2>&1; then
