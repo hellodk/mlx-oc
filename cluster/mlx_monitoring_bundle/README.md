@@ -623,6 +623,36 @@ When you deploy the stack and want to verify telemetry flow or troubleshoot miss
 
 ---
 
+### Step 5: Clean & Fresh Reinstallation
+
+To reset or redeploy components cleanly, `deploy.sh` supports **Clean** and **Reinstall Fresh** operations across two configuration modes:
+
+| Mode | What it does | When to use |
+|------|--------------|-------------|
+| **Config Re-use** (`--reuse-config`) | Tears down containers/volumes, halts exporter listeners, purges logs and transient queue files, but **preserves** `.env`, `nodes.yml`, and `edge.env`. Reinstalls immediately with existing configuration. | Reset corrupted container state, purge SQLite/TSDB data, rotate containers without losing credentials or endpoints. |
+| **Config Recreate** (`--recreate-config`) | Tears down all containers, volumes, listeners, and queues. **Backs up** existing configs with an IST timestamp (`.env.bak.YYYYMMDD_HHMMSS_IST`), wipes them, and prompts/generates a fresh configuration from scratch. | New cluster endpoints, changed passwords, full fresh provisioning. |
+
+#### CLI Commands
+
+```bash
+# Clean & Reinstall keeping existing configuration (fast reset)
+./scripts/deploy.sh reinstall-reuse [central|edge|all] [-y]
+
+# Clean & Reinstall with fresh configuration from scratch (full re-prompt)
+./scripts/deploy.sh reinstall-recreate [central|edge|all] [-y]
+
+# Interactive Clean / Teardown
+./scripts/deploy.sh clean [central|edge|all] [--reuse-config|--recreate-config] [-y]
+
+# Interactive Reinstall Wizard
+./scripts/deploy.sh reinstall [central|edge|all] [--opik] [-y]
+```
+
+Or select **`reinstall-reuse`**, **`reinstall-recreate`**, or **`clean`** directly from the interactive `./scripts/deploy.sh` menu.
+All destructive actions require explicit user confirmation unless passed `-y` / `--force`.
+
+---
+
 ---
 
 ## Opik SDK Tracing
