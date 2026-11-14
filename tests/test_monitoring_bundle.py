@@ -180,14 +180,12 @@ def test_central_compose_image_resolution_and_profiles():
     # Opik profile must include rustfs and not bitnami minio
     assert "rustfs/rustfs:latest" in opik_images
 
-    # Backend and MinIO must depend on opik-init-bucket completing successfully
+    # Backend must depend on minio, clickhouse, mysql, redis being healthy
     backend_deps = services["backend"].get("depends_on", {})
-    assert "opik-init-bucket" in backend_deps
-    assert backend_deps["opik-init-bucket"]["condition"] == "service_completed_successfully"
-
-    minio_deps = services["minio"].get("depends_on", {})
-    assert "opik-init-bucket" in minio_deps
-    assert minio_deps["opik-init-bucket"]["condition"] == "service_completed_successfully"
+    assert "minio" in backend_deps
+    assert backend_deps["minio"]["condition"] == "service_healthy"
+    assert "clickhouse" in backend_deps
+    assert backend_deps["clickhouse"]["condition"] == "service_healthy"
 
 
 def test_vmagent_custom_listen_ports_rendering():

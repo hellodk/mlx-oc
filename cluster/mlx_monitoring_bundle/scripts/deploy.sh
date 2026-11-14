@@ -1216,6 +1216,9 @@ cmd_central() {
       compose_cmd=("podman-compose")
     fi
   fi
+  if [[ "${compose_cmd[0]}" == "podman-compose" ]]; then
+    compose_args=(--in-pod false "${compose_args[@]}")
+  fi
 
   # 1. Determine container images required for this configuration
   local raw_images=()
@@ -1424,6 +1427,9 @@ clean_central() {
       compose_args=(--env-file "${CENTRAL_DIR}/.env" "${compose_args[@]}")
     fi
     compose_args=(--profile opik "${compose_args[@]}")
+    if [[ "${compose_cmd[0]}" == "podman-compose" ]]; then
+      compose_args=(--in-pod false "${compose_args[@]}")
+    fi
 
     info "tearing down compose services and removing volumes..."
     "${compose_cmd[@]}" "${compose_args[@]}" down -v --remove-orphans 2>&1 || true

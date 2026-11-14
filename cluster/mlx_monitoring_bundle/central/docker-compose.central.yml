@@ -196,16 +196,6 @@ services:
         limits:
           memory: 256M
 
-  clickhouse-init:
-    image: alpine:3.20
-    container_name: central-opik-clickhouse-init
-    profiles: ["opik"]
-    restart: "no"
-    volumes:
-      - ./opik/clickhouse_config:/clickhouse_config_files:ro
-      - opik-clickhouse-config:/config
-    command: ["sh", "-c", "cp -r /clickhouse_config_files/* /config/ && chmod -R a+rX /config && (chown -R 1000:1000 /config 2>/dev/null || true)"]
-
   clickhouse:
     image: clickhouse/clickhouse-server:26.3.16.16-alpine
     container_name: central-opik-clickhouse
@@ -219,7 +209,7 @@ services:
     volumes:
       - opik-clickhouse:/var/lib/clickhouse
       - opik-clickhouse-log:/var/log/clickhouse-server
-      - opik-clickhouse-config:/etc/clickhouse-server/config.d
+      - ./opik/clickhouse_config/additional_config.xml:/etc/clickhouse-server/config.d/additional_config.xml:ro
       - ./opik/clickhouse_config/users.d/enable_time_type.xml:/etc/clickhouse-server/users.d/enable_time_type.xml:ro
     deploy:
       resources:
@@ -237,8 +227,6 @@ services:
     depends_on:
       zookeeper:
         condition: service_healthy
-      clickhouse-init:
-        condition: service_completed_successfully
 
   zookeeper:
     image: zookeeper:3.9.4
@@ -260,16 +248,6 @@ services:
     volumes:
       - opik-zookeeper:/data
 
-  # One-shot bucket init for Opik's public trace bucket
-  opik-init-bucket:
-    image: alpine:3.20
-    container_name: central-opik-init-bucket
-    profiles: ["opik"]
-    restart: "no"
-    volumes:
-      - opik-storage:/data
-    command: ["sh", "-c", "mkdir -p /data/public && chmod -R 777 /data"]
-
   minio:
     image: rustfs/rustfs:latest
     container_name: central-opik-rustfs
@@ -288,14 +266,12 @@ services:
       start_period: 5s
     volumes:
       - opik-storage:/data
+    entrypoint: ["sh", "-c", "mkdir -p /data/public && chmod -R 777 /data 2>/dev/null || true; exec /etc/rustfs/entrypoint.sh \"$$@\"", "--"]
     command: ["/data"]
     deploy:
       resources:
         limits:
           memory: 256M
-    depends_on:
-      opik-init-bucket:
-        condition: service_completed_successfully
 
   backend:
     image: ghcr.io/comet-ml/opik/opik-backend:${OPIK_VERSION:-2.2.13}
@@ -349,8 +325,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      opik-init-bucket:
-        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health-check"]
       interval: 10s
@@ -426,6 +400,5 @@ volumes:
   opik-redis:
   opik-clickhouse:
   opik-clickhouse-log:
-  opik-clickhouse-config:
   opik-zookeeper:
   opik-storage:
