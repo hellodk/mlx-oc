@@ -501,6 +501,8 @@ def test_clean_central_unit_reuse_and_recreate(tmp_path):
     export SKIP_GIT_PULL=1
     source "{deploy_sh}"
     CENTRAL_DIR="{central_dir}"
+    docker() {{ return 1; }}
+    podman() {{ return 1; }}
     clean_central reuse
     """
     res = subprocess.run(["bash", "-c", script_reuse], capture_output=True, text=True)
@@ -512,6 +514,8 @@ def test_clean_central_unit_reuse_and_recreate(tmp_path):
     export SKIP_GIT_PULL=1
     source "{deploy_sh}"
     CENTRAL_DIR="{central_dir}"
+    docker() {{ return 1; }}
+    podman() {{ return 1; }}
     clean_central recreate
     """
     res = subprocess.run(["bash", "-c", script_recreate], capture_output=True, text=True)

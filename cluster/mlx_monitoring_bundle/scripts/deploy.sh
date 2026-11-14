@@ -1199,7 +1199,43 @@ except Exception:
     info "starting central observability stack"
   fi
   if ! "${compose_cmd[@]}" "${compose_args[@]}" up -d; then
-    die "failed to start central container stack"
+    local exit_code=$?
+    err "container compose failed with exit code ${exit_code}"
+    err "inspecting container status and failure causes:"
+    while IFS='|' read -r cid cname cstat; do
+      [[ -z "${cid}" ]] && continue
+      local c_err oom_killed exit_c
+      c_err="$("${engine}" inspect "${cid}" --format '{{.State.Error}}' 2>/dev/null || true)"
+      oom_killed="$("${engine}" inspect "${cid}" --format '{{.State.OOMKilled}}' 2>/dev/null || true)"
+      exit_c="$("${engine}" inspect "${cid}" --format '{{.State.ExitCode}}' 2>/dev/null || true)"
+      err "  • Container ${cname} (${cid:0:12}): ${cstat}"
+      if [[ -n "${exit_c}" && "${exit_c}" != "0" ]]; then
+        err "    Exit code: ${exit_c}"
+      fi
+      if [[ "${oom_killed}" == "true" || "${exit_c}" == "137" ]]; then
+        err "    >>> OOM KILLED: Process was terminated by the Linux Out-Of-Memory killer."
+      fi
+      if [[ -n "${c_err}" ]]; then
+        err "    Runtime error: ${c_err}"
+      fi
+    done < <("${engine}" ps -a --format '{{.ID}}|{{.Names}}|{{.Status}}' 2>/dev/null | grep -E 'central-|opik|grafana|victoria|otel' || true)
+
+    if [[ "$(uname -s)" == "Darwin" && "${engine}" == "podman" ]]; then
+      local vm_mem
+      vm_mem="$(podman machine list --format '{{.Memory}}' 2>/dev/null | head -1 || echo "")"
+      if [[ -n "${vm_mem}" ]]; then
+        err "  • Podman VM memory: ${vm_mem}"
+        if [[ "${vm_mem}" == *"2GiB"* || "${vm_mem}" == *"2048"* ]]; then
+          err "  >>> ROOT CAUSE: Podman VM memory is 2GiB. The Opik stack (ClickHouse, MySQL, JVM) requires at least 4GiB."
+          err "  >>> ACTIONABLE FIX:"
+          err "      1. Stop the VM:    podman machine stop"
+          err "      2. Expand memory:  podman machine set --memory 4096"
+          err "      3. Start the VM:   podman machine start"
+          err "      4. Retry:          $0 central --opik"
+        fi
+      fi
+    fi
+    die "failed to start central container stack (see triage diagnostics above)"
   fi
 
   # 6. Synchronize admin password with Grafana internal DB
