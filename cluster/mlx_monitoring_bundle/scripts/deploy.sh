@@ -23,6 +23,13 @@
 
 set -euo pipefail
 
+# Ensure standard binary search paths on macOS / Linux (e.g. Homebrew, system bins)
+for p in /opt/homebrew/bin /usr/local/bin /usr/bin /bin; do
+  if [[ -d "${p}" && ":${PATH}:" != *":${p}:"* ]]; then
+    export PATH="${p}:${PATH}"
+  fi
+done
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUNDLE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 EDGE_DIR="${BUNDLE_DIR}/edge"
