@@ -687,95 +687,259 @@ def test_podman_machine_memory_unit_conversion():
     assert res.stdout.strip() == "2048", f"Expected 2048 MB from 2GiB, got '{res.stdout.strip()}'"
 
 
-def test_podman_compose_provider_in_pod_flag_detection():
-    """Verify deploy.sh correctly sets --in-pod false only when podman-compose is the provider."""
+def _run_deploy_bash(bash_body: str, env: dict | None = None):
+    """Run a bash snippet with deploy.sh sourced (SKIP_GIT_PULL=1)."""
     import subprocess
     deploy_sh = BUNDLE_DIR / "scripts" / "deploy.sh"
+    script = f'export SKIP_GIT_PULL=1\nsource "{deploy_sh}"\n{bash_body}\n'
+    run_env = os.environ.copy()
+    if env:
+        run_env.update(env)
+    return subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=run_env)
 
-    # Scenario A: podman compose delegates to podman-compose -> --in-pod false should be present
-    script_podman_compose = f"""
-    export SKIP_GIT_PULL=1
-    source "{deploy_sh}"
-    engine="podman"
-    compose_cmd=("${{engine}}" "compose")
-    is_podman_compose=0
-    podman() {{
-        if [[ "$1" == "compose" && "$2" == "version" ]]; then
-            echo '>>>> Executing external compose provider "/opt/homebrew/bin/podman-compose". <<<<'
-            echo 'podman-compose version: 1.2.0'
+
+def test_podman_compose_provider_in_pod_flag_detection(tmp_path):
+    """Verify _resolve_central_compose sets IS_PODMAN_COMPOSE and COMPOSE_CMD across providers."""
+    # Scenario A: podman compose delegates to external podman-compose provider -> IS_PODMAN_COMPOSE=1
+    res_a = _run_deploy_bash(
+        """
+        podman() {
+            if [[ "$1" == "compose" && "$2" == "version" ]]; then
+                echo '>>>> Executing external compose provider "/opt/homebrew/bin/podman-compose". <<<<'
+                echo 'podman-compose version: 1.2.0'
+                return 0
+            fi
+            return 1
+        }
+        COMPOSE_CMD=()
+        IS_PODMAN_COMPOSE=0
+        _resolve_central_compose "podman"
+        echo "CMD=${COMPOSE_CMD[*]}|FLAG=${IS_PODMAN_COMPOSE}"
+        """
+    )
+    assert res_a.returncode == 0, res_a.stderr
+    assert res_a.stdout.strip() == "CMD=podman compose|FLAG=1"
+
+    # Scenario B: podman compose delegates to docker-compose -> IS_PODMAN_COMPOSE=0
+    res_b = _run_deploy_bash(
+        """
+        podman() {
+            if [[ "$1" == "compose" && "$2" == "version" ]]; then
+                echo '>>>> Executing external compose provider "/usr/local/bin/docker-compose". <<<<'
+                echo 'Docker Compose version v2.32.2'
+                return 0
+            fi
+            return 1
+        }
+        COMPOSE_CMD=()
+        IS_PODMAN_COMPOSE=0
+        _resolve_central_compose "podman"
+        echo "CMD=${COMPOSE_CMD[*]}|FLAG=${IS_PODMAN_COMPOSE}"
+        """
+    )
+    assert res_b.returncode == 0, res_b.stderr
+    assert res_b.stdout.strip() == "CMD=podman compose|FLAG=0"
+
+    # Scenario C: podman compose version fails, standalone podman-compose exists on PATH -> fallback
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    pc_bin = fake_bin / "podman-compose"
+    pc_bin.write_text("#!/usr/bin/env bash\necho 'podman-compose 1.2.0'\n", encoding="utf-8")
+    pc_bin.chmod(0o755)
+    res_c = _run_deploy_bash(
+        f"""
+        export PATH="{fake_bin}:$PATH"
+        podman() {{
+            if [[ "$1" == "compose" && "$2" == "version" ]]; then
+                return 1
+            fi
+            return 1
+        }}
+        COMPOSE_CMD=()
+        IS_PODMAN_COMPOSE=0
+        _resolve_central_compose "podman"
+        echo "CMD=${{COMPOSE_CMD[*]}}|FLAG=${{IS_PODMAN_COMPOSE}}"
+        """
+    )
+    assert res_c.returncode == 0, res_c.stderr
+    assert res_c.stdout.strip() == "CMD=podman-compose|FLAG=1"
+
+    # Scenario D: docker engine -> IS_PODMAN_COMPOSE=0
+    res_d = _run_deploy_bash(
+        """
+        COMPOSE_CMD=()
+        IS_PODMAN_COMPOSE=0
+        _resolve_central_compose "docker"
+        echo "CMD=${COMPOSE_CMD[*]}|FLAG=${IS_PODMAN_COMPOSE}"
+        """
+    )
+    assert res_d.returncode == 0, res_d.stderr
+    assert res_d.stdout.strip() == "CMD=docker compose|FLAG=0"
+
+
+def test_remove_orphan_central_pods_cleans_named_and_filtered_pods(tmp_path):
+    """Verify _remove_orphan_central_pods removes filtered pods and legacy pod_mlx-central/pod_central names."""
+    log_file = tmp_path / "podman_rm.log"
+    res = _run_deploy_bash(
+        f"""
+        podman() {{
+            if [[ "$1" == "pod" && "$2" == "ps" ]]; then
+                echo "abc123def456"
+                return 0
+            fi
+            if [[ "$1" == "pod" && "$2" == "exists" ]]; then
+                [[ "$3" == "pod_mlx-central" || "$3" == "pod_central" ]] && return 0
+                return 1
+            fi
+            if [[ "$1" == "pod" && "$2" == "rm" ]]; then
+                echo "RM:$*" >> "{log_file}"
+                return 0
+            fi
+            return 1
+        }}
+        _remove_orphan_central_pods "docker"
+        _remove_orphan_central_pods "podman"
+        """
+    )
+    assert res.returncode == 0, res.stderr
+    rm_lines = log_file.read_text(encoding="utf-8").splitlines()
+    assert "RM:pod rm -f abc123def456" in rm_lines
+    assert "RM:pod rm -f pod_mlx-central" in rm_lines
+    assert "RM:pod rm -f pod_central" in rm_lines
+    assert len(rm_lines) == 3
+
+
+def test_write_and_ensure_central_env_preserve_custom_keys_and_perms(tmp_path):
+    """Verify _write_central_env and ensure_central_env keep custom keys, set defaults, and apply 0600 perms."""
+    import stat
+
+    central_dir = tmp_path / "central"
+    central_dir.mkdir()
+    env_file = central_dir / ".env"
+    env_file.write_text(
+        "# old comment\n"
+        "GRAFANA_ADMIN_USER=opsadmin\n"
+        "GRAFANA_ADMIN_PASSWORD=StrongTestPass99\n"
+        "GRAFANA_ANONYMOUS_ENABLED=true\n"
+        "OPIK_VERSION=2.3.0\n"
+        "ONCALL_WEBHOOK_URL=https://hooks.example.com/alert\n",
+        encoding="utf-8",
+    )
+
+    res = _run_deploy_bash(
+        f"""
+        CENTRAL_DIR="{central_dir}"
+        ensure_central_env
+        echo "EXPORTED_OPIK=${{OPIK_VERSION:-}}|WEBHOOK=${{ONCALL_WEBHOOK_URL:-}}|VM=${{VICTORIAMETRICS_URL:-}}"
+        """
+    )
+    assert res.returncode == 0, res.stderr
+    assert "EXPORTED_OPIK=2.3.0|WEBHOOK=https://hooks.example.com/alert|VM=http://victoria-metrics:8428" in res.stdout
+
+    updated = env_file.read_text(encoding="utf-8")
+    assert "IST" in updated
+    assert "GRAFANA_ADMIN_USER=opsadmin" in updated
+    assert "GRAFANA_ADMIN_PASSWORD=StrongTestPass99" in updated
+    assert "GRAFANA_ANONYMOUS_ENABLED=true" in updated
+    assert "VICTORIAMETRICS_URL=http://victoria-metrics:8428" in updated
+    assert "OPIK_VERSION=2.3.0" in updated
+    assert "ONCALL_WEBHOOK_URL=https://hooks.example.com/alert" in updated
+    assert stat.S_IMODE(env_file.stat().st_mode) == 0o600
+
+
+def test_cmd_central_passes_in_pod_false_cleans_pods_and_reports_compose_exit_code(tmp_path):
+    """Verify cmd_central cleans pods, passes --in-pod=false to podman-compose, and reports real compose errors."""
+    central_dir = tmp_path / "central"
+    central_dir.mkdir()
+    (central_dir / "docker-compose.central.yml").write_text(
+        "name: mlx-central\nservices:\n  victoriametrics:\n    image: victoriametrics/victoria-metrics:latest\n",
+        encoding="utf-8",
+    )
+    (central_dir / ".env").write_text(
+        "GRAFANA_ADMIN_USER=admin\nGRAFANA_ADMIN_PASSWORD=StrongPass42\nVICTORIAMETRICS_URL=http://victoria-metrics:8428\n",
+        encoding="utf-8",
+    )
+
+    log_file = tmp_path / "podman.log"
+    res_ok = _run_deploy_bash(
+        f"""
+        CENTRAL_DIR="{central_dir}"
+        _detect_container_engine() {{ echo "podman"; }}
+        _check_podman_machine_size() {{ return 0; }}
+        render_alertmanager_config() {{ return 0; }}
+        render_grafana_datasource_config() {{ return 0; }}
+        podman() {{
+            echo "$*" >> "{log_file}"
+            if [[ "$1" == "compose" && "$2" == "version" ]]; then
+                echo '>>>> Executing external compose provider "/opt/homebrew/bin/podman-compose". <<<<'
+                echo 'podman-compose version: 1.2.0'
+                return 0
+            fi
+            if [[ "$1" == "pod" && "$2" == "ps" ]]; then
+                echo "deadbeefpod1"
+                return 0
+            fi
+            if [[ "$1" == "pod" && "$2" == "exists" ]]; then
+                [[ "$3" == "pod_mlx-central" ]] && return 0
+                return 1
+            fi
+            if [[ "$1" == "compose" ]]; then
+                if [[ "$*" == *" config --images"* ]]; then
+                    echo '>>>> Executing external compose provider "/opt/homebrew/bin/podman-compose". <<<<'
+                    echo 'victoriametrics/victoria-metrics:latest'
+                    return 0
+                fi
+                return 0
+            fi
+            if [[ "$1" == "image" && "$2" == "inspect" ]]; then
+                return 0
+            fi
+            if [[ "$1" == "ps" ]]; then
+                return 0
+            fi
             return 0
-        fi
-        return 1
-    }}
-    prov_out=$(podman compose version 2>&1 || true)
-    if echo "${{prov_out}}" | grep -qi "podman-compose"; then
-        is_podman_compose=1
-    fi
-    compose_args=(-f docker-compose.central.yml)
-    if [[ "${{is_podman_compose}}" -eq 1 ]]; then
-        compose_args=(--in-pod false "${{compose_args[@]}}")
-    fi
-    echo "${{compose_args[*]}}"
-    """
-    res_a = subprocess.run(["bash", "-c", script_podman_compose], capture_output=True, text=True)
-    assert res_a.returncode == 0
-    assert "--in-pod false" in res_a.stdout
+        }}
+        cmd_central --yes
+        """,
+        env={"NO_PROXY": ""},
+    )
+    assert res_ok.returncode == 0, res_ok.stderr
+    calls = log_file.read_text(encoding="utf-8").splitlines()
+    assert "pod rm -f deadbeefpod1" in calls
+    assert "pod rm -f pod_mlx-central" in calls
+    up_calls = [c for c in calls if c.startswith("compose ") and " up -d" in c]
+    assert len(up_calls) == 1
+    assert "--in-pod=false" in up_calls[0]
 
-    # Scenario B: podman compose delegates to docker-compose -> --in-pod false must NOT be added
-    script_docker_compose = f"""
-    export SKIP_GIT_PULL=1
-    source "{deploy_sh}"
-    engine="podman"
-    compose_cmd=("${{engine}}" "compose")
-    is_podman_compose=0
-    podman() {{
-        if [[ "$1" == "compose" && "$2" == "version" ]]; then
-            echo '>>>> Executing external compose provider "/usr/local/bin/docker-compose". <<<<'
-            echo 'Docker Compose version v2.32.2'
+    # Verify non-zero compose exit code is reported accurately (not masked to 0 by `if ! ...`)
+    res_fail = _run_deploy_bash(
+        f"""
+        CENTRAL_DIR="{central_dir}"
+        _detect_container_engine() {{ echo "podman"; }}
+        _check_podman_machine_size() {{ return 0; }}
+        render_alertmanager_config() {{ return 0; }}
+        render_grafana_datasource_config() {{ return 0; }}
+        podman() {{
+            if [[ "$1" == "compose" && "$2" == "version" ]]; then
+                echo 'podman-compose version: 1.2.0'
+                return 0
+            fi
+            if [[ "$1" == "compose" && "$*" == *" config --images"* ]]; then
+                echo 'victoriametrics/victoria-metrics:latest'
+                return 0
+            fi
+            if [[ "$1" == "compose" && "$*" == *" up -d"* ]]; then
+                return 42
+            fi
+            if [[ "$1" == "image" && "$2" == "inspect" ]]; then
+                return 0
+            fi
             return 0
-        fi
-        return 1
-    }}
-    prov_out=$(podman compose version 2>&1 || true)
-    if echo "${{prov_out}}" | grep -qi "podman-compose"; then
-        is_podman_compose=1
-    fi
-    compose_args=(-f docker-compose.central.yml)
-    if [[ "${{is_podman_compose}}" -eq 1 ]]; then
-        compose_args=(--in-pod false "${{compose_args[@]}}")
-    fi
-    echo "${{compose_args[*]}}"
-    """
-    res_b = subprocess.run(["bash", "-c", script_docker_compose], capture_output=True, text=True)
-    assert res_b.returncode == 0
-    assert "--in-pod false" not in res_b.stdout
-
-    # Scenario C: docker engine -> --in-pod false must NOT be added
-    script_docker_engine = f"""
-    export SKIP_GIT_PULL=1
-    source "{deploy_sh}"
-    engine="docker"
-    compose_cmd=("${{engine}}" "compose")
-    is_podman_compose=0
-    if [[ "${{compose_cmd[0]}}" == "podman-compose" ]]; then
-        is_podman_compose=1
-    fi
-    compose_args=(-f docker-compose.central.yml)
-    if [[ "${{is_podman_compose}}" -eq 1 ]]; then
-        compose_args=(--in-pod false "${{compose_args[@]}}")
-    fi
-    echo "${{compose_args[*]}}"
-    """
-    res_c = subprocess.run(["bash", "-c", script_docker_engine], capture_output=True, text=True)
-    assert res_c.returncode == 0
-    assert "--in-pod false" not in res_c.stdout
-
-
-
-
-
-
-
-
+        }}
+        cmd_central --yes
+        """
+    )
+    assert res_fail.returncode != 0
+    assert "failed with exit code 42" in res_fail.stderr
 
 
