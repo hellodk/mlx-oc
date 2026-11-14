@@ -157,8 +157,18 @@ def load_config() -> dict:
         "cvmalert": f"{central_host}:8880",
         "calertmanager": f"{central_host}:9093",
         "macbooks": macbooks,
-        "grafana_user": os.environ.get("GRAFANA_ADMIN_USER") or central_env.get("GRAFANA_ADMIN_USER", "admin"),
-        "grafana_password": os.environ.get("GRAFANA_ADMIN_PASSWORD") or central_env.get("GRAFANA_ADMIN_PASSWORD", "changeme"),
+        "grafana_user": (
+            os.environ.get("GRAFANA_ADMIN_USER")
+            or central_env.get("GRAFANA_ADMIN_USER")
+            or edge_env.get("GRAFANA_ADMIN_USER")
+            or "admin"
+        ),
+        "grafana_password": (
+            os.environ.get("GRAFANA_ADMIN_PASSWORD")
+            or central_env.get("GRAFANA_ADMIN_PASSWORD")
+            or edge_env.get("GRAFANA_ADMIN_PASSWORD")
+            or "admin"
+        ),
         "grafana_anon": os.environ.get("GRAFANA_ANONYMOUS_ENABLED") or central_env.get("GRAFANA_ANONYMOUS_ENABLED", "false"),
     }
 
@@ -431,14 +441,17 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             auth_code, auth_body = probe_http(f"http://{cfg['cgrafana']}/api/users", headers={"Authorization": auth_header})
             
             if auth_code == 401:
-                stage5_status = "FAIL"
-                stages_passed = False
-                breaks.append({
-                    "stage": "Stage 5: Grafana Authentication Mismatch",
-                    "issue": "Configured admin password in central/.env does not match Grafana database (HTTP 401 Unauthorized).",
-                    "impact": "Users are locked out and automated provisioning queries fail.",
-                    "fix": "Run './scripts/deploy.sh review-grafana' to live-synchronize the admin password."
-                })
+                if not (CENTRAL_DIR / ".env").is_file():
+                    stage5_notes.append("Auth check skipped (remote edge)")
+                else:
+                    stage5_status = "FAIL"
+                    stages_passed = False
+                    breaks.append({
+                        "stage": "Stage 5: Grafana Authentication Mismatch",
+                        "issue": "Configured admin password in central/.env does not match Grafana database (HTTP 401 Unauthorized).",
+                        "impact": "Users are locked out and automated provisioning queries fail.",
+                        "fix": "Run './scripts/deploy.sh review-grafana' to live-synchronize the admin password."
+                    })
             elif auth_code != 200:
                 stage5_status = "WARN"
                 stage5_notes.append(f"Auth check HTTP {auth_code}")
