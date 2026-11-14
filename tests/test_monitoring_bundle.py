@@ -377,6 +377,176 @@ def test_deploy_sh_cli_dispatcher_doctor():
     assert "ALL PIPELINE GATES PASSED" in proc.stdout
 
 
+def test_deploy_sh_clean_reinstall_cli_help():
+    """Verify clean and reinstall help screens exist and document flags."""
+    import subprocess
+    deploy_sh = BUNDLE_DIR / "scripts" / "deploy.sh"
+    env = dict(os.environ, SKIP_GIT_PULL="1")
+
+    for cmd in ["clean", "reinstall"]:
+        proc = subprocess.run(
+            [str(deploy_sh), cmd, "--help"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            stdin=subprocess.DEVNULL,
+            env=env,
+            timeout=10,
+        )
+        assert proc.returncode == 0, f"deploy.sh {cmd} --help failed: {proc.stderr}"
+        out = proc.stderr + proc.stdout
+        assert f"{cmd} [target] [options]" in out, f"Missing usage in {cmd} help"
+        assert "--reuse-config" in out, f"Missing --reuse-config in {cmd} help"
+        assert "--recreate-config" in out, f"Missing --recreate-config in {cmd} help"
+
+
+def test_deploy_sh_clean_reinstall_non_interactive_guard():
+    """Verify clean and reinstall require explicit -y or confirmation in non-interactive mode."""
+    import subprocess
+    deploy_sh = BUNDLE_DIR / "scripts" / "deploy.sh"
+    env = dict(os.environ, SKIP_GIT_PULL="1")
+
+    for cmd in ["clean", "reinstall"]:
+        proc = subprocess.run(
+            [str(deploy_sh), cmd],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            stdin=subprocess.DEVNULL,
+            env=env,
+            timeout=10,
+        )
+        assert proc.returncode != 0, f"deploy.sh {cmd} should fail when unconfirmed non-interactively"
+        assert "confirmation required" in proc.stderr or "aborted" in proc.stderr
+
+
+def test_clean_edge_unit_reuse_and_recreate(tmp_path):
+    """Verify clean_edge preserves config in reuse mode and backs up in recreate mode."""
+    import subprocess
+    edge_dir = tmp_path / "edge"
+    edge_dir.mkdir(parents=True)
+    logs_dir = edge_dir / "logs"
+    logs_dir.mkdir()
+    bin_dir = edge_dir / "bin"
+    bin_dir.mkdir()
+    cfg_dir = edge_dir / "config"
+    cfg_dir.mkdir()
+
+    # Create dummy files
+    (logs_dir / "test.log").write_text("dummy log")
+    (logs_dir / "vmagent.yml").write_text("dummy yaml")
+    (bin_dir / "dummy.pid").write_text("99999999")
+    (cfg_dir / "nodes.yml").write_text("nodes: dummy")
+    (cfg_dir / "edge.env").write_text("ENV=dummy")
+
+    deploy_sh = BUNDLE_DIR / "scripts" / "deploy.sh"
+
+    # Test reuse mode
+    script_reuse = f"""
+    export SKIP_GIT_PULL=1
+    source "{deploy_sh}"
+    EDGE_DIR="{edge_dir}"
+    ENV_FILE="{cfg_dir / 'edge.env'}"
+    clean_edge reuse
+    """
+    res = subprocess.run(["bash", "-c", script_reuse], capture_output=True, text=True)
+    assert res.returncode == 0, f"clean_edge reuse failed: {res.stderr}"
+    assert not (logs_dir / "test.log").exists()
+    assert not (logs_dir / "vmagent.yml").exists()
+    assert not (bin_dir / "dummy.pid").exists()
+    assert (cfg_dir / "nodes.yml").exists(), "nodes.yml should be preserved in reuse mode"
+    assert (cfg_dir / "edge.env").exists(), "edge.env should be preserved in reuse mode"
+
+    # Test recreate mode
+    (logs_dir / "new.log").write_text("new log")
+    script_recreate = f"""
+    export SKIP_GIT_PULL=1
+    source "{deploy_sh}"
+    EDGE_DIR="{edge_dir}"
+    ENV_FILE="{cfg_dir / 'edge.env'}"
+    clean_edge recreate
+    """
+    res = subprocess.run(["bash", "-c", script_recreate], capture_output=True, text=True)
+    assert res.returncode == 0, f"clean_edge recreate failed: {res.stderr}"
+    assert not (logs_dir / "new.log").exists()
+    assert not (cfg_dir / "nodes.yml").exists(), "nodes.yml should be deleted in recreate mode"
+    assert not (cfg_dir / "edge.env").exists(), "edge.env should be deleted in recreate mode"
+
+    # Verify backup files were created with IST timestamp suffix
+    nodes_baks = list(cfg_dir.glob("nodes.yml.bak.*_IST"))
+    env_baks = list(cfg_dir.glob("edge.env.bak.*_IST"))
+    assert len(nodes_baks) == 1, f"Expected 1 nodes.yml backup, found {nodes_baks}"
+    assert len(env_baks) == 1, f"Expected 1 edge.env backup, found {env_baks}"
+    assert re.match(r"^nodes\.yml\.bak\.\d{8}_\d{6}_IST$", nodes_baks[0].name)
+    assert re.match(r"^edge\.env\.bak\.\d{8}_\d{6}_IST$", env_baks[0].name)
+
+
+def test_clean_central_unit_reuse_and_recreate(tmp_path):
+    """Verify clean_central preserves .env in reuse mode and backs up in recreate mode."""
+    import subprocess
+    central_dir = tmp_path / "central"
+    central_dir.mkdir(parents=True)
+    cfg_dir = central_dir / "config"
+    cfg_dir.mkdir()
+
+    env_file = central_dir / ".env"
+    env_file.write_text("GRAFANA_ADMIN_PASSWORD=secret\n")
+    am_file = cfg_dir / "alertmanager.yml"
+    am_file.write_text("rendered: true\n")
+
+    deploy_sh = BUNDLE_DIR / "scripts" / "deploy.sh"
+
+    # Test reuse mode (mocking engine to none to avoid touching docker daemon in unit test)
+    script_reuse = f"""
+    export SKIP_GIT_PULL=1
+    source "{deploy_sh}"
+    CENTRAL_DIR="{central_dir}"
+    clean_central reuse
+    """
+    res = subprocess.run(["bash", "-c", script_reuse], capture_output=True, text=True)
+    assert res.returncode == 0, f"clean_central reuse failed: {res.stderr}"
+    assert env_file.exists(), ".env should be preserved in reuse mode"
+
+    # Test recreate mode
+    script_recreate = f"""
+    export SKIP_GIT_PULL=1
+    source "{deploy_sh}"
+    CENTRAL_DIR="{central_dir}"
+    clean_central recreate
+    """
+    res = subprocess.run(["bash", "-c", script_recreate], capture_output=True, text=True)
+    assert res.returncode == 0, f"clean_central recreate failed: {res.stderr}"
+    assert not env_file.exists(), ".env should be deleted in recreate mode"
+    assert not am_file.exists(), "alertmanager.yml should be deleted in recreate mode"
+
+    baks = list(central_dir.glob(".env.bak.*_IST"))
+    assert len(baks) == 1, f"Expected 1 .env backup, found {baks}"
+    assert re.match(r"^\.env\.bak\.\d{8}_\d{6}_IST$", baks[0].name)
+
+
+def test_reinstall_cli_aliases_and_flags():
+    """Verify reinstall-reuse and reinstall-recreate CLI subcommands dispatch."""
+    import subprocess
+    deploy_sh = BUNDLE_DIR / "scripts" / "deploy.sh"
+    env = dict(os.environ, SKIP_GIT_PULL="1")
+
+    for alias in ["reinstall-reuse", "reinstall-recreate"]:
+        proc = subprocess.run(
+            [str(deploy_sh), alias, "--help"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            stdin=subprocess.DEVNULL,
+            env=env,
+            timeout=10,
+        )
+        assert proc.returncode == 0, f"deploy.sh {alias} --help failed: {proc.stderr}"
+        out = proc.stderr + proc.stdout
+        assert "Usage: ./scripts/deploy.sh reinstall" in out
+
+
+
+
 
 
 

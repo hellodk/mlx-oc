@@ -107,6 +107,14 @@ prompt_confirm_word() {
   [ "$answer" = "$expect" ] || die "aborted (confirmation word mismatch)"
 }
 
+_ist_timestamp() {
+  TZ="Asia/Kolkata" date +'%Y%m%d_%H%M%S_IST'
+}
+
+_ist_now_display() {
+  TZ="Asia/Kolkata" date +'%d %b %Y, %H:%M:%S IST'
+}
+
 # The bundle imports PyYAML, so prefer the monitoring venv from edge.env when
 # it exists. System Python on macOS does not ship PyYAML.
 bundle_python() {
@@ -1047,9 +1055,12 @@ EOF
 
 cmd_central() {
   local with_opik=0
-  if [[ "${1:-}" == "--opik" ]]; then
-    with_opik=1
-  fi
+  for arg in "$@"; do
+    case "${arg}" in
+      --opik) with_opik=1 ;;
+      -y|--yes|-f|--force) export FORCE_DEPLOY=1 ;;
+    esac
+  done
   local engine=""
   if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
     engine="docker"
@@ -1141,35 +1152,27 @@ except Exception:
 
   # 3. Confirmation gate
   local force_pull=0
-  if [[ ${#missing_images[@]} -gt 0 ]]; then
+  local confirm="N"
+  if [[ "${FORCE_DEPLOY:-0}" == "1" ]]; then
+    confirm="y"
+  elif [[ ${#missing_images[@]} -gt 0 ]]; then
     info "${#cached_images[@]} image(s) cached locally; ${#missing_images[@]} missing image(s) will be downloaded."
-    local confirm
     confirm="$(_prompt_input "Proceed to download missing images and deploy the central stack? (y/N) [or enter 'pull' to re-pull all images]" "N")"
-    case "${confirm}" in
-      pull|PULL)
-        force_pull=1
-        ;;
-      y|Y|yes|YES) ;;
-      *)
-        info "Deployment aborted by user."
-        return 0
-        ;;
-    esac
   else
     info "All ${#cached_images[@]} image(s) are already cached locally in ${engine} storage (no downloads required)."
-    local confirm
     confirm="$(_prompt_input "Proceed to deploy the central stack? (y/N) [enter 'pull' to force re-download]" "N")"
-    case "${confirm}" in
-      pull|PULL)
-        force_pull=1
-        ;;
-      y|Y|yes|YES) ;;
-      *)
-        info "Deployment aborted by user."
-        return 0
-        ;;
-    esac
   fi
+
+  case "${confirm}" in
+    pull|PULL)
+      force_pull=1
+      ;;
+    y|Y|yes|YES) ;;
+    *)
+      info "Deployment aborted by user."
+      return 0
+      ;;
+  esac
 
   # 4. Pull only missing images unless user explicitly requested force pull
   if [[ "${force_pull}" == "1" ]]; then
@@ -1222,13 +1225,461 @@ except Exception:
   fi
   info "central stack started successfully"
 
-  if [[ -t 0 ]]; then
+  if [[ -t 0 && "${FORCE_DEPLOY:-0}" != "1" ]]; then
     local review
     review="$(_prompt_input "Review Grafana configuration and credentials now? (y/N)" "N")"
     if [[ "${review}" =~ ^[yY] ]]; then
       cmd_review_grafana
     fi
   fi
+}
+
+clean_central() {
+  local config_mode="${1:-reuse}"
+  local engine=""
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    engine="docker"
+  elif command -v podman >/dev/null 2>&1 && podman info >/dev/null 2>&1; then
+    engine="podman"
+  elif command -v docker >/dev/null 2>&1; then
+    engine="docker"
+  elif command -v podman >/dev/null 2>&1; then
+    engine="podman"
+  fi
+
+  info "cleaning central observability stack (mode: ${config_mode})..."
+
+  if [[ -n "${engine}" ]]; then
+    local compose_cmd=("${engine}" "compose")
+    if [[ "${engine}" == "podman" ]]; then
+      if ! podman compose version >/dev/null 2>&1 && command -v podman-compose >/dev/null 2>&1; then
+        compose_cmd=("podman-compose")
+      fi
+    fi
+
+    cd "${CENTRAL_DIR}"
+    local compose_args=(-f docker-compose.central.yml)
+    if [[ -f "${CENTRAL_DIR}/.env" ]]; then
+      compose_args=(--env-file "${CENTRAL_DIR}/.env" "${compose_args[@]}")
+    fi
+    compose_args=(--profile opik "${compose_args[@]}")
+
+    info "tearing down compose services and removing volumes..."
+    "${compose_cmd[@]}" "${compose_args[@]}" down -v --remove-orphans 2>&1 || true
+
+    # Clean any leftover or stopped containers
+    local central_containers=(
+      "central-grafana" "grafana"
+      "central-victoria-metrics" "victoria-metrics"
+      "central-vmalert" "vmalert"
+      "central-alertmanager" "alertmanager"
+      "central-otel-collector" "otel-collector"
+      "central-opik-backend" "opik-backend"
+      "central-opik-frontend" "opik-frontend"
+      "central-opik-mysql" "opik-mysql"
+      "central-opik-clickhouse" "opik-clickhouse"
+      "central-opik-redis" "opik-redis"
+      "central-opik-python-backend" "opik-python-backend"
+      "central-opik-storage" "opik-storage"
+    )
+    for cname in "${central_containers[@]}"; do
+      if "${engine}" inspect "${cname}" >/dev/null 2>&1; then
+        info "removing orphan container: ${cname}"
+        "${engine}" rm -f "${cname}" >/dev/null 2>&1 || true
+      fi
+    done
+
+    # Clean any leftover volumes
+    local central_volumes=(
+      "central_vm-data" "vm-data"
+      "central_grafana-data" "grafana-data"
+      "central_central-otel-logs" "central-otel-logs"
+      "central_opik-mysql" "opik-mysql"
+      "central_opik-clickhouse" "opik-clickhouse"
+      "central_opik-clickhouse-log" "opik-clickhouse-log"
+      "central_opik-clickhouse-config" "opik-clickhouse-config"
+      "central_opik-zookeeper" "opik-zookeeper"
+      "central_opik-redis" "opik-redis"
+      "central_opik-storage" "opik-storage"
+    )
+    for vname in "${central_volumes[@]}"; do
+      if "${engine}" volume inspect "${vname}" >/dev/null 2>&1; then
+        info "removing orphan volume: ${vname}"
+        "${engine}" volume rm -f "${vname}" >/dev/null 2>&1 || true
+      fi
+    done
+  else
+    warn "no container engine (docker/podman) detected; skipping container teardown"
+  fi
+
+  if [[ "${config_mode}" == "recreate" ]]; then
+    local ts
+    ts="$(_ist_timestamp)"
+    if [[ -f "${CENTRAL_DIR}/.env" ]]; then
+      local bak="${CENTRAL_DIR}/.env.bak.${ts}"
+      cp -p "${CENTRAL_DIR}/.env" "${bak}"
+      rm -f "${CENTRAL_DIR}/.env"
+      info "backed up ${CENTRAL_DIR}/.env -> ${bak} and removed current file"
+    fi
+    if [[ -f "${CENTRAL_DIR}/config/alertmanager.yml" ]]; then
+      rm -f "${CENTRAL_DIR}/config/alertmanager.yml"
+      info "removed rendered alertmanager.yml"
+    fi
+  else
+    info "preserving existing central configuration (${CENTRAL_DIR}/.env)"
+  fi
+  info "central clean completed"
+}
+
+clean_edge() {
+  local config_mode="${1:-reuse}"
+  info "cleaning edge monitoring bundle (mode: ${config_mode})..."
+
+  # 1. Stop edge bundle via Python
+  if [[ -f "${EDGE_DIR}/mlx_monitoring_bundle.py" ]]; then
+    local py_bin
+    py_bin="$(bundle_python)"
+    if command -v "${py_bin}" >/dev/null 2>&1; then
+      cd "${EDGE_DIR}"
+      "${py_bin}" mlx_monitoring_bundle.py stop >/dev/null 2>&1 || true
+    fi
+  fi
+
+  # 2. Check and terminate any processes tracked by PID files
+  if [[ -d "${EDGE_DIR}/bin" ]]; then
+    for pidfile in "${EDGE_DIR}/bin/"*.pid; do
+      if [[ -f "${pidfile}" ]]; then
+        local p
+        p="$(cat "${pidfile}" 2>/dev/null | tr -d '[:space:]')"
+        if [[ -n "${p}" ]] && kill -0 "${p}" 2>/dev/null; then
+          info "terminating PID ${p} ($(basename "${pidfile}"))"
+          kill "${p}" 2>/dev/null || true
+          sleep 0.2
+          if kill -0 "${p}" 2>/dev/null; then
+            kill -9 "${p}" 2>/dev/null || true
+          fi
+        fi
+        rm -f "${pidfile}"
+      fi
+    done
+  fi
+
+  # 3. Terminate any orphaned listeners on standard edge exporter ports
+  local edge_ports=(8080 9102 9104 9105 9106 8429)
+  if command -v lsof >/dev/null 2>&1; then
+    for port in "${edge_ports[@]}"; do
+      local pids
+      pids="$(lsof -ti :${port} 2>/dev/null || true)"
+      if [[ -n "${pids}" ]]; then
+        for p in ${pids}; do
+          info "terminating residual process on port ${port} (PID ${p})"
+          kill "${p}" 2>/dev/null || true
+          sleep 0.2
+          if kill -0 "${p}" 2>/dev/null; then
+            kill -9 "${p}" 2>/dev/null || true
+          fi
+        done
+      fi
+    done
+  fi
+
+  # 4. Terminate any running vmagent
+  pkill -f 'vmagent.*promscrape\.config' >/dev/null 2>&1 || true
+
+  # 5. Clean logs and transient cache/buffer files
+  if [[ -d "${EDGE_DIR}/logs" ]]; then
+    rm -f "${EDGE_DIR}/logs/"*.log
+    rm -f "${EDGE_DIR}/logs/vmagent.yml"
+    info "cleared edge logs and rendered configs"
+  fi
+  rm -rf /tmp/vmagent-remotewrite-data* 2>/dev/null || true
+
+  # 6. Handle config
+  if [[ "${config_mode}" == "recreate" ]]; then
+    local ts
+    ts="$(_ist_timestamp)"
+    if [[ -f "${EDGE_DIR}/config/nodes.yml" ]]; then
+      local bak_nodes="${EDGE_DIR}/config/nodes.yml.bak.${ts}"
+      cp -p "${EDGE_DIR}/config/nodes.yml" "${bak_nodes}"
+      rm -f "${EDGE_DIR}/config/nodes.yml"
+      info "backed up ${EDGE_DIR}/config/nodes.yml -> ${bak_nodes} and removed current file"
+    fi
+    if [[ -f "${ENV_FILE}" ]]; then
+      local bak_env="${ENV_FILE}.bak.${ts}"
+      cp -p "${ENV_FILE}" "${bak_env}"
+      rm -f "${ENV_FILE}"
+      info "backed up ${ENV_FILE} -> ${bak_env} and removed current file"
+    fi
+  else
+    info "preserving existing edge configuration (${ENV_FILE} and ${EDGE_DIR}/config/nodes.yml)"
+  fi
+  info "edge clean completed"
+}
+
+cmd_clean() {
+  local target=""
+  local config_mode="reuse"
+  local mode_explicit=0
+  local force=0
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      central|edge|all)
+        target="$1"
+        ;;
+      --reuse|--reuse-config|-r)
+        config_mode="reuse"
+        mode_explicit=1
+        ;;
+      --recreate|--recreate-config|-c)
+        config_mode="recreate"
+        mode_explicit=1
+        ;;
+      -y|--yes|-f|--force)
+        force=1
+        ;;
+      -h|--help)
+        cat >&2 <<EOF
+Usage: ./scripts/deploy.sh clean [target] [options]
+
+Targets:
+  central    tear down Central container stack and volumes
+  edge       stop edge exporters, clear logs and transient queues
+  all        clean both Central and Edge stacks
+
+Options:
+  --reuse-config, -r     preserve configuration files (.env, nodes.yml, edge.env) [default]
+  --recreate-config, -c  backup existing configuration (IST timestamp) and wipe it
+  -y, --yes, -f, --force skip confirmation prompt
+EOF
+        return 0
+        ;;
+      *)
+        warn "unknown clean option: $1"
+        ;;
+    esac
+    shift
+  done
+
+  # Interactive prompts if omitted
+  if [[ -z "${target}" ]]; then
+    if [[ -t 0 ]]; then
+      local choice
+      choice=$(_prompt_select "Select target to clean:" \
+        "central — tear down central containers and purge volumes" \
+        "edge    — stop edge exporters, clear logs and state" \
+        "all     — clean both central and edge stacks" \
+        "cancel") || die "aborted"
+      case "${choice}" in
+        central*) target="central" ;;
+        edge*)    target="edge" ;;
+        all*)     target="all" ;;
+        *)        die "aborted" ;;
+      esac
+    else
+      die "confirmation required: pass target (central, edge, all) and -y in non-interactive mode"
+    fi
+  fi
+
+  if [[ ${mode_explicit} -eq 0 && -t 0 ]]; then
+    local mchoice
+    mchoice=$(_prompt_select "Configuration handling for ${target}:" \
+      "reuse    — preserve configuration files (.env, nodes.yml)" \
+      "recreate — backup and wipe configuration to recreate from scratch" \
+      "cancel") || die "aborted"
+    case "${mchoice}" in
+      reuse*)    config_mode="reuse" ;;
+      recreate*) config_mode="recreate" ;;
+      *)         die "aborted" ;;
+    esac
+  fi
+
+  # Confirmation gate
+  if [[ ${force} -eq 0 ]]; then
+    if [[ ! -t 0 ]]; then
+      die "confirmation required: pass -y or --force in non-interactive mode"
+    fi
+    if [[ "${config_mode}" == "recreate" ]]; then
+      prompt_confirm_word "cleaning ${target} and wiping configs" "CONFIRM"
+    else
+      local ans
+      ans="$(_prompt_input "Are you sure you want to clean ${target} (config will be kept)? (y/N)" "N")"
+      case "${ans}" in
+        y|Y|yes|YES) ;;
+        *) die "clean aborted by user" ;;
+      esac
+    fi
+  fi
+
+  case "${target}" in
+    central)
+      clean_central "${config_mode}"
+      ;;
+    edge)
+      clean_edge "${config_mode}"
+      ;;
+    all)
+      clean_central "${config_mode}"
+      clean_edge "${config_mode}"
+      ;;
+    *)
+      die "invalid target: ${target}"
+      ;;
+  esac
+
+  info "clean operation completed successfully at $(_ist_now_display)"
+}
+
+cmd_reinstall() {
+  local target=""
+  local config_mode="reuse"
+  local mode_explicit=0
+  local with_opik=0
+  local force=0
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      central|edge|all)
+        target="$1"
+        ;;
+      --reuse|--reuse-config|-r)
+        config_mode="reuse"
+        mode_explicit=1
+        ;;
+      --recreate|--recreate-config|-c)
+        config_mode="recreate"
+        mode_explicit=1
+        ;;
+      --opik)
+        with_opik=1
+        ;;
+      -y|--yes|-f|--force)
+        force=1
+        ;;
+      -h|--help)
+        cat >&2 <<EOF
+Usage: ./scripts/deploy.sh reinstall [target] [options]
+
+Targets:
+  central    clean and reinstall Central observability container stack
+  edge       clean and reinstall Edge monitoring bundle
+  all        clean and reinstall both Central and Edge stacks
+
+Options:
+  --reuse-config, -r     clean and reinstall using existing configuration [default]
+  --recreate-config, -c  backup existing configuration and reconfigure from scratch
+  --opik                 (central/all) include Opik suite in reinstallation
+  -y, --yes, -f, --force skip confirmation prompt
+EOF
+        return 0
+        ;;
+      *)
+        warn "unknown reinstall option: $1"
+        ;;
+    esac
+    shift
+  done
+
+  # Interactive prompts if omitted
+  if [[ -z "${target}" ]]; then
+    if [[ -t 0 ]]; then
+      local choice
+      choice=$(_prompt_select "Select target to reinstall fresh:" \
+        "central — clean and reinstall central container stack" \
+        "edge    — clean and reinstall edge monitoring stack" \
+        "all     — clean and reinstall both central and edge stacks" \
+        "cancel") || die "aborted"
+      case "${choice}" in
+        central*) target="central" ;;
+        edge*)    target="edge" ;;
+        all*)     target="all" ;;
+        *)        die "aborted" ;;
+      esac
+    else
+      die "confirmation required: pass target (central, edge, all) and -y in non-interactive mode"
+    fi
+  fi
+
+  if [[ ${mode_explicit} -eq 0 && -t 0 ]]; then
+    local mchoice
+    mchoice=$(_prompt_select "Configuration handling for ${target} reinstallation:" \
+      "reuse    — keep existing configuration and redeploy fresh" \
+      "recreate — backup and reconfigure fresh from scratch" \
+      "cancel") || die "aborted"
+    case "${mchoice}" in
+      reuse*)    config_mode="reuse" ;;
+      recreate*) config_mode="recreate" ;;
+      *)         die "aborted" ;;
+    esac
+  fi
+
+  # Ask about Opik if target is central or all and not explicitly requested
+  if [[ ("${target}" == "central" || "${target}" == "all") && ${with_opik} -eq 0 && -t 0 ]]; then
+    local opik_choice
+    opik_choice="$(_prompt_input "Include Opik tracing suite in reinstallation? (y/N)" "N")"
+    if [[ "${opik_choice}" =~ ^[yY] ]]; then
+      with_opik=1
+    fi
+  fi
+
+  # Confirmation gate
+  if [[ ${force} -eq 0 ]]; then
+    if [[ ! -t 0 ]]; then
+      die "confirmation required: pass -y or --force in non-interactive mode"
+    fi
+    if [[ "${config_mode}" == "recreate" ]]; then
+      prompt_confirm_word "fresh reinstallation of ${target} (config recreated)" "REINSTALL"
+    else
+      local ans
+      ans="$(_prompt_input "Confirm fresh reinstallation of ${target} (re-using config)? (y/N)" "N")"
+      case "${ans}" in
+        y|Y|yes|YES) ;;
+        *) die "reinstallation aborted by user" ;;
+      esac
+    fi
+  fi
+
+  if [[ ${force} -eq 1 ]]; then
+    export FORCE_DEPLOY=1
+  fi
+
+  info "Starting fresh reinstallation of ${target} (mode: ${config_mode}) at $(_ist_now_display)"
+
+  # Step 1: Clean
+  case "${target}" in
+    central)
+      clean_central "${config_mode}"
+      ;;
+    edge)
+      clean_edge "${config_mode}"
+      ;;
+    all)
+      clean_central "${config_mode}"
+      clean_edge "${config_mode}"
+      ;;
+  esac
+
+  # Step 2: Deploy / Reinstall
+  if [[ "${target}" == "central" || "${target}" == "all" ]]; then
+    info "redeploying central observability stack..."
+    if [[ ${with_opik} -eq 1 ]]; then
+      cmd_central --opik
+    else
+      cmd_central
+    fi
+  fi
+
+  if [[ "${target}" == "edge" || "${target}" == "all" ]]; then
+    info "redeploying edge monitoring bundle..."
+    if [[ "${config_mode}" == "recreate" ]]; then
+      cmd_setup_edge
+    else
+      cmd_validate
+    fi
+    cmd_edge daemon
+  fi
+
+  info "reinstallation of ${target} completed successfully at $(_ist_now_display)"
 }
 
 usage() {
@@ -1248,9 +1699,22 @@ Usage:
   ./scripts/deploy.sh review-vmalert              audit vmalert rule evaluation
   ./scripts/deploy.sh review-otel                 audit OTel Collector pipelines & buffer
   ./scripts/deploy.sh review-opik                 audit Opik LLM observability suite
+  ./scripts/deploy.sh clean [target] [options]    tear down containers, stop exporters and purge state
+  ./scripts/deploy.sh reinstall [target] [opts]   clean & reinstall fresh (config reuse or recreate)
+  ./scripts/deploy.sh reinstall-reuse [target]    clean & reinstall fresh keeping existing configs
+  ./scripts/deploy.sh reinstall-recreate [target] clean & reinstall fresh with new configuration from scratch
   ./scripts/deploy.sh edge [start|daemon|stop|status] [node_id]  manage edge services
   ./scripts/deploy.sh validate                    validate edge configuration
   ./scripts/deploy.sh central [--opik]            deploy central Docker/Podman stack
+
+Clean & Reinstall targets:
+  central, edge, all (default: prompt interactively, or all in non-interactive)
+
+Clean & Reinstall options:
+  --reuse-config, -r       keep existing configuration (.env, nodes.yml, edge.env) [default]
+  --recreate-config, -c    backup old config (IST timestamp) and recreate from scratch
+  --opik                   (central/all) include Opik suite on reinstall
+  -y, --yes, -f, --force   skip confirmation prompt
 
 Setup-edge arguments:
   ./scripts/deploy.sh setup-edge <central_ip> [model_id] [model_path]
@@ -1291,6 +1755,10 @@ main() {
     review-opik) shift; cmd_diagnostics review-opik "$@" ;;
     review-vmagent|vmagent-config) shift; cmd_review_vmagent "$@" ;;
     review-grafana|grafana-config) shift; cmd_review_grafana "$@" ;;
+    clean)              shift; cmd_clean "$@" ;;
+    reinstall)          shift; cmd_reinstall "$@" ;;
+    reinstall-reuse)    shift; cmd_reinstall --reuse-config "$@" ;;
+    reinstall-recreate) shift; cmd_reinstall --recreate-config "$@" ;;
     edge)       shift; cmd_edge "$@" ;;
     edge-all)   shift; cmd_edge "$@" ;;
     central)    shift; cmd_central "$@" ;;
@@ -1299,24 +1767,27 @@ main() {
       # Interactive menu mode (following scripts/avika pattern)
       local choice
       choice=$(_prompt_select "MLX Monitoring Bundle operations:" \
-        "setup-edge     — setup edge node (detect venvs, vmagent, generate config)" \
-        "edge daemon    — start edge monitoring stack in background" \
-        "edge status    — check running status of edge exporters" \
-        "edge stop      — stop edge monitoring bundle" \
-        "edge start     — start edge bundle in foreground" \
-        "doctor         — automated end-to-end data pipeline traceroute & diagnostics" \
-        "review-central — comprehensive review of all central services" \
-        "review-edge    — comprehensive review of edge exporters & server" \
-        "review-vmagent — review and adjust vmagent edge configuration" \
-        "review-grafana — review Grafana configuration, credentials and health" \
-        "review-vm      — granular review of VictoriaMetrics TSDB" \
-        "review-vmalert — granular review of vmalert alert evaluation engine" \
+        "setup-edge          — setup edge node (detect venvs, vmagent, generate config)" \
+        "edge daemon         — start edge monitoring stack in background" \
+        "edge status         — check running status of edge exporters" \
+        "edge stop           — stop edge monitoring bundle" \
+        "edge start          — start edge bundle in foreground" \
+        "doctor              — automated end-to-end data pipeline traceroute & diagnostics" \
+        "review-central      — comprehensive review of all central services" \
+        "review-edge         — comprehensive review of edge exporters & server" \
+        "review-vmagent      — review and adjust vmagent edge configuration" \
+        "review-grafana      — review Grafana configuration, credentials and health" \
+        "review-vm           — granular review of VictoriaMetrics TSDB" \
+        "review-vmalert      — granular review of vmalert alert evaluation engine" \
         "review-alertmanager — granular review of Alertmanager notification routing" \
-        "review-otel    — granular review of OTel Collector pipelines" \
-        "review-opik    — granular review of Opik tracing platform" \
-        "validate       — validate nodes.yml and edge.env" \
-        "central        — deploy central observability stack" \
-        "central --opik — deploy central observability stack with Opik" \
+        "review-otel         — granular review of OTel Collector pipelines" \
+        "review-opik         — granular review of Opik tracing platform" \
+        "validate            — validate nodes.yml and edge.env" \
+        "central             — deploy central observability stack" \
+        "central --opik      — deploy central observability stack with Opik" \
+        "reinstall-reuse     — clean & reinstall fresh keeping existing configs" \
+        "reinstall-recreate  — clean & reinstall fresh with new configuration from scratch" \
+        "clean               — tear down containers, stop exporters and purge state" \
         "quit") || die "bye"
 
       case "${choice}" in
@@ -1338,6 +1809,9 @@ main() {
         validate*) cmd_validate ;;
         "central --opik"*) cmd_central --opik ;;
         central*) cmd_central ;;
+        reinstall-reuse*) cmd_reinstall --reuse-config ;;
+        reinstall-recreate*) cmd_reinstall --recreate-config ;;
+        clean*) cmd_clean ;;
         quit) die "bye" ;;
       esac
       ;;
@@ -1348,4 +1822,6 @@ main() {
   esac
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi
