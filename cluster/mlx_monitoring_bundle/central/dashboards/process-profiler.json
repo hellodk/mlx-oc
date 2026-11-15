@@ -334,6 +334,110 @@
           ]
         }
       }
+    },
+    {
+      "type": "table",
+      "title": "Full Process Snapshot (Top 200 \u2014 kri parity)",
+      "datasource": {
+        "type": "postgres",
+        "uid": "telemetry-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 24,
+        "h": 11
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT device, pid, name, is_llm, ROUND(cpu_pct::numeric, 1) AS cpu_pct, mem_rss_bytes, ROUND(mem_pct::numeric, 2) AS mem_pct, num_threads, status, username, io_read_bytes, io_write_bytes, cmdline, collected_at FROM process_stats_latest WHERE device ~ '${device:regex}' ORDER BY is_llm DESC, mem_rss_bytes DESC LIMIT 200;"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "mem_rss_bytes",
+            "desc": true
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mem_rss_bytes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "io_read_bytes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "io_write_bytes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "is_llm"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "true": {
+                        "text": "LLM",
+                        "color": "purple"
+                      },
+                      "false": {
+                        "text": "\u2014",
+                        "color": "transparent"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
     }
   ],
   "links": [

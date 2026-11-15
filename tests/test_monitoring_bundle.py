@@ -175,13 +175,15 @@ def test_central_compose_image_resolution_and_profiles():
         else:
             base_images.add(img)
 
-    # Base profile: 5 monitoring containers
+    # Base profile: 7 monitoring containers (including telemetry-db & telemetry-ingest)
     expected_base = {
         "victoriametrics/victoria-metrics:v1.155.0",
         "otel/opentelemetry-collector-contrib:0.139.0",
         "grafana/grafana:13.3.0",
         "victoriametrics/vmalert:v1.155.0",
         "prom/alertmanager:v0.34.2",
+        "postgres:16-alpine",
+        "python:3.12-alpine",
     }
     assert base_images == expected_base
 
@@ -1029,3 +1031,64 @@ def test_dashboards_json_validity():
 
 
 
+
+
+def test_process_telemetry_kri_parity_fields_and_llm_classifier():
+    """Verify mlx_process_telemetry exposes kri-compatible is_llm_process and rich snapshot schema."""
+    exporters_dir = str(BUNDLE_DIR / "edge" / "exporters")
+    if exporters_dir not in sys.path:
+        sys.path.insert(0, exporters_dir)
+    import mlx_process_telemetry as mpt  # type: ignore[import-not-found]
+
+    assert mpt.is_llm_process("python3", "/Users/dk/venvs/mlx/bin/python -m mlx_lm.server --port 11234") is True
+    assert mpt.is_llm_process("ollama", "ollama serve") is True
+    assert mpt.is_llm_process("WindowServer", "/System/Library/PrivateFrameworks/SkyLight") is False
+    assert mpt.is_llm_process("sshd", "sshd: dk@ttys001") is False
+
+    procs = mpt.collect_rich_processes(top_n=5)
+    assert isinstance(procs, list)
+    assert len(procs) >= 1
+    required_keys = {
+        "pid", "name", "cmdline", "cpu_pct", "mem_rss_bytes", "mem_pct",
+        "num_threads", "status", "username", "io_read_bytes", "io_write_bytes", "is_llm",
+    }
+    assert required_keys.issubset(procs[0].keys())
+
+
+def test_telemetry_ingest_cyclonedx_and_license_classification():
+    """Verify telemetry_ingest extracts CycloneDX components and classifies copyleft/permissive licenses."""
+    ingest_dir = str(BUNDLE_DIR / "central" / "ingest")
+    if ingest_dir not in sys.path:
+        sys.path.insert(0, ingest_dir)
+    import telemetry_ingest as ti  # type: ignore[import-not-found]
+
+    assert ti.classify_license(["GPL-3.0-only"]) == "copyleft"
+    assert ti.classify_license(["MIT"]) == "permissive"
+    assert ti.classify_license([]) == "unknown"
+
+    bom = {
+        "bomFormat": "CycloneDX",
+        "components": [
+            {
+                "type": "library",
+                "name": "mlx-lm",
+                "version": "0.31.3",
+                "purl": "pkg:pypi/mlx-lm@0.31.3",
+                "licenses": [{"license": {"id": "MIT"}}],
+                "properties": [{"name": "ecosystem", "value": "pip"}],
+            },
+            {
+                "type": "library",
+                "name": "gpl-tool",
+                "version": "1.0.0",
+                "purl": "pkg:brew/gpl-tool@1.0.0",
+                "licenses": [{"license": {"id": "GPL-3.0"}}],
+            },
+        ],
+    }
+    comps = ti._extract_components(bom)
+    assert len(comps) == 2
+    assert comps[0]["license_category"] == "permissive"
+    assert comps[0]["purl"] == "pkg:pypi/mlx-lm@0.31.3"
+    assert comps[1]["license_category"] == "copyleft"
+    assert comps[1]["ecosystem"] == "brew"

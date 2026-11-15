@@ -10,3 +10,16 @@ datasources:
       timeInterval: 5s
       httpMethod: POST
     version: 2
+  - name: TelemetryDB
+    uid: telemetry-pg
+    type: postgres
+    access: proxy
+    url: telemetry-db:5432
+    user: telemetry
+    editable: true
+    jsonData:
+      database: telemetry
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: false
+    version: 1

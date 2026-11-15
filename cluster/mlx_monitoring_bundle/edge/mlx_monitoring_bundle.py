@@ -221,6 +221,19 @@ class Bundle:
             f"{self.otlp_scheme}://{self.central_opik}" if self.central_opik else ""
         )
         self.opik_otlp_endpoint = config.get("OPIK_OTLP_ENDPOINT", "")
+        central_ingest = (
+            config.get("CENTRAL_TELEMETRY_INGEST")
+            or (config.get("central") or {}).get("telemetry_ingest")
+            or ""
+        )
+        if not central_ingest and self.central_vm:
+            vm_host = self.central_vm.split("://")[-1].split(":", 1)[0]
+            central_ingest = f"{vm_host}:8088"
+        self.telemetry_ingest_endpoint = (
+            (central_ingest if "://" in central_ingest else f"{self.otlp_scheme}://{central_ingest}")
+            if central_ingest
+            else ""
+        )
 
         model_path = (
             config.get("MLX_MODEL_PATH")
@@ -406,6 +419,8 @@ class Bundle:
             "--interval", config_val(self.config, "PROCESS_SAMPLE_INTERVAL", "5.0"),
             "--top-k", config_val(self.config, "PROCESS_TOP_K", "10"),
         ]
+        if self.telemetry_ingest_endpoint:
+            cmd += ["--ingest-url", self.telemetry_ingest_endpoint]
         self._spawn("process", cmd)
 
     def start_sbom(self):
@@ -419,6 +434,8 @@ class Bundle:
             "--interval", config_val(self.config, "SBOM_SCAN_INTERVAL", "3600.0"),
             "--base-device", base_dev,
         ]
+        if self.telemetry_ingest_endpoint:
+            cmd += ["--ingest-url", self.telemetry_ingest_endpoint]
         self._spawn("sbom", cmd)
 
     def _render_vmagent_config(self) -> bool:

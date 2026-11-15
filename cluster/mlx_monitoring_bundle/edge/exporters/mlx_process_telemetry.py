@@ -21,9 +21,12 @@ Cross-platform: Apple Silicon macOS native with fallback for Linux / CI testbeds
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
 import math
 import os
+from pathlib import Path
 import re
 import shutil
 import signal
@@ -32,7 +35,8 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Any, Dict, List, Tuple
+import urllib.request
+from typing import Any, Dict, List, Optional, Tuple
 
 from prometheus_client import CollectorRegistry, Counter, Gauge, generate_latest
 
@@ -44,6 +48,29 @@ from mlx_logging import debug, degraded, error, info, setup_logging
 DEFAULT_LISTEN = "127.0.0.1:9107"
 DEFAULT_INTERVAL = 5.0
 DEFAULT_TOP_K = 10
+DEFAULT_SNAPSHOT_TOP_N = 200
+DEFAULT_INGEST_INTERVAL = 30.0
+LOG_DIR = Path(os.environ.get("LOG_DIR", str(Path(__file__).resolve().parent.parent / "logs")))
+
+_LLM_PATTERNS = (
+    "exo", "mlx", "llama", "vllm", "ollama", "llm", "tinygrad",
+    "model-server", "model_server", "modelserver", "text-generation",
+    "text_generation", "triton", "torchserve", "bentoml", "ray",
+)
+_SYSTEM_PROCS = frozenset({
+    "sshd", "salt-minion", "salt-master", "kernel_task", "launchd",
+    "windowserver", "systemd", "kthreadd", "init", "loginwindow",
+    "com.apple.security", "com.apple.cfnetwork",
+})
+
+
+def is_llm_process(name: str, cmdline: str) -> bool:
+    """Return True if this process appears to be an LLM/AI runtime (kri parity)."""
+    name_lower = (name or "").lower()
+    cmdline_lower = (cmdline or "").lower()
+    if name_lower in _SYSTEM_PROCS:
+        return False
+    return any(p in name_lower or p in cmdline_lower for p in _LLM_PATTERNS)
 
 # ---------------------------------------------------------------------------
 # Metric Registry & Gauge Definitions (Isolated to avoid collisions)
@@ -104,12 +131,26 @@ G_PROCESS_RANKING = Gauge(
     ["device", "process", "pid", "user", "command"],
     registry=REGISTRY,
 )
+G_PROCESS_IS_LLM = Gauge(
+    "process_is_llm",
+    "1 if the process matches an LLM/AI runtime pattern",
+    ["device", "process", "pid"],
+    registry=REGISTRY,
+)
+G_PROCESS_THREADS = Gauge(
+    "process_num_threads",
+    "Thread count of dynamic process",
+    ["device", "process", "pid"],
+    registry=REGISTRY,
+)
 
 # Global sampler lock and states
 _SAMPLE_LOCK = threading.Lock()
 _PREV_IO_SNAPSHOTS: Dict[int, Tuple[float, float, float]] = {}  # pid -> (read_b, write_b, timestamp)
 _GPU_RESIDENCY_TOTAL = 0.0
 _ANE_POWER_TOTAL_WATTS = 0.0
+_LAST_SNAPSHOT: Dict[str, Any] = {}
+_LAST_INGEST_AT: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -346,8 +387,127 @@ def _sample_processes(node_name: str, top_k: int = 10) -> None:
             command=p["command"],
         ).set(rank)
 
+    G_PROCESS_IS_LLM.clear()
+    G_PROCESS_THREADS.clear()
+    for p in composite_ranked:
+        G_PROCESS_IS_LLM.labels(
+            device=node_name, process=p["process"], pid=str(p["pid"]),
+        ).set(1.0 if is_llm_process(p["process"], p["command"]) else 0.0)
+        if p.get("num_threads") is not None:
+            G_PROCESS_THREADS.labels(
+                device=node_name, process=p["process"], pid=str(p["pid"]),
+            ).set(float(p["num_threads"]))
+
     G_PROFILER_UP.labels(device=node_name).set(1)
     G_PROFILER_SAMPLES.labels(device=node_name).inc()
+
+
+def collect_rich_processes(top_n: int = DEFAULT_SNAPSHOT_TOP_N) -> List[Dict[str, Any]]:
+    """Collect kri-compatible per-process stats (psutil primary, ps fallback)."""
+    self_pid = os.getpid()
+    procs: List[Dict[str, Any]] = []
+    try:
+        import psutil  # noqa: PLC0415
+
+        for proc in psutil.process_iter([
+            "pid", "name", "cmdline", "cpu_percent", "memory_info",
+            "memory_percent", "num_threads", "status", "username",
+        ]):
+            try:
+                pinfo = proc.info
+                pid = int(pinfo.get("pid") or 0)
+                if pid <= 0 or pid == self_pid:
+                    continue
+                name = str(pinfo.get("name") or "")
+                cmdline = " ".join(pinfo.get("cmdline") or []) or name
+                mem_info = pinfo.get("memory_info")
+                mem_rss = int(mem_info.rss) if mem_info else 0
+                try:
+                    io = proc.io_counters()
+                    io_read: Optional[int] = int(io.read_bytes) if io else None
+                    io_write: Optional[int] = int(io.write_bytes) if io else None
+                except Exception:
+                    io_read, io_write = None, None
+                procs.append({
+                    "pid": pid,
+                    "name": name,
+                    "cmdline": cmdline,
+                    "cpu_pct": round(float(pinfo.get("cpu_percent") or 0.0), 2),
+                    "mem_rss_bytes": mem_rss,
+                    "mem_pct": round(float(pinfo.get("memory_percent") or 0.0), 2),
+                    "num_threads": int(pinfo.get("num_threads") or 0),
+                    "status": str(pinfo.get("status") or ""),
+                    "username": str(pinfo.get("username") or ""),
+                    "io_read_bytes": io_read,
+                    "io_write_bytes": io_write,
+                    "is_llm": is_llm_process(name, cmdline),
+                })
+            except Exception:
+                continue
+    except ImportError:
+        for p in _list_processes():
+            procs.append({
+                "pid": p["pid"],
+                "name": p["process"],
+                "cmdline": p["command"],
+                "cpu_pct": round(float(p["cpu_pct"]), 2),
+                "mem_rss_bytes": int(p["rss_bytes"]),
+                "mem_pct": 0.0,
+                "num_threads": 0,
+                "status": "",
+                "username": p["user"],
+                "io_read_bytes": None,
+                "io_write_bytes": None,
+                "is_llm": is_llm_process(p["process"], p["command"]),
+            })
+
+    procs.sort(key=lambda item: item["mem_rss_bytes"], reverse=True)
+    return procs[:top_n]
+
+
+def _publish_snapshot(
+    node_name: str,
+    snapshot_top_n: int,
+    ingest_url: str,
+    ingest_interval: float,
+    force_ingest: bool = False,
+) -> None:
+    """Persist process_snapshot.json and POST to central telemetry-ingest."""
+    global _LAST_SNAPSHOT, _LAST_INGEST_AT
+    now = time.time()
+    if not force_ingest and _LAST_SNAPSHOT and (now - _LAST_INGEST_AT) < ingest_interval:
+        return
+
+    processes = collect_rich_processes(top_n=snapshot_top_n)
+    payload = {
+        "device": node_name,
+        "collected_at": datetime.now(timezone.utc).isoformat(),
+        "count": len(processes),
+        "processes": processes,
+    }
+    _LAST_SNAPSHOT = payload
+    _LAST_INGEST_AT = now
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        (LOG_DIR / "process_snapshot.json").write_text(
+            json.dumps(payload, indent=2), encoding="utf8"
+        )
+    except Exception as exc:
+        debug(f"failed to write process_snapshot.json: {exc!r}", component="process-profiler")
+
+    if ingest_url:
+        target = ingest_url.rstrip("/") + "/api/v1/ingest/process_stats"
+        try:
+            req = urllib.request.Request(
+                target,
+                data=json.dumps(payload).encode("utf8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                resp.read()
+        except Exception as exc:
+            debug(f"process snapshot ingest push failed ({target}): {exc!r}", component="process-profiler")
 
 
 # ---------------------------------------------------------------------------
@@ -362,6 +522,13 @@ class MetricsHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
+        elif self.path in ("/snapshot", "/api/processes"):
+            body = json.dumps(_LAST_SNAPSHOT or {"processes": []}).encode("utf8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         elif self.path in ("/health", "/healthz", "/"):
             resp = b'{"status":"healthy","service":"mlx-process-profiler"}\n'
             self.send_response(200)
@@ -381,7 +548,15 @@ class MetricsHandler(BaseHTTPRequestHandler):
 # ---------------------------------------------------------------------------
 # Daemon Sampling Loop
 # ---------------------------------------------------------------------------
-def _profiling_loop(node_name: str, interval: float, top_k: int, stop_event: threading.Event) -> None:
+def _profiling_loop(
+    node_name: str,
+    interval: float,
+    top_k: int,
+    snapshot_top_n: int,
+    ingest_url: str,
+    ingest_interval: float,
+    stop_event: threading.Event,
+) -> None:
     """Continuously sample top processes at the specified interval."""
     info(
         f"starting process profiling loop: node={node_name}, interval={interval}s, top_k={top_k}",
@@ -391,6 +566,12 @@ def _profiling_loop(node_name: str, interval: float, top_k: int, stop_event: thr
         try:
             with _SAMPLE_LOCK:
                 _sample_processes(node_name=node_name, top_k=top_k)
+                _publish_snapshot(
+                    node_name=node_name,
+                    snapshot_top_n=snapshot_top_n,
+                    ingest_url=ingest_url,
+                    ingest_interval=ingest_interval,
+                )
         except Exception as exc:
             error(f"process profiling sampling error: {exc!r}", component="process-profiler")
         stop_event.wait(interval)
@@ -425,18 +606,50 @@ def main() -> int:
         default=int(os.environ.get("PROCESS_TOP_K", DEFAULT_TOP_K)),
         help=f"number of top processes to track per resource (default: {DEFAULT_TOP_K})",
     )
+    parser.add_argument(
+        "--snapshot-top-n",
+        type=int,
+        default=int(os.environ.get("PROCESS_SNAPSHOT_TOP_N", DEFAULT_SNAPSHOT_TOP_N)),
+        help=f"number of processes to include in JSON/DB snapshot (default: {DEFAULT_SNAPSHOT_TOP_N})",
+    )
+    parser.add_argument(
+        "--ingest-url",
+        default=os.environ.get("CENTRAL_TELEMETRY_INGEST", ""),
+        help="central telemetry-ingest base URL (e.g. http://127.0.0.1:8088)",
+    )
+    parser.add_argument(
+        "--ingest-interval",
+        type=float,
+        default=float(os.environ.get("PROCESS_INGEST_INTERVAL", DEFAULT_INGEST_INTERVAL)),
+        help=f"snapshot push interval in seconds (default: {DEFAULT_INGEST_INTERVAL}s)",
+    )
 
     args = parser.parse_args()
 
     setup_logging(service="mlx-process-telemetry", macbook=args.node_name)
 
-    # Initial synchronous sample so metrics are available immediately on startup
+    # Initial synchronous sample so metrics and snapshot are available immediately on startup
     _sample_processes(node_name=args.node_name, top_k=args.top_k)
+    _publish_snapshot(
+        node_name=args.node_name,
+        snapshot_top_n=args.snapshot_top_n,
+        ingest_url=args.ingest_url,
+        ingest_interval=args.ingest_interval,
+        force_ingest=True,
+    )
 
     stop_event = threading.Event()
     sampler_thread = threading.Thread(
         target=_profiling_loop,
-        args=(args.node_name, max(1.0, args.interval), args.top_k, stop_event),
+        args=(
+            args.node_name,
+            max(1.0, args.interval),
+            args.top_k,
+            args.snapshot_top_n,
+            args.ingest_url,
+            max(5.0, args.ingest_interval),
+            stop_event,
+        ),
         daemon=True,
     )
     sampler_thread.start()
