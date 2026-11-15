@@ -921,6 +921,7 @@ def test_cmd_central_passes_in_pod_false_cleans_pods_and_reports_compose_exit_co
     up_calls = [c for c in calls if c.startswith("compose ") and " up -d" in c]
     assert len(up_calls) == 1
     assert "--in-pod=false" in up_calls[0]
+    assert "--force-recreate" in up_calls[0]
 
     # Verify non-zero compose exit code is reported accurately (not masked to 0 by `if ! ...`)
     res_fail = _run_deploy_bash(

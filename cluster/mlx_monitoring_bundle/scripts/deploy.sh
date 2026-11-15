@@ -1425,7 +1425,7 @@ except Exception:
     info "starting central observability stack"
   fi
   local compose_rc=0
-  "${COMPOSE_CMD[@]}" "${compose_args[@]}" up -d || compose_rc=$?
+  "${COMPOSE_CMD[@]}" "${compose_args[@]}" up -d --force-recreate || compose_rc=$?
   if [[ "${compose_rc}" -ne 0 ]]; then
     err "container compose failed with exit code ${compose_rc}"
     err "inspecting container status and failure causes:"
