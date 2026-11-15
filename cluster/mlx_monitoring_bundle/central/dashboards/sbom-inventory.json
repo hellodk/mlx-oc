@@ -28,11 +28,31 @@
         "name": "ecosystem",
         "type": "custom",
         "options": [
-          { "text": "All Ecosystems", "value": ".*", "selected": true },
-          { "text": "pip (Python virtualenvs)", "value": "pip", "selected": false },
-          { "text": "brew (Homebrew)", "value": "brew", "selected": false },
-          { "text": "model (MLX Weights)", "value": "model", "selected": false },
-          { "text": "system (System Binaries)", "value": "system", "selected": false }
+          {
+            "text": "All Ecosystems",
+            "value": ".*",
+            "selected": true
+          },
+          {
+            "text": "pip (Python virtualenvs)",
+            "value": "pip",
+            "selected": false
+          },
+          {
+            "text": "brew (Homebrew)",
+            "value": "brew",
+            "selected": false
+          },
+          {
+            "text": "model (MLX Weights)",
+            "value": "model",
+            "selected": false
+          },
+          {
+            "text": "system (System Binaries)",
+            "value": "system",
+            "selected": false
+          }
         ],
         "includeAll": false,
         "multi": false
@@ -44,7 +64,12 @@
       "type": "stat",
       "title": "Cataloged Packages & Models",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 0, "y": 0, "w": 3, "h": 3 },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 3,
+        "h": 3
+      },
       "targets": [
         {
           "expr": "count(count by (package, macbook) (mac_sbom_package_info{macbook=~\"$device\"})) or vector(3142)",
@@ -54,10 +79,17 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "blue", "value": null }]
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
           }
         }
       }
@@ -66,7 +98,12 @@
       "type": "stat",
       "title": "Python / pip Packages",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 3, "y": 0, "w": 3, "h": 3 },
+      "gridPos": {
+        "x": 3,
+        "y": 0,
+        "w": 3,
+        "h": 3
+      },
       "targets": [
         {
           "expr": "count(mac_sbom_package_info{macbook=~\"$device\", ecosystem=\"pip\"}) or vector(418)",
@@ -76,10 +113,17 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "purple", "value": null }]
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
           }
         }
       }
@@ -88,7 +132,12 @@
       "type": "stat",
       "title": "Homebrew Formulae",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 6, "y": 0, "w": 3, "h": 3 },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 3,
+        "h": 3
+      },
       "targets": [
         {
           "expr": "count(mac_sbom_package_info{macbook=~\"$device\", ecosystem=\"brew\"}) or vector(142)",
@@ -98,10 +147,17 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "green", "value": null }]
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
           }
         }
       }
@@ -110,7 +166,12 @@
       "type": "stat",
       "title": "MLX Model Artifacts",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 9, "y": 0, "w": 3, "h": 3 },
+      "gridPos": {
+        "x": 9,
+        "y": 0,
+        "w": 3,
+        "h": 3
+      },
       "targets": [
         {
           "expr": "count(mac_sbom_package_info{macbook=~\"$device\", ecosystem=\"model\"}) or vector(12)",
@@ -120,10 +181,17 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "green", "value": null }]
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
           }
         }
       }
@@ -133,7 +201,12 @@
       "title": "SBOM Package, Version, and Executable Path Inventory",
       "description": "Comprehensive catalog of all installed packages, Python virtualenv dependencies, Homebrew binaries, and MLX model directories.",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 0, "y": 3, "w": 12, "h": 14 },
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 12,
+        "h": 14
+      },
       "targets": [
         {
           "expr": "mac_sbom_package_info{macbook=~\"$device\", ecosystem=~\"$ecosystem\"}",
@@ -150,7 +223,7 @@
           },
           "links": [
             {
-              "title": "🔀 Compare Drift against other nodes (Use ${__data.fields.macbook} as baseline)",
+              "title": "\ud83d\udd00 Compare Drift against other nodes (Use ${__data.fields.macbook} as baseline)",
               "url": "/d/mlx-sbom-drift?var-base_device=${__data.fields.macbook}",
               "targetBlank": true
             }

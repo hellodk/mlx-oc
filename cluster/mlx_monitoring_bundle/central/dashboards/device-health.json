@@ -31,7 +31,12 @@
       "type": "stat",
       "title": "Healthy Nodes Online",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 3 },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 3
+      },
       "targets": [
         {
           "expr": "count(count by (macbook) (mlx_hw_up == 1))",
@@ -41,12 +46,20 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           }
         }
@@ -56,7 +69,12 @@
       "type": "stat",
       "title": "Degraded / Firing Alerts",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 3 },
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 3
+      },
       "targets": [
         {
           "expr": "count(ALERTS{alertname=~\"MLX.*\", alertstate=\"firing\"}) or vector(0)",
@@ -66,12 +84,20 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 1 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
             ]
           }
         }
@@ -81,7 +107,12 @@
       "type": "stat",
       "title": "SSH Connectivity (Fleet)",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 3 },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 3
+      },
       "targets": [
         {
           "expr": "sum(mlx_ssh_up) or sum(mlx_hw_up)",
@@ -91,12 +122,20 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           }
         }
@@ -107,7 +146,12 @@
       "title": "Panel 1: Fleet Availability Heatmap Matrix (Square Tiles)",
       "description": "Auto-scaling square tiles per discovered Mac. Click on any tile to drill down into Process Profiler or SBOM.",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 0, "y": 3, "w": 12, "h": 7 },
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 12,
+        "h": 7
+      },
       "targets": [
         {
           "expr": "max by (macbook, instance) (mlx_hw_up)",
@@ -118,7 +162,9 @@
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": ""
         },
         "orientation": "auto",
@@ -133,38 +179,53 @@
             {
               "type": "value",
               "options": {
-                "0": { "text": "DOWN / OFFLINE", "color": "red" },
-                "1": { "text": "ONLINE", "color": "green" }
+                "0": {
+                  "text": "DOWN / OFFLINE",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "ONLINE",
+                  "color": "green"
+                }
               }
             },
             {
               "type": "special",
               "options": {
                 "match": "null",
-                "result": { "text": "NO DATA", "color": "semi-dark-gray" }
+                "result": {
+                  "text": "NO DATA",
+                  "color": "semi-dark-gray"
+                }
               }
             }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           },
           "links": [
             {
-              "title": "⚡ Drilldown: Top 10 Process Profiler for ${__field.labels.macbook}",
+              "title": "\u26a1 Drilldown: Top 10 Process Profiler for ${__field.labels.macbook}",
               "url": "/d/mlx-process-profiler?var-device=${__field.labels.macbook}",
               "targetBlank": true
             },
             {
-              "title": "📦 Drilldown: Software Inventory (SBOM) for ${__field.labels.macbook}",
+              "title": "\ud83d\udce6 Drilldown: Software Inventory (SBOM) for ${__field.labels.macbook}",
               "url": "/d/mlx-sbom-inventory?var-device=${__field.labels.macbook}",
               "targetBlank": true
             },
             {
-              "title": "📊 Drilldown: Hardware Telemetry for ${__field.labels.macbook}",
+              "title": "\ud83d\udcca Drilldown: Hardware Telemetry for ${__field.labels.macbook}",
               "url": "/d/detail?var-device=${__field.labels.macbook}",
               "targetBlank": true
             }
@@ -177,7 +238,12 @@
       "title": "Panel 2: Device Availability Over Time Period",
       "description": "Historical timeline blocks: Green (Available: 1), Red (Down: 0), Gray (No data / sleep)",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 0, "y": 10, "w": 12, "h": 7 },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 12,
+        "h": 7
+      },
       "targets": [
         {
           "expr": "max by (macbook) (mlx_hw_up{macbook=~\"$device\"})",
@@ -191,23 +257,38 @@
             {
               "type": "value",
               "options": {
-                "0": { "text": "Down", "color": "red" },
-                "1": { "text": "Available", "color": "green" }
+                "0": {
+                  "text": "Down",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Available",
+                  "color": "green"
+                }
               }
             },
             {
               "type": "special",
               "options": {
                 "match": "null",
-                "result": { "text": "No Telemetry", "color": "semi-dark-gray" }
+                "result": {
+                  "text": "No Telemetry",
+                  "color": "semi-dark-gray"
+                }
               }
             }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           }
         }
@@ -217,7 +298,12 @@
       "type": "table",
       "title": "Panel 3: Concurrent SSH Connectivity Validation (ssh -T 'hostname')",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 0, "y": 17, "w": 12, "h": 6 },
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 12,
+        "h": 6
+      },
       "targets": [
         {
           "expr": "mlx_ssh_up{macbook=~\"$device\"} or mlx_hw_up{macbook=~\"$device\"}",
@@ -229,20 +315,34 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           },
           "mappings": [
             {
               "type": "value",
               "options": {
-                "0": { "text": "FAILED (255)", "color": "red" },
-                "1": { "text": "CONNECTED (0)", "color": "green" }
+                "0": {
+                  "text": "FAILED (255)",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "CONNECTED (0)",
+                  "color": "green"
+                }
               }
             }
           ]
