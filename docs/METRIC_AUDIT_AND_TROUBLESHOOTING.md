@@ -400,3 +400,33 @@ Expected output:
 * Active Series Found: `136+`
 * Query Errors: `0`
 * Empty Series: `<= 12` (all idle-dependent)
+
+
+---
+
+## 8. `mm1` (`192.168.1.64`) Live Audit & Root Cause Record (`15 Nov 2026, 12:57 IST`)
+
+### 8.1 Environment & Local LLM Status on `mm1`
+- **Local LLM**: Running on `127.0.0.1:11234` (`PID 52430`, supervised by `mlx_server_supervisor.py` `PID 52429`) serving `mlx-community/Qwen2.5-0.5B-Instruct-4bit` (~`75 MB` RSS).
+- **Initial LLM Failure & Memory Constraint**:
+  1. Initially, no LLM was running on `11234` because `mm1`'s `edge/config/nodes.yml` lacked `model`/`model_path`, causing `mlx_lm.server` to start with `--model unknown` and fail with HuggingFace `404 RepositoryNotFoundError`.
+  2. Switching to local `Qwen3.5-4B-MLX-4bit` (`~2.9 GB` + `--prompt-cache-bytes 2g`) on an 8 GB Mac mini (`hw.memsize=8589934592`) alongside the 4 GB Podman VM (`vfkit --memory 4096`) starved RAM (`3506` free pages / `~57 MB`), causing `podman ps` and Grafana `/api/ds/query` calls to time out (`status=499`/`status=502 context canceled`).
+  3. Switching to `mlx-community/Qwen2.5-0.5B-Instruct-4bit` resolved the memory starvation while serving both non-streaming (with `logprobs`) and streaming requests via `:8080`.
+
+### 8.2 Every Miss Observed on `mm1` and Why It Happened
+
+| # | Area / Panel | What Missed | Root Cause (Verified) | Resolution & Verification |
+|---|--------------|-------------|-----------------------|---------------------------|
+| 1 | `deploy.sh central --opik` | `podman-compose` failed (`unknown flag: --in-pod`) | Podman delegated to external `/usr/local/bin/docker-compose` instead of `podman-compose`. | Updated `_resolve_central_compose` in `scripts/deploy.sh` (`9fa28c9`) to prefer `podman-compose` directly. |
+| 2 | Central VictoriaMetrics on `mm1` | Contained only `ALERTS` / `ALERTS_FOR_STATE` (0 edge metrics) | `edge.env` / `nodes.yml` on `mm1` pushed edge `vmagent`/`OTLP`/`Opik` to `192.168.1.10` instead of `127.0.0.1`. | Set `CENTRAL_VICTORIA_METRICS=127.0.0.1:8428`, `CENTRAL_OTEL=127.0.0.1:4318`, `CENTRAL_OPIK=127.0.0.1:32173` on `mm1`. All 7 scrape jobs reported `up="1"`. |
+| 3 | `mlx-process` (`:9107`) & `mlx-sbom` (`:9108`) | `up=0` after edge restart | Orphaned PIDs `50284`/`50285` still held `:9107` and `:9108`, causing `OSError: [Errno 48] Address already in use` on restart. | Killed orphaned processes (`pkill -9`) and restarted `deploy.sh edge daemon`; all 7 jobs verified `up="1"`. |
+| 4 | `[mlx-overview] Requests / sec (cluster)` & `Request Rate by Device` | `EMPTY_FRAMES` (`No data`) | `overview.json` queried `mlx_requests_total{device=~"$device", node=~"$node"}`, but `mlx_requests_total` has no `node` label (only `service, job, model, instance, device, kind, macbook, serial, streaming`). `$node=~".+"` dropped all series. | Removed `node=~"$node"` from both queries in `overview.json` (`65e16b3`). Verified `WITH DATA` in Grafana audit. |
+| 5 | `[mlx-inference] Tool Calls` | `EMPTY_FRAMES` (`No data`) | `inference.json` queried `rate(mlx_tool_calls_total{device=~"$device", kind=~"$kind"}[5m])`, but `mlx_tool_calls_total` has no `kind` label (only `service, job, model, instance, device, macbook, serial`). `$kind=~".+"` dropped all series. | Removed `kind=~"$kind"` from `inference.json` (`65e16b3`). Verified `WITH DATA` in Grafana audit. |
+| 6 | `[mlx-overview] 5xx Error Rate` & all 4 rate-ratio panels in `[mlx-slo]` (`5xx Error Rate (1h)`, `Total Error Rate (4xx+5xx, 1h)`, `Error Budget Remaining (5% target)`, `Availability (1 - error rate, 1h)`) | `EMPTY_FRAMES` (`No data`) when `rate(mlx_requests_total) == 0` | Dividing `rate(mlx_error_total)` (`0`) by `rate(mlx_requests_total)` (`0`) evaluates to `NaN` when idle (`0 / 0 = NaN`), which Grafana renders as `No data` instead of `0%` error rate / `100%` availability. | Guarded denominator with `> 0` and added `or vector(0)` / `or (0 * sum by (device) (mlx_requests_total{...}))` in `overview.json` and `slo.json` (`65e16b3`). Verified `WITH DATA` in Grafana audit. |
+| 7 | `[mlx-sbom-drift] Granular Package Drift & Version Diff Matrix` | `EMPTY_FRAMES` (`0` rows) | `mlx_sbom_collector.py` only emits `mac_sbom_drift_details` inside `for d in diffs:` when `_evaluate_drift()` detects version mismatches or missing packages between `device` and `base_device`. Comparing single node `mm` against `mm` yields `mismatches=0, missing=0` (`diffs=[]`). | Expected event-driven behavior on a single-device/zero-drift cluster; all other SBOM panels (`150` packages, `IN_SYNC`) report data. |
+
+### 8.3 Live Grafana Audit Result (`http://192.168.1.64:3000`, `15 Nov 2026, 12:56:58 IST`)
+- **Dashboards**: `17`
+- **Panels**: `132`
+- **Query Targets**: `148` total (`147` returning data, `1` intentionally empty event-driven SBOM drift diff table)
+- **Empty Template Variables**: `0`
