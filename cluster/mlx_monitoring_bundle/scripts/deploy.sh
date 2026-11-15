@@ -1233,7 +1233,10 @@ _resolve_central_compose() {
     else
       local prov_out
       prov_out="$(podman compose version 2>&1 || true)"
-      if echo "${prov_out}" | grep -qi "podman-compose"; then
+      # Podman prints "Please see podman-compose(1)" even when invoking docker-compose;
+      # only treat it as podman-compose when docker-compose is absent and the provider/binary matches.
+      if ! echo "${prov_out}" | grep -qiE "docker-compose|Docker Compose" && \
+         echo "${prov_out}" | grep -qiE "podman-compose([^(]|$)"; then
         IS_PODMAN_COMPOSE=1
       fi
     fi

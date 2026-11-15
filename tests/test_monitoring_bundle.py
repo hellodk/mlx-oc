@@ -737,7 +737,7 @@ def test_podman_compose_provider_in_pod_flag_detection(tmp_path):
         """
         podman() {
             if [[ "$1" == "compose" && "$2" == "version" ]]; then
-                echo '>>>> Executing external compose provider "/usr/local/bin/docker-compose". <<<<'
+                echo '>>>> Executing external compose provider "/usr/local/bin/docker-compose". Please see podman-compose(1) for how to disable this message. <<<<'
                 echo 'Docker Compose version v2.32.2'
                 return 0
             fi
