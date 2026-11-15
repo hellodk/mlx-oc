@@ -45,7 +45,6 @@ import subprocess
 import sys
 import threading
 import time
-import urllib.request
 from typing import Any, Dict, List, Optional, Tuple
 
 from prometheus_client import CollectorRegistry, Counter, Gauge, generate_latest
@@ -129,12 +128,6 @@ G_SBOM_DRIFT_DETAILS = Gauge(
     "mac_sbom_drift_details",
     "Granular package delta details against baseline",
     ["device", "base", "package", "base_version", "target_version", "ecosystem", "path"],
-    registry=REGISTRY,
-)
-G_SBOM_LICENSE_COUNT = Gauge(
-    "mac_sbom_license_count",
-    "Total cataloged SBOM packages by license policy category",
-    ["device", "category"],
     registry=REGISTRY,
 )
 
@@ -269,7 +262,6 @@ def _scan_pip_venvs() -> List[Dict[str, Any]]:
                     dist_info = Path(site_path) / f"{name.replace('-', '_')}-{ver}.dist-info"
                     record_file = dist_info / "RECORD"
                     h = _compute_sha256(record_file) if record_file.is_file() else "pypi"
-                    lic = _read_pip_license(dist_info)
 
                     items.append({
                         "package": name,
@@ -277,9 +269,6 @@ def _scan_pip_venvs() -> List[Dict[str, Any]]:
                         "ecosystem": "pip",
                         "path": site_path,
                         "hash": h,
-                        "licenses": [lic] if lic else [],
-                        "purl": f"pkg:pypi/{name.lower()}@{ver}",
-                        "type": "library",
                     })
         except Exception as exc:
             debug(f"pip scan failed for {py}: {exc!r}", component="sbom")
@@ -473,150 +462,18 @@ def _evaluate_drift(
 # ---------------------------------------------------------------------------
 # Core Collection & Metrics Update
 # ---------------------------------------------------------------------------
-_COPYLEFT_LICENSES = frozenset({
-    "GPL-2.0", "GPL-2.0-only", "GPL-2.0-or-later",
-    "GPL-3.0", "GPL-3.0-only", "GPL-3.0-or-later",
-    "LGPL-2.0", "LGPL-2.0-only", "LGPL-2.0-or-later",
-    "LGPL-2.1", "LGPL-2.1-only", "LGPL-2.1-or-later",
-    "LGPL-3.0", "LGPL-3.0-only", "LGPL-3.0-or-later",
-    "AGPL-3.0", "AGPL-3.0-only", "AGPL-3.0-or-later",
-    "EUPL-1.1", "EUPL-1.2", "OSL-3.0",
-    "CC-BY-SA-4.0", "CC-BY-NC-SA-4.0",
-})
-
-
-def _classify_license(licenses: List[str]) -> str:
-    if not licenses:
-        return "unknown"
-    for lic in licenses:
-        upper = lic.upper()
-        if lic in _COPYLEFT_LICENSES or "GPL" in upper or "AGPL" in upper:
-            return "copyleft"
-    for lic in licenses:
-        upper = lic.upper()
-        if any(tok in upper for tok in ("MIT", "APACHE", "BSD", "ISC", "PSF", "UNLICENSE", "0BSD")):
-            return "permissive"
-    return "other"
-
-
-def _read_pip_license(dist_info: Path) -> str:
-    """Extract License or License-Expression from wheel METADATA if present."""
-    for fname in ("METADATA", "PKG-INFO"):
-        fpath = dist_info / fname
-        if not fpath.is_file():
-            continue
-        try:
-            for line in fpath.read_text(encoding="utf8", errors="ignore").splitlines():
-                if line == "":
-                    break
-                if line.startswith("License-Expression:"):
-                    val = line.split(":", 1)[1].strip()
-                    if val and val.upper() != "UNKNOWN":
-                        return val
-                elif line.startswith("License:"):
-                    val = line.split(":", 1)[1].strip()
-                    if val and val.upper() != "UNKNOWN":
-                        return val[:120]
-        except Exception:
-            pass
-    return ""
-
-
-def _enrich_item_cyclonedx(item: Dict[str, Any]) -> Dict[str, Any]:
-    """Ensure purl, type, licenses, and license_category exist on every SBOM item."""
-    eco = item.get("ecosystem") or "unknown"
-    pkg = item.get("package") or ""
-    ver = item.get("version") or ""
-    if not item.get("purl"):
-        if eco == "brew":
-            item["purl"] = f"pkg:brew/{pkg}@{ver}" if ver else f"pkg:brew/{pkg}"
-        elif eco == "pip":
-            item["purl"] = f"pkg:pypi/{pkg.lower()}@{ver}" if ver else f"pkg:pypi/{pkg.lower()}"
-        else:
-            item["purl"] = f"pkg:generic/{pkg}@{ver}" if ver else f"pkg:generic/{pkg}"
-    item.setdefault("type", "application" if eco in ("system", "model") else "library")
-    lics = item.get("licenses") or []
-    item["licenses"] = lics if isinstance(lics, list) else ([str(lics)] if lics else [])
-    item["license_category"] = _classify_license(item["licenses"])
-    return item
-
-
-def _find_syft_binary() -> Optional[str]:
-    for cand in (shutil.which("syft"), "/usr/local/bin/syft", "/opt/homebrew/bin/syft"):
-        if cand and Path(cand).is_file():
-            return cand
-    return None
-
-
-def _scan_syft(syft_bin: str) -> Optional[Dict[str, Any]]:
-    """Run Syft CycloneDX scan when available (mirrors kri sbom_scan.sls)."""
-    try:
-        res = subprocess.run(
-            [syft_bin, "packages", "--scope", "all-layers", "--output", "cyclonedx-json", "/"],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-        if res.returncode == 0 and res.stdout.strip():
-            return json.loads(res.stdout)
-    except Exception as exc:
-        debug(f"syft scan failed, falling back to native scanner: {exc!r}", component="sbom")
-    return None
-
-
-def collect_and_update_metrics(
-    node_name: str,
-    base_device: str,
-    ingest_url: str = "",
-    scanner_mode: str = "auto",
-) -> None:
-    """Run full SBOM scan, update Prometheus gauges, dump CycloneDX JSON, and push to central."""
+def collect_and_update_metrics(node_name: str, base_device: str) -> None:
+    """Run full SBOM scan, update Prometheus gauges, and dump JSON snapshot."""
     global _CURRENT_INVENTORY
 
     start_time = time.time()
     all_items: List[Dict[str, Any]] = []
-    syft_bom: Optional[Dict[str, Any]] = None
-    scanner_used = "native"
 
-    if scanner_mode in ("auto", "syft"):
-        syft_bin = _find_syft_binary()
-        if syft_bin:
-            syft_bom = _scan_syft(syft_bin)
-            if syft_bom and isinstance(syft_bom.get("components"), list):
-                scanner_used = "syft"
-                for comp in syft_bom["components"]:
-                    if not isinstance(comp, dict) or not comp.get("name"):
-                        continue
-                    lics: List[str] = []
-                    for entry in comp.get("licenses") or []:
-                        if isinstance(entry, dict):
-                            lic_obj = entry.get("license") if isinstance(entry.get("license"), dict) else entry
-                            lid = lic_obj.get("id") or lic_obj.get("name") or ""
-                            if lid:
-                                lics.append(str(lid))
-                    purl = str(comp.get("purl") or "")
-                    eco = (
-                        purl.split(":", 2)[1].split("/", 1)[0]
-                        if purl.startswith("pkg:") and "/" in purl
-                        else "syft"
-                    )
-                    all_items.append({
-                        "package": str(comp["name"]),
-                        "version": str(comp.get("version") or "unknown"),
-                        "ecosystem": eco,
-                        "path": str(comp.get("purl") or "/"),
-                        "hash": "syft",
-                        "purl": purl,
-                        "type": str(comp.get("type") or "library"),
-                        "licenses": lics,
-                    })
-
-    if not all_items:
-        # 1. Collect all ecosystems
-        all_items.extend(_scan_pip_venvs())
-        all_items.extend(_scan_homebrew())
-        all_items.extend(_scan_system_binaries())
-        all_items.extend(_scan_mlx_models())
+    # 1. Collect all ecosystems
+    all_items.extend(_scan_pip_venvs())
+    all_items.extend(_scan_homebrew())
+    all_items.extend(_scan_system_binaries())
+    all_items.extend(_scan_mlx_models())
 
     # Fallback sanity: if empty in minimal container/CI environment, populate base package
     if not all_items:
@@ -628,7 +485,6 @@ def collect_and_update_metrics(
             "hash": "ci-base",
         })
 
-    all_items = [_enrich_item_cyclonedx(item) for item in all_items]
     _CURRENT_INVENTORY = all_items
 
     # 2. Reset gauges to prevent stale packages
@@ -638,16 +494,12 @@ def collect_and_update_metrics(
     G_SBOM_DRIFT_MISMATCH_COUNT.clear()
     G_SBOM_MISSING_PACKAGE_COUNT.clear()
     G_SBOM_DRIFT_DIFF.clear()
-    G_SBOM_LICENSE_COUNT.clear()
 
     # 3. Populate package inventory gauges
     counts_by_eco: Dict[str, int] = {}
-    counts_by_lic: Dict[str, int] = {"copyleft": 0, "permissive": 0, "other": 0, "unknown": 0}
     for item in all_items:
         eco = item["ecosystem"]
         counts_by_eco[eco] = counts_by_eco.get(eco, 0) + 1
-        cat = item.get("license_category", "unknown")
-        counts_by_lic[cat] = counts_by_lic.get(cat, 0) + 1
 
         G_SBOM_PACKAGE_INFO.labels(
             device=node_name,
@@ -660,8 +512,6 @@ def collect_and_update_metrics(
 
     for eco, count in counts_by_eco.items():
         G_SBOM_TOTAL_PACKAGES.labels(device=node_name, ecosystem=eco).set(count)
-    for cat, count in counts_by_lic.items():
-        G_SBOM_LICENSE_COUNT.labels(device=node_name, category=cat).set(count)
 
     # 4. Evaluate Drift against Base Device
     status, mismatch_cnt, missing_cnt, diffs = _evaluate_drift(node_name, base_device, all_items)
@@ -695,45 +545,20 @@ def collect_and_update_metrics(
     G_SBOM_UP.labels(device=node_name).set(1.0)
     G_SBOM_LAST_SCAN.labels(device=node_name).set(now)
 
-    # 5. Persist CycloneDX-compatible JSON snapshot & push to central telemetry-ingest
+    # 5. Persist JSON snapshot to disk for historical audit & ClickHouse ingestion
     ist_tz = timezone(timedelta(hours=5, minutes=30))
     now_ist = datetime.fromtimestamp(now, tz=timezone.utc).astimezone(ist_tz).strftime("%d %b %Y, %H:%M:%S IST")
-    cyclonedx_components = (
-        syft_bom["components"]
-        if syft_bom and isinstance(syft_bom.get("components"), list)
-        else [
-            {
-                "type": item["type"],
-                "name": item["package"],
-                "version": item["version"],
-                "purl": item["purl"],
-                "licenses": [{"license": {"name": lic}} for lic in item.get("licenses", [])],
-                "properties": [
-                    {"name": "ecosystem", "value": item["ecosystem"]},
-                    {"name": "path", "value": item["path"]},
-                    {"name": "hash", "value": item["hash"]},
-                ],
-            }
-            for item in all_items
-        ]
-    )
     snapshot = {
-        "bomFormat": "CycloneDX",
-        "specVersion": "1.5",
         "device": node_name,
         "macbook": node_name,
-        "scanner": scanner_used,
-        "scanned_at": datetime.fromtimestamp(now, tz=timezone.utc).isoformat(),
         "scanned_at_ist": now_ist,
         "scanned_at_epoch": int(now),
         "total_packages": len(all_items),
         "ecosystem_counts": counts_by_eco,
-        "license_counts": counts_by_lic,
         "drift_status": status,
         "base_device": base_device,
         "mismatches": mismatch_cnt,
         "missing": missing_cnt,
-        "components": cyclonedx_components,
         "packages": all_items,
     }
     snapshot_path = LOG_DIR / "sbom_snapshot.json"
@@ -741,20 +566,6 @@ def collect_and_update_metrics(
         snapshot_path.write_text(json.dumps(snapshot, indent=2), encoding="utf8")
     except Exception as exc:
         debug(f"failed to save sbom snapshot: {exc!r}", component="sbom")
-
-    if ingest_url:
-        target = f"{ingest_url.rstrip('/')}/api/v1/ingest/sbom/{node_name}"
-        try:
-            req = urllib.request.Request(
-                target,
-                data=json.dumps(snapshot).encode("utf8"),
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=15.0) as resp:
-                resp.read()
-        except Exception as exc:
-            debug(f"sbom ingest push failed ({target}): {exc!r}", component="sbom")
 
     duration = time.time() - start_time
     info(
@@ -806,26 +617,14 @@ class SbomHandler(BaseHTTPRequestHandler):
 # ---------------------------------------------------------------------------
 # Daemon Scan Loop
 # ---------------------------------------------------------------------------
-def _scan_loop(
-    node_name: str,
-    base_device: str,
-    interval: float,
-    stop_event: threading.Event,
-    ingest_url: str = "",
-    scanner_mode: str = "auto",
-) -> None:
+def _scan_loop(node_name: str, base_device: str, interval: float, stop_event: threading.Event) -> None:
     while not stop_event.is_set():
         stop_event.wait(interval)
         if stop_event.is_set():
             break
         try:
             with _SCAN_LOCK:
-                collect_and_update_metrics(
-                    node_name,
-                    base_device,
-                    ingest_url=ingest_url,
-                    scanner_mode=scanner_mode,
-                )
+                collect_and_update_metrics(node_name, base_device)
         except Exception as exc:
             error(f"scheduled sbom scan error: {exc!r}", component="sbom")
 
@@ -859,17 +658,6 @@ def main() -> int:
         help=f"baseline reference device for drift comparison (default: {DEFAULT_BASE_DEVICE})",
     )
     parser.add_argument(
-        "--ingest-url",
-        default=os.environ.get("CENTRAL_TELEMETRY_INGEST", ""),
-        help="central telemetry-ingest base URL (e.g. http://127.0.0.1:8088)",
-    )
-    parser.add_argument(
-        "--scanner",
-        choices=("auto", "syft", "native"),
-        default=os.environ.get("SBOM_SCANNER", "auto"),
-        help="SBOM scanner backend (default: auto)",
-    )
-    parser.add_argument(
         "--scan-once",
         action="store_true",
         help="execute a single synchronous scan, write snapshot, and exit",
@@ -881,12 +669,7 @@ def main() -> int:
 
     # Initial synchronous scan
     with _SCAN_LOCK:
-        collect_and_update_metrics(
-            args.node_name,
-            args.base_device,
-            ingest_url=args.ingest_url,
-            scanner_mode=args.scanner,
-        )
+        collect_and_update_metrics(args.node_name, args.base_device)
 
     if args.scan_once:
         print(f"SBOM scan complete. Snapshot written to {LOG_DIR / 'sbom_snapshot.json'}")
@@ -895,14 +678,7 @@ def main() -> int:
     stop_event = threading.Event()
     loop_thread = threading.Thread(
         target=_scan_loop,
-        args=(
-            args.node_name,
-            args.base_device,
-            max(10.0, args.interval),
-            stop_event,
-            args.ingest_url,
-            args.scanner,
-        ),
+        args=(args.node_name, args.base_device, max(10.0, args.interval), stop_event),
         daemon=True,
     )
     loop_thread.start()

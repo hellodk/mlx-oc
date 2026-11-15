@@ -1535,8 +1535,6 @@ clean_central() {
       "central-vmalert" "vmalert"
       "central-alertmanager" "alertmanager"
       "central-otelcol" "central-otel-collector" "otel-collector"
-      "central-telemetry-db" "telemetry-db"
-      "central-telemetry-ingest" "telemetry-ingest"
       "central-opik-backend" "opik-backend"
       "central-opik-frontend" "opik-frontend"
       "central-opik-mysql" "opik-mysql"

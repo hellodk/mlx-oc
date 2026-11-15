@@ -231,50 +231,6 @@
           ]
         }
       }
-    },
-    {
-      "type": "table",
-      "title": "SBOM License Policy Breakdown",
-      "datasource": {
-        "type": "postgres",
-        "uid": "telemetry-pg"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 17,
-        "w": 8,
-        "h": 9
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT c.license_category, COUNT(*) AS packages FROM sbom_components c JOIN (SELECT DISTINCT ON (device) id, device FROM sbom_scans ORDER BY device, scanned_at DESC) s ON c.scan_id = s.id WHERE c.device ~ '${device:regex}' GROUP BY c.license_category ORDER BY packages DESC;"
-        }
-      ]
-    },
-    {
-      "type": "table",
-      "title": "Full CycloneDX SBOM Inventory (PURL & Licenses \u2014 kri parity)",
-      "datasource": {
-        "type": "postgres",
-        "uid": "telemetry-pg"
-      },
-      "gridPos": {
-        "x": 8,
-        "y": 17,
-        "w": 16,
-        "h": 9
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT c.device, c.name, c.version, c.ecosystem, c.type, c.licenses, c.license_category, c.purl, c.path, s.scanner, s.scanned_at FROM sbom_components c JOIN (SELECT DISTINCT ON (device) id, device, scanner, scanned_at FROM sbom_scans ORDER BY device, scanned_at DESC) s ON c.scan_id = s.id WHERE c.device ~ '${device:regex}' AND c.ecosystem ~ '${ecosystem:regex}' ORDER BY (c.license_category = 'copyleft') DESC, c.ecosystem, c.name;"
-        }
-      ]
     }
   ],
   "links": [

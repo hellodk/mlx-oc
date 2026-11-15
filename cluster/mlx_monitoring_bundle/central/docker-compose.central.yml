@@ -81,7 +81,7 @@ services:
       - HTTPS_PROXY=
       - http_proxy=
       - https_proxy=
-      - NO_PROXY=victoria-metrics,central-victoriametrics,otel-collector,vmalert,alertmanager,telemetry-db,telemetry-ingest,localhost,127.0.0.1
+      - NO_PROXY=victoria-metrics,central-victoriametrics,otel-collector,vmalert,alertmanager,localhost,127.0.0.1
     volumes:
       - grafana-data:/var/lib/grafana
       - ./config/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
@@ -403,61 +403,10 @@ services:
       retries: 30
       start_period: 5s
 
-  telemetry-db:
-    image: postgres:16-alpine
-    container_name: central-telemetry-db
-    restart: unless-stopped
-    environment:
-      - POSTGRES_USER=telemetry
-      - POSTGRES_DB=telemetry
-      - POSTGRES_HOST_AUTH_METHOD=trust
-    command: ["postgres", "-c", "shared_buffers=32MB", "-c", "max_connections=40"]
-    volumes:
-      - telemetry-pg-data:/var/lib/postgresql/data
-    deploy:
-      resources:
-        limits:
-          memory: 192M
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U telemetry -d telemetry || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
-  telemetry-ingest:
-    image: python:3.12-alpine
-    container_name: central-telemetry-ingest
-    restart: unless-stopped
-    ports:
-      - "8088:8088"
-    environment:
-      - TELEMETRY_DB_HOST=telemetry-db
-      - TELEMETRY_DB_PORT=5432
-      - TELEMETRY_DB_USER=telemetry
-      - TELEMETRY_DB_NAME=telemetry
-      - INGEST_LISTEN_HOST=0.0.0.0
-      - INGEST_LISTEN_PORT=8088
-    command: ["python3", "/app/telemetry_ingest.py"]
-    volumes:
-      - ./ingest/telemetry_ingest.py:/app/telemetry_ingest.py:ro
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-    depends_on:
-      telemetry-db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8088/healthz', timeout=2)\" || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
 volumes:
   vm-data:
   grafana-data:
   central-otel-logs:
-  telemetry-pg-data:
   opik-mysql:
   opik-redis:
   opik-clickhouse:
