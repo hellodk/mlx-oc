@@ -18,7 +18,6 @@ Components:
   - mlx_metrics_proxy.py     :8080  OpenAI proxy + Prometheus + OTLP + Opik
   - mlx_hw_telemetry.py      :9102  hardware telemetry
   - mlx_kv_cache_agent.py    :9104  KV-cache + context-length gauges
-  - mlx_server_supervisor.py :9105  mlx_lm.server supervisor + auto-restart
   - mlx_server_log_tailer.py :9106  server.log tailer -> OTLP logs
 
 Push-only model: the edge initiates all outbound connections. No inbound
@@ -243,16 +242,9 @@ class Bundle:
             raw_upstream if "://" in raw_upstream else f"http://{raw_upstream}"
         )
         self.upstream_addr = self.upstream_url.split("://", 1)[1].rstrip("/")
-        self.server_port = self.upstream_addr.rsplit(":", 1)[-1]
 
         self.venv_python = _resolve_python(
             config.get("VENV_PYTHON"), str(Path.home() / ".venv" / "bin" / "python")
-        )
-        self.mlx_venv_python = _resolve_python(
-            config.get("MLX_VENV_PYTHON"), str(Path.home() / "venvs" / "mlx" / "bin" / "python")
-        )
-        self.mlx_launch = config.get(
-            "MLX_LAUNCH", str(Path.home() / "venvs" / "mlx" / "bin" / "mlx.launch")
         )
 
         self.exporter_log_dir = Path(config.get("EXPORTER_LOG_DIR", str(CONFIG_DIR.parent / "logs")))
@@ -264,7 +256,6 @@ class Bundle:
         self.enable_proxy = config.get("ENABLE_PROXY", "true").lower() == "true"
         self.enable_hw = config.get("ENABLE_HW_TELEMETRY", "true").lower() == "true"
         self.enable_kv = config.get("ENABLE_KV_AGENT", "true").lower() == "true"
-        self.enable_supervisor = config.get("ENABLE_SUPERVISOR", "true").lower() == "true"
         self.enable_logtailer = config.get("ENABLE_LOGTAILER", "true").lower() == "true"
         self.enable_process = config.get("ENABLE_PROCESS_PROFILER", "true").lower() == "true"
         self.enable_sbom = config.get("ENABLE_SBOM_COLLECTOR", "true").lower() == "true"
@@ -443,7 +434,6 @@ class Bundle:
                 "PROXY_LISTEN": config_val(self.config, "PROXY_LISTEN", "127.0.0.1:8080"),
                 "HW_LISTEN": config_val(self.config, "HW_LISTEN", "127.0.0.1:9102"),
                 "KV_LISTEN": config_val(self.config, "KV_LISTEN", "127.0.0.1:9104"),
-                "SUPERVISOR_LISTEN": config_val(self.config, "SUPERVISOR_LISTEN", "127.0.0.1:9105"),
                 "LOGTAILER_LISTEN": config_val(self.config, "LOGTAILER_LISTEN", "127.0.0.1:9106"),
                 "PROCESS_LISTEN": config_val(self.config, "PROCESS_LISTEN", "127.0.0.1:9107"),
                 "SBOM_LISTEN": config_val(self.config, "SBOM_LISTEN", "127.0.0.1:9108"),
@@ -508,54 +498,9 @@ class Bundle:
         write_pid(self.pid_dir / "vmagent.pid", p.pid)
         info(f"started vmagent (pid={p.pid})", component="bundle")
 
-    def start_supervisor(self):
-        if not self.enable_supervisor:
-            return
-
-        server_port = self.node_config.get("mlx_server_port") or self.server_port
-        server_cmd_template = self.node_config.get("mlx_server_cmd") or config_val(
-            self.config,
-            "MLX_SERVER_CMD",
-            f"{self.mlx_venv_python} -m mlx_lm.server --model {{model}} "
-            f"--host 127.0.0.1 --port {{port}} "
-            f"--prompt-cache-size 4 --prompt-cache-bytes 2g "
-            f"--prompt-concurrency 4"
-        )
-        # The served model id is the basename; running from the model's parent
-        # directory lets mlx_lm.server resolve it without an absolute path and
-        # keeps request model ids stable.
-        server_cwd = str(BUNDLE_DIR)
-        model_arg = self.model or "unknown"
-        if self.model_path:
-            model_arg = self.model or Path(self.model_path.rstrip("/")).name
-            server_cwd = str(Path(self.model_path).parent)
-        srv_cmd = (
-            server_cmd_template
-            .replace("{model}", shlex.quote(model_arg))
-            .replace("{port}", str(server_port))
-        )
-
-        cmd = [
-            self.venv_python, "mlx_server_supervisor.py",
-            "--command", srv_cmd,
-            "--cwd", server_cwd,
-            "--model", model_arg if model_arg != "unknown" else "",
-            "--health", f"http://127.0.0.1:{server_port}/v1/models",
-            "--server-log", config_val(self.config, "MLX_SERVER_LOG", str(self.exporter_log_dir / "server.log")),
-            "--listen", config_val(self.config, "SUPERVISOR_LISTEN", "127.0.0.1:9105"),
-            "--probe-interval", "5",
-            "--backoff", "3",
-            "--backoff-max", "30",
-            "--hang-after", "15",
-            "--backoff-reset", "120",
-        ]
-        if config_val(self.config, "SUPERVISOR_ATTACH_HEALTHY", "true").lower() != "true":
-            cmd.append("--no-attach")
-        self._spawn("supervisor", cmd)
-
     def status(self) -> dict:
         pids = {}
-        for name in ["supervisor", "logtailer", "kv", "hw", "proxy", "process", "sbom", "vmagent"]:
+        for name in ["logtailer", "kv", "hw", "proxy", "process", "sbom", "vmagent"]:
             pfile = self.pid_dir / f"{name}.pid"
             pids[name] = read_pid(pfile)
         return {
@@ -583,7 +528,7 @@ class Bundle:
                     os.kill(bp, signal.SIGTERM)
                 except Exception as exc2:
                     debug(f"kill bundle failed: {exc2!r}", component="bundle")
-        for name in ["supervisor", "logtailer", "kv", "hw", "proxy", "process", "sbom", "vmagent"]:
+        for name in ["logtailer", "kv", "hw", "proxy", "process", "sbom", "vmagent"]:
             pfile = self.pid_dir / f"{name}.pid"
             pid = read_pid(pfile)
             if pid:
@@ -617,9 +562,6 @@ class Bundle:
             debug(f"os.setsid failed: {exc!r}", component="bundle")
 
         started = []
-        if self.enable_supervisor:
-            self.start_supervisor(); started.append("supervisor:9105")
-            time.sleep(2)
         if self.enable_kv:
             self.start_kv(); started.append("kv:9104")
         if self.enable_logtailer:

@@ -216,7 +216,7 @@ def _scan_pip_venvs() -> List[Dict[str, Any]]:
     seen: set[Tuple[str, str, str]] = set()
 
     pythons = [sys.executable]
-    for env_var in ("VENV_PYTHON", "MLX_VENV_PYTHON"):
+    for env_var in ("VENV_PYTHON",):
         val = os.environ.get(env_var)
         if val and os.path.isfile(val) and val not in pythons:
             pythons.append(val)

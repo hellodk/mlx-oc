@@ -53,7 +53,7 @@ def test_vmagent_yaml_rendering():
     assert data["global"]["external_labels"]["device"] == "test-mac"
     assert data["global"]["external_labels"]["macbook"] == "test-mac"
     assert data["global"]["external_labels"]["serial"] == "SERIAL12345"
-    assert len(data["scrape_configs"]) == 7
+    assert len(data["scrape_configs"]) == 6
 
 
 def test_vmagent_yaml_rendering_with_defaults():
@@ -92,25 +92,6 @@ def test_no_duplicate_metrics_between_exporters():
     assert hasattr(mlx_sbom_collector, "G_SBOM_PACKAGE_INFO")
 
 
-def test_supervisor_command_json_no_keyerror():
-    """Verify JSON with braces does not raise KeyError in command generation."""
-    server_cmd_template = (
-        "python3 -m mlx_lm.server --model {model} --port {port} "
-        "--chat-template-args '{\"enable_thinking\":false}'"
-    )
-    model_arg = "Qwen3.5-4B-MLX-4bit"
-    server_port = 11234
-
-    srv_cmd = (
-        server_cmd_template
-        .replace("{model}", shlex.quote(model_arg))
-        .replace("{port}", str(server_port))
-    )
-    assert "Qwen3.5-4B-MLX-4bit" in srv_cmd
-    assert "11234" in srv_cmd
-    assert '{"enable_thinking":false}' in srv_cmd
-
-
 def test_model_info_graceful_fallback():
     """Verify missing model config returns None gracefully without unhandled exception."""
     import mlx_model_info
@@ -130,20 +111,17 @@ def test_vmalert_rules_validity():
     alerts = [r["alert"] for g in data["groups"] for r in g.get("rules", []) if "alert" in r]
     assert "MLXDeviceSilent" in alerts
     assert "MLXMacbookSilent" in alerts
-    assert "MLXServerCrashLooping" in alerts
     assert "MLXHardwareExporterDown" in alerts
     assert "MLXMemoryPressureHigh" in alerts
 
 
 def test_exporter_listen_defaults_are_local():
-    """Verify all 5 standalone exporter scripts default to 127.0.0.1 for security."""
+    """Verify standalone exporter scripts default to 127.0.0.1 for security."""
     from mlx_hw_telemetry import LISTEN_DEFAULT as hw_listen
     from mlx_kv_cache_agent import LISTEN_DEFAULT as kv_listen
-    from mlx_server_supervisor import LISTEN_DEFAULT as sup_listen
 
     assert hw_listen.startswith("127.0.0.1:"), f"hw_telemetry should bind to 127.0.0.1 by default, got {hw_listen}"
     assert kv_listen.startswith("127.0.0.1:"), f"kv_cache_agent should bind to 127.0.0.1 by default, got {kv_listen}"
-    assert sup_listen.startswith("127.0.0.1:"), f"supervisor should bind to 127.0.0.1 by default, got {sup_listen}"
 
 
 def test_no_magic_container_domains():
@@ -204,7 +182,6 @@ def test_vmagent_custom_listen_ports_rendering():
         "PROXY_LISTEN": "127.0.0.1:18080",
         "HW_LISTEN": "127.0.0.1:19102",
         "KV_LISTEN": "127.0.0.1:19104",
-        "SUPERVISOR_LISTEN": "127.0.0.1:19105",
         "LOGTAILER_LISTEN": "127.0.0.1:19106",
         "PROCESS_LISTEN": "127.0.0.1:19107",
         "SBOM_LISTEN": "127.0.0.1:19108",
@@ -225,7 +202,6 @@ def test_vmagent_custom_listen_ports_rendering():
     assert targets["mlx-proxy"] == "127.0.0.1:18080"
     assert targets["mlx-hw"] == "127.0.0.1:19102"
     assert targets["mlx-kv"] == "127.0.0.1:19104"
-    assert targets["mlx-supervisor"] == "127.0.0.1:19105"
     assert targets["mlx-logtailer"] == "127.0.0.1:19106"
     assert targets["mlx-process"] == "127.0.0.1:19107"
     assert targets["mlx-sbom"] == "127.0.0.1:19108"
@@ -996,7 +972,7 @@ def test_sbom_collector_inventory_and_drift():
 
 
 def test_dashboards_json_validity():
-    """Verify all 17 production dashboards parse cleanly, contain deterministic UIDs, and have header links."""
+    """Verify all 16 production dashboards parse cleanly, contain deterministic UIDs, and have header links."""
     dashboards_dir = BUNDLE_DIR / "central" / "dashboards"
     expected = {
         "alerts.json": "mlx-alerts",
@@ -1014,7 +990,6 @@ def test_dashboards_json_validity():
         "quality.json": "mlx-quality",
         "sbom-drift.json": "mlx-sbom-drift",
         "sbom-inventory.json": "mlx-sbom-inventory",
-        "serving.json": "mlx-serving",
         "slo.json": "mlx-slo",
     }
     for fname, expected_uid in expected.items():

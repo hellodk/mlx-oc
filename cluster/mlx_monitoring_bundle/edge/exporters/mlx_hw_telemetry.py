@@ -101,7 +101,6 @@ _PROC_COMPONENTS = {
     "mlx_proxy": "mlx_metrics_proxy",
     "kv_agent": "mlx_kv_cache_agent",
     "log_tailer": "mlx_server_log_tailer",
-    "supervisor": "mlx_server_supervisor",
 }
 
 _CONTAINER_COMPONENTS = {

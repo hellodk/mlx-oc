@@ -11,7 +11,7 @@ connectivity check is needed. This tool verifies:
   - at least one enabled macbook entry exists
   - a node can be selected (MLX_MACBOOK_ID or exactly one enabled entry)
   - model_path (when set) contains a readable config.json
-  - VENV_PYTHON and MLX_VENV_PYTHON point at executables
+  - VENV_PYTHON points at a Python executable
   - required Python packages import in the monitoring venv
   - optionally, that the exporter ports are free
 
@@ -172,10 +172,8 @@ def main() -> int:
                 errors.append(f"model path does not contain config.json: {cfg}")
 
     venv_python = env.get("VENV_PYTHON", "python3")
-    mlx_python = env.get("MLX_VENV_PYTHON", venv_python)
     for label, executable in (
         ("VENV_PYTHON", venv_python),
-        ("MLX_VENV_PYTHON", mlx_python),
     ):
         path = Path(executable).expanduser()
         if not (path.is_file() and os.access(path, os.X_OK)):
@@ -189,7 +187,7 @@ def main() -> int:
                 errors.append(f"{module} is not importable in {venv_python}")
 
     if args.check_ports:
-        for port in (8080, 9102, 9104, 9105, 9106):
+        for port in (8080, 9102, 9104, 9106):
             if not port_free(port):
                 warnings.append(f"port {port} is already in use")
 

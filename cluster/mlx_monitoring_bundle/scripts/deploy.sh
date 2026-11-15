@@ -263,28 +263,6 @@ _detect_venv() {
   return 1
 }
 
-_detect_mlx_venv() {
-  local candidates=(
-    "${MLX_VENV_PYTHON:-}"
-    "${HOME}/venvs/mlx/bin/python"
-    "${HOME}/mlx-venv/bin/python"
-    "${HOME}/.venv-mlx/bin/python"
-  )
-  for c in "${candidates[@]}"; do
-    if [[ -n "${c}" && -x "${c}" ]]; then
-      printf '%s' "${c}"
-      return 0
-    fi
-  done
-  if command -v python3 >/dev/null 2>&1; then
-    if python3 -c 'import mlx_lm' >/dev/null 2>&1; then
-      command -v python3
-      return 0
-    fi
-  fi
-  return 1
-}
-
 cmd_setup_edge() {
   local central_ip="${1:-}"
   local model_id="${2:-}"
@@ -320,14 +298,8 @@ cmd_setup_edge() {
   fi
 
   # Ensure virtualenv (creates ~/mlx-monitoring/venv if none exists)
-  local mon_python mlx_python
+  local mon_python
   mon_python="$(ensure_monitoring_venv)"
-
-  mlx_python="$(_detect_mlx_venv || true)"
-  if [[ -z "${mlx_python}" ]]; then
-    warn "Could not auto-detect a virtualenv with mlx_lm installed."
-    mlx_python="$(_prompt_input "Path to MLX Python binary (press Enter to use monitoring python)" "${mon_python}")"
-  fi
 
   # Generate nodes.yml using the monitoring python (which has pyyaml)
   local disc_cmd=(
@@ -351,7 +323,6 @@ cmd_setup_edge() {
 ENABLE_PROXY=true
 ENABLE_HW_TELEMETRY=true
 ENABLE_KV_AGENT=true
-ENABLE_SUPERVISOR=true
 ENABLE_LOGTAILER=true
 ENABLE_VMAGENT=true
 
@@ -364,12 +335,9 @@ PID_DIR=./bin
 CONFIG_DIR=./config
 
 VENV_PYTHON=${mon_python}
-MLX_VENV_PYTHON=${mlx_python}
 
+# External LLM server endpoint. The proxy listens on :8080 and forwards here.
 MLX_UPSTREAM=http://127.0.0.1:11234
-MLX_SERVER_PORT=11234
-
-SUPERVISOR_ATTACH_HEALTHY=true
 MLX_PROXY_STRICT_MODEL=false
 
 MLX_NET_IFACE=
@@ -532,7 +500,6 @@ targets = [
     ('mlx-proxy', env.get('PROXY_LISTEN', '127.0.0.1:8080'), '/metrics'),
     ('mlx-hw', env.get('HW_LISTEN', '127.0.0.1:9102'), '/metrics'),
     ('mlx-kv', env.get('KV_LISTEN', '127.0.0.1:9104'), '/metrics'),
-    ('mlx-supervisor', env.get('SUPERVISOR_LISTEN', '127.0.0.1:9105'), '/metrics'),
     ('mlx-logtailer', env.get('LOGTAILER_LISTEN', '127.0.0.1:9106'), '/metrics'),
 ]
 target_rows = []
