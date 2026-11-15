@@ -312,7 +312,7 @@
       },
       "targets": [
         {
-          "expr": "topk(10, process_ranking_info{device=~\"$device\"})",
+          "expr": "bottomk(10, process_ranking_info{device=~\"$device\"})",
           "format": "table",
           "instant": true,
           "refId": "A"

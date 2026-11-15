@@ -32,7 +32,6 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import yaml
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 BUNDLE_DIR = SCRIPT_DIR.parent
@@ -80,9 +79,19 @@ def get_local_ips() -> set[str]:
 def probe_tcp(addr: str, timeout: float = 0.8) -> tuple[bool, float | str]:
     """Test TCP socket connection and measure latency in milliseconds."""
     try:
-        host, port = addr.split(":") if ":" in addr else ("127.0.0.1", addr)
+        raw = addr.strip()
+        if "://" in raw:
+            parsed = urllib.parse.urlsplit(raw)
+            host = parsed.hostname or "127.0.0.1"
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        elif ":" in raw:
+            host, port_str = raw.rsplit(":", 1)
+            host = host.strip("[]") or "127.0.0.1"
+            port = int(port_str)
+        else:
+            host, port = "127.0.0.1", int(raw)
         t0 = time.time()
-        with socket.create_connection((host, int(port)), timeout=timeout):
+        with socket.create_connection((host, port), timeout=timeout):
             latency = (time.time() - t0) * 1000
             return True, latency
     except Exception as exc:
@@ -116,6 +125,7 @@ def load_config() -> dict:
     nodes = {}
     if nodes_path.is_file():
         try:
+            import yaml
             nodes = yaml.safe_load(nodes_path.read_text(encoding="utf-8")) or {}
         except Exception:
             pass
@@ -170,7 +180,7 @@ def load_config() -> dict:
             os.environ.get("GRAFANA_ADMIN_PASSWORD")
             or central_env.get("GRAFANA_ADMIN_PASSWORD")
             or edge_env.get("GRAFANA_ADMIN_PASSWORD")
-            or "admin"
+            or "changeme"
         ),
         "grafana_anon": os.environ.get("GRAFANA_ANONYMOUS_ENABLED") or central_env.get("GRAFANA_ANONYMOUS_ENABLED", "false"),
     }

@@ -1218,6 +1218,102 @@ def test_passive_server_observer_helpers_and_main(monkeypatch):
     sup.main()
 
 
+def test_mlx_logging_traceback_and_upstream_url(tmp_path):
+    """Verify exc_info=True writes traceback into JSON 'err' and parse_upstream_url normalizes formats."""
+    import json
+    import sys
+
+    sys.path.insert(0, str(BUNDLE_DIR / "edge" / "exporters"))
+    import mlx_logging as mlog
+
+    mlog.setup_logging(service="test-audit", macbook="test-mac", log_dir=tmp_path)
+    try:
+        raise ValueError("boom-trace")
+    except ValueError:
+        mlog.error("caught failure", component="test", exc_info=True)
+
+    log_file = tmp_path / "test-audit.log"
+    lines = [json.loads(line) for line in log_file.read_text(encoding="utf8").splitlines() if line.strip()]
+    assert lines, "expected at least one JSON log record"
+    rec = lines[-1]
+    assert rec["msg"] == "caught failure"
+    assert "ValueError: boom-trace" in rec.get("err", "")
+
+    assert mlog.parse_upstream_url("127.0.0.1:11234") == (
+        "http", "127.0.0.1", 11234, "http://127.0.0.1:11234"
+    )
+    assert mlog.parse_upstream_url("https://llm.local:8443/v1") == (
+        "https", "llm.local", 8443, "https://llm.local:8443"
+    )
+    assert mlog.parse_upstream_url("localhost", default_port=8000) == (
+        "http", "localhost", 8000, "http://localhost:8000"
+    )
+
+
+def test_mlx_model_info_served_model_and_zero_int():
+    """Verify _pick_served_model_id skips default_model and _first_int preserves 0."""
+    import sys
+
+    sys.path.insert(0, str(BUNDLE_DIR / "edge" / "exporters"))
+    import mlx_model_info as mmi
+
+    assert mmi._first_int({"a": 0, "b": 42}, "a", "b", default=99) == 0
+    assert mmi._pick_served_model_id([
+        {"id": "default_model"},
+        {"id": "mlx-community/Qwen2.5-7B"},
+    ]) == "mlx-community/Qwen2.5-7B"
+
+
+def test_sbom_non_base_missing_reference_not_in_sync(tmp_path, monkeypatch):
+    """Verify non-base nodes do not falsely claim IN_SYNC when sbom_base_reference.json is absent."""
+    import sys
+
+    sys.path.insert(0, str(BUNDLE_DIR / "edge" / "exporters"))
+    import mlx_sbom_collector as sbom
+
+    monkeypatch.setattr(sbom, "CONFIG_DIR", tmp_path)
+    status, mismatch_cnt, missing_cnt, diffs = sbom._evaluate_drift(
+        node_name="edge-mac-2",
+        base_device="edge-mac-1",
+        current_items=[{"package": "python3", "version": "3.12", "ecosystem": "system", "path": "/usr/bin/python3", "hash": "x"}],
+    )
+    assert status == "NO_REFERENCE"
+    assert mismatch_cnt == 0
+    assert missing_cnt == 0
+    assert diffs == []
+
+
+def test_bundle_stop_does_not_kill_self(tmp_path, monkeypatch):
+    """Verify MonitoringBundle.stop() never signals os.getpid() during self-shutdown."""
+    import os
+    import sys
+
+    sys.path.insert(0, str(BUNDLE_DIR / "edge"))
+    import mlx_monitoring_bundle as mb
+
+    pid_dir = tmp_path / "bin"
+    pid_dir.mkdir(parents=True, exist_ok=True)
+    bundle_pid_file = pid_dir / "mlx_monitoring_bundle.pid"
+    bundle_pid_file.write_text(str(os.getpid()), encoding="utf8")
+    (pid_dir / "hw.pid").write_text("999991", encoding="utf8")
+
+    monkeypatch.setattr(mb, "PID_FILE", bundle_pid_file)
+    monkeypatch.setattr(mb, "pid_alive", lambda _p: True)
+
+    killed = []
+    monkeypatch.setattr(os, "getpgid", lambda p: p)
+    monkeypatch.setattr(os, "killpg", lambda pgid, sig: killed.append(("killpg", pgid, sig)))
+    monkeypatch.setattr(os, "kill", lambda pid, sig: killed.append(("kill", pid, sig)))
+
+    bundle = object.__new__(mb.Bundle)
+    bundle.pid_dir = pid_dir
+    bundle.stop()
+
+    assert not any(pid == os.getpid() for _, pid, _ in killed)
+    assert any(pid == 999991 for _, pid, _ in killed)
+
+
+
 
 
 

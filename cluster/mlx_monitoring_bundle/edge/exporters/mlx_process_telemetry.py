@@ -259,19 +259,42 @@ def _sample_processes(node_name: str, top_k: int = 10) -> None:
             pid=str(p["pid"]),
         ).set(p["rss_bytes"])
 
-    # 3. Top Process Disk & Network I/O (using /proc or platform approximations)
-    # Estimate I/O throughput from active memory churn and active processes
+    # 3. Top Process Disk & Network I/O (real psutil counters when available; 0.0 otherwise)
     top_io_procs = sorted(
         procs,
         key=lambda p: (p["cpu_pct"] * 0.4) + (p["rss_bytes"] / (1024 * 1024 * 1024) * 0.6),
         reverse=True,
     )[:top_k]
 
-    for idx, p in enumerate(top_io_procs):
-        # Base realistic I/O rate proportional to memory/cpu activity for top processes
-        base_rate = (p["cpu_pct"] * 1024 * 128) + (math.sqrt(p["rss_bytes"]) * 64)
-        disk_rate = max(0.0, base_rate * (1.0 - (idx * 0.08)))
-        net_rate = max(0.0, base_rate * 0.35 * (1.0 - (idx * 0.05)))
+    active_pids = {p["pid"] for p in procs}
+    for stale_pid in list(_PREV_IO_SNAPSHOTS.keys()):
+        if stale_pid not in active_pids:
+            del _PREV_IO_SNAPSHOTS[stale_pid]
+
+    try:
+        import psutil  # optional dependency
+    except ImportError:
+        psutil = None
+
+    for p in top_io_procs:
+        disk_rate = 0.0
+        if psutil is not None:
+            try:
+                io = psutil.Process(p["pid"]).io_counters()
+                cur_read = float(getattr(io, "read_bytes", 0))
+                cur_write = float(getattr(io, "write_bytes", 0))
+                prev = _PREV_IO_SNAPSHOTS.get(p["pid"])
+                _PREV_IO_SNAPSHOTS[p["pid"]] = (cur_read, cur_write, now)
+                if prev is not None and now > prev[2]:
+                    dt = now - prev[2]
+                    delta_bytes = max(0.0, (cur_read - prev[0]) + (cur_write - prev[1]))
+                    disk_rate = delta_bytes / dt
+            except Exception:
+                disk_rate = 0.0
+
+        # Per-PID network I/O is not exposed portably by POSIX ps/psutil; report 0.0
+        # rather than fabricating synthetic estimates.
+        net_rate = 0.0
 
         G_PROCESS_DISK_IO.labels(
             device=node_name,
@@ -356,7 +379,8 @@ def _sample_processes(node_name: str, top_k: int = 10) -> None:
 class MetricsHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path in ("/metrics", "/metrics/"):
-            data = generate_latest(REGISTRY)
+            with _SAMPLE_LOCK:
+                data = generate_latest(REGISTRY)
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
@@ -371,6 +395,7 @@ class MetricsHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
         else:
             self.send_response(404)
+            self.send_header("Content-Length", "0")
             self.end_headers()
 
     def log_message(self, format: str, *args: Any) -> None:
@@ -451,8 +476,7 @@ def main() -> int:
     def _shutdown_handler(signum: int, frame: Any) -> None:
         info("received termination signal, stopping process profiler...", component="process-profiler")
         stop_event.set()
-        server.shutdown()
-        sys.exit(0)
+        threading.Thread(target=server.shutdown, daemon=True).start()
 
     signal.signal(signal.SIGTERM, _shutdown_handler)
     signal.signal(signal.SIGINT, _shutdown_handler)

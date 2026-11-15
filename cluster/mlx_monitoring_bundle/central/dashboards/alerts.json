@@ -16,7 +16,7 @@
         "name": "device",
         "type": "query",
         "datasource": "VictoriaMetrics",
-        "query": "label_values(ALERTS, device)",
+        "query": "label_values(mlx_hw_up, device)",
         "includeAll": true,
         "allValue": ".+",
         "multi": false,

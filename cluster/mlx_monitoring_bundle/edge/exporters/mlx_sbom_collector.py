@@ -393,19 +393,18 @@ def _load_or_save_baseline_reference(
     node_name: str,
     base_device: str,
     current_items: List[Dict[str, Any]],
-) -> Dict[str, Dict[str, Any]]:
+) -> Optional[Dict[str, Dict[str, Any]]]:
     """Load baseline reference inventory; if current node is base, update reference file."""
     ref_file = CONFIG_DIR / "sbom_base_reference.json"
-    ref_map: Dict[str, Dict[str, Any]] = {}
 
     if node_name == base_device:
         # We are the baseline authority; write reference
+        ref_data = {item["package"]: item for item in current_items}
         try:
-            ref_data = {item["package"]: item for item in current_items}
             ref_file.write_text(json.dumps(ref_data, indent=2), encoding="utf8")
-            return ref_data
         except Exception as exc:
             debug(f"failed to write base reference: {exc!r}", component="sbom")
+        return ref_data
 
     if ref_file.is_file():
         try:
@@ -415,8 +414,8 @@ def _load_or_save_baseline_reference(
         except Exception as exc:
             debug(f"failed to read base reference: {exc!r}", component="sbom")
 
-    # If no reference exists, build default baseline mapping from current items
-    return {item["package"]: item for item in current_items}
+    # Non-base node without a synced reference must not claim IN_SYNC against itself.
+    return None
 
 
 def _evaluate_drift(
@@ -426,6 +425,8 @@ def _evaluate_drift(
 ) -> Tuple[str, int, int, List[Dict[str, Any]]]:
     """Compare local items against base device reference to compute delta."""
     baseline = _load_or_save_baseline_reference(node_name, base_device, current_items)
+    if baseline is None:
+        return "NO_REFERENCE", 0, 0, []
     curr_map = {item["package"]: item for item in current_items}
 
     diffs: List[Dict[str, Any]] = []
@@ -490,9 +491,11 @@ def collect_and_update_metrics(node_name: str, base_device: str) -> None:
     G_SBOM_PACKAGE_INFO.clear()
     G_SBOM_TOTAL_PACKAGES.clear()
     G_SBOM_DRIFT_STATUS.clear()
+    G_SBOM_DEVICE_DRIFT_SUMMARY.clear()
     G_SBOM_DRIFT_MISMATCH_COUNT.clear()
     G_SBOM_MISSING_PACKAGE_COUNT.clear()
     G_SBOM_DRIFT_DIFF.clear()
+    G_SBOM_DRIFT_DETAILS.clear()
 
     # 3. Populate package inventory gauges
     counts_by_eco: Dict[str, int] = {}
@@ -580,7 +583,8 @@ def collect_and_update_metrics(node_name: str, base_device: str) -> None:
 class SbomHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path in ("/metrics", "/metrics/"):
-            data = generate_latest(REGISTRY)
+            with _SCAN_LOCK:
+                data = generate_latest(REGISTRY)
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
@@ -597,6 +601,7 @@ class SbomHandler(BaseHTTPRequestHandler):
                 self.wfile.write(content)
             else:
                 self.send_response(404)
+                self.send_header("Content-Length", "0")
                 self.end_headers()
         elif self.path in ("/health", "/healthz", "/"):
             resp = b'{"status":"healthy","service":"mlx-sbom-collector"}\n'
@@ -607,6 +612,7 @@ class SbomHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
         else:
             self.send_response(404)
+            self.send_header("Content-Length", "0")
             self.end_headers()
 
     def log_message(self, format: str, *args: Any) -> None:
@@ -692,8 +698,7 @@ def main() -> int:
     def _shutdown_handler(signum: int, frame: Any) -> None:
         info("received termination signal, stopping sbom collector...", component="sbom")
         stop_event.set()
-        server.shutdown()
-        sys.exit(0)
+        threading.Thread(target=server.shutdown, daemon=True).start()
 
     signal.signal(signal.SIGTERM, _shutdown_handler)
     signal.signal(signal.SIGINT, _shutdown_handler)

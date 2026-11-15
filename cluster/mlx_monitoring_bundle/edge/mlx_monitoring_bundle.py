@@ -30,10 +30,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -302,16 +304,16 @@ class Bundle:
         return env
 
     def _spawn(self, name: str, cmd: list) -> int:
-        logf = open(self.log_dir / f"{name}.bundle.log", "a", encoding="utf8")
         env = self._child_env(name)
-        p = subprocess.Popen(
-            cmd,
-            cwd=str(BUNDLE_DIR / "exporters"),
-            env=env,
-            stdout=logf,
-            stderr=logf,
-            start_new_session=True,
-        )
+        with open(self.log_dir / f"{name}.bundle.log", "a", encoding="utf8") as logf:
+            p = subprocess.Popen(
+                cmd,
+                cwd=str(BUNDLE_DIR / "exporters"),
+                env=env,
+                stdout=logf,
+                stderr=logf,
+                start_new_session=True,
+            )
         self.procs[name] = p
         write_pid(self.pid_dir / f"{name}.pid", p.pid)
         return p.pid
@@ -442,7 +444,6 @@ class Bundle:
                 "SBOM_LISTEN": config_val(self.config, "SBOM_LISTEN", "127.0.0.1:9108"),
             }
             # Single-pass substitution: replace ${VAR} and ${VAR:-default}.
-            import re
 
             def repl(m):
                 expr = m.group(1)
@@ -485,18 +486,18 @@ class Bundle:
             ]
         if self.otlp_scheme == "https" and not self.otlp_verify_tls:
             cmd.append("-remoteWrite.tlsSkipVerify=true")
-        logf = open(self.log_dir / "vmagent.bundle.log", "a", encoding="utf8")
         env = dict(os.environ)
         env["MLX_SERVICE_NAME"] = "vmagent"
         env["MLX_MACBOOK_ID"] = self.macbook
-        p = subprocess.Popen(
-            cmd,
-            cwd=str(BUNDLE_DIR),
-            env=env,
-            stdout=logf,
-            stderr=logf,
-            start_new_session=True,
-        )
+        with open(self.log_dir / "vmagent.bundle.log", "a", encoding="utf8") as logf:
+            p = subprocess.Popen(
+                cmd,
+                cwd=str(BUNDLE_DIR),
+                env=env,
+                stdout=logf,
+                stderr=logf,
+                start_new_session=True,
+            )
         self.procs["vmagent"] = p
         write_pid(self.pid_dir / "vmagent.pid", p.pid)
         info(f"started vmagent (pid={p.pid})", component="bundle")
@@ -546,29 +547,31 @@ class Bundle:
         }
 
     def stop(self):
-        bp = read_pid(PID_FILE)
-        if bp and pid_alive(bp):
-            try:
-                os.killpg(os.getpgid(bp), signal.SIGTERM)
-            except Exception as exc:
-                debug(f"killpg bundle failed: {exc!r}", component="bundle")
-                try:
-                    os.kill(bp, signal.SIGTERM)
-                except Exception as exc2:
-                    debug(f"kill bundle failed: {exc2!r}", component="bundle")
+        # Stop child exporters before signalling any external bundle PID so an
+        # in-process signal handler never kills itself mid-cleanup.
         for name in ["supervisor", "logtailer", "kv", "hw", "proxy", "process", "sbom", "vmagent"]:
             pfile = self.pid_dir / f"{name}.pid"
             pid = read_pid(pfile)
-            if pid:
+            if pid and pid != os.getpid():
                 try:
                     os.killpg(os.getpgid(pid), signal.SIGTERM)
-                except Exception as exc:
+                except OSError as exc:
                     debug(f"killpg {name} failed: {exc!r}", component="bundle")
                     try:
                         os.kill(pid, signal.SIGTERM)
-                    except Exception as exc2:
+                    except OSError as exc2:
                         debug(f"kill {name} failed: {exc2!r}", component="bundle")
-                remove_pid(pfile)
+            remove_pid(pfile)
+        bp = read_pid(PID_FILE)
+        if bp and bp != os.getpid() and pid_alive(bp):
+            try:
+                os.killpg(os.getpgid(bp), signal.SIGTERM)
+            except OSError as exc:
+                debug(f"killpg bundle failed: {exc!r}", component="bundle")
+                try:
+                    os.kill(bp, signal.SIGTERM)
+                except OSError as exc2:
+                    debug(f"kill bundle failed: {exc2!r}", component="bundle")
         remove_pid(PID_FILE)
 
     def start(self):
@@ -586,7 +589,7 @@ class Bundle:
         write_pid(PID_FILE, os.getpid())
         try:
             os.setsid()
-        except Exception as exc:
+        except OSError as exc:
             debug(f"os.setsid failed: {exc!r}", component="bundle")
 
         started = []
@@ -594,32 +597,48 @@ class Bundle:
             self.start_server_monitor()
             started.append("supervisor:9105")
         if self.enable_kv:
-            self.start_kv(); started.append("kv:9104")
+            self.start_kv()
+            started.append("kv:9104")
         if self.enable_logtailer:
-            self.start_logtailer(); started.append("logtailer:9106")
+            self.start_logtailer()
+            started.append("logtailer:9106")
         if self.enable_proxy:
-            self.start_proxy(); started.append("proxy:8080")
+            self.start_proxy()
+            started.append("proxy:8080")
         if self.enable_hw:
-            self.start_hw(); started.append("hw:9102")
+            self.start_hw()
+            started.append("hw:9102")
         if self.enable_process:
-            self.start_process(); started.append("process:9107")
+            self.start_process()
+            started.append("process:9107")
         if self.enable_sbom:
-            self.start_sbom(); started.append("sbom:9108")
+            self.start_sbom()
+            started.append("sbom:9108")
         if self.enable_vmagent:
-            self.start_vmagent(); started.append("vmagent")
+            self.start_vmagent()
+            started.append("vmagent")
 
         info(f"started: {', '.join(started)}", component="bundle")
 
+        stop_event = threading.Event()
+
         def _handle_exit(signum, frame):
-            self.stop()
-            sys.exit(0)
+            stop_event.set()
 
         signal.signal(signal.SIGTERM, _handle_exit)
         signal.signal(signal.SIGINT, _handle_exit)
 
+        reported_exits: set[str] = set()
         try:
-            while True:
-                time.sleep(10)
+            while not stop_event.wait(10):
+                for name, proc in list(self.procs.items()):
+                    rc = proc.poll()
+                    if rc is not None and name not in reported_exits:
+                        reported_exits.add(name)
+                        error(
+                            f"child process {name} (pid={proc.pid}) exited unexpectedly with rc={rc}",
+                            component="bundle",
+                        )
         except KeyboardInterrupt:
             pass
         finally:

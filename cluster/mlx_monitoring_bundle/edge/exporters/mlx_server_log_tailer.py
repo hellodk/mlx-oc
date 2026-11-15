@@ -134,20 +134,24 @@ class TokenBucket:
 class Tailer:
     def __init__(self, log_path: Path, exporter: str, rate: float,
                  include_http: bool, all_lines: bool,
-                 backfill: int, project: str, macbook: str):
+                 backfill: int, project: str, macbook: str,
+                 verify_tls: bool = True):
         self.log_path = log_path
         self.include_http = include_http or all_lines
         self.all_lines = all_lines
         self.backfill = max(backfill, 0)
         self.project = project
         self.macbook = macbook
+        self.verify_tls = verify_tls
         self.stop = threading.Event()
         self._bucket = TokenBucket(rate=rate, capacity=max(rate, 50.0))
         self._provider = None
         self._logger = None
+        self._processor = None
         self._prepare_exporter(exporter)
 
     def _prepare_exporter(self, endpoint: str) -> None:
+        import requests
         from opentelemetry._logs import set_logger_provider
         from opentelemetry.exporter.otlp.proto.http._log_exporter import (
             OTLPLogExporter,
@@ -161,21 +165,24 @@ class Tailer:
             HOST_NAME: socket.gethostname(),
             "mlx.node.name": self.macbook,
         })
+        session = requests.Session()
+        session.verify = self.verify_tls
         provider = LoggerProvider(resource=resource)
-        provider.add_log_record_processor(
-            BatchLogRecordProcessor(
-                OTLPLogExporter(
-                    endpoint=sig_url(endpoint, "logs"),
-                    headers={"projectName": self.project},
-                    timeout=5,
-                ),
-                max_queue_size=2048,
-                max_export_batch_size=256,
-                schedule_delay_millis=5000,
-            )
+        processor = BatchLogRecordProcessor(
+            OTLPLogExporter(
+                endpoint=sig_url(endpoint, "logs"),
+                headers={"projectName": self.project},
+                timeout=5,
+                session=session,
+            ),
+            max_queue_size=2048,
+            max_export_batch_size=256,
+            schedule_delay_millis=5000,
         )
+        provider.add_log_record_processor(processor)
         set_logger_provider(provider)
         self._provider = provider
+        self._processor = processor
         self._logger = provider.get_logger("mlx.log.tailer")
 
     def _emit(self, line: str, severity: str, category: str) -> None:
@@ -195,33 +202,72 @@ class Tailer:
         )
         G_SHIPPED.labels(severity=severity).inc()
 
+    def _update_queue_gauge(self) -> None:
+        q = getattr(self._processor, "_queue", None)
+        if q is not None:
+            try:
+                G_QUEUE.set(len(q))
+            except TypeError:
+                pass
+
     def run(self) -> None:
-        if not self.log_path.exists():
-            info(f"{self.log_path} not found; waiting for it",
-                 component="logtailer")
-            while not self.stop.is_set() and not self.log_path.exists():
-                time.sleep(1.0)
+        while not self.stop.is_set():
+            if not self.log_path.exists():
+                info(f"{self.log_path} not found; waiting for it",
+                     component="logtailer")
+                while not self.stop.is_set() and not self.log_path.exists():
+                    self.stop.wait(1.0)
+                if self.stop.is_set():
+                    break
 
-        with open(self.log_path, "rb") as fh:
-            if self.backfill:
-                fh.seek(0, 2)
-                size = fh.tell()
-                fh.seek(max(0, size - 1))
-                while fh.tell() > 0 and size - fh.tell() < self.backfill * 200:
-                    fh.seek(fh.tell() - 1)
-                fh.readline()
-            else:
-                fh.seek(0, 2)
+            try:
+                with open(self.log_path, "rb") as fh:
+                    st = os.fstat(fh.fileno())
+                    cur_inode = (st.st_dev, st.st_ino)
+                    if self.backfill:
+                        fh.seek(0, os.SEEK_END)
+                        size = fh.tell()
+                        approx_bytes = self.backfill * 200
+                        if size > approx_bytes:
+                            fh.seek(size - approx_bytes)
+                            fh.readline()
+                        else:
+                            fh.seek(0)
+                    else:
+                        fh.seek(0, os.SEEK_END)
+                    G_UP.set(1)
 
-            line = fh.readline()
-            while not self.stop.is_set():
-                if line:
-                    G_POS.set(fh.tell())
-                    self._handle_line(line.decode("utf-8", "replace"))
-                    line = fh.readline()
-                    continue
-                time.sleep(DEFAULT_POLL_INTERVAL)
-                line = fh.readline()
+                    while not self.stop.is_set():
+                        line = fh.readline()
+                        if line:
+                            G_POS.set(fh.tell())
+                            self._handle_line(line.decode("utf-8", "replace"))
+                            self._update_queue_gauge()
+                            continue
+                        self._update_queue_gauge()
+                        # Detect rename rotation or copytruncate
+                        try:
+                            path_st = os.stat(self.log_path)
+                            if (path_st.st_dev, path_st.st_ino) != cur_inode:
+                                info(f"{self.log_path} rotated (inode changed); reopening",
+                                     component="logtailer")
+                                break
+                            if path_st.st_size < fh.tell():
+                                info(f"{self.log_path} truncated; seeking to 0",
+                                     component="logtailer")
+                                fh.seek(0)
+                                G_POS.set(0)
+                        except FileNotFoundError:
+                            info(f"{self.log_path} missing during rotation; waiting",
+                                 component="logtailer")
+                            break
+                        self.stop.wait(DEFAULT_POLL_INTERVAL)
+            except OSError as exc:
+                G_ERRORS.inc()
+                G_UP.set(0)
+                error(f"log tailer I/O error on {self.log_path}: {exc!r}",
+                      component="logtailer")
+                self.stop.wait(1.0)
 
     def _handle_line(self, raw: str) -> None:
         line = raw.rstrip("\n").rstrip("\r")
@@ -247,6 +293,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path != "/metrics":
             self.send_response(404)
+            self.send_header("Content-Length", "0")
             self.end_headers()
             return
         body = generate_latest()
@@ -314,9 +361,11 @@ def main():
         backfill=args.backfill,
         project=args.project,
         macbook=os.environ.get("MLX_MACBOOK_ID", "unknown"),
+        verify_tls=args.otlp_verify_tls,
     )
 
     host, _, port = args.listen.rpartition(":")
+    ThreadingHTTPServer.allow_reuse_address = True
     server = ThreadingHTTPServer((host or "0.0.0.0", int(port or 9106)), Handler)
 
     def _shutdown(signum, frame):
@@ -333,12 +382,13 @@ def main():
         server.serve_forever()
     finally:
         tailer.stop.set()
+        t.join(timeout=2.0)
         try:
             if tailer._provider:
                 tailer._provider.force_flush(timeout_millis=3000)
                 tailer._provider.shutdown()
         except Exception as exc:
-            debug(f"opentelemetry provider shutdown failed: {exc!r}", component="log_tailer")
+            debug(f"opentelemetry provider shutdown failed: {exc!r}", component="logtailer")
         server.server_close()
 
 

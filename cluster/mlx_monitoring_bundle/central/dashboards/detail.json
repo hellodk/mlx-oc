@@ -405,7 +405,7 @@
           ],
           "fieldConfig": {
             "defaults": {
-              "unit": "percentunit",
+              "unit": "percent",
               "min": 0,
               "max": 100
             }

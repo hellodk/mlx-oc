@@ -32,6 +32,7 @@ import os
 import random
 import re
 import socket
+import ssl
 import sys
 import threading
 import time
@@ -49,7 +50,24 @@ from prometheus_client import (
     CONTENT_TYPE_LATEST,
 )
 
-from mlx_logging import degraded, debug, error, info, setup_logging
+from mlx_logging import degraded, debug, error, info, parse_upstream_url, setup_logging
+
+
+def _make_upstream_conn(
+    upstream: tuple[str, int] | tuple[str, str, int, str],
+    timeout: int = 300,
+) -> http.client.HTTPConnection:
+    """Create an HTTP(S) connection to the normalized upstream endpoint."""
+    if len(upstream) == 2:
+        scheme = "http"
+        host, port = upstream
+    else:
+        scheme, host, port, _ = upstream
+    if scheme == "https":
+        verify = os.environ.get("OTLP_VERIFY_TLS", "true").lower() != "false"
+        ctx = ssl.create_default_context() if verify else ssl._create_unverified_context()
+        return http.client.HTTPSConnection(host, port, timeout=timeout, context=ctx)
+    return http.client.HTTPConnection(host, port, timeout=timeout)
 
 try:
     from mlx_model_info import model_info as _model_info
@@ -427,9 +445,10 @@ def perplexity(confidences) -> float:
         return 0.0
     mean_logp = sum(math.log(max(p, _EPS)) for p in confidences) / len(confidences)
     try:
-        return math.exp(-mean_logp)
+        val = math.exp(-mean_logp)
+        return val if math.isfinite(val) else 0.0
     except OverflowError:
-        return float("inf")
+        return 0.0
 
 
 def confidence_stats(confidences) -> tuple:
@@ -738,17 +757,19 @@ class Proxy(BaseHTTPRequestHandler):
     strict_model = True
     model_aliases = []
     _rate_hits = {}
+    _rate_lock = threading.Lock()
 
     def _rate_limited(self, key):
         now = time.monotonic()
-        hits = [t for t in self._rate_hits.get(key, [])
-                if now - t < self.rate_window]
-        if len(hits) >= self.rate_limit:
+        with self._rate_lock:
+            hits = [t for t in self._rate_hits.get(key, [])
+                    if now - t < self.rate_window]
+            if len(hits) >= self.rate_limit:
+                self._rate_hits[key] = hits
+                return True
+            hits.append(now)
             self._rate_hits[key] = hits
-            return True
-        hits.append(now)
-        self._rate_hits[key] = hits
-        return False
+            return False
 
     def log_message(self, fmt, *args):
         line = "%s - %s" % (self.address_string(), fmt % args)
@@ -812,21 +833,6 @@ class Proxy(BaseHTTPRequestHandler):
 
     def _forward(self):
         t_arrival = time.monotonic()
-        length = int(self.headers.get("Content-Length", 0) or 0)
-
-        if self.api_key and self.headers.get("Authorization") != f"Bearer {self.api_key}":
-            self._reject(401, {"error": {"message": "unauthorized",
-                                         "type": "authentication_error"}},
-                         _MODEL_NAME or "unknown", "auth")
-            return
-        if length > self.max_body_bytes:
-            self._reject(413, {"error": {"message": "request body too large",
-                                         "type": "invalid_request_error"}},
-                         _MODEL_NAME or "unknown", "chat")
-            return
-
-        body = self.rfile.read(length) if length else b""
-
         req_path = self.path
         if self.path == self.metrics_path:
             payload = generate_latest()
@@ -836,6 +842,26 @@ class Proxy(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(payload)
             return
+
+        length = int(self.headers.get("Content-Length", 0) or 0)
+
+        if self.api_key and self.headers.get("Authorization") != f"Bearer {self.api_key}":
+            self._reject(401, {"error": {"message": "unauthorized",
+                                         "type": "authentication_error"}},
+                         _MODEL_NAME or "unknown", "auth")
+            return
+        if self.rate_limit > 0 and self._rate_limited(self.client_address[0]):
+            self._reject(429, {"error": {"message": "rate limit exceeded",
+                                         "type": "rate_limit_error"}},
+                         _MODEL_NAME or "unknown", "rate_limit")
+            return
+        if length > self.max_body_bytes:
+            self._reject(413, {"error": {"message": "request body too large",
+                                         "type": "invalid_request_error"}},
+                         _MODEL_NAME or "unknown", "chat")
+            return
+
+        body = self.rfile.read(length) if length else b""
 
         model = _MODEL_NAME or "unknown"
         streaming = False
@@ -888,11 +914,13 @@ class Proxy(BaseHTTPRequestHandler):
                     )
                     return
                 mt = req.get("max_tokens")
+                body_dirty = False
                 if mt is None:
                     req["max_tokens"] = self.max_tokens_cap
+                    body_dirty = True
                 elif mt > self.max_tokens_cap:
                     req["max_tokens"] = self.max_tokens_cap
-                    body = json.dumps(req).encode("utf-8")
+                    body_dirty = True
 
                 if req.get("logprobs"):
                     lp_source = "client" if not streaming else ""
@@ -907,9 +935,11 @@ class Proxy(BaseHTTPRequestHandler):
                         req["top_logprobs"] = self.logprobs_top
                         if synth_sse:
                             req["stream"] = False
-                        body = json.dumps(req).encode("utf-8")
-            except json.JSONDecodeError:
-                pass
+                        body_dirty = True
+                if body_dirty:
+                    body = json.dumps(req).encode("utf-8")
+            except json.JSONDecodeError as exc:
+                debug(f"invalid JSON chat body: {exc!r}", component="proxy")
             if _OPIK is not None and self.headers.get("X-Mlx-Trace", "1") != "0":
                 try:
                     opik_trace = _OPIK.trace(
@@ -935,15 +965,12 @@ class Proxy(BaseHTTPRequestHandler):
                             "messages": messages,
                         },
                     )
-                    _OPIK.flush()
                 except Exception as exc:
                     error(f"opik trace start failed ({exc!r})", component="proxy")
                     opik_trace = None
                     opik_span = None
 
-        conn = http.client.HTTPConnection(
-            self.upstream[0], self.upstream[1], timeout=300
-        )
+        conn = _make_upstream_conn(self.upstream, timeout=300)
         headers = {}
         for k, v in self.headers.items():
             if k.lower() in (
@@ -1030,6 +1057,7 @@ class Proxy(BaseHTTPRequestHandler):
 
             parser = _StreamParser()
             content_bytes = []
+            client_disconnected = False
 
             while True:
                 chunk = resp.read1(65536)
@@ -1041,9 +1069,13 @@ class Proxy(BaseHTTPRequestHandler):
                         t_first_token = time.monotonic()
                 else:
                     content_bytes.append(chunk)
-                if not rewrite:
-                    self.wfile.write(chunk)
-                    self.wfile.flush()
+                if not rewrite and not client_disconnected:
+                    try:
+                        self.wfile.write(chunk)
+                        self.wfile.flush()
+                    except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                        client_disconnected = True
+                        debug("downstream client disconnected mid-stream", component="proxy")
 
             t_done = time.monotonic()
 
@@ -1083,18 +1115,40 @@ class Proxy(BaseHTTPRequestHandler):
 
             lp_obj = choice_logprobs(resp_obj) if lp_source else None
 
-            if rewrite:
-                self._send_rewritten(
-                    status, resp_headers, resp_obj, content_bytes,
-                    synth_sse, model,
-                )
+            if rewrite and not client_disconnected:
+                try:
+                    self._send_rewritten(
+                        status, resp_headers, resp_obj, content_bytes,
+                        synth_sse, model,
+                    )
+                except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                    debug("downstream client disconnected before rewritten send", component="proxy")
 
             if not is_chat:
                 return
 
+            if status >= 400:
+                REQUESTS.labels(model, kind).inc()
+                if span is not None:
+                    span.set_attribute("http.response.status_code", status)
+                    span.set_status("ERROR", f"HTTP {status}")
+                    span.end()
+                    span = None
+                if opik_span is not None:
+                    try:
+                        opik_span.end(error_info={"exception_type": f"HTTP{status}", "exception_message": f"upstream returned {status}"})
+                    except Exception as exc2:
+                        debug(f"opik_span.end failed: {exc2!r}", component="proxy")
+                if opik_trace is not None:
+                    try:
+                        opik_trace.end(error_info={"exception_type": f"HTTP{status}", "exception_message": f"upstream returned {status}"})
+                    except Exception as exc2:
+                        debug(f"opik_trace.end failed: {exc2!r}", component="proxy")
+                return
+
             if usage:
-                prompt_tokens = int(usage.get("prompt_tokens", 0))
-                comp_tokens = int(usage.get("completion_tokens", 0))
+                prompt_tokens = int(usage.get("prompt_tokens") or 0)
+                comp_tokens = int(usage.get("completion_tokens") or 0)
             else:
                 prompt_tokens = sum(
                     len(str(m.get("content", "")).split()) for m in messages
@@ -1103,7 +1157,7 @@ class Proxy(BaseHTTPRequestHandler):
             TOKENS_PROMPT.labels(model, kind).inc(prompt_tokens)
             TOKENS_COMPLETION.labels(model, kind).inc(comp_tokens)
             if usage:
-                cached = int((usage.get("prompt_tokens_details") or {}).get("cached_tokens", 0))
+                cached = int((usage.get("prompt_tokens_details") or {}).get("cached_tokens") or 0)
                 PROMPT_CACHED.labels(model, kind).inc(cached)
                 if prompt_tokens > 0:
                     PROMPT_CACHE_RATIO.labels(model=model).set(
@@ -1217,6 +1271,7 @@ class Proxy(BaseHTTPRequestHandler):
                     )
                 span.set_status("OK")
                 span.end()
+                span = None
 
             if opik_span is not None:
                 try:
@@ -1313,6 +1368,7 @@ class Proxy(BaseHTTPRequestHandler):
                 span.set_attribute("http.response.status_code", 503)
                 span.set_status("ERROR", str(exc))
                 span.end()
+                span = None
             if opik_span is not None:
                 try:
                     opik_span.end(
@@ -1373,14 +1429,30 @@ class Proxy(BaseHTTPRequestHandler):
         self.close_connection = True
 
 
-def _health_watch(upstream):
+def _health_watch(upstream, args_model: str | None = None, model_path: str | None = None):
+    global _MODEL_NAME, _CTX_MAX_TOKENS
     while True:
         try:
-            c = http.client.HTTPConnection(upstream[0], upstream[1], timeout=3)
+            c = _make_upstream_conn(upstream, timeout=3)
             c.request("GET", "/v1/models")
             r = c.getresponse()
-            UPSTREAM_UP.set(1 if r.status == 200 else 0)
+            r.read()
+            is_ok = r.status == 200
+            UPSTREAM_UP.set(1 if is_ok else 0)
             c.close()
+            if is_ok and _MODEL_NAME is None:
+                discovered = _resolve_model(args_model, upstream[3], model_path)
+                if discovered:
+                    _MODEL_NAME = discovered
+                    info(f"model discovered on health retry: {_MODEL_NAME}", component="proxy")
+                    if _model_info is not None:
+                        try:
+                            info_obj = _model_info(_MODEL_NAME, model_path=model_path, upstream_url=upstream[3])
+                            if info_obj is not None:
+                                _CTX_MAX_TOKENS = info_obj.max_context_tokens
+                                CONTEXT_MAX.labels(model=_MODEL_NAME).set(_CTX_MAX_TOKENS)
+                        except Exception as exc:
+                            debug(f"retry model_info lookup failed: {exc!r}", component="proxy")
         except Exception as exc:
             debug(f"health watch failed: {exc!r}", component="proxy")
             UPSTREAM_UP.set(0)
@@ -1480,8 +1552,11 @@ def main():
                   macbook=os.environ.get("MLX_MACBOOK_ID", "unknown"))
 
     host, _, port = args.listen.rpartition(":")
-    up_host, _, up_port = args.upstream.rpartition(":")
-    Proxy.upstream = (up_host or "127.0.0.1", int(up_port or 8081))
+    try:
+        Proxy.upstream = parse_upstream_url(args.upstream, default_port=8000)
+    except ValueError as exc:
+        error(f"invalid upstream address {args.upstream!r}: {exc}", component="proxy")
+        sys.exit(1)
     Proxy.metrics_path = args.metrics_path
     Proxy.logprobs_top = max(0, min(10, args.logprobs))
     Proxy.stream_sample = max(0.0, min(1.0, args.logprobs_stream_sample))
@@ -1495,7 +1570,7 @@ def main():
     aliases_raw = os.environ.get("MLX_MODEL_ALIASES", "")
     Proxy.model_aliases = [a.strip() for a in aliases_raw.split(",") if a.strip()]
 
-    upstream_url = f"http://{Proxy.upstream[0]}:{Proxy.upstream[1]}"
+    upstream_url = Proxy.upstream[3]
     _MODEL_NAME = _resolve_model(args.model, upstream_url, args.model_path)
 
     TOOL_CALLS.labels(model=_MODEL_NAME or "unknown", kind="", tool="", type="").inc(0)
@@ -1579,13 +1654,16 @@ def main():
         error(f"model info failed ({exc!r})", component="proxy")
 
     threading.Thread(
-        target=_health_watch, args=(Proxy.upstream,), daemon=True
+        target=_health_watch,
+        args=(Proxy.upstream, args.model, args.model_path),
+        daemon=True,
     ).start()
 
+    ThreadingHTTPServer.allow_reuse_address = True
     server = ThreadingHTTPServer((host or "0.0.0.0", int(port or 8080)), Proxy)
     info(
         f"listening on {host or '0.0.0.0'}:{port or 8080} "
-        f"-> upstream {Proxy.upstream[0]}:{Proxy.upstream[1]} "
+        f"-> upstream {Proxy.upstream[3]} "
         f"(metrics at {args.metrics_path})",
         component="proxy",
     )

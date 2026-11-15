@@ -103,8 +103,10 @@ _prompt_select() {
   local choice; read -r choice || true
   [ -z "$choice" ] && return 1
   case "$choice" in ''|*[!0-9]*) return 1;; esac
-  [ "$choice" -lt 1 ] || [ "$choice" -gt "$#" ] && return 1
-  eval "echo \${$choice}"
+  if [[ "$choice" -lt 1 || "$choice" -gt "$#" ]]; then
+    return 1
+  fi
+  printf '%s\n' "${!choice}"
 }
 
 prompt_confirm_word() {
@@ -131,6 +133,12 @@ bundle_python() {
   fi
   if [[ -n "${candidate}" && -x "${candidate}" ]]; then
     printf '%s' "${candidate}"
+    return
+  fi
+  local detected
+  detected="$(_detect_venv || true)"
+  if [[ -n "${detected}" && -x "${detected}" ]]; then
+    printf '%s' "${detected}"
     return
   fi
   printf '%s' "python3"
@@ -273,6 +281,9 @@ cmd_setup_edge() {
   info "setting up edge monitoring bundle on local machine"
   mkdir -p "${MLX_MONITORING_DIR}"
   ensure_vmagent "${vmagent_bin}"
+  if command -v vmagent >/dev/null 2>&1; then
+    vmagent_bin="$(command -v vmagent)"
+  fi
 
   mkdir -p "${EDGE_DIR}/config"
   mkdir -p "${EDGE_DIR}/logs"
@@ -820,8 +831,9 @@ pw_note = ''
 if not password:
     pw_note = ' [FAIL: Password is empty]'
 elif password == 'changeme':
-    pw_note = ' [WARN: Using default password changeme]'
-print(f'  • Admin Password  : {password}{pw_note}')
+    pw_note = ' [WARN: Using default password]'
+masked_pw = '<empty>' if not password else f'<configured: {len(password)} chars>'
+print(f'  • Admin Password  : {masked_pw}{pw_note}')
 print(f'  • Anonymous Auth  : {\"ENABLED\" if anon.lower() == \"true\" else \"DISABLED\"} (GF_AUTH_ANONYMOUS_ENABLED={anon})')
 print('Access Endpoints:')
 print(f'  • Localhost       : http://127.0.0.1:3000')
@@ -1047,12 +1059,12 @@ render_alertmanager_config() {
 
   local oncall_cfg="webhook_configs: []"
   if [[ -n "${oncall_url}" ]]; then
-    oncall_cfg="webhook_configs:\n      - url: \"${oncall_url}\"\n        send_resolved: true"
+    oncall_cfg=$'webhook_configs:\n      - url: "'"${oncall_url}"$'"\n        send_resolved: true'
   fi
 
   local default_cfg="webhook_configs: []"
   if [[ -n "${default_url}" ]]; then
-    default_cfg="webhook_configs:\n      - url: \"${default_url}\"\n        send_resolved: true"
+    default_cfg=$'webhook_configs:\n      - url: "'"${default_url}"$'"\n        send_resolved: true'
   fi
 
   python3 -c "
@@ -1391,8 +1403,7 @@ except Exception:
       ;;
     y|Y|yes|YES) ;;
     *)
-      info "Deployment aborted by user."
-      return 0
+      die "Deployment aborted by user."
       ;;
   esac
 
@@ -1641,7 +1652,7 @@ clean_edge() {
   if command -v lsof >/dev/null 2>&1; then
     for port in "${edge_ports[@]}"; do
       local pids
-      pids="$(lsof -ti :${port} 2>/dev/null || true)"
+      pids="$(lsof -ti -sTCP:LISTEN :${port} 2>/dev/null || true)"
       if [[ -n "${pids}" ]]; then
         for p in ${pids}; do
           info "terminating residual process on port ${port} (PID ${p})"

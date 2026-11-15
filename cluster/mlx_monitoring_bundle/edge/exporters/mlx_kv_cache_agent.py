@@ -19,14 +19,16 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import signal
 import sys
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import requests
 
-from mlx_logging import degraded, debug, error, info, setup_logging
+from mlx_logging import degraded, debug, error, info, parse_upstream_url, setup_logging
 from mlx_model_info import model_info as _model_info
 
 LISTEN_DEFAULT = "127.0.0.1:9104"
@@ -62,24 +64,29 @@ G_UTIL = Gauge(
 
 def _read_cache_stats(log_path: str) -> dict:
     """Return {type: (sequences, bytes)} from the last cache-stats block."""
-    latest: dict[str, tuple[int, int]] = {}
+    latest: dict[str, tuple[int, float]] = {}
+    gib = float(1024 ** 3)
     try:
-        with open(log_path, "r", errors="replace") as fh:
+        with open(log_path, "rb") as fh:
             fh.seek(0, os.SEEK_END)
             size = fh.tell()
-            fh.seek(max(0, size - 1_000_000))
-            fh.readline()
-            for line in fh:
+            if size > 1_000_000:
+                fh.seek(size - 1_000_000)
+                fh.readline()  # drop partial first line only when seeking mid-file
+            else:
+                fh.seek(0)
+            for raw_line in fh:
+                line = raw_line.decode("utf8", errors="replace")
                 m = CACHE_RE.search(line)
                 if m:
                     latest = {}
-                    latest["total"] = (int(m.group(1)), float(m.group(2)) * 1e9)
+                    latest["total"] = (int(m.group(1)), float(m.group(2)) * gib)
                     continue
                 m = TYPE_RE.search(line)
                 if m:
                     latest[m.group(1)] = (
                         int(m.group(2)),
-                        float(m.group(3)) * 1e9,
+                        float(m.group(3)) * gib,
                     )
     except FileNotFoundError:
         debug(f"log file not found yet: {log_path}", component="kv-agent")
@@ -178,15 +185,15 @@ def _update_gauges(log_path: str, model_name: str | None,
         except Exception as exc:
             degraded(f"could not resolve model info for '{model_name}': {exc!r}",
                      component="kv-agent")
+    kv_max_ctx_bytes = 0
     if info_obj is not None:
-        G_KV_MAX_CTX.set(info_obj.kv_bytes_for_max_context)
-    else:
-        G_KV_MAX_CTX.set(0)
+        kv_max_ctx_bytes = info_obj.kv_bytes_for_max_context
+    G_KV_MAX_CTX.set(kv_max_ctx_bytes)
 
     total_bytes = stats.get("total", (0, 0))[1]
     if not total_bytes:
         total_bytes = max((b for n, b in stats.values()), default=0)
-    capacity = MAX_SEQ_DEFAULT * (G_KV_MAX_CTX._value.get() or 0)
+    capacity = MAX_SEQ_DEFAULT * kv_max_ctx_bytes
     G_UTIL.set(total_bytes / capacity if capacity else 0.0)
 
 
@@ -194,6 +201,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path != "/metrics":
             self.send_response(404)
+            self.send_header("Content-Length", "0")
             self.end_headers()
             return
         body = generate_latest()
@@ -228,36 +236,60 @@ def main():
     setup_logging(service="mlx-kv-agent",
                   macbook=os.environ.get("MLX_MACBOOK_ID", "unknown"))
 
-    model_name = _resolve_model(args.model, args.upstream, args.model_path)
+    try:
+        _, _, _, upstream_base = parse_upstream_url(args.upstream, default_port=8081)
+    except ValueError as exc:
+        error(f"invalid upstream URL {args.upstream!r}: {exc}", component="kv-agent")
+        sys.exit(1)
+
+    model_name = _resolve_model(args.model, upstream_base, args.model_path)
 
     G_UP.set(1)
     info(f"log_file={args.log_file} model={model_name or '<skipped>'} "
          f"model_path={args.model_path or '<unset>'} "
          f"-> metrics on {args.listen}", component="kv-agent")
 
+    stop_event = threading.Event()
+
     def _poll():
-        while True:
+        nonlocal model_name
+        while not stop_event.is_set():
             try:
+                if model_name is None:
+                    model_name = _discover_model_from_upstream(upstream_base, args.model_path)
+                    if model_name:
+                        info(f"model discovered on retry: {model_name}", component="kv-agent")
                 _update_gauges(
                     args.log_file,
                     model_name,
                     model_path=args.model_path,
-                    upstream_url=args.upstream,
+                    upstream_url=upstream_base,
                 )
             except Exception as exc:
                 error(f"poll error: {exc!r}", component="kv-agent")
-            time.sleep(args.interval)
+            stop_event.wait(args.interval)
 
-    import threading
     threading.Thread(target=_poll, daemon=True).start()
 
     host, _, port = args.listen.rpartition(":")
+    ThreadingHTTPServer.allow_reuse_address = True
     server = ThreadingHTTPServer((host or "0.0.0.0", int(port or 9104)), Handler)
     info(f"tailing {args.log_file}", component="kv-agent")
+
+    def _shutdown(signum, frame):
+        stop_event.set()
+        threading.Thread(target=server.shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
+    finally:
+        stop_event.set()
+        server.server_close()
 
 
 if __name__ == "__main__":

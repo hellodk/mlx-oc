@@ -27,29 +27,33 @@ if [[ "${1:-}" == "--dry-run" ]]; then
   DRY_RUN=1
 fi
 
-ENGINE="docker"
-if command -v podman >/dev/null 2>&1 && ! command -v docker >/dev/null 2>&1; then
-  ENGINE="podman"
+ENGINE="podman"
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  ENGINE="docker"
+elif ! command -v podman >/dev/null 2>&1; then
+  ENGINE="docker"
 fi
+
+REGISTRY_HOST="${REGISTRY%%/*}"
 
 info() { printf '[build] %s\n' "$*" >&2; }
 err()  { printf '[build][ERR] %s\n' "$*" >&2; }
 
 login() {
   if [[ "${DRY_RUN}" == "1" ]]; then
-    info "dry-run: skipping quay login"
+    info "dry-run: skipping registry login"
     return 0
   fi
   if [[ -n "${QUAY_USERNAME:-}" && -n "${QUAY_PASSWORD:-}" ]]; then
-    printf '%s' "${QUAY_PASSWORD}" | "${ENGINE}" login quay.io -u "${QUAY_USERNAME}" --password-stdin
+    printf '%s' "${QUAY_PASSWORD}" | "${ENGINE}" login "${REGISTRY_HOST}" -u "${QUAY_USERNAME}" --password-stdin
     return
   fi
   if [[ -n "${QUAY_TOKEN:-}" ]]; then
-    printf '%s' "${QUAY_TOKEN}" | "${ENGINE}" login quay.io -u "${QUAY_USERNAME:-hellodk}" --password-stdin
+    printf '%s' "${QUAY_TOKEN}" | "${ENGINE}" login "${REGISTRY_HOST}" -u "${QUAY_USERNAME:-hellodk}" --password-stdin
     return
   fi
-  info "no QUAY credentials found; attempting existing quay login"
-  "${ENGINE}" login quay.io || true
+  info "no QUAY credentials found; attempting existing ${REGISTRY_HOST} login"
+  "${ENGINE}" login "${REGISTRY_HOST}" || true
 }
 
 full="${REGISTRY}/${REPO}:${TAG}"
@@ -63,6 +67,7 @@ if [[ "${DRY_RUN}" == "1" ]]; then
   exit 0
 fi
 
+login
 info "pushing ${full}"
 "${ENGINE}" push "${full}"
 info "pushed ${full}"

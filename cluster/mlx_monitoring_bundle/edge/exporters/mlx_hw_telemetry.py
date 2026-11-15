@@ -119,6 +119,7 @@ _NET_IFACE = ""
 _CONTAINER_STATS = False
 
 _GPU_LOCK = threading.Lock()
+_POWERMETRICS_LOCK = threading.Lock()
 _GPU_STATS = {"util": float("nan"), "freq": float("nan"),
               "gpu_power": float("nan"), "pkg_power": float("nan"),
               "cpu_power": float("nan"), "ane_power": float("nan"),
@@ -192,10 +193,11 @@ def _mem_info():
 
 def _cpu_temp():
     try:
-        out = subprocess.run(
-            ["sudo", "-n", "powermetrics", "-n", "1", "--samplers", "thermal", "-f", "text"],
-            capture_output=True, text=True, timeout=6,
-        ).stdout
+        with _POWERMETRICS_LOCK:
+            out = subprocess.run(
+                ["sudo", "-n", "powermetrics", "-n", "1", "--samplers", "thermal", "-f", "text"],
+                capture_output=True, text=True, timeout=6,
+            ).stdout
         for line in out.splitlines():
             m = re.search(r"(?:CPU die temperature|package.*temperature|temperature)\s*:\s*([\d.]+)",
                           line, re.I)
@@ -239,11 +241,12 @@ def _gpu_power_stats():
     global _GPU_STATS
     util = freq = gpu_power = pkg_power = cpu_power = ane_power = float("nan")
     try:
-        out = subprocess.run(
-            ["sudo", "-n", "powermetrics", "-n", "1",
-             "--samplers", "cpu_power,gpu_power", "-i", "1000", "-f", "text"],
-            capture_output=True, text=True, timeout=8,
-        ).stdout
+        with _POWERMETRICS_LOCK:
+            out = subprocess.run(
+                ["sudo", "-n", "powermetrics", "-n", "1",
+                 "--samplers", "cpu_power,gpu_power", "-i", "1000", "-f", "text"],
+                capture_output=True, text=True, timeout=8,
+            ).stdout
         for line in out.splitlines():
             m = re.search(r"GPU HW active residency:\s*([\d.]+)%", line)
             if m:
@@ -535,6 +538,8 @@ def _sample():
     G_WORKER_CPU.labels(NODE).set(wcpu)
     G_WORKER_RSS.labels(NODE).set(wrss)
 
+    G_PROC_CPU.clear()
+    G_PROC_RSS.clear()
     for name, (cpu, rss) in _proc_stats().items():
         G_PROC_CPU.labels(NODE, name).set(cpu)
         G_PROC_RSS.labels(NODE, name).set(rss)
@@ -618,6 +623,7 @@ def main():
     threading.Thread(target=_gpu_sampler_loop, args=(args.gpu_interval,),
                      daemon=True).start()
 
+    ThreadingHTTPServer.allow_reuse_address = True
     server = ThreadingHTTPServer(LISTEN, Handler)
     info(f"node={NODE} listening on {LISTEN[0]}:{LISTEN[1]}",
          component="hw")

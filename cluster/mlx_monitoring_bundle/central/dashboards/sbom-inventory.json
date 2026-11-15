@@ -73,7 +73,7 @@
       },
       "targets": [
         {
-          "expr": "count(count by (package, device) (mac_sbom_package_info{device=~\"$device\"})) or vector(3142)",
+          "expr": "count(count by (package, device) (mac_sbom_package_info{device=~\"$device\"})) or vector(0)",
           "legendFormat": "Artifacts",
           "refId": "A"
         }
@@ -107,7 +107,7 @@
       },
       "targets": [
         {
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"pip\"}) or vector(418)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"pip\"}) or vector(0)",
           "legendFormat": "pip packages",
           "refId": "A"
         }
@@ -141,7 +141,7 @@
       },
       "targets": [
         {
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"brew\"}) or vector(142)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"brew\"}) or vector(0)",
           "legendFormat": "brew formulae",
           "refId": "A"
         }
@@ -175,7 +175,7 @@
       },
       "targets": [
         {
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or vector(12)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or vector(0)",
           "legendFormat": "Model Weights",
           "refId": "A"
         }

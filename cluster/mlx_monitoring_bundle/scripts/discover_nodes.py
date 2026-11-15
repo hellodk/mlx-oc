@@ -35,6 +35,7 @@ Output is YAML written to stdout. Review before deploying.
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import os
 import re
@@ -78,7 +79,7 @@ def get_serial_ssh(host, user, key) -> str:
 
 def get_serial_local() -> str:
     out = run_local(["system_profiler", "SPHardwareDataType"])
-    m = re.search(r"Serial Number\s*:\s*(\S+)", out)
+    m = re.search(r"Serial Number[^:]*:\s*(\S+)", out)
     return m.group(1) if m else "unknown"
 
 
@@ -136,8 +137,8 @@ def main() -> int:
     ap.add_argument("--ssh-key", help="SSH private key for remote discovery")
     ap.add_argument("--model", help="pinned model id (optional, auto-discovered if unset)")
     ap.add_argument("--model-path", help="local model directory (optional)")
-    ap.add_argument("--enabled", action="store_true", default=True,
-                    help="mark node as enabled (default: true)")
+    ap.add_argument("--enabled", action=argparse.BooleanOptionalAction, default=True,
+                    help="mark node as enabled (default: true; --no-enabled to disable)")
     ap.add_argument("--central-victoria-metrics", required=True,
                     help="VictoriaMetrics host:port (required, no default)")
     ap.add_argument("--central-otel", required=True,
@@ -154,7 +155,7 @@ def main() -> int:
 
     if args.local:
         host = args.host or get_ip_local(target_vm_host)
-        user = args.ssh_user or os.environ.get("USER", "dk")
+        user = args.ssh_user or os.environ.get("USER") or getpass.getuser()
         key = args.ssh_key
         serial = get_serial_local()
         ip = get_ip_local(target_vm_host)
