@@ -91,7 +91,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(mlx_requests_total{device=~\"$device\", node=~\"$node\"}[1m]))",
+          "expr": "sum(rate(mlx_requests_total{device=~\"$device\"}[1m]))",
           "legendFormat": "req/s",
           "refId": "A"
         }
@@ -139,7 +139,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(mlx_error_total{status=~\"5..\", device=~\"$device\"}[5m])) / sum(rate(mlx_requests_total{device=~\"$device\"}[5m]))",
+          "expr": "(sum(rate(mlx_error_total{status=~\"5..\", device=~\"$device\"}[5m])) / (sum(rate(mlx_requests_total{device=~\"$device\"}[5m])) > 0)) or vector(0)",
           "legendFormat": "error rate",
           "refId": "A"
         }
@@ -163,8 +163,8 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_requests_total{device=~\"$device\", node=~\"$node\"}[1m])",
-          "legendFormat": "{{device}} / {{node}}",
+          "expr": "rate(mlx_requests_total{device=~\"$device\"}[1m])",
+          "legendFormat": "{{device}} ({{model}})",
           "refId": "A"
         }
       ],

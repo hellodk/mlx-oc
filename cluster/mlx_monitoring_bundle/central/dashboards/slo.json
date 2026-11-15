@@ -38,7 +38,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (device) (rate(mlx_error_total{status=~\"5..\", device=~\"$device\"}[1h])) / sum by (device) (rate(mlx_requests_total{device=~\"$device\"}[1h]))",
+          "expr": "(sum by (device) (rate(mlx_error_total{status=~\"5..\", device=~\"$device\"}[1h])) / (sum by (device) (rate(mlx_requests_total{device=~\"$device\"}[1h])) > 0)) or (0 * sum by (device) (mlx_requests_total{device=~\"$device\"}))",
           "legendFormat": "{{device}}",
           "refId": "A"
         }
@@ -64,7 +64,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (device) (rate(mlx_error_total{device=~\"$device\"}[1h])) / sum by (device) (rate(mlx_requests_total{device=~\"$device\"}[1h]))",
+          "expr": "(sum by (device) (rate(mlx_error_total{device=~\"$device\"}[1h])) / (sum by (device) (rate(mlx_requests_total{device=~\"$device\"}[1h])) > 0)) or (0 * sum by (device) (mlx_requests_total{device=~\"$device\"}))",
           "legendFormat": "{{device}}",
           "refId": "A"
         }
@@ -90,7 +90,7 @@
       },
       "targets": [
         {
-          "expr": "1 - (sum by (device) (rate(mlx_error_total{status=~\"5..\", device=~\"$device\"}[1h])) / sum by (device) (rate(mlx_requests_total{device=~\"$device\"}[1h]))) / 0.05",
+          "expr": "1 - ((sum by (device) (rate(mlx_error_total{status=~\"5..\", device=~\"$device\"}[1h])) / (sum by (device) (rate(mlx_requests_total{device=~\"$device\"}[1h])) > 0)) or (0 * sum by (device) (mlx_requests_total{device=~\"$device\"}))) / 0.05",
           "legendFormat": "{{device}} budget remaining",
           "refId": "A"
         }
@@ -157,7 +157,7 @@
       },
       "targets": [
         {
-          "expr": "1 - sum by (device) (rate(mlx_error_total{status=~\"5..\", device=~\"$device\"}[1h])) / sum by (device) (rate(mlx_requests_total{device=~\"$device\"}[1h]))",
+          "expr": "1 - ((sum by (device) (rate(mlx_error_total{status=~\"5..\", device=~\"$device\"}[1h])) / (sum by (device) (rate(mlx_requests_total{device=~\"$device\"}[1h])) > 0)) or (0 * sum by (device) (mlx_requests_total{device=~\"$device\"})))",
           "legendFormat": "{{device}} availability",
           "refId": "A"
         }

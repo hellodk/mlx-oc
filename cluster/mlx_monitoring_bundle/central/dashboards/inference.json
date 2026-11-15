@@ -232,8 +232,8 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_tool_calls_total{device=~\"$device\", kind=~\"$kind\"}[5m])",
-          "legendFormat": "{{device}} {{tool}} {{type}} {{kind}}",
+          "expr": "rate(mlx_tool_calls_total{device=~\"$device\"}[5m])",
+          "legendFormat": "{{device}} {{model}}",
           "refId": "A"
         }
       ]
