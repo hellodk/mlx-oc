@@ -257,7 +257,9 @@ class Bundle:
         self.enable_proxy = config.get("ENABLE_PROXY", "true").lower() == "true"
         self.enable_hw = config.get("ENABLE_HW_TELEMETRY", "true").lower() == "true"
         self.enable_kv = config.get("ENABLE_KV_AGENT", "true").lower() == "true"
-        self.enable_server_monitor = config.get("ENABLE_SERVER_MONITOR", "true").lower() == "true"
+        self.enable_server_monitor = config.get(
+            "ENABLE_SERVER_MONITOR", config.get("ENABLE_SUPERVISOR", "true")
+        ).lower() == "true"
         self.enable_logtailer = config.get("ENABLE_LOGTAILER", "true").lower() == "true"
         self.enable_process = config.get("ENABLE_PROCESS_PROFILER", "true").lower() == "true"
         self.enable_sbom = config.get("ENABLE_SBOM_COLLECTOR", "true").lower() == "true"

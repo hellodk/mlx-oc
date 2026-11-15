@@ -207,7 +207,7 @@ groups:
 
     - alert: MLXServerHung
       expr: mlx_server_state == 2 and mlx_server_up == 1
-      for: 30s
+      for: 5m
       labels:
         severity: warning
         category: serving
@@ -215,8 +215,8 @@ groups:
         summary: "Server health degraded on {{ $labels.device }}"
         description: |
           mlx_lm.server is alive but not serving (/v1/models failing) on Device
-          {{ $labels.device }} ({{ $labels.node }}). The keep-alive watchdog
-          will kill and restart it after --hang-after seconds.
+          {{ $labels.device }} ({{ $labels.node }}). Check the external
+          supervisor and server.log.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#server-hung"
 
   - name: mlx.inference

@@ -175,9 +175,7 @@ macbooks:
 ```
 
 `model_path` lets the exporters read `config.json` directly instead of guessing
-architecture values. When it is set, the supervisor starts `mlx_lm.server` from
-the model's parent directory and passes the basename as `--model`, so request
-model ids stay stable.
+architecture values and keeps reported model ids stable.
 
 ### edge.env (Runtime Overrides)
 
@@ -516,7 +514,7 @@ Run the interactive setup on the Mac (no root access required):
 ```
 Or pass parameters directly:
 ```bash
-./scripts/deploy.sh setup-edge <CENTRAL_IP> [MODEL_ID] [MODEL_PATH]
+./scripts/deploy.sh setup-edge <CENTRAL_IP> [MODEL_ID] [MODEL_PATH] [MLX_UPSTREAM]
 ```
 
 **What this automatically does:**

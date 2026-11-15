@@ -132,7 +132,7 @@
     },
     {
       "type": "graph",
-      "title": "Server State (0=idle 1=running 2=starting 3=backoff)",
+      "title": "Server State (0=down 1=running_ready 2=up_not_ready 3=backoff)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,

@@ -1054,6 +1054,75 @@ def test_passive_server_observer_never_spawns_and_tracks_restarts(tmp_path, monk
     assert sup.G_READY._value.get() == 0
     assert sup.G_STATE._value.get() == 2
 
+    # 3. Multi-step UP -> DOWN -> RESTARTED should NOT double-count crashes
+    monkeypatch.setattr(sup, "find_server_process", lambda _pat: (202, 5.0))
+    monkeypatch.setattr(obs, "_probe_health", lambda: (True, ["Qwen3.5-9B"]))
+    obs.poll_once()
+    assert sup.G_MODEL.labels(model="Qwen3.5-4B")._value.get() == 0
+    assert sup.G_MODEL.labels(model="Qwen3.5-9B")._value.get() == 1
+
+    crashes_before = sup.G_CRASHES.labels(reason="metal_gpu_error")._value.get()
+    restarts_before = sup.G_RESTARTS._value.get()
+    # Goes DOWN
+    monkeypatch.setattr(sup, "find_server_process", lambda _pat: None)
+    monkeypatch.setattr(obs, "_probe_health", lambda: (False, []))
+    obs.poll_once()
+    assert sup.G_CRASHES.labels(reason="metal_gpu_error")._value.get() == crashes_before + 1
+    assert sup.G_RESTARTS._value.get() == restarts_before
+    # Comes back with new PID 303 -> restart +1, crash stays +1 (no double count)
+    monkeypatch.setattr(sup, "find_server_process", lambda _pat: (303, 1.0))
+    monkeypatch.setattr(obs, "_probe_health", lambda: (True, ["Qwen3.5-9B"]))
+    obs.poll_once()
+    assert sup.G_CRASHES.labels(reason="metal_gpu_error")._value.get() == crashes_before + 1
+    assert sup.G_RESTARTS._value.get() == restarts_before + 1
+
+
+def test_passive_server_observer_helpers_and_main(monkeypatch):
+    """Verify _parse_etime, _probe_health non-list HTTP 200, and main() startup."""
+    import argparse
+    import io
+    import mlx_server_supervisor as sup
+
+    assert sup._parse_etime("45") == 45.0
+    assert sup._parse_etime("03:04") == 184.0
+    assert sup._parse_etime("02:03:04") == 7384.0
+    assert sup._parse_etime("01-02:03:04") == 93784.0
+
+    # _probe_health accepts HTTP 200 even when JSON has no "data" list
+    class _FakeResp:
+        status = 200
+        def read(self):
+            return b'{"status":"ok"}'
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(sup.urllib.request, "urlopen", lambda *_a, **_kw: _FakeResp())
+    obs = sup.PassiveServerObserver(argparse.Namespace(
+        listen="127.0.0.1:9105", health="http://127.0.0.1:8000/health", model="",
+        server_log="", process_pattern="mlx_lm.server", launchd_label="",
+        systemd_unit="", probe_interval=5.0,
+    ))
+    ok, models = obs._probe_health()
+    assert ok is True
+    assert models == []
+
+    # main() initializes logging and server without TypeError
+    class _FakeServer:
+        def __init__(self, *_a, **_kw):
+            pass
+        def serve_forever(self):
+            pass
+        def server_close(self):
+            pass
+
+    monkeypatch.setattr(sup, "_ReusableHTTPServer", _FakeServer)
+    monkeypatch.setattr(sup.PassiveServerObserver, "run", lambda self: None)
+    monkeypatch.setattr(sys, "argv", ["mlx_server_supervisor.py", "--listen", "127.0.0.1:0"])
+    sup.main()
+
+
 
 
 

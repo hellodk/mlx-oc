@@ -88,20 +88,42 @@ def sniff_crash_reason(log_path: str, nbytes: int = 8192) -> str:
     return "exit"
 
 
+def _parse_etime(etime_str: str) -> float:
+    """Parse POSIX ps etime ([[dd-]hh:]mm:ss) into elapsed seconds."""
+    s = etime_str.strip()
+    days = 0
+    if "-" in s:
+        day_part, s = s.split("-", 1)
+        if day_part.isdigit():
+            days = int(day_part)
+    parts = [int(p) for p in s.split(":") if p.isdigit()]
+    if len(parts) == 3:
+        return float(days * 86400 + parts[0] * 3600 + parts[1] * 60 + parts[2])
+    if len(parts) == 2:
+        return float(days * 86400 + parts[0] * 60 + parts[1])
+    if len(parts) == 1:
+        return float(days * 86400 + parts[0])
+    return 0.0
+
+
 def find_server_process(pattern: str) -> tuple[int, float] | None:
     """Return (pid, uptime_seconds) for a matching local process, or None."""
     if not pattern:
         return None
+    self_pid = os.getpid()
     try:
         import psutil  # type: ignore
 
         now = time.time()
         for proc in psutil.process_iter(["pid", "cmdline", "create_time"]):
             try:
+                pid = int(proc.info["pid"])
+                if pid == self_pid:
+                    continue
                 cmdline = " ".join(proc.info.get("cmdline") or [])
                 if pattern in cmdline and "mlx_server_supervisor.py" not in cmdline:
                     ct = proc.info.get("create_time") or now
-                    return int(proc.info["pid"]), max(0.0, now - float(ct))
+                    return pid, max(0.0, now - float(ct))
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
         return None
@@ -110,7 +132,7 @@ def find_server_process(pattern: str) -> tuple[int, float] | None:
 
     try:
         out = subprocess.check_output(
-            ["ps", "-eo", "pid=,etimes=,args="],
+            ["ps", "-eo", "pid=,etime=,args="],
             text=True,
             stderr=subprocess.DEVNULL,
             timeout=3,
@@ -119,9 +141,14 @@ def find_server_process(pattern: str) -> tuple[int, float] | None:
             parts = line.strip().split(None, 2)
             if len(parts) < 3:
                 continue
-            pid_s, etimes_s, args_s = parts
+            pid_s, etime_s, args_s = parts
+            if not pid_s.isdigit():
+                continue
+            pid = int(pid_s)
+            if pid == self_pid:
+                continue
             if pattern in args_s and "mlx_server_supervisor.py" not in args_s:
-                return int(pid_s), max(0.0, float(etimes_s))
+                return pid, _parse_etime(etime_s)
     except Exception:
         pass
     return None
@@ -169,21 +196,28 @@ class PassiveServerObserver:
         self.known_models: set[str] = set()
         if args.model:
             self.known_models.add(args.model)
+        for r in KNOWN_REASONS:
+            G_CRASHES.labels(reason=r).inc(0)
+            G_REASON.labels(reason=r).set(0)
 
     def _probe_health(self) -> tuple[bool, list[str]]:
         try:
             with urllib.request.urlopen(self.args.health, timeout=3) as resp:
                 if resp.status == 200:
-                    body = resp.read().decode("utf-8", "replace")
-                    payload = json.loads(body)
-                    data = payload.get("data")
-                    if isinstance(data, list):
-                        models = [
-                            str(item.get("id"))
-                            for item in data
-                            if isinstance(item, dict) and item.get("id")
-                        ]
-                        return True, models
+                    models: list[str] = []
+                    try:
+                        body = resp.read().decode("utf-8", "replace")
+                        payload = json.loads(body)
+                        data = payload.get("data") if isinstance(payload, dict) else None
+                        if isinstance(data, list):
+                            models = [
+                                str(item.get("id"))
+                                for item in data
+                                if isinstance(item, dict) and item.get("id")
+                            ]
+                    except Exception:
+                        pass
+                    return True, models
         except Exception as exc:
             debug(f"health check failed: {exc!r}", component="supervisor")
         return False, []
@@ -210,7 +244,8 @@ class PassiveServerObserver:
         # Detect external restarts (PID changed) or unexpected disappearance
         if self.last_pid is not None and pid is not None and pid != self.last_pid:
             G_RESTARTS.inc()
-            self._record_transition_down()
+            if self.was_up:
+                self._record_transition_down()
         elif self.was_up and pid is None and not ok:
             self._record_transition_down()
         elif not self.was_up and self.last_pid is not None and (pid is not None or ok):
@@ -245,7 +280,7 @@ class PassiveServerObserver:
         for m in served_models:
             self.known_models.add(m)
         for m in list(self.known_models):
-            loaded = 1 if (ok and (m in served_models or (not self.args.model and served_models))) else 0
+            loaded = 1 if (ok and m in served_models) else 0
             G_MODEL.labels(model=m).set(loaded)
 
     def run(self):
@@ -289,8 +324,12 @@ class MetricsHandler(BaseHTTPRequestHandler):
         pass
 
 
+class _ReusableHTTPServer(ThreadingHTTPServer):
+    allow_reuse_address = True
+
+
 def main():
-    setup_logging("supervisor")
+    setup_logging("mlx-supervisor", os.environ.get("MLX_MACBOOK_ID", "unknown"))
     p = argparse.ArgumentParser(
         description="Passive, read-only serving-status exporter for external mlx_lm.server."
     )
@@ -342,7 +381,7 @@ def main():
     port = int(port_s)
 
     observer = PassiveServerObserver(args)
-    httpd = ThreadingHTTPServer((host, port), MetricsHandler)
+    httpd = _ReusableHTTPServer((host, port), MetricsHandler)
 
     def _shutdown(signum, _frame):
         info(f"received signal {signum}, stopping", component="supervisor")

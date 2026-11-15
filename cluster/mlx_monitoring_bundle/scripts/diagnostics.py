@@ -655,8 +655,11 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
             print(f"    {status_tag:<8} {exp_name:<16} -> {probe_addr:<22} ({details})")
 
         # Check upstream model server
-        srv_port = cfg["edge_env"].get("MLX_SERVER_PORT", "11234")
-        srv_addr = f"{'127.0.0.1' if is_local else nb_ip}:{srv_port}"
+        raw_upstream = cfg["edge_env"].get("MLX_UPSTREAM", "http://127.0.0.1:11234")
+        parsed_up = urllib.parse.urlparse(raw_upstream if "://" in raw_upstream else f"http://{raw_upstream}")
+        srv_host = parsed_up.hostname or "127.0.0.1"
+        srv_port = str(parsed_up.port or 11234)
+        srv_addr = f"{srv_host if is_local else nb_ip}:{srv_port}"
         srv_ok, _ = probe_tcp(srv_addr, timeout=0.5)
         srv_info = "server unreachable"
         if srv_ok:
