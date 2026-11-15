@@ -732,7 +732,7 @@ def test_podman_compose_provider_in_pod_flag_detection(tmp_path):
     assert res_a.returncode == 0, res_a.stderr
     assert res_a.stdout.strip() == "CMD=podman compose|FLAG=1"
 
-    # Scenario B: podman compose delegates to docker-compose -> IS_PODMAN_COMPOSE=0
+    # Scenario B: podman compose delegates to docker-compose without podman-compose -> rejected
     res_b = _run_deploy_bash(
         """
         podman() {
@@ -746,11 +746,10 @@ def test_podman_compose_provider_in_pod_flag_detection(tmp_path):
         COMPOSE_CMD=()
         IS_PODMAN_COMPOSE=0
         _resolve_central_compose "podman"
-        echo "CMD=${COMPOSE_CMD[*]}|FLAG=${IS_PODMAN_COMPOSE}"
         """
     )
-    assert res_b.returncode == 0, res_b.stderr
-    assert res_b.stdout.strip() == "CMD=podman compose|FLAG=0"
+    assert res_b.returncode != 0
+    assert "podman-compose is required" in res_b.stderr
 
     # Scenario C: podman compose version fails, standalone podman-compose exists on PATH -> fallback
     fake_bin = tmp_path / "bin"

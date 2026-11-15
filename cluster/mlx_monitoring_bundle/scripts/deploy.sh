@@ -1227,17 +1227,19 @@ _resolve_central_compose() {
   IS_PODMAN_COMPOSE=0
 
   if [[ "${engine}" == "podman" ]]; then
-    if ! podman compose version >/dev/null 2>&1 && command -v podman-compose >/dev/null 2>&1; then
+    # Always prefer podman-compose directly when installed so podman compose
+    # does not silently delegate to /usr/local/bin/docker-compose on macOS.
+    if command -v podman-compose >/dev/null 2>&1; then
       COMPOSE_CMD=("podman-compose")
       IS_PODMAN_COMPOSE=1
     else
       local prov_out
       prov_out="$(podman compose version 2>&1 || true)"
-      # Podman prints "Please see podman-compose(1)" even when invoking docker-compose;
-      # only treat it as podman-compose when docker-compose is absent and the provider/binary matches.
       if ! echo "${prov_out}" | grep -qiE "docker-compose|Docker Compose" && \
          echo "${prov_out}" | grep -qiE "podman-compose([^(]|$)"; then
         IS_PODMAN_COMPOSE=1
+      else
+        die "podman-compose is required when using podman (install podman-compose; docker-compose is not used with podman)"
       fi
     fi
   elif [[ "${COMPOSE_CMD[0]}" == "podman-compose" ]]; then
