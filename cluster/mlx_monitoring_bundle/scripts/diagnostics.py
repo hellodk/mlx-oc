@@ -603,6 +603,8 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
             ("mlx-kv", cfg["edge_env"].get("KV_LISTEN", "127.0.0.1:9104"), "/metrics"),
             ("mlx-supervisor", cfg["edge_env"].get("SUPERVISOR_LISTEN", "127.0.0.1:9105"), "/metrics"),
             ("mlx-logtailer", cfg["edge_env"].get("LOGTAILER_LISTEN", "127.0.0.1:9106"), "/metrics"),
+            ("mlx-process", cfg["edge_env"].get("PROCESS_LISTEN", "127.0.0.1:9107"), "/metrics"),
+            ("mlx-sbom", cfg["edge_env"].get("SBOM_LISTEN", "127.0.0.1:9108"), "/metrics"),
         ]
 
         for exp_name, listen, path in exporters:
@@ -618,11 +620,12 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
             if tcp_ok:
                 h_code, h_body = probe_http(f"http://{probe_addr}{path}", timeout=1.0)
                 if h_code == 200:
-                    metric_count = sum(1 for line in h_body.splitlines() if line.startswith("mlx_"))
+                    metric_count = sum(1 for line in h_body.splitlines() if line and not line.startswith("#"))
                     details = f"{metric_count} metrics"
                 else:
                     details = f"HTTP {h_code}"
 
+            is_optional = exp_name in ("mlx-process", "mlx-sbom")
             if tcp_ok and metric_count > 0:
                 status_tag = "[OK]"
             elif not tcp_ok and not is_local:
@@ -633,8 +636,14 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
                     sec_str = f"last sample {float(rec[0]['value'][1]):.1f}s ago" if rec else "active"
                     status_tag = "[OK]"
                     details = f"scraped by local vmagent (UP in TSDB, {sec_str})"
+                elif is_optional:
+                    status_tag = "[INFO]"
+                    details = "not yet streaming from remote node"
                 else:
                     status_tag = "[FAIL]"
+            elif is_optional:
+                status_tag = "[INFO]"
+                details = "optional exporter idle"
             else:
                 status_tag = "[FAIL]"
 

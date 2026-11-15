@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MLX Cluster Observability &amp; SBOM Suite</title>
+  <style>
+    :root {
+      --bg: #F9FAFB;
+      --card-bg: #FFFFFF;
+      --text-primary: #111827;
+      --text-secondary: #4B5563;
+      --border: #E5E7EB;
+
+      /* High-contrast Green semantic palette */
+      --green-bg-tint: #ECFDF5;
+      --green-border: #10B981;
+      --green-text-deep: #064E3B;
+      --green-solid: #059669;
+
+      /* High-contrast Red semantic palette */
+      --red-bg-tint: #FEF2F2;
+      --red-border: #EF4444;
+      --red-text-deep: #7F1D1D;
+      --red-solid: #DC2626;
+
+      /* Gray / No-Data */
+      --gray-bg-tint: #F3F4F6;
+      --gray-border: #9CA3AF;
+      --gray-text: #374151;
+      --gray-solid: #6B7280;
+
+      --accent: #2563EB;
+      --accent-hover: #1D4ED8;
+      --amber: #D97706;
+      --purple: #7C3AED;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-primary);
+      padding: 20px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    /* Top Navigation Tabs */
+    .app-nav {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn:hover {
+      background: #F1F5F9;
+      color: var(--text-primary);
+    }
+
+    .tab-btn.active {
+      background: #EFF6FF;
+      border-color: #BFDBFE;
+      color: var(--accent);
+    }
+
+    .nav-right-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .time-badge {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: #F3F4F6;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    /* Tab View Content wrappers */
+    .tab-view {
+      display: none;
+    }
+
+    .tab-view.active {
+      display: block;
+    }
+
+    /* Common Card Styles */
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .panel-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    /* KPI Row */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .kpi-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    .kpi-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .kpi-val {
+      font-size: 24px;
+      font-weight: 800;
+    }
+
+    /* Data Tables */
+    .table-container {
+      max-height: 480px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+
+    .data-table th {
+      background: #F3F4F6;
+      color: var(--text-secondary);
+      font-weight: 700;
+      text-align: left;
+      padding: 10px 14px;
+      position: sticky;
+      top: 0;
+      border-bottom: 1px solid var(--border);
+      z-index: 1;
+    }
+
+    .data-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    .data-table tr:hover td {
+      background: #F8FAFC;
+    }
+
+    /* Pills & Badges */
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    .badge-pass { background: var(--green-bg-tint); color: var(--green-text-deep); border: 1px solid var(--green-border); }
+    .badge-fail { background: var(--red-bg-tint); color: var(--red-text-deep); border: 1px solid var(--red-border); }
+    .badge-warn { background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; }
+    .badge-info { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+    .badge-purple { background: #F5F3FF; color: #6D28D9; border: 1px solid #DDD6FE; }
+
+    .path-code {
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 11.5px;
+      background: #F1F5F9;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #0F172A;
+      border: 1px solid #E2E8F0;
+      word-break: break-all;
+    }
+
+    /* Filter Controls */
+    .controls-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .search-input {
+      padding: 6px 12px;
+      font-size: 13px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      width: 280px;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+    }
+
+    .select-dropdown {
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid #CBD5E1;
+      border-radius: 6px;
+      background: #FFFFFF;
+      outline: none;
+    }
+
+    /* SVGs in Process Tab */
+    .svg-container {
+      width: 100%;
+      overflow-x: auto;
+      margin-bottom: 16px;
+    }
+
+    .svg-container > svg {
+      display: block;
+      width: 100%;
+      min-width: 900px;
+      height: 220px;
+    }
+
+    .tick-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #ECFDF5;
+      color: #065F46;
+      border: 1px solid #A7F3D0;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .tick-dot {
+      width: 6px;
+      height: 6px;
+      background: #10B981;
+      border-radius: 50%;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Top App Navigation Tabs -->
+  <header class="app-nav">
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('tabFleet')">
+        <span>🖥️ Fleet Health &amp; Tiles</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('tabSbomInventory')">
+        <span>📦 SBOM Inventory (Packages &amp; Paths)</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('tabSbomDrift')">
+        <span>🔀 SBOM Drift &amp; Delta Compare</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('tabProcessProfiler')">
+        <span>⚡ Top 10 Process Profiler (5s Telemetry)</span>
+      </button>
+    </div>
+    <div class="nav-right-meta">
+      <span class="time-badge">Timezone: Asia/Kolkata (IST)</span>
+    </div>
+  </header>
+
+  <!-- =========================================================
+       TAB 1: FLEET HEALTH & SQUARES (FROM PREVIOUS STEP)
+       ========================================================= -->
+  <div id="tabFleet" class="tab-view active">
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Total Discovered Fleet</div>
+          <div class="kpi-val">50 Nodes</div>
+        </div>
+        <span class="badge badge-info">100% Pushing</span>
+      </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Alertmanager Status</div>
+          <div class="kpi-val" style="color: var(--green-solid);">Rules Active</div>
+        </div>
+        <span class="badge badge-pass">vmalert OK</span>
+      </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">SBOM Collection</div>
+          <div class="kpi-val">Hourly (ClickHouse)</div>
+        </div>
+        <span class="badge badge-purple">50/50 Synced</span>
+      </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Process Telemetry</div>
+          <div class="kpi-val" style="color: var(--accent);">5-sec Resolution</div>
+        </div>
+        <span class="badge badge-pass">Top 10 Consumers</span>
+      </div>
+    </div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Fleet Tile Health Matrix</h2>
+          <p class="panel-desc">Auto-adjusting 60px square tiles. Configured for dynamic ingestion, Alertmanager rule thresholds, and SSH connectivity.</p>
+        </div>
+        <div style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">
+          Evaluated: 15 Nov 2026, 09:14:01 IST
+        </div>
+      </div>
+      <div style="padding: 16px; background: #F8FAFC; border: 1px solid var(--border); border-radius: 6px; text-align: center;">
+        <span style="font-size: 13px; color: var(--text-secondary);">
+          Square tile controls active. Use tabs above to inspect the new <strong>SBOM Inventory</strong>, <strong>SBOM Drift</strong>, and <strong>Top 10 Process Profiler (5s)</strong> dashboards.
+        </span>
+      </div>
+    </section>
+  </div>
+
+  <!-- =========================================================
+       TAB 2: SBOM FLEET INVENTORY DASHBOARD
+       ========================================================= -->
+  <div id="tabSbomInventory" class="tab-view">
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Total Cataloged Artifacts</div>
+          <div class="kpi-val">3,142</div>
+        </div>
+        <span class="badge badge-info">All Ecosystems</span>
+      </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Homebrew Packages</div>
+          <div class="kpi-val" style="color: #0284C7;">142</div>
+        </div>
+        <span class="badge badge-info">Formulae &amp; Casks</span>
+      </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Python / Virtualenvs</div>
+          <div class="kpi-val" style="color: #7C3AED;">418</div>
+        </div>
+        <span class="badge badge-purple">pip modules</span>
+      </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">MLX Model Weights</div>
+          <div class="kpi-val" style="color: var(--green-solid);">12</div>
+        </div>
+        <span class="badge badge-pass">Local Checksums OK</span>
+      </div>
+    </div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Fleet Software Bill of Materials (SBOM) Explorer</h2>
+          <p class="panel-desc">Querying ClickHouse <code style="background:#F1F5F9; padding:2px 6px;">mlx_sbom_inventory</code> table. Hourly snapshot across all 50 Mac nodes.</p>
+        </div>
+        <div style="font-size: 12px; color: var(--text-secondary);">
+          Storage: <strong>ClickHouse Columnar Engine (Optimal for Relational Drift Queries)</strong>
+        </div>
+      </div>
+
+      <div class="controls-bar">
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <select id="sbomNodeFilter" class="select-dropdown" onchange="filterSbomTable()">
+            <option value="ALL">All Nodes (50 Devices)</option>
+            <option value="mm">mm (192.168.1.64)</option>
+            <option value="mbp-16">mbp-16 (192.168.1.65)</option>
+            <option value="studio-01">studio-01 (192.168.1.66)</option>
+          </select>
+
+          <select id="sbomTypeFilter" class="select-dropdown" onchange="filterSbomTable()">
+            <option value="ALL">All Package Types</option>
+            <option value="pip">Python / pip (virtualenvs)</option>
+            <option value="brew">Homebrew (brew)</option>
+            <option value="model">MLX Model Weights</option>
+            <option value="system">System / Binary Executables</option>
+          </select>
+        </div>
+
+        <input type="text" id="sbomSearch" class="search-input" placeholder="Search package name, version, or file path..." oninput="filterSbomTable()">
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Node</th>
+              <th>Ecosystem</th>
+              <th>Package / Artifact Name</th>
+              <th>Version</th>
+              <th>Installed File / Weights PATH</th>
+              <th>Integrity / Hash</th>
+              <th>Last Scanned (IST)</th>
+            </tr>
+          </thead>
+          <tbody id="sbomTableBody">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- =========================================================
+       TAB 3: SBOM DRIFT & DELTA COMPARISON DASHBOARD
+       ========================================================= -->
+  <div id="tabSbomDrift" class="tab-view">
+    <div class="kpi-row">
+      <div class="kpi-card" style="border-left: 4px solid var(--red-solid);">
+        <div>
+          <div class="kpi-label">Version Drift Detected</div>
+          <div class="kpi-val" style="color: var(--red-solid);">4 Packages</div>
+        </div>
+        <span class="badge badge-fail">Out-of-Sync</span>
+      </div>
+      <div class="kpi-card" style="border-left: 4px solid var(--amber);">
+        <div>
+          <div class="kpi-label">Packages Missing on Node</div>
+          <div class="kpi-val" style="color: var(--amber);">2 Missing</div>
+        </div>
+        <span class="badge badge-warn">Discrepancy</span>
+      </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">24h Hourly Drift Changes</div>
+          <div class="kpi-val">1 Upgraded</div>
+        </div>
+        <span class="badge badge-info">Historical Delta</span>
+      </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Cluster Conformity Score</div>
+          <div class="kpi-val" style="color: var(--green-solid);">98.4%</div>
+        </div>
+        <span class="badge badge-pass">Near Uniform</span>
+      </div>
+    </div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">SBOM Cross-Node Drift &amp; Historical Delta Engine</h2>
+          <p class="panel-desc">Direct ClickHouse diff query comparing installed packages, binary paths, and versions between nodes or across time windows.</p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="filter-btn active" id="btnDriftNode" onclick="setDriftMode('node')">Node vs Node Compare</button>
+          <button class="filter-btn" id="btnDriftTime" onclick="setDriftMode('time')">24h Time-Travel Drift</button>
+        </div>
+      </div>
+
+      <!-- Comparison Selectors -->
+      <div class="controls-bar" id="driftSelectors">
+        <div style="display: flex; gap: 12px; align-items: center;">
+          <span style="font-weight: 700; font-size: 13px;">Baseline Node:</span>
+          <select class="select-dropdown" id="driftBaseNode" onchange="runDriftCompare()">
+            <option value="mm">mm (Mac mini M4 - Reference)</option>
+            <option value="mbp-16">mbp-16 (MacBook Pro M3)</option>
+          </select>
+
+          <span style="font-weight: 700; font-size: 13px;">Compare Against:</span>
+          <select class="select-dropdown" id="driftTargetNode" onchange="runDriftCompare()">
+            <option value="mbp-16">mbp-16 (MacBook Pro M3)</option>
+            <option value="studio-01">studio-01 (Mac Studio M2)</option>
+            <option value="ALL">Entire Fleet (Find Any Outlier)</option>
+          </select>
+        </div>
+
+        <div>
+          <span class="badge badge-warn">Showing Only Drifts / Mismatches</span>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Package / Artifact</th>
+              <th>Ecosystem</th>
+              <th>Baseline Version (mm)</th>
+              <th>Target Version</th>
+              <th>Baseline Path</th>
+              <th>Target Path</th>
+              <th>Drift Status</th>
+            </tr>
+          </thead>
+          <tbody id="driftTableBody">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- =========================================================
+       TAB 4: TOP 10 PROCESS RESOURCE PROFILER (5s TELEMETRY)
+       ========================================================= -->
+  <div id="tabProcessProfiler" class="tab-view">
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Telemetry Resolution</div>
+          <div class="kpi-val" style="color: var(--accent);">5.0 Seconds</div>
+        </div>
+        <span class="tick-indicator"><span class="tick-dot"></span> LIVE TICK</span>
+      </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Dominant CPU Consumer</div>
+          <div class="kpi-val">mlx_lm.server</div>
+        </div>
+        <span class="badge badge-pass">82.4% CPU</span>
+      </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Dominant Memory RSS</div>
+          <div class="kpi-val">14.8 GB</div>
+        </div>
+        <span class="badge badge-info">PID 4921</span>
+      </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">High I/O Consumer (Unhelpful)</div>
+          <div class="kpi-val" style="color: var(--amber);">mds_stores</div>
+        </div>
+        <span class="badge badge-warn">48 MB/s I/O</span>
+      </div>
+    </div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Top 10 Resource Consumers Over Time (5-Sec Resolution)</h2>
+          <p class="panel-desc">Real-time process accounting streaming CPU, Memory, Disk I/O, Network, GPU, and Apple Neural Engine (ANE) telemetry.</p>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <select class="select-dropdown" id="procNodeSelect" onchange="updateProcessCharts()">
+            <option value="mm">Node: mm (192.168.1.64)</option>
+            <option value="mbp-16">Node: mbp-16 (192.168.1.65)</option>
+          </select>
+          <div style="display: flex; gap: 4px;">
+            <button class="filter-btn active" id="btnMetricCpu" onclick="setProcessMetric('cpu')">CPU %</button>
+            <button class="filter-btn" id="btnMetricMem" onclick="setProcessMetric('mem')">Memory RSS</button>
+            <button class="filter-btn" id="btnMetricGpu" onclick="setProcessMetric('gpu')">GPU %</button>
+            <button class="filter-btn" id="btnMetricAne" onclick="setProcessMetric('ane')">ANE Power</button>
+            <button class="filter-btn" id="btnMetricIo" onclick="setProcessMetric('io')">Disk I/O</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Real-time SVG Stacked Consumption Chart -->
+      <div class="svg-container">
+        <svg viewBox="0 0 1000 200" xmlns="http://www.w3.org/2000/svg">
+          <!-- Grid Lines -->
+          <line x1="80" y1="20" x2="980" y2="20" stroke="#E5E7EB" stroke-dasharray="2,2"/>
+          <line x1="80" y1="65" x2="980" y2="65" stroke="#E5E7EB" stroke-dasharray="2,2"/>
+          <line x1="80" y1="110" x2="980" y2="110" stroke="#E5E7EB" stroke-dasharray="2,2"/>
+          <line x1="80" y1="155" x2="980" y2="155" stroke="#E5E7EB"/>
+
+          <!-- Y Axis -->
+          <text x="70" y="24" font-size="11" fill="#4B5563" text-anchor="end">100%</text>
+          <text x="70" y="69" font-size="11" fill="#4B5563" text-anchor="end">75%</text>
+          <text x="70" y="114" font-size="11" fill="#4B5563" text-anchor="end">50%</text>
+          <text x="70" y="159" font-size="11" fill="#4B5563" text-anchor="end">0%</text>
+
+          <!-- Area: mlx_lm.server (Primary) -->
+          <path d="M 80 80 Q 200 40, 350 50 T 600 35 T 850 45 L 980 40 L 980 155 L 80 155 Z" fill="#2563EB" opacity="0.25"/>
+          <path d="M 80 80 Q 200 40, 350 50 T 600 35 T 850 45 L 980 40" fill="none" stroke="#2563EB" stroke-width="2.5"/>
+
+          <!-- Area: mds_stores (Unhelpful Spotlight Indexer) -->
+          <path d="M 80 120 Q 200 135, 350 115 T 600 105 T 850 125 L 980 120 L 980 155 L 80 155 Z" fill="#D97706" opacity="0.2"/>
+          <path d="M 80 120 Q 200 135, 350 115 T 600 105 T 850 125 L 980 120" fill="none" stroke="#D97706" stroke-width="2"/>
+
+          <!-- Area: WindowServer -->
+          <path d="M 80 145 Q 200 148, 350 142 T 600 145 T 850 144 L 980 145 L 980 155 L 80 155 Z" fill="#10B981" opacity="0.2"/>
+          <path d="M 80 145 Q 200 148, 350 142 T 600 145 T 850 144 L 980 145" fill="none" stroke="#10B981" stroke-width="1.5"/>
+
+          <!-- Time Markers (5-second increments) -->
+          <text x="80" y="175" font-size="11" fill="#4B5563" text-anchor="start">09:12:00 IST</text>
+          <text x="305" y="175" font-size="11" fill="#4B5563" text-anchor="middle">09:12:30 IST</text>
+          <text x="530" y="175" font-size="11" fill="#4B5563" text-anchor="middle">09:13:00 IST</text>
+          <text x="755" y="175" font-size="11" fill="#4B5563" text-anchor="middle">09:13:30 IST</text>
+          <text x="980" y="175" font-size="11" fill="#4B5563" text-anchor="end">09:14:00 IST</text>
+        </svg>
+      </div>
+
+      <!-- Top 10 Ranked Consumers Table -->
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Process Name</th>
+              <th>PID</th>
+              <th>User</th>
+              <th>CPU %</th>
+              <th>Memory (RSS)</th>
+              <th>Disk I/O</th>
+              <th>GPU Active</th>
+              <th>ANE Power</th>
+              <th>Binary Path &amp; Arguments</th>
+              <th>Triage Assessment</th>
+            </tr>
+          </thead>
+          <tbody id="procTableBody">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+  // Tab Switching
+  function switchTab(tabId) {
+    document.querySelectorAll('.tab-view').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+
+    const btnIndex = tabId === 'tabFleet' ? 0 : tabId === 'tabSbomInventory' ? 1 : tabId === 'tabSbomDrift' ? 2 : 3;
+    document.querySelectorAll('.tab-btn')[btnIndex].classList.add('active');
+  }
+
+  // Sample SBOM Inventory Data (ClickHouse representation)
+  const sbomData = [
+    { node: 'mm', type: 'pip', name: 'mlx-lm', ver: '0.14.2', path: '/Users/dk/.venv/mlx/lib/python3.12/site-packages/mlx_lm', hash: 'sha256:4a8c9b...' },
+    { node: 'mm', type: 'pip', name: 'mlx', ver: '0.15.0', path: '/Users/dk/.venv/mlx/lib/python3.12/site-packages/mlx', hash: 'sha256:7b1e2f...' },
+    { node: 'mm', type: 'model', name: 'Qwen3.5-4B-MLX-4bit', ver: 'v1.2 (weights)', path: '/Users/dk/mlx-models/Qwen3.5-4B-MLX-4bit', hash: 'sha256:91c0e3...' },
+    { node: 'mm', type: 'brew', name: 'vmagent', ver: '1.101.0', path: '/opt/homebrew/bin/vmagent', hash: 'sha256:11bb22...' },
+    { node: 'mm', type: 'brew', name: 'ffmpeg', ver: '7.0.1', path: '/opt/homebrew/bin/ffmpeg', hash: 'sha256:88ee99...' },
+    { node: 'mm', type: 'system', name: 'python3', ver: '3.12.3', path: '/usr/local/bin/python3', hash: 'sha256:33cc44...' },
+    { node: 'mm', type: 'system', name: 'macOS', ver: '15.1.0 (24B83)', path: '/System/Library/CoreServices/SystemVersion.plist', hash: 'apple:sealed' },
+
+    // mbp-16 with version drifts!
+    { node: 'mbp-16', type: 'pip', name: 'mlx-lm', ver: '0.12.0', path: '/Users/dk/miniconda3/envs/mlx/lib/python3.11/site-packages/mlx_lm', hash: 'sha256:outdated' },
+    { node: 'mbp-16', type: 'pip', name: 'mlx', ver: '0.14.0', path: '/Users/dk/miniconda3/envs/mlx/lib/python3.11/site-packages/mlx', hash: 'sha256:outdated' },
+    { node: 'mbp-16', type: 'model', name: 'Qwen3.5-4B-MLX-4bit', ver: 'v1.1 (weights)', path: '/Users/dk/models/Qwen3.5-4B-MLX-4bit', hash: 'sha256:diffpath' },
+    { node: 'mbp-16', type: 'brew', name: 'vmagent', ver: '1.101.0', path: '/opt/homebrew/bin/vmagent', hash: 'sha256:11bb22...' },
+    { node: 'mbp-16', type: 'brew', name: 'ffmpeg', ver: '6.1.1', path: '/opt/homebrew/bin/ffmpeg', hash: 'sha256:55aa77...' },
+    { node: 'mbp-16', type: 'system', name: 'python3', ver: '3.11.8', path: '/opt/homebrew/bin/python3', hash: 'sha256:22bb99...' },
+    { node: 'mbp-16', type: 'system', name: 'macOS', ver: '15.0.1 (24A348)', path: '/System/Library/CoreServices/SystemVersion.plist', hash: 'apple:sealed' }
+  ];
+
+  function filterSbomTable() {
+    const nodeFilt = document.getElementById('sbomNodeFilter').value;
+    const typeFilt = document.getElementById('sbomTypeFilter').value;
+    const search = document.getElementById('sbomSearch').value.toLowerCase().trim();
+
+    const tbody = document.getElementById('sbomTableBody');
+    tbody.innerHTML = '';
+
+    const filtered = sbomData.filter(item => {
+      if (nodeFilt !== 'ALL' && item.node !== nodeFilt) return false;
+      if (typeFilt !== 'ALL' && item.type !== typeFilt) return false;
+      if (search) {
+        return item.name.toLowerCase().includes(search) || item.ver.toLowerCase().includes(search) || item.path.toLowerCase().includes(search);
+      }
+      return true;
+    });
+
+    filtered.forEach(row => {
+      const tr = document.createElement('tr');
+      let typeBadge = `<span class="badge badge-info">${row.type}</span>`;
+      if (row.type === 'pip') typeBadge = `<span class="badge badge-purple">pip</span>`;
+      if (row.type === 'model') typeBadge = `<span class="badge badge-pass">model</span>`;
+
+      tr.innerHTML = `
+        <td><strong>${row.node}</strong></td>
+        <td>${typeBadge}</td>
+        <td><strong>${row.name}</strong></td>
+        <td><code>${row.ver}</code></td>
+        <td><span class="path-code">${row.path}</span></td>
+        <td><code style="font-size:11px;">${row.hash}</code></td>
+        <td>15 Nov 2026, 09:14:00 IST</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Drift Comparison Data
+  const driftItems = [
+    { name: 'mlx-lm', type: 'pip', baseVer: '0.14.2', tgtVer: '0.12.0', basePath: '/Users/dk/.venv/mlx/.../mlx_lm', tgtPath: '/Users/dk/miniconda3/.../mlx_lm', status: 'VERSION_MISMATCH' },
+    { name: 'mlx', type: 'pip', baseVer: '0.15.0', tgtVer: '0.14.0', basePath: '/Users/dk/.venv/mlx/.../mlx', tgtPath: '/Users/dk/miniconda3/.../mlx', status: 'VERSION_MISMATCH' },
+    { name: 'ffmpeg', type: 'brew', baseVer: '7.0.1', tgtVer: '6.1.1', basePath: '/opt/homebrew/bin/ffmpeg', tgtPath: '/opt/homebrew/bin/ffmpeg', status: 'OUTDATED' },
+    { name: 'Qwen3.5-4B-MLX', type: 'model', baseVer: 'v1.2', tgtVer: 'v1.1', basePath: '/Users/dk/mlx-models/...', tgtPath: '/Users/dk/models/...', status: 'PATH_&_VERSION_DRIFT' },
+    { name: 'macOS Kernel', type: 'system', baseVer: '15.1.0 (24B83)', tgtVer: '15.0.1 (24A348)', basePath: 'Darwin 24.1.0', tgtPath: 'Darwin 24.0.0', status: 'OS_DRIFT' }
+  ];
+
+  function runDriftCompare() {
+    const tbody = document.getElementById('driftTableBody');
+    tbody.innerHTML = '';
+
+    driftItems.forEach(d => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${d.name}</strong></td>
+        <td><span class="badge badge-info">${d.type}</span></td>
+        <td><code style="color:var(--green-solid); font-weight:700;">${d.baseVer}</code></td>
+        <td><code style="color:var(--red-solid); font-weight:700;">${d.tgtVer}</code></td>
+        <td><span class="path-code">${d.basePath}</span></td>
+        <td><span class="path-code">${d.tgtPath}</span></td>
+        <td><span class="badge badge-fail">DRIFT: ${d.status}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function setDriftMode(mode) {
+    document.getElementById('btnDriftNode').classList.toggle('active', mode === 'node');
+    document.getElementById('btnDriftTime').classList.toggle('active', mode === 'time');
+    runDriftCompare();
+  }
+
+  // Top 10 Process Consumers (5-second live telemetry)
+  const topProcesses = [
+    { rank: 1, name: 'python3 (mlx_lm.server)', pid: 4921, user: 'dk', cpu: 82.4, mem: '14.8 GB', io: '0.4 MB/s', gpu: '88%', ane: '4.2 W', path: '/Users/dk/.venv/mlx/bin/python3 -m mlx_lm.server --model Qwen3.5-4B-MLX', assess: 'Primary MLX Inference Server', isRogue: false },
+    { rank: 2, name: 'mds_stores (Spotlight Index)', pid: 812, user: 'root', cpu: 34.1, mem: '1.9 GB', io: '48.2 MB/s', gpu: '0%', ane: '0.0 W', path: '/System/Library/Frameworks/CoreServices.framework/.../mds_stores', assess: 'Unhelpful Background Indexing (Safe to Throttle)', isRogue: true },
+    { rank: 3, name: 'WindowServer', pid: 241, user: '_windowserver', cpu: 12.5, mem: '1.1 GB', io: '0.1 MB/s', gpu: '14%', ane: '0.0 W', path: '/System/Library/PrivateFrameworks/SkyLight.framework/.../WindowServer', assess: 'macOS UI Window Compositor', isRogue: false },
+    { rank: 4, name: 'vmagent-darwin-arm64', pid: 6236, user: 'dk', cpu: 1.8, mem: '84 MB', io: '1.2 MB/s', gpu: '0%', ane: '0.0 W', path: '/opt/mlx-monitoring/bin/vmagent -remoteWrite.url=...', assess: 'Observability Exporter (Nominal)', isRogue: false },
+    { rank: 5, name: 'kernel_task', pid: 0, user: 'root', cpu: 4.2, mem: '380 MB', io: '0.8 MB/s', gpu: '2%', ane: '0.0 W', path: '[kernel]', assess: 'Core Operating System', isRogue: false },
+    { rank: 6, name: 'launchd', pid: 1, user: 'root', cpu: 0.8, mem: '42 MB', io: '0.0 MB/s', gpu: '0%', ane: '0.0 W', path: '/sbin/launchd', assess: 'Init Process', isRogue: false },
+    { rank: 7, name: 'ollama_llama_server', pid: 5104, user: 'dk', cpu: 0.1, mem: '2.4 GB', io: '0.0 MB/s', gpu: '0%', ane: '0.0 W', path: '/usr/local/bin/ollama runner --model ...', assess: 'Idle Zombie Process (Consuming 2.4GB RAM)', isRogue: true },
+    { rank: 8, name: 'syslogd', pid: 114, user: 'root', cpu: 1.2, mem: '31 MB', io: '2.4 MB/s', gpu: '0%', ane: '0.0 W', path: '/usr/sbin/syslogd', assess: 'System Logging Daemon', isRogue: false },
+    { rank: 9, name: 'sshd: dk [priv]', pid: 7240, user: 'root', cpu: 0.3, mem: '14 MB', io: '0.0 MB/s', gpu: '0%', ane: '0.0 W', path: 'sshd: dk@pts/1', assess: 'Active SSH Session', isRogue: false },
+    { rank: 10, name: 'mlx_hw_telemetry.py', pid: 6231, user: 'dk', cpu: 0.6, mem: '38 MB', io: '0.1 MB/s', gpu: '0%', ane: '0.0 W', path: 'python3 exporters/mlx_hw_telemetry.py --port 9102', assess: 'Telemetry Exporter (Nominal)', isRogue: false }
+  ];
+
+  function populateProcessTable() {
+    const tbody = document.getElementById('procTableBody');
+    tbody.innerHTML = '';
+
+    topProcesses.forEach(p => {
+      const tr = document.createElement('tr');
+      let assessBadge = `<span class="badge badge-pass">${p.assess}</span>`;
+      if (p.isRogue) {
+        assessBadge = `<span class="badge badge-warn">${p.assess}</span>`;
+      }
+
+      tr.innerHTML = `
+        <td><strong>#${p.rank}</strong></td>
+        <td><strong>${p.name}</strong></td>
+        <td><code>${p.pid}</code></td>
+        <td><code>${p.user}</code></td>
+        <td><strong style="color:${p.cpu > 50 ? 'var(--red-solid)' : 'var(--text-primary)'};">${p.cpu}%</strong></td>
+        <td><strong>${p.mem}</strong></td>
+        <td><code>${p.io}</code></td>
+        <td><strong style="color:var(--accent);">${p.gpu}</strong></td>
+        <td><code style="color:var(--purple); font-weight:700;">${p.ane}</code></td>
+        <td><span class="path-code">${p.path}</span></td>
+        <td>${assessBadge}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function setProcessMetric(metric) {
+    document.querySelectorAll('#btnMetricCpu, #btnMetricMem, #btnMetricGpu, #btnMetricAne, #btnMetricIo').forEach(b => b.classList.remove('active'));
+    if (metric === 'cpu') document.getElementById('btnMetricCpu').classList.add('active');
+    if (metric === 'mem') document.getElementById('btnMetricMem').classList.add('active');
+    if (metric === 'gpu') document.getElementById('btnMetricGpu').classList.add('active');
+    if (metric === 'ane') document.getElementById('btnMetricAne').classList.add('active');
+    if (metric === 'io') document.getElementById('btnMetricIo').classList.add('active');
+  }
+
+  // Initial Load
+  filterSbomTable();
+  runDriftCompare();
+  populateProcessTable();
+</script>
+
+</body>
+</html>

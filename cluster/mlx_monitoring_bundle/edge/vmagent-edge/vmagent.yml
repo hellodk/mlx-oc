@@ -69,3 +69,25 @@ scrape_configs:
         replacement: mlx-logtailer
       - target_label: instance
         replacement: ${MACBOOK_ID:-unknown}:9106
+
+  - job_name: mlx-process
+    scrape_interval: 5s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["${PROCESS_LISTEN:-127.0.0.1:9107}"]
+    relabel_configs:
+      - target_label: service
+        replacement: mlx-process
+      - target_label: instance
+        replacement: ${MACBOOK_ID:-unknown}:9107
+
+  - job_name: mlx-sbom
+    scrape_interval: 60s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["${SBOM_LISTEN:-127.0.0.1:9108}"]
+    relabel_configs:
+      - target_label: service
+        replacement: mlx-sbom
+      - target_label: instance
+        replacement: ${MACBOOK_ID:-unknown}:9108

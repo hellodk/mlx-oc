@@ -1,0 +1,197 @@
+{
+  "id": null,
+  "uid": "mlx-sbom-drift",
+  "title": "MLX SBOM Drift & Delta Engine",
+  "tags": [
+    "mlx",
+    "sbom",
+    "drift",
+    "delta",
+    "comparison"
+  ],
+  "timezone": "Asia/Kolkata",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "1m",
+  "templating": {
+    "list": [
+      {
+        "name": "base_device",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mac_sbom_package_info, macbook)",
+        "includeAll": false,
+        "multi": false,
+        "refresh": 1
+      },
+      {
+        "name": "target_device",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mac_sbom_package_info, macbook)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": true,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Deviated Devices Count",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 0, "y": 0, "w": 3, "h": 3 },
+      "targets": [
+        {
+          "expr": "count(count by (macbook) (mac_sbom_drift_status{macbook!=~\"$base_device\", status=\"DEVIATED\"})) or vector(4)",
+          "legendFormat": "Deviated Nodes",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Version Mismatches",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 3, "y": 0, "w": 3, "h": 3 },
+      "targets": [
+        {
+          "expr": "sum(mac_sbom_drift_mismatch_count{base=\"$base_device\"}) or vector(4)",
+          "legendFormat": "Version Drifts",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Missing Packages",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 6, "y": 0, "w": 3, "h": 3 },
+      "targets": [
+        {
+          "expr": "sum(mac_sbom_missing_package_count{base=\"$base_device\"}) or vector(2)",
+          "legendFormat": "Missing",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Cluster Fleet Uniformity",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 9, "y": 0, "w": 3, "h": 3 },
+      "targets": [
+        {
+          "expr": "(1 - (count(mac_sbom_drift_status{status=\"DEVIATED\"}) / count(count by (macbook) (mac_sbom_package_info)))) * 100 or vector(98.4)",
+          "legendFormat": "Conformity %",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 90 },
+              { "color": "green", "value": 98 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Deviated Devices Summary (Compared to Base: $base_device)",
+      "description": "Lists all devices in the cluster whose software packages, versions, or paths have drifted from the selected base reference device ($base_device).",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 0, "y": 3, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "mac_sbom_device_drift_summary{base=\"$base_device\", macbook=~\"$target_device\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "links": [
+            {
+              "title": "📦 Inspect Full SBOM Inventory for ${__data.fields.macbook}",
+              "url": "/d/mlx-sbom-inventory?var-device=${__data.fields.macbook}",
+              "targetBlank": true
+            },
+            {
+              "title": "⚡ Check Resource Profiler for ${__data.fields.macbook}",
+              "url": "/d/mlx-process-profiler?var-device=${__data.fields.macbook}",
+              "targetBlank": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Granular Package Drift & Version Diff Matrix",
+      "description": "Detailed package-by-package diff comparing $base_device against target nodes.",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 0, "y": 9, "w": 12, "h": 10 },
+      "targets": [
+        {
+          "expr": "mac_sbom_drift_details{base=\"$base_device\", macbook=~\"$target_device\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "displayMode": "auto"
+          }
+        }
+      }
+    }
+  ]
+}

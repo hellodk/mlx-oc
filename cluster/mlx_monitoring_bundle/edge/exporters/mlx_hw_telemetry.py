@@ -33,6 +33,7 @@ SAMPLE_INTERVAL_DEFAULT = 5.0
 GPU_SAMPLE_INTERVAL_DEFAULT = 15.0
 
 G_UP = Gauge("mlx_hw_up", "1 if the node telemetry agent is running", ["node"])
+G_SSH_UP = Gauge("mlx_ssh_up", "1 if SSH daemon is reachable on local port 22", ["node"])
 G_UPTIME = Gauge("mlx_hw_uptime_seconds", "Host uptime in seconds", ["node"])
 G_LOAD1 = Gauge("mlx_hw_load1", "1-minute system load average", ["node"])
 G_LOAD5 = Gauge("mlx_hw_load5", "5-minute system load average", ["node"])
@@ -490,6 +491,13 @@ def _sample():
     disk = shutil.disk_usage("/")
 
     G_UP.labels(NODE).set(1)
+    ssh_up = 0.0
+    try:
+        with socket.create_connection(("127.0.0.1", 22), timeout=0.3):
+            ssh_up = 1.0
+    except Exception:
+        ssh_up = 0.0
+    G_SSH_UP.labels(NODE).set(ssh_up)
     boot = _sysctl("kern.boottime", "")
     m = re.search(r"sec\s*=\s*(\d+)", boot)
     if m:

@@ -26,7 +26,7 @@ name: mlx-central
 
 services:
   victoria-metrics:
-    image: victoriametrics/victoria-metrics:latest
+    image: victoriametrics/victoria-metrics:v1.155.0
     container_name: central-victoriametrics
     restart: unless-stopped
     ports:
@@ -65,7 +65,7 @@ services:
           memory: 512M
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.3.0
     container_name: central-grafana
     restart: unless-stopped
     ports:
@@ -96,7 +96,7 @@ services:
       retries: 20
 
   vmalert:
-    image: victoriametrics/vmalert:latest
+    image: victoriametrics/vmalert:v1.155.0
     container_name: central-vmalert
     restart: unless-stopped
     ports:
@@ -125,7 +125,7 @@ services:
       retries: 20
 
   alertmanager:
-    image: prom/alertmanager:latest
+    image: prom/alertmanager:v0.34.2
     container_name: central-alertmanager
     restart: unless-stopped
     ports:
@@ -249,7 +249,7 @@ services:
       - opik-zookeeper:/data
 
   minio:
-    image: rustfs/rustfs:latest
+    image: rustfs/rustfs:1.0.5
     container_name: central-opik-rustfs
     restart: unless-stopped
     profiles: ["opik"]

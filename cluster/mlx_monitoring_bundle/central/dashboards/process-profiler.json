@@ -1,0 +1,254 @@
+{
+  "id": null,
+  "uid": "mlx-process-profiler",
+  "title": "MLX Process & Resource Profiler",
+  "tags": [
+    "mlx",
+    "processes",
+    "profiler",
+    "resources",
+    "top10"
+  ],
+  "timezone": "Asia/Kolkata",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5s",
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_hw_up, macbook)",
+        "includeAll": false,
+        "multi": false,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Sampling Resolution",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 0, "y": 0, "w": 3, "h": 3 },
+      "targets": [
+        {
+          "expr": "vector(5)",
+          "legendFormat": "Seconds",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Top CPU Consumer",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 3, "y": 0, "w": 3, "h": 3 },
+      "targets": [
+        {
+          "expr": "topk(1, max by (process, macbook) (process_cpu_percent{macbook=\"$device\"}))",
+          "legendFormat": "{{process}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Top Memory Consumer",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 6, "y": 0, "w": 3, "h": 3 },
+      "targets": [
+        {
+          "expr": "topk(1, max by (process, macbook) (process_memory_rss_bytes{macbook=\"$device\"}))",
+          "legendFormat": "{{process}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "purple", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Top GPU Consumer",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 9, "y": 0, "w": 3, "h": 3 },
+      "targets": [
+        {
+          "expr": "topk(1, max by (process, macbook) (process_gpu_utilization_percent{macbook=\"$device\"}))",
+          "legendFormat": "{{process}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Top 10 CPU Consumers Over Time (5-Sec Resolution)",
+      "description": "Real-time CPU percentage for the top 10 dynamic process consumers on $device.",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 0, "y": 3, "w": 6, "h": 8 },
+      "targets": [
+        {
+          "expr": "topk(10, process_cpu_percent{macbook=\"$device\"})",
+          "legendFormat": "{{process}} (PID {{pid}})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "stacking": { "mode": "none" }
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Top 10 Memory RSS Consumers Over Time",
+      "description": "Resident Set Size (RAM) consumed by top 10 processes on $device.",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 6, "y": 3, "w": 6, "h": 8 },
+      "targets": [
+        {
+          "expr": "topk(10, process_memory_rss_bytes{macbook=\"$device\"})",
+          "legendFormat": "{{process}} (PID {{pid}})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "stacking": { "mode": "none" }
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Top Process Disk & Network I/O",
+      "description": "I/O throughput consumed by top dynamic processes.",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 0, "y": 11, "w": 6, "h": 7 },
+      "targets": [
+        {
+          "expr": "topk(5, process_disk_io_bytes_sec{macbook=\"$device\"})",
+          "legendFormat": "Disk: {{process}}",
+          "refId": "A"
+        },
+        {
+          "expr": "topk(5, process_network_io_bytes_sec{macbook=\"$device\"})",
+          "legendFormat": "Net: {{process}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "binBps",
+          "custom": { "fillOpacity": 15, "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "GPU Utilization & Apple Neural Engine (ANE) Power",
+      "description": "Per-process GPU active residency and Apple Neural Engine power draw.",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 6, "y": 11, "w": 6, "h": 7 },
+      "targets": [
+        {
+          "expr": "topk(5, process_gpu_utilization_percent{macbook=\"$device\"})",
+          "legendFormat": "GPU: {{process}}",
+          "refId": "A"
+        },
+        {
+          "expr": "topk(5, process_ane_power_watts{macbook=\"$device\"})",
+          "legendFormat": "ANE: {{process}} (Watts)",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 15, "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Top 10 Processes Live Leaderboard (Ranked by Total Resource Footprint)",
+      "description": "Shows PID, User, CPU%, RSS, I/O, GPU, ANE, and command line arguments. Drill down to SBOM inventory to inspect installed packages.",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 0, "y": 18, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "topk(10, process_ranking_info{macbook=\"$device\"})",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "links": [
+            {
+              "title": "📦 Inspect Installed SBOM Packages for ${__data.fields.macbook}",
+              "url": "/d/mlx-sbom-inventory?var-device=${__data.fields.macbook}",
+              "targetBlank": true
+            },
+            {
+              "title": "🖥️ Return to Fleet Health Matrix",
+              "url": "/d/mlx-device-health",
+              "targetBlank": false
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

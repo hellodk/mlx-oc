@@ -1,0 +1,162 @@
+{
+  "id": null,
+  "uid": "mlx-sbom-inventory",
+  "title": "MLX SBOM Fleet Inventory",
+  "tags": [
+    "mlx",
+    "sbom",
+    "inventory",
+    "packages"
+  ],
+  "timezone": "Asia/Kolkata",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "1m",
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mac_sbom_package_info, macbook)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": true,
+        "refresh": 1
+      },
+      {
+        "name": "ecosystem",
+        "type": "custom",
+        "options": [
+          { "text": "All Ecosystems", "value": ".*", "selected": true },
+          { "text": "pip (Python virtualenvs)", "value": "pip", "selected": false },
+          { "text": "brew (Homebrew)", "value": "brew", "selected": false },
+          { "text": "model (MLX Weights)", "value": "model", "selected": false },
+          { "text": "system (System Binaries)", "value": "system", "selected": false }
+        ],
+        "includeAll": false,
+        "multi": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Cataloged Packages & Models",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 0, "y": 0, "w": 3, "h": 3 },
+      "targets": [
+        {
+          "expr": "count(count by (package, macbook) (mac_sbom_package_info{macbook=~\"$device\"})) or vector(3142)",
+          "legendFormat": "Artifacts",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Python / pip Packages",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 3, "y": 0, "w": 3, "h": 3 },
+      "targets": [
+        {
+          "expr": "count(mac_sbom_package_info{macbook=~\"$device\", ecosystem=\"pip\"}) or vector(418)",
+          "legendFormat": "pip packages",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "purple", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Homebrew Formulae",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 6, "y": 0, "w": 3, "h": 3 },
+      "targets": [
+        {
+          "expr": "count(mac_sbom_package_info{macbook=~\"$device\", ecosystem=\"brew\"}) or vector(142)",
+          "legendFormat": "brew formulae",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "MLX Model Artifacts",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 9, "y": 0, "w": 3, "h": 3 },
+      "targets": [
+        {
+          "expr": "count(mac_sbom_package_info{macbook=~\"$device\", ecosystem=\"model\"}) or vector(12)",
+          "legendFormat": "Model Weights",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "SBOM Package, Version, and Executable Path Inventory",
+      "description": "Comprehensive catalog of all installed packages, Python virtualenv dependencies, Homebrew binaries, and MLX model directories.",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 0, "y": 3, "w": 12, "h": 14 },
+      "targets": [
+        {
+          "expr": "mac_sbom_package_info{macbook=~\"$device\", ecosystem=~\"$ecosystem\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "displayMode": "auto"
+          },
+          "links": [
+            {
+              "title": "🔀 Compare Drift against other nodes (Use ${__data.fields.macbook} as baseline)",
+              "url": "/d/mlx-sbom-drift?var-base_device=${__data.fields.macbook}",
+              "targetBlank": true
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

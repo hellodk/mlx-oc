@@ -257,6 +257,8 @@ class Bundle:
         self.enable_kv = config.get("ENABLE_KV_AGENT", "true").lower() == "true"
         self.enable_supervisor = config.get("ENABLE_SUPERVISOR", "true").lower() == "true"
         self.enable_logtailer = config.get("ENABLE_LOGTAILER", "true").lower() == "true"
+        self.enable_process = config.get("ENABLE_PROCESS_PROFILER", "true").lower() == "true"
+        self.enable_sbom = config.get("ENABLE_SBOM_COLLECTOR", "true").lower() == "true"
         self.enable_vmagent = config.get("ENABLE_VMAGENT", "true").lower() == "true"
         self.vmagent_binary = config.get("VMAGENT_BINARY", "vmagent")
         self.vmagent_config_template = BUNDLE_DIR / "vmagent-edge" / "vmagent.yml"
@@ -383,6 +385,31 @@ class Bundle:
             cmd.append("--otlp-verify-tls")
         self._spawn("logtailer", cmd)
 
+    def start_process(self):
+        if not self.enable_process:
+            return
+        cmd = [
+            self.venv_python, "mlx_process_telemetry.py",
+            "--node-name", self.macbook,
+            "--listen", config_val(self.config, "PROCESS_LISTEN", "127.0.0.1:9107"),
+            "--interval", config_val(self.config, "PROCESS_SAMPLE_INTERVAL", "5.0"),
+            "--top-k", config_val(self.config, "PROCESS_TOP_K", "10"),
+        ]
+        self._spawn("process", cmd)
+
+    def start_sbom(self):
+        if not self.enable_sbom:
+            return
+        base_dev = config_val(self.config, "SBOM_BASE_DEVICE", "mm")
+        cmd = [
+            self.venv_python, "mlx_sbom_collector.py",
+            "--node-name", self.macbook,
+            "--listen", config_val(self.config, "SBOM_LISTEN", "127.0.0.1:9108"),
+            "--interval", config_val(self.config, "SBOM_SCAN_INTERVAL", "3600.0"),
+            "--base-device", base_dev,
+        ]
+        self._spawn("sbom", cmd)
+
     def _render_vmagent_config(self) -> bool:
         """Render vmagent.yml template with environment variables."""
         if not self.vmagent_config_template.exists():
@@ -405,6 +432,8 @@ class Bundle:
                 "KV_LISTEN": config_val(self.config, "KV_LISTEN", "127.0.0.1:9104"),
                 "SUPERVISOR_LISTEN": config_val(self.config, "SUPERVISOR_LISTEN", "127.0.0.1:9105"),
                 "LOGTAILER_LISTEN": config_val(self.config, "LOGTAILER_LISTEN", "127.0.0.1:9106"),
+                "PROCESS_LISTEN": config_val(self.config, "PROCESS_LISTEN", "127.0.0.1:9107"),
+                "SBOM_LISTEN": config_val(self.config, "SBOM_LISTEN", "127.0.0.1:9108"),
             }
             # Single-pass substitution: replace ${VAR} and ${VAR:-default}.
             import re
@@ -513,7 +542,7 @@ class Bundle:
 
     def status(self) -> dict:
         pids = {}
-        for name in ["supervisor", "logtailer", "kv", "hw", "proxy", "vmagent"]:
+        for name in ["supervisor", "logtailer", "kv", "hw", "proxy", "process", "sbom", "vmagent"]:
             pfile = self.pid_dir / f"{name}.pid"
             pids[name] = read_pid(pfile)
         return {
@@ -540,7 +569,7 @@ class Bundle:
                     os.kill(bp, signal.SIGTERM)
                 except Exception as exc2:
                     debug(f"kill bundle failed: {exc2!r}", component="bundle")
-        for name in ["supervisor", "logtailer", "kv", "hw", "proxy", "vmagent"]:
+        for name in ["supervisor", "logtailer", "kv", "hw", "proxy", "process", "sbom", "vmagent"]:
             pfile = self.pid_dir / f"{name}.pid"
             pid = read_pid(pfile)
             if pid:
@@ -585,6 +614,10 @@ class Bundle:
             self.start_proxy(); started.append("proxy:8080")
         if self.enable_hw:
             self.start_hw(); started.append("hw:9102")
+        if self.enable_process:
+            self.start_process(); started.append("process:9107")
+        if self.enable_sbom:
+            self.start_sbom(); started.append("sbom:9108")
         if self.enable_vmagent:
             self.start_vmagent(); started.append("vmagent")
 

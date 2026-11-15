@@ -51,7 +51,7 @@ def test_vmagent_yaml_rendering():
     assert data["global"]["scrape_interval"] == "15s"
     assert data["global"]["external_labels"]["macbook"] == "test-mac"
     assert data["global"]["external_labels"]["serial"] == "SERIAL12345"
-    assert len(data["scrape_configs"]) == 5
+    assert len(data["scrape_configs"]) == 7
 
 
 def test_vmagent_yaml_rendering_with_defaults():
@@ -76,13 +76,17 @@ def test_vmagent_yaml_rendering_with_defaults():
 
 
 def test_no_duplicate_metrics_between_exporters():
-    """Verify importing both kv_cache_agent and proxy does not throw CollectorRegistry collision."""
+    """Verify importing kv_cache_agent, proxy, process_telemetry, and sbom_collector does not throw CollectorRegistry collision."""
     import mlx_kv_cache_agent
     import mlx_metrics_proxy
+    import mlx_process_telemetry
+    import mlx_sbom_collector
 
-    # Both modules must import cleanly into the same process
+    # All modules must import cleanly into the same process
     assert hasattr(mlx_kv_cache_agent, "G_UTIL")
     assert hasattr(mlx_metrics_proxy, "CONTEXT_MAX")
+    assert hasattr(mlx_process_telemetry, "G_PROCESS_CPU")
+    assert hasattr(mlx_sbom_collector, "G_SBOM_PACKAGE_INFO")
 
 
 def test_supervisor_command_json_no_keyerror():
@@ -169,16 +173,16 @@ def test_central_compose_image_resolution_and_profiles():
 
     # Base profile: 5 monitoring containers
     expected_base = {
-        "victoriametrics/victoria-metrics:latest",
+        "victoriametrics/victoria-metrics:v1.155.0",
         "otel/opentelemetry-collector-contrib:0.139.0",
-        "grafana/grafana:latest",
-        "victoriametrics/vmalert:latest",
-        "prom/alertmanager:latest",
+        "grafana/grafana:13.3.0",
+        "victoriametrics/vmalert:v1.155.0",
+        "prom/alertmanager:v0.34.2",
     }
     assert base_images == expected_base
 
     # Opik profile must include rustfs and not bitnami minio
-    assert "rustfs/rustfs:latest" in opik_images
+    assert "rustfs/rustfs:1.0.5" in opik_images
 
     # Backend must depend on minio, clickhouse, mysql, redis being healthy
     backend_deps = services["backend"].get("depends_on", {})
@@ -198,6 +202,8 @@ def test_vmagent_custom_listen_ports_rendering():
         "KV_LISTEN": "127.0.0.1:19104",
         "SUPERVISOR_LISTEN": "127.0.0.1:19105",
         "LOGTAILER_LISTEN": "127.0.0.1:19106",
+        "PROCESS_LISTEN": "127.0.0.1:19107",
+        "SBOM_LISTEN": "127.0.0.1:19108",
     }
 
     def repl(m):
@@ -217,6 +223,8 @@ def test_vmagent_custom_listen_ports_rendering():
     assert targets["mlx-kv"] == "127.0.0.1:19104"
     assert targets["mlx-supervisor"] == "127.0.0.1:19105"
     assert targets["mlx-logtailer"] == "127.0.0.1:19106"
+    assert targets["mlx-process"] == "127.0.0.1:19107"
+    assert targets["mlx-sbom"] == "127.0.0.1:19108"
 
 
 def test_vmagent_config_cli_action():
@@ -941,5 +949,63 @@ def test_cmd_central_passes_in_pod_false_cleans_pods_and_reports_compose_exit_co
     )
     assert res_fail.returncode != 0
     assert "failed with exit code 42" in res_fail.stderr
+
+
+def test_process_telemetry_metrics_sampling():
+    """Verify mlx_process_telemetry samples top-10 consumers and registers Prometheus metrics."""
+    import mlx_process_telemetry
+    from prometheus_client import generate_latest
+
+    # Run sampling round
+    mlx_process_telemetry._sample_processes("test-node-42", top_k=10)
+
+    output = generate_latest(mlx_process_telemetry.REGISTRY).decode("utf-8")
+    assert 'process_profiler_up{macbook="test-node-42"} 1.0' in output
+    assert "process_cpu_percent" in output
+    assert "process_memory_rss_bytes" in output
+    assert "process_disk_io_bytes_sec" in output
+    assert "process_network_io_bytes_sec" in output
+    assert "process_ranking_info" in output
+
+
+def test_sbom_collector_inventory_and_drift():
+    """Verify mlx_sbom_collector builds catalog, computes drift, and exposes Prometheus metrics."""
+    import mlx_sbom_collector
+    from prometheus_client import generate_latest
+
+    mlx_sbom_collector.collect_and_update_metrics("target-mac", "base-mac")
+
+    output = generate_latest(mlx_sbom_collector.REGISTRY).decode("utf-8")
+    assert 'mac_sbom_collector_up{macbook="target-mac"} 1.0' in output
+    assert "mac_sbom_package_info" in output
+    assert "mac_sbom_total_packages" in output
+    assert 'mac_sbom_drift_status{base="base-mac",macbook="target-mac"' in output
+
+    snap_file = mlx_sbom_collector.LOG_DIR / "sbom_snapshot.json"
+    assert snap_file.is_file()
+    snap_data = json.loads(snap_file.read_text(encoding="utf-8"))
+    assert snap_data["macbook"] == "target-mac"
+    assert "scanned_at_ist" in snap_data
+    assert snap_data["scanned_at_ist"].endswith(" IST")
+    assert snap_data["total_packages"] > 0
+
+
+def test_dashboards_json_validity():
+    """Verify all new production dashboards parse cleanly and contain required UIDs."""
+    dashboards_dir = BUNDLE_DIR / "central" / "dashboards"
+    expected = {
+        "device-health.json": "mlx-device-health",
+        "sbom-inventory.json": "mlx-sbom-inventory",
+        "sbom-drift.json": "mlx-sbom-drift",
+        "process-profiler.json": "mlx-process-profiler",
+    }
+    for fname, expected_uid in expected.items():
+        fpath = dashboards_dir / fname
+        assert fpath.is_file(), f"Missing dashboard file {fname}"
+        data = json.loads(fpath.read_text(encoding="utf-8"))
+        assert data.get("uid") == expected_uid
+        assert data.get("title")
+        assert len(data.get("panels", [])) > 0
+
 
 
