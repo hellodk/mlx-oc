@@ -2,6 +2,7 @@
   "id": null,
   "title": "MLX Serving Health",
   "tags": [
+    "cluster",
     "mlx",
     "serving"
   ],
@@ -15,7 +16,7 @@
         "name": "device",
         "type": "query",
         "datasource": "VictoriaMetrics",
-        "query": "label_values(mlx_server_up, macbook)",
+        "query": "label_values(mlx_server_up, device)",
         "includeAll": true,
         "allValue": ".+",
         "multi": false,
@@ -36,8 +37,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_up{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}}",
+          "expr": "mlx_server_up{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
@@ -75,8 +76,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_ready{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}}",
+          "expr": "mlx_server_ready{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
@@ -99,8 +100,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_model_loaded{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}}",
+          "expr": "mlx_model_loaded{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
@@ -123,8 +124,8 @@
       },
       "targets": [
         {
-          "expr": "increase(mlx_server_restarts_total{macbook=~\"$device\"}[15m])",
-          "legendFormat": "{{macbook}}",
+          "expr": "increase(mlx_server_restarts_total{device=~\"$device\"}[15m])",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ]
@@ -141,8 +142,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_state{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}}",
+          "expr": "mlx_server_state{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
@@ -165,8 +166,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_uptime_seconds{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}}",
+          "expr": "mlx_server_uptime_seconds{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
@@ -188,8 +189,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_crashes_total{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}} {{reason}}",
+          "expr": "mlx_server_crashes_total{device=~\"$device\"}",
+          "legendFormat": "{{device}} {{reason}}",
           "refId": "A"
         }
       ]
@@ -206,8 +207,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_last_exit_code{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}}",
+          "expr": "mlx_server_last_exit_code{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ]
@@ -224,8 +225,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_health_checks_total{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}} {{result}}",
+          "expr": "mlx_server_health_checks_total{device=~\"$device\"}",
+          "legendFormat": "{{device}} {{result}}",
           "refId": "A"
         }
       ]
@@ -242,11 +243,106 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_backoff_seconds{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}}",
+          "expr": "mlx_server_backoff_seconds{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ]
+    }
+  ],
+  "uid": "mlx-serving",
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [
+        "mlx"
+      ],
+      "title": "MLX Dashboards",
+      "type": "dashboards"
+    },
+    {
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Cluster Overview",
+      "tooltip": "Fleet-wide health and throughput",
+      "type": "link",
+      "url": "/d/mlx-overview"
+    },
+    {
+      "icon": "heart",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Health",
+      "tooltip": "Square tile matrix and fleet diagnostics",
+      "type": "link",
+      "url": "/d/mlx-device-health"
+    },
+    {
+      "icon": "server",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Detail",
+      "tooltip": "Per-device serving and hardware deep dive",
+      "type": "link",
+      "url": "/d/mlx-detail"
+    },
+    {
+      "icon": "bolt",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Hardware",
+      "tooltip": "CPU, GPU, RAM, Disk telemetry",
+      "type": "link",
+      "url": "/d/mlx-hardware"
+    },
+    {
+      "icon": "process",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Process Profiler",
+      "tooltip": "Top 10 CPU/RSS/Disk/Network/GPU consumers",
+      "type": "link",
+      "url": "/d/mlx-process-profiler"
+    },
+    {
+      "icon": "sitemap",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Network & TB4",
+      "tooltip": "Thunderbolt bridge & 10GbE network throughput",
+      "type": "link",
+      "url": "/d/mlx-network"
+    },
+    {
+      "icon": "cube",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "SBOM Inventory & Drift",
+      "tooltip": "Packages, paths, versions, and drift delta",
+      "type": "link",
+      "url": "/d/mlx-sbom-inventory"
+    },
+    {
+      "icon": "compass",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Opik Traces",
+      "tooltip": "LLM inference traces and token confidence",
+      "type": "link",
+      "url": "/d/mlx-opik"
+    },
+    {
+      "icon": "bell",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Alerts",
+      "tooltip": "Active cluster alerts and silences",
+      "type": "link",
+      "url": "/d/mlx-alerts"
     }
   ]
 }

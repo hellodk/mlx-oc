@@ -2,8 +2,8 @@
   "id": null,
   "title": "MLX Cluster Overview",
   "tags": [
-    "mlx",
     "cluster",
+    "mlx",
     "overview"
   ],
   "timezone": "Asia/Kolkata",
@@ -16,7 +16,7 @@
         "name": "device",
         "type": "query",
         "datasource": "VictoriaMetrics",
-        "query": "label_values(mlx_hw_up, macbook)",
+        "query": "label_values(mlx_hw_up, device)",
         "includeAll": true,
         "allValue": ".+",
         "multi": false,
@@ -37,7 +37,7 @@
   "panels": [
     {
       "type": "stat",
-      "title": "Macbooks Online",
+      "title": "Devices Online",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
@@ -47,8 +47,8 @@
       },
       "targets": [
         {
-          "expr": "count(count by (macbook) (mlx_hw_up))",
-          "legendFormat": "{{macbook}}",
+          "expr": "count(count by (device) (mlx_hw_up))",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
@@ -63,7 +63,19 @@
                 "value": null
               }
             ]
-          }
+          },
+          "links": [
+            {
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail for ${__field.labels.device}",
+              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: Device Health & Matrix",
+              "url": "/d/mlx-device-health?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
         }
       }
     },
@@ -79,7 +91,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(mlx_requests_total{macbook=~\"$device\", node=~\"$node\"}[1m]))",
+          "expr": "sum(rate(mlx_requests_total{device=~\"$device\", node=~\"$node\"}[1m]))",
           "legendFormat": "req/s",
           "refId": "A"
         }
@@ -103,7 +115,7 @@
       },
       "targets": [
         {
-          "expr": "avg(rate(mlx_token_rate_tokens_per_second_sum{macbook=~\"$device\"}[1m]) / rate(mlx_token_rate_tokens_per_second_count{macbook=~\"$device\"}[1m]))",
+          "expr": "avg(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\"}[1m]) / rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\"}[1m]))",
           "legendFormat": "tok/s",
           "refId": "A"
         }
@@ -127,7 +139,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(mlx_error_total{status=~\"5..\", macbook=~\"$device\"}[5m])) / sum(rate(mlx_requests_total{macbook=~\"$device\"}[5m]))",
+          "expr": "sum(rate(mlx_error_total{status=~\"5..\", device=~\"$device\"}[5m])) / sum(rate(mlx_requests_total{device=~\"$device\"}[5m]))",
           "legendFormat": "error rate",
           "refId": "A"
         }
@@ -141,7 +153,7 @@
     },
     {
       "type": "graph",
-      "title": "Request Rate by Macbook",
+      "title": "Request Rate by Device",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
@@ -151,15 +163,31 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_requests_total{macbook=~\"$device\", node=~\"$node\"}[1m])",
-          "legendFormat": "{{macbook}} / {{node}}",
+          "expr": "rate(mlx_requests_total{device=~\"$device\", node=~\"$node\"}[1m])",
+          "legendFormat": "{{device}} / {{node}}",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "links": [
+            {
+              "title": "\u26a1 Drilldown: Inference Metrics for ${__field.labels.device}",
+              "url": "/d/mlx-inference?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\ud83d\udd0d Drilldown: Opik Tracing for ${__field.labels.device}",
+              "url": "/d/mlx-opik?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
+        }
+      }
     },
     {
       "type": "graph",
-      "title": "Server Up / Ready by Macbook",
+      "title": "Server Up / Ready by Device",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 12,
@@ -169,20 +197,36 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_up{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}} up",
+          "expr": "mlx_server_up{device=~\"$device\"}",
+          "legendFormat": "{{device}} up",
           "refId": "A"
         },
         {
-          "expr": "mlx_server_ready{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}} ready",
+          "expr": "mlx_server_ready{device=~\"$device\"}",
+          "legendFormat": "{{device}} ready",
           "refId": "B"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "links": [
+            {
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail for ${__field.labels.device}",
+              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: Device Health & Matrix",
+              "url": "/d/mlx-device-health?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
+        }
+      }
     },
     {
       "type": "graph",
-      "title": "GPU Utilization by Macbook",
+      "title": "GPU Utilization by Device",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
@@ -192,8 +236,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_gpu_utilization_percent{macbook=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{macbook}} / {{node}}",
+          "expr": "mlx_hw_gpu_utilization_percent{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}} / {{node}}",
           "refId": "A"
         }
       ],
@@ -201,13 +245,25 @@
         "defaults": {
           "unit": "percentunit",
           "min": 0,
-          "max": 100
+          "max": 100,
+          "links": [
+            {
+              "title": "\u26a1 Drilldown: Top 10 Process Profiler for ${__field.labels.device}",
+              "url": "/d/mlx-process-profiler?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\ud83d\udcbb Drilldown: Hardware Telemetry for ${__field.labels.device}",
+              "url": "/d/mlx-hardware?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
         }
       }
     },
     {
       "type": "graph",
-      "title": "Thermal Pressure by Macbook",
+      "title": "Thermal Pressure by Device",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 12,
@@ -217,8 +273,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_thermal_pressure{macbook=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{macbook}} / {{node}}",
+          "expr": "mlx_hw_thermal_pressure{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}} / {{node}}",
           "refId": "A"
         }
       ],
@@ -227,13 +283,25 @@
           "unit": "percentunit",
           "min": 0,
           "max": 1,
-          "decimals": 2
+          "decimals": 2,
+          "links": [
+            {
+              "title": "\u26a1 Drilldown: Top 10 Process Profiler for ${__field.labels.device}",
+              "url": "/d/mlx-process-profiler?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\ud83d\udcbb Drilldown: Hardware Telemetry for ${__field.labels.device}",
+              "url": "/d/mlx-hardware?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
         }
       }
     },
     {
       "type": "graph",
-      "title": "Hallucination Risk by Macbook",
+      "title": "Hallucination Risk by Device",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
@@ -243,8 +311,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_hallucination_risk{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}}",
+          "expr": "mlx_hallucination_risk{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
@@ -259,7 +327,7 @@
     },
     {
       "type": "graph",
-      "title": "Mean Token Confidence by Macbook",
+      "title": "Mean Token Confidence by Device",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 12,
@@ -269,8 +337,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_token_confidence_mean{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}}",
+          "expr": "mlx_token_confidence_mean{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
@@ -282,6 +350,101 @@
           "decimals": 2
         }
       }
+    }
+  ],
+  "uid": "mlx-overview",
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [
+        "mlx"
+      ],
+      "title": "MLX Dashboards",
+      "type": "dashboards"
+    },
+    {
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Cluster Overview",
+      "tooltip": "Fleet-wide health and throughput",
+      "type": "link",
+      "url": "/d/mlx-overview"
+    },
+    {
+      "icon": "heart",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Health",
+      "tooltip": "Square tile matrix and fleet diagnostics",
+      "type": "link",
+      "url": "/d/mlx-device-health"
+    },
+    {
+      "icon": "server",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Detail",
+      "tooltip": "Per-device serving and hardware deep dive",
+      "type": "link",
+      "url": "/d/mlx-detail"
+    },
+    {
+      "icon": "bolt",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Hardware",
+      "tooltip": "CPU, GPU, RAM, Disk telemetry",
+      "type": "link",
+      "url": "/d/mlx-hardware"
+    },
+    {
+      "icon": "process",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Process Profiler",
+      "tooltip": "Top 10 CPU/RSS/Disk/Network/GPU consumers",
+      "type": "link",
+      "url": "/d/mlx-process-profiler"
+    },
+    {
+      "icon": "sitemap",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Network & TB4",
+      "tooltip": "Thunderbolt bridge & 10GbE network throughput",
+      "type": "link",
+      "url": "/d/mlx-network"
+    },
+    {
+      "icon": "cube",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "SBOM Inventory & Drift",
+      "tooltip": "Packages, paths, versions, and drift delta",
+      "type": "link",
+      "url": "/d/mlx-sbom-inventory"
+    },
+    {
+      "icon": "compass",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Opik Traces",
+      "tooltip": "LLM inference traces and token confidence",
+      "type": "link",
+      "url": "/d/mlx-opik"
+    },
+    {
+      "icon": "bell",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Alerts",
+      "tooltip": "Active cluster alerts and silences",
+      "type": "link",
+      "url": "/d/mlx-alerts"
     }
   ]
 }

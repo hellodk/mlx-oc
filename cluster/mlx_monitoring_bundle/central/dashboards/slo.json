@@ -2,9 +2,10 @@
   "id": null,
   "title": "MLX SLO / Error Budget",
   "tags": [
+    "cluster",
+    "error-budget",
     "mlx",
-    "slo",
-    "error-budget"
+    "slo"
   ],
   "timezone": "Asia/Kolkata",
   "schemaVersion": 38,
@@ -16,7 +17,7 @@
         "name": "device",
         "type": "query",
         "datasource": "VictoriaMetrics",
-        "query": "label_values(mlx_requests_total, macbook)",
+        "query": "label_values(mlx_requests_total, device)",
         "includeAll": true,
         "allValue": ".+",
         "multi": false,
@@ -37,8 +38,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (macbook) (rate(mlx_error_total{status=~\"5..\", macbook=~\"$device\"}[1h])) / sum by (macbook) (rate(mlx_requests_total{macbook=~\"$device\"}[1h]))",
-          "legendFormat": "{{macbook}}",
+          "expr": "sum by (device) (rate(mlx_error_total{status=~\"5..\", device=~\"$device\"}[1h])) / sum by (device) (rate(mlx_requests_total{device=~\"$device\"}[1h]))",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
@@ -63,8 +64,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (macbook) (rate(mlx_error_total{macbook=~\"$device\"}[1h])) / sum by (macbook) (rate(mlx_requests_total{macbook=~\"$device\"}[1h]))",
-          "legendFormat": "{{macbook}}",
+          "expr": "sum by (device) (rate(mlx_error_total{device=~\"$device\"}[1h])) / sum by (device) (rate(mlx_requests_total{device=~\"$device\"}[1h]))",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
@@ -89,8 +90,8 @@
       },
       "targets": [
         {
-          "expr": "1 - (sum by (macbook) (rate(mlx_error_total{status=~\"5..\", macbook=~\"$device\"}[1h])) / sum by (macbook) (rate(mlx_requests_total{macbook=~\"$device\"}[1h]))) / 0.05",
-          "legendFormat": "{{macbook}} budget remaining",
+          "expr": "1 - (sum by (device) (rate(mlx_error_total{status=~\"5..\", device=~\"$device\"}[1h])) / sum by (device) (rate(mlx_requests_total{device=~\"$device\"}[1h]))) / 0.05",
+          "legendFormat": "{{device}} budget remaining",
           "refId": "A"
         }
       ],
@@ -115,8 +116,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (macbook) (rate(mlx_requests_total{macbook=~\"$device\"}[1h]))",
-          "legendFormat": "{{macbook}} req/h",
+          "expr": "sum by (device) (rate(mlx_requests_total{device=~\"$device\"}[1h]))",
+          "legendFormat": "{{device}} req/h",
           "refId": "A"
         }
       ],
@@ -138,8 +139,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (macbook) (increase(mlx_error_total{status=~\"5..\", macbook=~\"$device\"}[1h]))",
-          "legendFormat": "{{macbook}}",
+          "expr": "sum by (device) (increase(mlx_error_total{status=~\"5..\", device=~\"$device\"}[1h]))",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ]
@@ -156,8 +157,8 @@
       },
       "targets": [
         {
-          "expr": "1 - sum by (macbook) (rate(mlx_error_total{status=~\"5..\", macbook=~\"$device\"}[1h])) / sum by (macbook) (rate(mlx_requests_total{macbook=~\"$device\"}[1h]))",
-          "legendFormat": "{{macbook}} availability",
+          "expr": "1 - sum by (device) (rate(mlx_error_total{status=~\"5..\", device=~\"$device\"}[1h])) / sum by (device) (rate(mlx_requests_total{device=~\"$device\"}[1h]))",
+          "legendFormat": "{{device}} availability",
           "refId": "A"
         }
       ],
@@ -169,6 +170,101 @@
           "decimals": 4
         }
       }
+    }
+  ],
+  "uid": "mlx-slo",
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [
+        "mlx"
+      ],
+      "title": "MLX Dashboards",
+      "type": "dashboards"
+    },
+    {
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Cluster Overview",
+      "tooltip": "Fleet-wide health and throughput",
+      "type": "link",
+      "url": "/d/mlx-overview"
+    },
+    {
+      "icon": "heart",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Health",
+      "tooltip": "Square tile matrix and fleet diagnostics",
+      "type": "link",
+      "url": "/d/mlx-device-health"
+    },
+    {
+      "icon": "server",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Detail",
+      "tooltip": "Per-device serving and hardware deep dive",
+      "type": "link",
+      "url": "/d/mlx-detail"
+    },
+    {
+      "icon": "bolt",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Hardware",
+      "tooltip": "CPU, GPU, RAM, Disk telemetry",
+      "type": "link",
+      "url": "/d/mlx-hardware"
+    },
+    {
+      "icon": "process",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Process Profiler",
+      "tooltip": "Top 10 CPU/RSS/Disk/Network/GPU consumers",
+      "type": "link",
+      "url": "/d/mlx-process-profiler"
+    },
+    {
+      "icon": "sitemap",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Network & TB4",
+      "tooltip": "Thunderbolt bridge & 10GbE network throughput",
+      "type": "link",
+      "url": "/d/mlx-network"
+    },
+    {
+      "icon": "cube",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "SBOM Inventory & Drift",
+      "tooltip": "Packages, paths, versions, and drift delta",
+      "type": "link",
+      "url": "/d/mlx-sbom-inventory"
+    },
+    {
+      "icon": "compass",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Opik Traces",
+      "tooltip": "LLM inference traces and token confidence",
+      "type": "link",
+      "url": "/d/mlx-opik"
+    },
+    {
+      "icon": "bell",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Alerts",
+      "tooltip": "Active cluster alerts and silences",
+      "type": "link",
+      "url": "/d/mlx-alerts"
     }
   ]
 }

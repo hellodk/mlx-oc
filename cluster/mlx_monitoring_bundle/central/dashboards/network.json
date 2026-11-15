@@ -2,6 +2,7 @@
   "id": null,
   "title": "MLX Network (Ring Interconnect)",
   "tags": [
+    "cluster",
     "mlx",
     "network",
     "ring"
@@ -16,7 +17,7 @@
         "name": "device",
         "type": "query",
         "datasource": "VictoriaMetrics",
-        "query": "label_values(mlx_net_rx_bytes_total, macbook)",
+        "query": "label_values(mlx_net_rx_bytes_total, device)",
         "includeAll": true,
         "allValue": ".+",
         "multi": false,
@@ -57,14 +58,26 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_net_rx_bytes_total{macbook=~\"$device\", node=~\"$node\", iface=\"$iface\"}[1m])",
-          "legendFormat": "{{macbook}} {{iface}} rx",
+          "expr": "rate(mlx_net_rx_bytes_total{device=~\"$device\", node=~\"$node\", iface=\"$iface\"}[1m])",
+          "legendFormat": "{{device}} {{iface}} rx",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "Bps"
+          "unit": "Bps",
+          "links": [
+            {
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail for ${__field.labels.device}",
+              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: Top 10 Process Profiler for ${__field.labels.device}",
+              "url": "/d/mlx-process-profiler?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
         }
       }
     },
@@ -80,14 +93,26 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_net_tx_bytes_total{macbook=~\"$device\", node=~\"$node\", iface=\"$iface\"}[1m])",
-          "legendFormat": "{{macbook}} {{iface}} tx",
+          "expr": "rate(mlx_net_tx_bytes_total{device=~\"$device\", node=~\"$node\", iface=\"$iface\"}[1m])",
+          "legendFormat": "{{device}} {{iface}} tx",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "Bps"
+          "unit": "Bps",
+          "links": [
+            {
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail for ${__field.labels.device}",
+              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: Top 10 Process Profiler for ${__field.labels.device}",
+              "url": "/d/mlx-process-profiler?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
         }
       }
     },
@@ -103,14 +128,26 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_net_rx_errors_total{macbook=~\"$device\", node=~\"$node\", iface=\"$iface\"}[5m])",
-          "legendFormat": "{{macbook}} {{iface}} rx_err",
+          "expr": "rate(mlx_net_rx_errors_total{device=~\"$device\", node=~\"$node\", iface=\"$iface\"}[5m])",
+          "legendFormat": "{{device}} {{iface}} rx_err",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "reqps"
+          "unit": "reqps",
+          "links": [
+            {
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail for ${__field.labels.device}",
+              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: Top 10 Process Profiler for ${__field.labels.device}",
+              "url": "/d/mlx-process-profiler?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
         }
       }
     },
@@ -126,16 +163,123 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_net_tx_errors_total{macbook=~\"$device\", node=~\"$node\", iface=\"$iface\"}[5m])",
-          "legendFormat": "{{macbook}} {{iface}} tx_err",
+          "expr": "rate(mlx_net_tx_errors_total{device=~\"$device\", node=~\"$node\", iface=\"$iface\"}[5m])",
+          "legendFormat": "{{device}} {{iface}} tx_err",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "reqps"
+          "unit": "reqps",
+          "links": [
+            {
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail for ${__field.labels.device}",
+              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: Top 10 Process Profiler for ${__field.labels.device}",
+              "url": "/d/mlx-process-profiler?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
         }
       }
+    }
+  ],
+  "uid": "mlx-network",
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [
+        "mlx"
+      ],
+      "title": "MLX Dashboards",
+      "type": "dashboards"
+    },
+    {
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Cluster Overview",
+      "tooltip": "Fleet-wide health and throughput",
+      "type": "link",
+      "url": "/d/mlx-overview"
+    },
+    {
+      "icon": "heart",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Health",
+      "tooltip": "Square tile matrix and fleet diagnostics",
+      "type": "link",
+      "url": "/d/mlx-device-health"
+    },
+    {
+      "icon": "server",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Detail",
+      "tooltip": "Per-device serving and hardware deep dive",
+      "type": "link",
+      "url": "/d/mlx-detail"
+    },
+    {
+      "icon": "bolt",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Hardware",
+      "tooltip": "CPU, GPU, RAM, Disk telemetry",
+      "type": "link",
+      "url": "/d/mlx-hardware"
+    },
+    {
+      "icon": "process",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Process Profiler",
+      "tooltip": "Top 10 CPU/RSS/Disk/Network/GPU consumers",
+      "type": "link",
+      "url": "/d/mlx-process-profiler"
+    },
+    {
+      "icon": "sitemap",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Network & TB4",
+      "tooltip": "Thunderbolt bridge & 10GbE network throughput",
+      "type": "link",
+      "url": "/d/mlx-network"
+    },
+    {
+      "icon": "cube",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "SBOM Inventory & Drift",
+      "tooltip": "Packages, paths, versions, and drift delta",
+      "type": "link",
+      "url": "/d/mlx-sbom-inventory"
+    },
+    {
+      "icon": "compass",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Opik Traces",
+      "tooltip": "LLM inference traces and token confidence",
+      "type": "link",
+      "url": "/d/mlx-opik"
+    },
+    {
+      "icon": "bell",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Alerts",
+      "tooltip": "Active cluster alerts and silences",
+      "type": "link",
+      "url": "/d/mlx-alerts"
     }
   ]
 }

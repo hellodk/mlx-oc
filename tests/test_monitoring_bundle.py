@@ -26,6 +26,7 @@ def test_vmagent_yaml_rendering():
     subs = {
         "CENTRAL_VICTORIA_METRICS": "192.168.1.10:8428",
         "OTLP_SCHEME": "http",
+        "DEVICE_ID": "test-mac",
         "MACBOOK_ID": "test-mac",
         "MACBOOK_SERIAL": "SERIAL12345",
         "VMAGENT_SCRAPE_INTERVAL": "15s",
@@ -49,6 +50,7 @@ def test_vmagent_yaml_rendering():
 
     data = yaml.safe_load(rendered)
     assert data["global"]["scrape_interval"] == "15s"
+    assert data["global"]["external_labels"]["device"] == "test-mac"
     assert data["global"]["external_labels"]["macbook"] == "test-mac"
     assert data["global"]["external_labels"]["serial"] == "SERIAL12345"
     assert len(data["scrape_configs"]) == 7
@@ -72,6 +74,7 @@ def test_vmagent_yaml_rendering_with_defaults():
     rendered = re.sub(r"\$\{([^}]+)\}", repl, template)
     data = yaml.safe_load(rendered)
     assert data["global"]["scrape_interval"] == "10s"
+    assert data["global"]["external_labels"]["device"] == "unknown"
     assert data["global"]["external_labels"]["macbook"] == "unknown"
 
 
@@ -125,6 +128,7 @@ def test_vmalert_rules_validity():
     data = yaml.safe_load(text)
     assert "groups" in data
     alerts = [r["alert"] for g in data["groups"] for r in g.get("rules", []) if "alert" in r]
+    assert "MLXDeviceSilent" in alerts
     assert "MLXMacbookSilent" in alerts
     assert "MLXServerCrashLooping" in alerts
     assert "MLXHardwareExporterDown" in alerts
@@ -960,7 +964,7 @@ def test_process_telemetry_metrics_sampling():
     mlx_process_telemetry._sample_processes("test-node-42", top_k=10)
 
     output = generate_latest(mlx_process_telemetry.REGISTRY).decode("utf-8")
-    assert 'process_profiler_up{macbook="test-node-42"} 1.0' in output
+    assert 'process_profiler_up{device="test-node-42"} 1.0' in output
     assert "process_cpu_percent" in output
     assert "process_memory_rss_bytes" in output
     assert "process_disk_io_bytes_sec" in output
@@ -976,14 +980,15 @@ def test_sbom_collector_inventory_and_drift():
     mlx_sbom_collector.collect_and_update_metrics("target-mac", "base-mac")
 
     output = generate_latest(mlx_sbom_collector.REGISTRY).decode("utf-8")
-    assert 'mac_sbom_collector_up{macbook="target-mac"} 1.0' in output
+    assert 'mac_sbom_collector_up{device="target-mac"} 1.0' in output
     assert "mac_sbom_package_info" in output
     assert "mac_sbom_total_packages" in output
-    assert 'mac_sbom_drift_status{base="base-mac",macbook="target-mac"' in output
+    assert 'mac_sbom_drift_status{base="base-mac",device="target-mac"' in output
 
     snap_file = mlx_sbom_collector.LOG_DIR / "sbom_snapshot.json"
     assert snap_file.is_file()
     snap_data = json.loads(snap_file.read_text(encoding="utf-8"))
+    assert snap_data["device"] == "target-mac"
     assert snap_data["macbook"] == "target-mac"
     assert "scanned_at_ist" in snap_data
     assert snap_data["scanned_at_ist"].endswith(" IST")
@@ -991,13 +996,26 @@ def test_sbom_collector_inventory_and_drift():
 
 
 def test_dashboards_json_validity():
-    """Verify all new production dashboards parse cleanly and contain required UIDs."""
+    """Verify all 17 production dashboards parse cleanly, contain deterministic UIDs, and have header links."""
     dashboards_dir = BUNDLE_DIR / "central" / "dashboards"
     expected = {
+        "alerts.json": "mlx-alerts",
+        "detail.json": "mlx-detail",
         "device-health.json": "mlx-device-health",
-        "sbom-inventory.json": "mlx-sbom-inventory",
-        "sbom-drift.json": "mlx-sbom-drift",
+        "hardware.json": "mlx-hardware",
+        "inference.json": "mlx-inference",
+        "kv-cache.json": "mlx-kv-cache",
+        "logs.json": "mlx-logs",
+        "network.json": "mlx-network",
+        "opik.json": "mlx-opik",
+        "overview.json": "mlx-overview",
+        "power-thermal.json": "mlx-power-thermal",
         "process-profiler.json": "mlx-process-profiler",
+        "quality.json": "mlx-quality",
+        "sbom-drift.json": "mlx-sbom-drift",
+        "sbom-inventory.json": "mlx-sbom-inventory",
+        "serving.json": "mlx-serving",
+        "slo.json": "mlx-slo",
     }
     for fname, expected_uid in expected.items():
         fpath = dashboards_dir / fname
@@ -1006,6 +1024,8 @@ def test_dashboards_json_validity():
         assert data.get("uid") == expected_uid
         assert data.get("title")
         assert len(data.get("panels", [])) > 0
+        assert len(data.get("links", [])) > 0, f"Dashboard {fname} missing header drill-down links"
+        assert "mlx" in data.get("tags", []), f"Dashboard {fname} missing 'mlx' tag for dynamic discovery"
 
 
 

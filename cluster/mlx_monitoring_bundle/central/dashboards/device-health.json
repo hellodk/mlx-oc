@@ -3,10 +3,11 @@
   "uid": "mlx-device-health",
   "title": "MLX Device Health & Diagnostics",
   "tags": [
-    "mlx",
+    "cluster",
+    "diagnostics",
     "fleet",
     "health",
-    "diagnostics"
+    "mlx"
   ],
   "timezone": "Asia/Kolkata",
   "schemaVersion": 38,
@@ -18,7 +19,7 @@
         "name": "device",
         "type": "query",
         "datasource": "VictoriaMetrics",
-        "query": "label_values(mlx_hw_up, macbook)",
+        "query": "label_values(mlx_hw_up, device)",
         "includeAll": true,
         "allValue": ".+",
         "multi": true,
@@ -39,7 +40,7 @@
       },
       "targets": [
         {
-          "expr": "count(count by (macbook) (mlx_hw_up == 1))",
+          "expr": "count(count by (device) (mlx_hw_up == 1))",
           "legendFormat": "Online",
           "refId": "A"
         }
@@ -154,8 +155,8 @@
       },
       "targets": [
         {
-          "expr": "max by (macbook, instance) (mlx_hw_up)",
-          "legendFormat": "{{macbook}} ({{instance}})",
+          "expr": "max by (device, instance) (mlx_hw_up)",
+          "legendFormat": "{{device}} ({{instance}})",
           "refId": "A"
         }
       ],
@@ -215,19 +216,29 @@
           },
           "links": [
             {
-              "title": "\u26a1 Drilldown: Top 10 Process Profiler for ${__field.labels.macbook}",
-              "url": "/d/mlx-process-profiler?var-device=${__field.labels.macbook}",
-              "targetBlank": true
+              "title": "\u26a1 Drilldown: Top 10 Process Profiler for ${__field.labels.device}",
+              "url": "/d/mlx-process-profiler?var-device=${__field.labels.device}",
+              "targetBlank": false
             },
             {
-              "title": "\ud83d\udce6 Drilldown: Software Inventory (SBOM) for ${__field.labels.macbook}",
-              "url": "/d/mlx-sbom-inventory?var-device=${__field.labels.macbook}",
-              "targetBlank": true
+              "title": "\ud83d\udce6 Drilldown: Software Inventory (SBOM) for ${__field.labels.device}",
+              "url": "/d/mlx-sbom-inventory?var-device=${__field.labels.device}",
+              "targetBlank": false
             },
             {
-              "title": "\ud83d\udcca Drilldown: Hardware Telemetry for ${__field.labels.macbook}",
-              "url": "/d/detail?var-device=${__field.labels.macbook}",
-              "targetBlank": true
+              "title": "\ud83d\udcca Drilldown: Hardware Telemetry for ${__field.labels.device}",
+              "url": "/d/mlx-hardware?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\ud83c\udf10 Drilldown: Network & Thunderbolt Interconnect for ${__field.labels.device}",
+              "url": "/d/mlx-network?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\ud83d\udccb Drilldown: Per-Device Detail for ${__field.labels.device}",
+              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
+              "targetBlank": false
             }
           ]
         }
@@ -246,8 +257,8 @@
       },
       "targets": [
         {
-          "expr": "max by (macbook) (mlx_hw_up{macbook=~\"$device\"})",
-          "legendFormat": "{{macbook}}",
+          "expr": "max by (device) (mlx_hw_up{device=~\"$device\"})",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
@@ -306,8 +317,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_ssh_up{macbook=~\"$device\"} or mlx_hw_up{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}}",
+          "expr": "mlx_ssh_up{device=~\"$device\"} or mlx_hw_up{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
           "refId": "A",
           "format": "table",
           "instant": true
@@ -348,6 +359,100 @@
           ]
         }
       }
+    }
+  ],
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [
+        "mlx"
+      ],
+      "title": "MLX Dashboards",
+      "type": "dashboards"
+    },
+    {
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Cluster Overview",
+      "tooltip": "Fleet-wide health and throughput",
+      "type": "link",
+      "url": "/d/mlx-overview"
+    },
+    {
+      "icon": "heart",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Health",
+      "tooltip": "Square tile matrix and fleet diagnostics",
+      "type": "link",
+      "url": "/d/mlx-device-health"
+    },
+    {
+      "icon": "server",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Detail",
+      "tooltip": "Per-device serving and hardware deep dive",
+      "type": "link",
+      "url": "/d/mlx-detail"
+    },
+    {
+      "icon": "bolt",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Hardware",
+      "tooltip": "CPU, GPU, RAM, Disk telemetry",
+      "type": "link",
+      "url": "/d/mlx-hardware"
+    },
+    {
+      "icon": "process",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Process Profiler",
+      "tooltip": "Top 10 CPU/RSS/Disk/Network/GPU consumers",
+      "type": "link",
+      "url": "/d/mlx-process-profiler"
+    },
+    {
+      "icon": "sitemap",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Network & TB4",
+      "tooltip": "Thunderbolt bridge & 10GbE network throughput",
+      "type": "link",
+      "url": "/d/mlx-network"
+    },
+    {
+      "icon": "cube",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "SBOM Inventory & Drift",
+      "tooltip": "Packages, paths, versions, and drift delta",
+      "type": "link",
+      "url": "/d/mlx-sbom-inventory"
+    },
+    {
+      "icon": "compass",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Opik Traces",
+      "tooltip": "LLM inference traces and token confidence",
+      "type": "link",
+      "url": "/d/mlx-opik"
+    },
+    {
+      "icon": "bell",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Alerts",
+      "tooltip": "Active cluster alerts and silences",
+      "type": "link",
+      "url": "/d/mlx-alerts"
     }
   ]
 }

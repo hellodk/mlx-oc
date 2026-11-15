@@ -2,8 +2,9 @@
   "id": null,
   "title": "MLX Alerts",
   "tags": [
-    "mlx",
-    "alerts"
+    "alerts",
+    "cluster",
+    "mlx"
   ],
   "timezone": "Asia/Kolkata",
   "schemaVersion": 38,
@@ -15,7 +16,7 @@
         "name": "device",
         "type": "query",
         "datasource": "VictoriaMetrics",
-        "query": "label_values(ALERTS, macbook)",
+        "query": "label_values(ALERTS, device)",
         "includeAll": true,
         "allValue": ".+",
         "multi": false,
@@ -46,7 +47,7 @@
   "panels": [
     {
       "type": "graph",
-      "title": "Active Alerts by Macbook",
+      "title": "Active Alerts by Device",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
@@ -56,15 +57,27 @@
       },
       "targets": [
         {
-          "expr": "ALERTS{alertname=~\"MLX.*\", macbook=~\"$device\", severity=~\"$severity\"}",
-          "legendFormat": "{{alertname}} {{severity}} {{macbook}}",
+          "expr": "ALERTS{alertname=~\"MLX.*\", device=~\"$device\", severity=~\"$severity\"}",
+          "legendFormat": "{{alertname}} {{severity}} {{device}}",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "min": 0,
-          "max": 1
+          "max": 1,
+          "links": [
+            {
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail for ${__field.labels.device}",
+              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: Device Health Matrix",
+              "url": "/d/mlx-device-health?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
         }
       }
     },
@@ -80,11 +93,27 @@
       },
       "targets": [
         {
-          "expr": "count(ALERTS{alertname=~\"MLX.*\", macbook=~\"$device\", severity=\"critical\", alertstate=\"firing\"})",
+          "expr": "count(ALERTS{alertname=~\"MLX.*\", device=~\"$device\", severity=\"critical\", alertstate=\"firing\"})",
           "legendFormat": "critical",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "links": [
+            {
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail for ${__field.labels.device}",
+              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: Device Health Matrix",
+              "url": "/d/mlx-device-health?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
+        }
+      }
     },
     {
       "type": "stat",
@@ -98,11 +127,27 @@
       },
       "targets": [
         {
-          "expr": "count(ALERTS{alertname=~\"MLX.*\", macbook=~\"$device\", severity=\"warning\", alertstate=\"firing\"})",
+          "expr": "count(ALERTS{alertname=~\"MLX.*\", device=~\"$device\", severity=\"warning\", alertstate=\"firing\"})",
           "legendFormat": "warning",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "links": [
+            {
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail for ${__field.labels.device}",
+              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: Device Health Matrix",
+              "url": "/d/mlx-device-health?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
+        }
+      }
     },
     {
       "type": "graph",
@@ -116,15 +161,27 @@
       },
       "targets": [
         {
-          "expr": "ALERTS{alertname=~\"MLX.*\", macbook=~\"$device\"}",
-          "legendFormat": "{{alertname}} {{macbook}} {{alertstate}}",
+          "expr": "ALERTS{alertname=~\"MLX.*\", device=~\"$device\"}",
+          "legendFormat": "{{alertname}} {{device}} {{alertstate}}",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "min": 0,
-          "max": 2
+          "max": 2,
+          "links": [
+            {
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail for ${__field.labels.device}",
+              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: Device Health Matrix",
+              "url": "/d/mlx-device-health?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
         }
       }
     },
@@ -140,11 +197,122 @@
       },
       "targets": [
         {
-          "expr": "ALERTS{alertname=~\"MLX.*\", macbook=~\"$device\", severity=~\"$severity\", alertstate=\"firing\"}",
+          "expr": "ALERTS{alertname=~\"MLX.*\", device=~\"$device\", severity=~\"$severity\", alertstate=\"firing\"}",
           "legendFormat": "{{alertname}}",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "links": [
+            {
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail for ${__field.labels.device}",
+              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: Device Health Matrix",
+              "url": "/d/mlx-device-health?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "uid": "mlx-alerts",
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [
+        "mlx"
+      ],
+      "title": "MLX Dashboards",
+      "type": "dashboards"
+    },
+    {
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Cluster Overview",
+      "tooltip": "Fleet-wide health and throughput",
+      "type": "link",
+      "url": "/d/mlx-overview"
+    },
+    {
+      "icon": "heart",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Health",
+      "tooltip": "Square tile matrix and fleet diagnostics",
+      "type": "link",
+      "url": "/d/mlx-device-health"
+    },
+    {
+      "icon": "server",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Detail",
+      "tooltip": "Per-device serving and hardware deep dive",
+      "type": "link",
+      "url": "/d/mlx-detail"
+    },
+    {
+      "icon": "bolt",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Hardware",
+      "tooltip": "CPU, GPU, RAM, Disk telemetry",
+      "type": "link",
+      "url": "/d/mlx-hardware"
+    },
+    {
+      "icon": "process",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Process Profiler",
+      "tooltip": "Top 10 CPU/RSS/Disk/Network/GPU consumers",
+      "type": "link",
+      "url": "/d/mlx-process-profiler"
+    },
+    {
+      "icon": "sitemap",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Network & TB4",
+      "tooltip": "Thunderbolt bridge & 10GbE network throughput",
+      "type": "link",
+      "url": "/d/mlx-network"
+    },
+    {
+      "icon": "cube",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "SBOM Inventory & Drift",
+      "tooltip": "Packages, paths, versions, and drift delta",
+      "type": "link",
+      "url": "/d/mlx-sbom-inventory"
+    },
+    {
+      "icon": "compass",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Opik Traces",
+      "tooltip": "LLM inference traces and token confidence",
+      "type": "link",
+      "url": "/d/mlx-opik"
+    },
+    {
+      "icon": "bell",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Alerts",
+      "tooltip": "Active cluster alerts and silences",
+      "type": "link",
+      "url": "/d/mlx-alerts"
     }
   ]
 }

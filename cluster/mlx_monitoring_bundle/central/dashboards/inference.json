@@ -2,8 +2,9 @@
   "id": null,
   "title": "MLX Inference Metrics",
   "tags": [
-    "mlx",
-    "inference"
+    "cluster",
+    "inference",
+    "mlx"
   ],
   "timezone": "Asia/Kolkata",
   "schemaVersion": 38,
@@ -15,7 +16,7 @@
         "name": "device",
         "type": "query",
         "datasource": "VictoriaMetrics",
-        "query": "label_values(mlx_requests_total, macbook)",
+        "query": "label_values(mlx_requests_total, device)",
         "includeAll": true,
         "allValue": ".+",
         "multi": false,
@@ -46,8 +47,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_up{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}}",
+          "expr": "mlx_up{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
@@ -70,8 +71,8 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_requests_total{macbook=~\"$device\", kind=\"$kind\"}[1m])",
-          "legendFormat": "{{macbook}} {{kind}}",
+          "expr": "rate(mlx_requests_total{device=~\"$device\", kind=\"$kind\"}[1m])",
+          "legendFormat": "{{device}} {{kind}}",
           "refId": "A"
         }
       ],
@@ -93,8 +94,8 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, rate(mlx_ttft_seconds_bucket{macbook=~\"$device\"}[5m]))",
-          "legendFormat": "{{macbook}} p95",
+          "expr": "histogram_quantile(0.95, rate(mlx_ttft_seconds_bucket{device=~\"$device\"}[5m]))",
+          "legendFormat": "{{device}} p95",
           "refId": "A"
         }
       ],
@@ -116,8 +117,8 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, rate(mlx_generation_seconds_bucket{macbook=~\"$device\"}[5m]))",
-          "legendFormat": "{{macbook}} p95",
+          "expr": "histogram_quantile(0.95, rate(mlx_generation_seconds_bucket{device=~\"$device\"}[5m]))",
+          "legendFormat": "{{device}} p95",
           "refId": "A"
         }
       ],
@@ -139,8 +140,8 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_token_rate_tokens_per_second_sum{macbook=~\"$device\"}[1m]) / rate(mlx_token_rate_tokens_per_second_count{macbook=~\"$device\"}[1m])",
-          "legendFormat": "{{macbook}}",
+          "expr": "rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\"}[1m]) / rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\"}[1m])",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
@@ -162,8 +163,8 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, rate(mlx_queue_wait_seconds_bucket{macbook=~\"$device\"}[5m]))",
-          "legendFormat": "{{macbook}} p95",
+          "expr": "histogram_quantile(0.95, rate(mlx_queue_wait_seconds_bucket{device=~\"$device\"}[5m]))",
+          "legendFormat": "{{device}} p95",
           "refId": "A"
         }
       ],
@@ -185,13 +186,13 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_tokens_prompt_total{macbook=~\"$device\", kind=\"$kind\"}[1m])",
-          "legendFormat": "{{macbook}} prompt {{kind}}",
+          "expr": "rate(mlx_tokens_prompt_total{device=~\"$device\", kind=\"$kind\"}[1m])",
+          "legendFormat": "{{device}} prompt {{kind}}",
           "refId": "A"
         },
         {
-          "expr": "rate(mlx_tokens_completion_total{macbook=~\"$device\", kind=\"$kind\"}[1m])",
-          "legendFormat": "{{macbook}} completion {{kind}}",
+          "expr": "rate(mlx_tokens_completion_total{device=~\"$device\", kind=\"$kind\"}[1m])",
+          "legendFormat": "{{device}} completion {{kind}}",
           "refId": "B"
         }
       ],
@@ -213,8 +214,8 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_finish_reason_total{macbook=~\"$device\", kind=\"$kind\"}[5m])",
-          "legendFormat": "{{macbook}} {{reason}} {{kind}}",
+          "expr": "rate(mlx_finish_reason_total{device=~\"$device\", kind=\"$kind\"}[5m])",
+          "legendFormat": "{{device}} {{reason}} {{kind}}",
           "refId": "A"
         }
       ]
@@ -231,11 +232,106 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_tool_calls_total{macbook=~\"$device\", kind=\"$kind\"}[5m])",
-          "legendFormat": "{{macbook}} {{tool}} {{type}} {{kind}}",
+          "expr": "rate(mlx_tool_calls_total{device=~\"$device\", kind=\"$kind\"}[5m])",
+          "legendFormat": "{{device}} {{tool}} {{type}} {{kind}}",
           "refId": "A"
         }
       ]
+    }
+  ],
+  "uid": "mlx-inference",
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [
+        "mlx"
+      ],
+      "title": "MLX Dashboards",
+      "type": "dashboards"
+    },
+    {
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Cluster Overview",
+      "tooltip": "Fleet-wide health and throughput",
+      "type": "link",
+      "url": "/d/mlx-overview"
+    },
+    {
+      "icon": "heart",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Health",
+      "tooltip": "Square tile matrix and fleet diagnostics",
+      "type": "link",
+      "url": "/d/mlx-device-health"
+    },
+    {
+      "icon": "server",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Detail",
+      "tooltip": "Per-device serving and hardware deep dive",
+      "type": "link",
+      "url": "/d/mlx-detail"
+    },
+    {
+      "icon": "bolt",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Hardware",
+      "tooltip": "CPU, GPU, RAM, Disk telemetry",
+      "type": "link",
+      "url": "/d/mlx-hardware"
+    },
+    {
+      "icon": "process",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Process Profiler",
+      "tooltip": "Top 10 CPU/RSS/Disk/Network/GPU consumers",
+      "type": "link",
+      "url": "/d/mlx-process-profiler"
+    },
+    {
+      "icon": "sitemap",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Network & TB4",
+      "tooltip": "Thunderbolt bridge & 10GbE network throughput",
+      "type": "link",
+      "url": "/d/mlx-network"
+    },
+    {
+      "icon": "cube",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "SBOM Inventory & Drift",
+      "tooltip": "Packages, paths, versions, and drift delta",
+      "type": "link",
+      "url": "/d/mlx-sbom-inventory"
+    },
+    {
+      "icon": "compass",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Opik Traces",
+      "tooltip": "LLM inference traces and token confidence",
+      "type": "link",
+      "url": "/d/mlx-opik"
+    },
+    {
+      "icon": "bell",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Alerts",
+      "tooltip": "Active cluster alerts and silences",
+      "type": "link",
+      "url": "/d/mlx-alerts"
     }
   ]
 }

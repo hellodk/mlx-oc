@@ -73,43 +73,43 @@ REGISTRY = CollectorRegistry()
 G_SBOM_UP = Gauge(
     "mac_sbom_collector_up",
     "1 if the SBOM inventory collector is running",
-    ["macbook"],
+    ["device"],
     registry=REGISTRY,
 )
 G_SBOM_LAST_SCAN = Gauge(
     "mac_sbom_last_scan_timestamp_seconds",
     "Unix epoch timestamp of the most recent SBOM scan",
-    ["macbook"],
+    ["device"],
     registry=REGISTRY,
 )
 G_SBOM_TOTAL_PACKAGES = Gauge(
     "mac_sbom_total_packages",
     "Total cataloged SBOM packages by ecosystem",
-    ["macbook", "ecosystem"],
+    ["device", "ecosystem"],
     registry=REGISTRY,
 )
 G_SBOM_PACKAGE_INFO = Gauge(
     "mac_sbom_package_info",
     "Detailed package metadata and installation path",
-    ["macbook", "package", "version", "ecosystem", "path", "hash"],
+    ["device", "package", "version", "ecosystem", "path", "hash"],
     registry=REGISTRY,
 )
 G_SBOM_DRIFT_STATUS = Gauge(
     "mac_sbom_drift_status",
     "Cluster configuration drift status (IN_SYNC or DEVIATED)",
-    ["macbook", "base", "status"],
+    ["device", "base", "status"],
     registry=REGISTRY,
 )
 G_SBOM_DRIFT_MISMATCH_COUNT = Gauge(
     "mac_sbom_drift_mismatch_count",
     "Count of package version mismatches compared to baseline device",
-    ["macbook", "base"],
+    ["device", "base"],
     registry=REGISTRY,
 )
 G_SBOM_MISSING_PACKAGE_COUNT = Gauge(
     "mac_sbom_missing_package_count",
     "Count of missing packages compared to baseline device",
-    ["macbook", "base"],
+    ["device", "base"],
     registry=REGISTRY,
 )
 G_SBOM_DRIFT_DIFF = Gauge(
@@ -490,7 +490,7 @@ def collect_and_update_metrics(node_name: str, base_device: str) -> None:
         counts_by_eco[eco] = counts_by_eco.get(eco, 0) + 1
 
         G_SBOM_PACKAGE_INFO.labels(
-            macbook=node_name,
+            device=node_name,
             package=item["package"],
             version=item["version"],
             ecosystem=eco,
@@ -499,14 +499,14 @@ def collect_and_update_metrics(node_name: str, base_device: str) -> None:
         ).set(1.0)
 
     for eco, count in counts_by_eco.items():
-        G_SBOM_TOTAL_PACKAGES.labels(macbook=node_name, ecosystem=eco).set(count)
+        G_SBOM_TOTAL_PACKAGES.labels(device=node_name, ecosystem=eco).set(count)
 
     # 4. Evaluate Drift against Base Device
     status, mismatch_cnt, missing_cnt, diffs = _evaluate_drift(node_name, base_device, all_items)
 
-    G_SBOM_DRIFT_STATUS.labels(macbook=node_name, base=base_device, status=status).set(1.0)
-    G_SBOM_DRIFT_MISMATCH_COUNT.labels(macbook=node_name, base=base_device).set(mismatch_cnt)
-    G_SBOM_MISSING_PACKAGE_COUNT.labels(macbook=node_name, base=base_device).set(missing_cnt)
+    G_SBOM_DRIFT_STATUS.labels(device=node_name, base=base_device, status=status).set(1.0)
+    G_SBOM_DRIFT_MISMATCH_COUNT.labels(device=node_name, base=base_device).set(mismatch_cnt)
+    G_SBOM_MISSING_PACKAGE_COUNT.labels(device=node_name, base=base_device).set(missing_cnt)
 
     for d in diffs:
         G_SBOM_DRIFT_DIFF.labels(
@@ -520,13 +520,14 @@ def collect_and_update_metrics(node_name: str, base_device: str) -> None:
         ).set(1.0)
 
     now = time.time()
-    G_SBOM_UP.labels(macbook=node_name).set(1.0)
-    G_SBOM_LAST_SCAN.labels(macbook=node_name).set(now)
+    G_SBOM_UP.labels(device=node_name).set(1.0)
+    G_SBOM_LAST_SCAN.labels(device=node_name).set(now)
 
     # 5. Persist JSON snapshot to disk for historical audit & ClickHouse ingestion
     ist_tz = timezone(timedelta(hours=5, minutes=30))
     now_ist = datetime.fromtimestamp(now, tz=timezone.utc).astimezone(ist_tz).strftime("%d %b %Y, %H:%M:%S IST")
     snapshot = {
+        "device": node_name,
         "macbook": node_name,
         "scanned_at_ist": now_ist,
         "scanned_at_epoch": int(now),
@@ -615,8 +616,8 @@ def main() -> int:
     )
     parser.add_argument(
         "--node-name",
-        default=os.environ.get("MLX_MACBOOK_ID") or socket.gethostname(),
-        help="macbook / node identifier (default: MLX_MACBOOK_ID or hostname)",
+        default=os.environ.get("MLX_DEVICE_ID") or os.environ.get("MLX_MACBOOK_ID") or socket.gethostname(),
+        help="device / node identifier (default: MLX_DEVICE_ID or hostname)",
     )
     parser.add_argument(
         "--listen",

@@ -12,7 +12,7 @@ global:
   resolve_timeout: 5m
 
 route:
-  group_by: ["alertname", "macbook", "model"]
+  group_by: ["alertname", "device", "model"]
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
@@ -39,16 +39,16 @@ inhibit_rules:
       - alertname = "MLXProxyDown"
     target_matchers:
       - alertname =~ "MLXUpstreamDown|MLXThroughputDrop|MLXInferenceStalled"
-    equal: ["macbook"]
+    equal: ["device"]
 
   - source_matchers:
       - alertname =~ "MLXHardwareExporterDown"
     target_matchers:
       - alertname =~ "MLXGPUHighUtilization|MLXThermalThrottling|MLXLoadHigh"
-    equal: ["macbook"]
+    equal: ["device"]
 
   - source_matchers:
-      - alertname = "MLXMacbookSilent"
+      - alertname =~ "MLXDeviceSilent|MLXMacbookSilent"
     target_matchers:
       - alertname =~ "MLX.*"
-    equal: ["macbook"]
+    equal: ["device"]

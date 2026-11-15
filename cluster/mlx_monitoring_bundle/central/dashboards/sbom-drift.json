@@ -3,11 +3,12 @@
   "uid": "mlx-sbom-drift",
   "title": "MLX SBOM Drift & Delta Engine",
   "tags": [
-    "mlx",
-    "sbom",
-    "drift",
+    "cluster",
+    "comparison",
     "delta",
-    "comparison"
+    "drift",
+    "mlx",
+    "sbom"
   ],
   "timezone": "Asia/Kolkata",
   "schemaVersion": 38,
@@ -19,7 +20,7 @@
         "name": "base_device",
         "type": "query",
         "datasource": "VictoriaMetrics",
-        "query": "label_values(mac_sbom_package_info, macbook)",
+        "query": "label_values(mac_sbom_package_info, device)",
         "includeAll": false,
         "multi": false,
         "refresh": 1
@@ -28,7 +29,7 @@
         "name": "target_device",
         "type": "query",
         "datasource": "VictoriaMetrics",
-        "query": "label_values(mac_sbom_package_info, macbook)",
+        "query": "label_values(mac_sbom_package_info, device)",
         "includeAll": true,
         "allValue": ".+",
         "multi": true,
@@ -49,7 +50,7 @@
       },
       "targets": [
         {
-          "expr": "count(count by (macbook) (mac_sbom_drift_status{macbook!=~\"$base_device\", status=\"DEVIATED\"})) or vector(4)",
+          "expr": "count(count by (device) (mac_sbom_drift_status{device!=~\"$base_device\", status=\"DEVIATED\"})) or vector(4)",
           "legendFormat": "Deviated Nodes",
           "refId": "A"
         }
@@ -163,7 +164,7 @@
       },
       "targets": [
         {
-          "expr": "(1 - (count(mac_sbom_drift_status{status=\"DEVIATED\"}) / count(count by (macbook) (mac_sbom_package_info)))) * 100 or vector(98.4)",
+          "expr": "(1 - (count(mac_sbom_drift_status{status=\"DEVIATED\"}) / count(count by (device) (mac_sbom_package_info)))) * 100 or vector(98.4)",
           "legendFormat": "Conformity %",
           "refId": "A"
         }
@@ -207,7 +208,7 @@
       },
       "targets": [
         {
-          "expr": "mac_sbom_device_drift_summary{base=\"$base_device\", macbook=~\"$target_device\"}",
+          "expr": "mac_sbom_device_drift_summary{base=\"$base_device\", device=~\"$target_device\"}",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -217,13 +218,13 @@
         "defaults": {
           "links": [
             {
-              "title": "\ud83d\udce6 Inspect Full SBOM Inventory for ${__data.fields.macbook}",
-              "url": "/d/mlx-sbom-inventory?var-device=${__data.fields.macbook}",
+              "title": "\ud83d\udce6 Inspect Full SBOM Inventory for ${__data.fields.device}",
+              "url": "/d/mlx-sbom-inventory?var-device=${__data.fields.device}",
               "targetBlank": true
             },
             {
-              "title": "\u26a1 Check Resource Profiler for ${__data.fields.macbook}",
-              "url": "/d/mlx-process-profiler?var-device=${__data.fields.macbook}",
+              "title": "\u26a1 Check Resource Profiler for ${__data.fields.device}",
+              "url": "/d/mlx-process-profiler?var-device=${__data.fields.device}",
               "targetBlank": true
             }
           ]
@@ -243,7 +244,7 @@
       },
       "targets": [
         {
-          "expr": "mac_sbom_drift_details{base=\"$base_device\", macbook=~\"$target_device\"}",
+          "expr": "mac_sbom_drift_details{base=\"$base_device\", device=~\"$target_device\"}",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -257,6 +258,100 @@
           }
         }
       }
+    }
+  ],
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [
+        "mlx"
+      ],
+      "title": "MLX Dashboards",
+      "type": "dashboards"
+    },
+    {
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Cluster Overview",
+      "tooltip": "Fleet-wide health and throughput",
+      "type": "link",
+      "url": "/d/mlx-overview"
+    },
+    {
+      "icon": "heart",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Health",
+      "tooltip": "Square tile matrix and fleet diagnostics",
+      "type": "link",
+      "url": "/d/mlx-device-health"
+    },
+    {
+      "icon": "server",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Detail",
+      "tooltip": "Per-device serving and hardware deep dive",
+      "type": "link",
+      "url": "/d/mlx-detail"
+    },
+    {
+      "icon": "bolt",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Hardware",
+      "tooltip": "CPU, GPU, RAM, Disk telemetry",
+      "type": "link",
+      "url": "/d/mlx-hardware"
+    },
+    {
+      "icon": "process",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Process Profiler",
+      "tooltip": "Top 10 CPU/RSS/Disk/Network/GPU consumers",
+      "type": "link",
+      "url": "/d/mlx-process-profiler"
+    },
+    {
+      "icon": "sitemap",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Network & TB4",
+      "tooltip": "Thunderbolt bridge & 10GbE network throughput",
+      "type": "link",
+      "url": "/d/mlx-network"
+    },
+    {
+      "icon": "cube",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "SBOM Inventory & Drift",
+      "tooltip": "Packages, paths, versions, and drift delta",
+      "type": "link",
+      "url": "/d/mlx-sbom-inventory"
+    },
+    {
+      "icon": "compass",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Opik Traces",
+      "tooltip": "LLM inference traces and token confidence",
+      "type": "link",
+      "url": "/d/mlx-opik"
+    },
+    {
+      "icon": "bell",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Alerts",
+      "tooltip": "Active cluster alerts and silences",
+      "type": "link",
+      "url": "/d/mlx-alerts"
     }
   ]
 }

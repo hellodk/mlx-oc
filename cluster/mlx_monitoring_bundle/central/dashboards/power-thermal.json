@@ -2,6 +2,7 @@
   "id": null,
   "title": "MLX Power & Thermal",
   "tags": [
+    "cluster",
     "mlx",
     "power",
     "thermal"
@@ -16,7 +17,7 @@
         "name": "device",
         "type": "query",
         "datasource": "VictoriaMetrics",
-        "query": "label_values(mlx_hw_gpu_power_milliwatts, macbook)",
+        "query": "label_values(mlx_hw_gpu_power_milliwatts, device)",
         "includeAll": true,
         "allValue": ".+",
         "multi": false,
@@ -47,8 +48,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_gpu_power_milliwatts{macbook=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{macbook}} {{node}} GPU",
+          "expr": "mlx_hw_gpu_power_milliwatts{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}} {{node}} GPU",
           "refId": "A"
         }
       ],
@@ -70,8 +71,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_package_power_milliwatts{macbook=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{macbook}} {{node}} pkg",
+          "expr": "mlx_hw_package_power_milliwatts{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}} {{node}} pkg",
           "refId": "A"
         }
       ],
@@ -93,8 +94,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_cpu_power_milliwatts{macbook=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{macbook}} {{node}} CPU",
+          "expr": "mlx_hw_cpu_power_milliwatts{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}} {{node}} CPU",
           "refId": "A"
         }
       ],
@@ -116,8 +117,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_ane_power_milliwatts{macbook=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{macbook}} {{node}} ANE",
+          "expr": "mlx_hw_ane_power_milliwatts{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}} {{node}} ANE",
           "refId": "A"
         }
       ],
@@ -139,8 +140,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_thermal_pressure{macbook=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{macbook}} {{node}}",
+          "expr": "mlx_hw_thermal_pressure{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}} {{node}}",
           "refId": "A"
         }
       ],
@@ -165,8 +166,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_gpu_utilization_percent{macbook=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{macbook}} {{node}}",
+          "expr": "mlx_hw_gpu_utilization_percent{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}} {{node}}",
           "refId": "A"
         }
       ],
@@ -190,8 +191,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_gpu_frequency_mhz{macbook=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{macbook}} {{node}}",
+          "expr": "mlx_hw_gpu_frequency_mhz{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}} {{node}}",
           "refId": "A"
         }
       ],
@@ -214,8 +215,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_gpu_iokit_util_percent{macbook=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{macbook}} {{node}}",
+          "expr": "mlx_hw_gpu_iokit_util_percent{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}} {{node}}",
           "refId": "A"
         }
       ],
@@ -226,6 +227,101 @@
           "max": 100
         }
       }
+    }
+  ],
+  "uid": "mlx-power-thermal",
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [
+        "mlx"
+      ],
+      "title": "MLX Dashboards",
+      "type": "dashboards"
+    },
+    {
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Cluster Overview",
+      "tooltip": "Fleet-wide health and throughput",
+      "type": "link",
+      "url": "/d/mlx-overview"
+    },
+    {
+      "icon": "heart",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Health",
+      "tooltip": "Square tile matrix and fleet diagnostics",
+      "type": "link",
+      "url": "/d/mlx-device-health"
+    },
+    {
+      "icon": "server",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Detail",
+      "tooltip": "Per-device serving and hardware deep dive",
+      "type": "link",
+      "url": "/d/mlx-detail"
+    },
+    {
+      "icon": "bolt",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Hardware",
+      "tooltip": "CPU, GPU, RAM, Disk telemetry",
+      "type": "link",
+      "url": "/d/mlx-hardware"
+    },
+    {
+      "icon": "process",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Process Profiler",
+      "tooltip": "Top 10 CPU/RSS/Disk/Network/GPU consumers",
+      "type": "link",
+      "url": "/d/mlx-process-profiler"
+    },
+    {
+      "icon": "sitemap",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Network & TB4",
+      "tooltip": "Thunderbolt bridge & 10GbE network throughput",
+      "type": "link",
+      "url": "/d/mlx-network"
+    },
+    {
+      "icon": "cube",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "SBOM Inventory & Drift",
+      "tooltip": "Packages, paths, versions, and drift delta",
+      "type": "link",
+      "url": "/d/mlx-sbom-inventory"
+    },
+    {
+      "icon": "compass",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Opik Traces",
+      "tooltip": "LLM inference traces and token confidence",
+      "type": "link",
+      "url": "/d/mlx-opik"
+    },
+    {
+      "icon": "bell",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Alerts",
+      "tooltip": "Active cluster alerts and silences",
+      "type": "link",
+      "url": "/d/mlx-alerts"
     }
   ]
 }

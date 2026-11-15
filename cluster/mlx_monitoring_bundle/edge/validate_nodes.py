@@ -61,7 +61,7 @@ def load_env_file(path: Path) -> dict:
 
 def select_node(data: dict, explicit: str | None) -> dict:
     macbooks = [
-        nb for nb in (data.get("macbooks") or [])
+        nb for nb in (data.get("devices") or data.get("macbooks") or [])
         if isinstance(nb, dict) and nb.get("enabled", True)
     ]
     if explicit:
@@ -131,20 +131,20 @@ def main() -> int:
         warnings.append("central.opik is not configured; Opik tracing will be skipped")
 
     macbooks = [
-        nb for nb in (data.get("macbooks") or [])
+        nb for nb in (data.get("devices") or data.get("macbooks") or [])
         if isinstance(nb, dict) and nb.get("enabled", True)
     ]
     if not macbooks:
-        errors.append("no enabled macbook entries in nodes.yml")
+        errors.append("no enabled device entries in nodes.yml")
     elif not args.node and len(macbooks) > 1:
         errors.append(
-            "multiple enabled macbooks: pass --node or set MLX_MACBOOK_ID"
+            "multiple enabled devices: pass --node or set MLX_DEVICE_ID / MLX_MACBOOK_ID"
         )
 
     node = select_node(data, args.node)
     if macbooks and not node:
         errors.append(
-            f"node '{args.node}' not found among enabled macbooks"
+            f"node '{args.node}' not found among enabled devices"
             if args.node else "could not select a node"
         )
     elif node:

@@ -143,7 +143,10 @@ def load_config() -> dict:
 
     central_host = cvm.split(":")[0] if ":" in cvm else "127.0.0.1"
 
-    macbooks = [nb for nb in nodes.get("macbooks", []) if isinstance(nb, dict) and nb.get("enabled", True)]
+    macbooks = [
+        nb for nb in (nodes.get("devices") or nodes.get("macbooks") or [])
+        if isinstance(nb, dict) and nb.get("enabled", True)
+    ]
 
     return {
         "nodes": nodes,
@@ -292,15 +295,15 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     stage2_details = []
 
     if not target_nodes:
-        print("[Stage 2/5] Edge Exporters & Nodes   : WARN (no enabled macbook nodes found in nodes.yml)")
+        print("[Stage 2/5] Edge Exporters & Nodes   : WARN (no enabled device nodes found in nodes.yml)")
     else:
         for nb in target_nodes:
             nb_id = nb.get("id", "unknown")
             nb_ip = nb.get("ip", "unknown")
 
-            # Query VictoriaMetrics for up targets reported by vmagent
-            up_data = query_vm(cfg["cvm"], f"up{{macbook=\"{nb_id}\"}}") if vm_ok else None
-            recency_data = query_vm(cfg["cvm"], f"time() - max(timestamp(up{{macbook=\"{nb_id}\"}}))") if vm_ok else None
+            # Query VictoriaMetrics for up targets reported by vmagent (supports device and legacy macbook label)
+            up_data = query_vm(cfg["cvm"], f"(up{{device=\"{nb_id}\"}} or up{{macbook=\"{nb_id}\"}})") if vm_ok else None
+            recency_data = query_vm(cfg["cvm"], f"time() - max(timestamp(up{{device=\"{nb_id}\"}} or up{{macbook=\"{nb_id}\"}}))") if vm_ok else None
             recency_sec = float(recency_data[0]["value"][1]) if recency_data else None
 
             if up_data is None or len(up_data) == 0:
@@ -308,7 +311,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                 stages_passed = False
                 breaks.append({
                     "stage": f"Stage 2: Edge Node '{nb_id}' Telemetry Shipping",
-                    "issue": f"VictoriaMetrics has received ZERO metrics for macbook '{nb_id}' (IP: {nb_ip}).",
+                    "issue": f"VictoriaMetrics has received ZERO metrics for device '{nb_id}' (IP: {nb_ip}).",
                     "impact": "Grafana dashboards for this node will be completely empty ('No Data').",
                     "fix": f"On node '{nb_id}' ({nb_ip}), run './scripts/deploy.sh review-vmagent' and start edge services with './scripts/deploy.sh edge daemon'."
                 })
@@ -630,9 +633,9 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
                 status_tag = "[OK]"
             elif not tcp_ok and not is_local:
                 # Edge exporters bind to loopback for security; check VictoriaMetrics telemetry ingestion
-                vm_data = query_vm(cfg["cvm"], f'up{{macbook="{nb_id}", job="{exp_name}"}}')
+                vm_data = query_vm(cfg["cvm"], f'(up{{device="{nb_id}", job="{exp_name}"}} or up{{macbook="{nb_id}", job="{exp_name}"}})')
                 if vm_data and len(vm_data) > 0 and vm_data[0].get("value", [0, "0"])[1] == "1":
-                    rec = query_vm(cfg["cvm"], f'time() - timestamp(up{{macbook="{nb_id}", job="{exp_name}"}})')
+                    rec = query_vm(cfg["cvm"], f'time() - timestamp(up{{device="{nb_id}", job="{exp_name}"}} or up{{macbook="{nb_id}", job="{exp_name}"}})')
                     sec_str = f"last sample {float(rec[0]['value'][1]):.1f}s ago" if rec else "active"
                     status_tag = "[OK]"
                     details = f"scraped by local vmagent (UP in TSDB, {sec_str})"
@@ -666,7 +669,7 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
                 except Exception:
                     srv_info = "model endpoint OK"
         elif not srv_ok and not is_local:
-            vm_up = query_vm(cfg["cvm"], f'mlx_up{{macbook="{nb_id}"}}')
+            vm_up = query_vm(cfg["cvm"], f'(mlx_up{{device="{nb_id}"}} or mlx_up{{macbook="{nb_id}"}})')
             if vm_up and len(vm_up) > 0 and vm_up[0].get("value", [0, "0"])[1] == "1":
                 srv_ok = True
                 srv_info = f"healthy (upstream confirmed by proxy in TSDB, model: {nb.get('model', 'none')})"
@@ -707,16 +710,22 @@ def cmd_review_vm(args: argparse.Namespace) -> int:
         # Nodes reporting
         label_data = []
         try:
-            with urllib.request.urlopen(f"http://{cfg['cvm']}/api/v1/label/macbook/values", timeout=2) as r:
+            with urllib.request.urlopen(f"http://{cfg['cvm']}/api/v1/label/device/values", timeout=2) as r:
                 label_data = json.loads(r.read().decode())["data"]
         except Exception:
             pass
+        if not label_data:
+            try:
+                with urllib.request.urlopen(f"http://{cfg['cvm']}/api/v1/label/macbook/values", timeout=2) as r:
+                    label_data = json.loads(r.read().decode())["data"]
+            except Exception:
+                pass
         print(f"Reporting Nodes   : {', '.join(label_data) if label_data else 'None'}")
         for node in label_data:
-            rec_q = f'time() - max(timestamp({{macbook="{node}"}}))'
+            rec_q = f'time() - max(timestamp({{device="{node}"}} or {{macbook="{node}"}}))'
             recency = query_vm(cfg["cvm"], rec_q)
             sec = float(recency[0]["value"][1]) if recency else None
-            cnt_q = f'count({{macbook="{node}"}})'
+            cnt_q = f'count({{device="{node}"}} or {{macbook="{node}"}})'
             count_res = query_vm(cfg["cvm"], cnt_q)
             c_str = count_res[0]["value"][1] if count_res else "0"
             rec_str = f"{sec:.1f}s ago" if sec is not None else "no data"

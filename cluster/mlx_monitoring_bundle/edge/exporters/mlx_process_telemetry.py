@@ -53,55 +53,55 @@ REGISTRY = CollectorRegistry()
 G_PROFILER_UP = Gauge(
     "process_profiler_up",
     "1 if the process telemetry profiler is running",
-    ["macbook"],
+    ["device"],
     registry=REGISTRY,
 )
 G_PROFILER_SAMPLES = Counter(
     "process_profiler_samples_total",
     "Total rounds of 5s process profiling samples collected",
-    ["macbook"],
+    ["device"],
     registry=REGISTRY,
 )
 G_PROCESS_CPU = Gauge(
     "process_cpu_percent",
     "Real-time CPU percentage consumed by dynamic process",
-    ["macbook", "process", "pid"],
+    ["device", "process", "pid"],
     registry=REGISTRY,
 )
 G_PROCESS_MEMORY = Gauge(
     "process_memory_rss_bytes",
     "Resident set size (RSS) memory in bytes consumed by dynamic process",
-    ["macbook", "process", "pid"],
+    ["device", "process", "pid"],
     registry=REGISTRY,
 )
 G_PROCESS_DISK_IO = Gauge(
     "process_disk_io_bytes_sec",
     "Disk I/O throughput in bytes per second for dynamic process",
-    ["macbook", "process", "pid"],
+    ["device", "process", "pid"],
     registry=REGISTRY,
 )
 G_PROCESS_NET_IO = Gauge(
     "process_network_io_bytes_sec",
     "Network I/O throughput in bytes per second for dynamic process",
-    ["macbook", "process", "pid"],
+    ["device", "process", "pid"],
     registry=REGISTRY,
 )
 G_PROCESS_GPU = Gauge(
     "process_gpu_utilization_percent",
     "Active GPU residency percentage attributed to process",
-    ["macbook", "process", "pid"],
+    ["device", "process", "pid"],
     registry=REGISTRY,
 )
 G_PROCESS_ANE = Gauge(
     "process_ane_power_watts",
     "Apple Neural Engine (ANE) power draw in Watts attributed to process",
-    ["macbook", "process", "pid"],
+    ["device", "process", "pid"],
     registry=REGISTRY,
 )
 G_PROCESS_RANKING = Gauge(
     "process_ranking_info",
     "Composite resource leaderboard ranking info for dynamic process",
-    ["macbook", "process", "pid", "user", "command"],
+    ["device", "process", "pid", "user", "command"],
     registry=REGISTRY,
 )
 
@@ -245,7 +245,7 @@ def _sample_processes(node_name: str, top_k: int = 10) -> None:
     sorted_by_cpu = sorted(procs, key=lambda p: p["cpu_pct"], reverse=True)[:top_k]
     for p in sorted_by_cpu:
         G_PROCESS_CPU.labels(
-            macbook=node_name,
+            device=node_name,
             process=p["process"],
             pid=str(p["pid"]),
         ).set(p["cpu_pct"])
@@ -254,7 +254,7 @@ def _sample_processes(node_name: str, top_k: int = 10) -> None:
     sorted_by_rss = sorted(procs, key=lambda p: p["rss_bytes"], reverse=True)[:top_k]
     for p in sorted_by_rss:
         G_PROCESS_MEMORY.labels(
-            macbook=node_name,
+            device=node_name,
             process=p["process"],
             pid=str(p["pid"]),
         ).set(p["rss_bytes"])
@@ -274,13 +274,13 @@ def _sample_processes(node_name: str, top_k: int = 10) -> None:
         net_rate = max(0.0, base_rate * 0.35 * (1.0 - (idx * 0.05)))
 
         G_PROCESS_DISK_IO.labels(
-            macbook=node_name,
+            device=node_name,
             process=p["process"],
             pid=str(p["pid"]),
         ).set(round(disk_rate, 2))
 
         G_PROCESS_NET_IO.labels(
-            macbook=node_name,
+            device=node_name,
             process=p["process"],
             pid=str(p["pid"]),
         ).set(round(net_rate, 2))
@@ -304,13 +304,13 @@ def _sample_processes(node_name: str, top_k: int = 10) -> None:
             p_ane = round(ane_watts * share, 3)
 
             G_PROCESS_GPU.labels(
-                macbook=node_name,
+                device=node_name,
                 process=p["process"],
                 pid=str(p["pid"]),
             ).set(p_gpu)
 
             G_PROCESS_ANE.labels(
-                macbook=node_name,
+                device=node_name,
                 process=p["process"],
                 pid=str(p["pid"]),
             ).set(p_ane)
@@ -319,12 +319,12 @@ def _sample_processes(node_name: str, top_k: int = 10) -> None:
         if sorted_by_cpu:
             p0 = sorted_by_cpu[0]
             G_PROCESS_GPU.labels(
-                macbook=node_name,
+                device=node_name,
                 process=p0["process"],
                 pid=str(p0["pid"]),
             ).set(0.0)
             G_PROCESS_ANE.labels(
-                macbook=node_name,
+                device=node_name,
                 process=p0["process"],
                 pid=str(p0["pid"]),
             ).set(0.0)
@@ -339,15 +339,15 @@ def _sample_processes(node_name: str, top_k: int = 10) -> None:
 
     for rank, p in enumerate(composite_ranked, 1):
         G_PROCESS_RANKING.labels(
-            macbook=node_name,
+            device=node_name,
             process=p["process"],
             pid=str(p["pid"]),
             user=p["user"],
             command=p["command"],
         ).set(rank)
 
-    G_PROFILER_UP.labels(macbook=node_name).set(1)
-    G_PROFILER_SAMPLES.labels(macbook=node_name).inc()
+    G_PROFILER_UP.labels(device=node_name).set(1)
+    G_PROFILER_SAMPLES.labels(device=node_name).inc()
 
 
 # ---------------------------------------------------------------------------
@@ -405,8 +405,8 @@ def main() -> int:
     )
     parser.add_argument(
         "--node-name",
-        default=os.environ.get("MLX_MACBOOK_ID") or socket.gethostname(),
-        help="macbook / node identifier (default: MLX_MACBOOK_ID or hostname)",
+        default=os.environ.get("MLX_DEVICE_ID") or os.environ.get("MLX_MACBOOK_ID") or socket.gethostname(),
+        help="device / node identifier (default: MLX_DEVICE_ID or hostname)",
     )
     parser.add_argument(
         "--listen",

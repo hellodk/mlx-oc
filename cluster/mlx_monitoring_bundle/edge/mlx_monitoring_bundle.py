@@ -105,7 +105,7 @@ def central_value(config: dict, key: str, default: str = "") -> str:
 
 
 def find_node_config(config: dict, macbook_id: str) -> dict:
-    for nb in (config.get("macbooks") or []):
+    for nb in (config.get("devices") or config.get("macbooks") or []):
         if nb.get("id") == macbook_id:
             return nb
     return {}
@@ -114,13 +114,18 @@ def find_node_config(config: dict, macbook_id: str) -> dict:
 def select_node_config(config: dict) -> dict:
     """Select the node for this host.
 
-    MLX_MACBOOK_ID wins. When it is unset and nodes.yml contains exactly one
+    MLX_DEVICE_ID / MLX_MACBOOK_ID wins. When it is unset and nodes.yml contains exactly one
     enabled entry, that entry is selected automatically, which keeps the
-    single-Mac setup free of per-host flags.
+    single-node setup free of per-host flags.
     """
-    macbook_id = config.get("MLX_MACBOOK_ID") or config.get("MACBOOK_ID")
+    macbook_id = (
+        config.get("MLX_DEVICE_ID")
+        or config.get("DEVICE_ID")
+        or config.get("MLX_MACBOOK_ID")
+        or config.get("MACBOOK_ID")
+    )
     macbooks = [
-        nb for nb in (config.get("macbooks") or [])
+        nb for nb in (config.get("devices") or config.get("macbooks") or [])
         if isinstance(nb, dict) and nb.get("enabled", True)
     ]
     if macbook_id:
@@ -186,13 +191,17 @@ class Bundle:
         self.config = config
         self.node_config = select_node_config(config)
         self.macbook = (
-            config.get("MLX_MACBOOK_ID")
+            config.get("MLX_DEVICE_ID")
+            or config.get("DEVICE_ID")
+            or config.get("MLX_MACBOOK_ID")
             or config.get("MACBOOK_ID")
             or self.node_config.get("id")
             or socket.gethostname()
         )
+        self.device = self.macbook
         self.serial = (
-            config.get("MACBOOK_SERIAL")
+            config.get("DEVICE_SERIAL")
+            or config.get("MACBOOK_SERIAL")
             or self.node_config.get("serial")
             or "unknown"
         )
@@ -277,7 +286,9 @@ class Bundle:
             if isinstance(value, (str, int, float, bool)):
                 env[key] = str(value)
         env["MLX_SERVICE_NAME"] = name
+        env["MLX_DEVICE_ID"] = self.device
         env["MLX_MACBOOK_ID"] = self.macbook
+        env["DEVICE_SERIAL"] = self.serial
         env["MACBOOK_SERIAL"] = self.serial
         env["MLX_MODEL"] = self.model or ""
         env["MLX_MODEL_PATH"] = self.model_path
@@ -421,6 +432,8 @@ class Bundle:
             subs = {
                 "CENTRAL_VICTORIA_METRICS": self.central_vm,
                 "OTLP_SCHEME": self.otlp_scheme,
+                "DEVICE_ID": self.device,
+                "DEVICE_SERIAL": self.serial,
                 "MACBOOK_ID": self.macbook,
                 "MACBOOK_SERIAL": self.serial,
                 "VMAGENT_SCRAPE_INTERVAL": config_val(self.config, "VMAGENT_SCRAPE_INTERVAL", "10s"),
@@ -548,6 +561,7 @@ class Bundle:
         return {
             "bundle_pid": read_pid(PID_FILE),
             "pids": pids,
+            "device": self.device,
             "macbook": self.macbook,
             "model": self.model,
             "model_path": self.model_path,

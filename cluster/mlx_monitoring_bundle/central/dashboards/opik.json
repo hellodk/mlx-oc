@@ -2,6 +2,7 @@
   "id": null,
   "title": "MLX Opik Tracing",
   "tags": [
+    "cluster",
     "mlx",
     "opik",
     "tracing"
@@ -16,7 +17,7 @@
         "name": "device",
         "type": "query",
         "datasource": "VictoriaMetrics",
-        "query": "label_values(mlx_token_confidence_mean, macbook)",
+        "query": "label_values(mlx_token_confidence_mean, device)",
         "includeAll": true,
         "allValue": ".+",
         "multi": false,
@@ -48,13 +49,13 @@
       },
       "targets": [
         {
-          "expr": "mlx_token_confidence_mean{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}} mean",
+          "expr": "mlx_token_confidence_mean{device=~\"$device\"}",
+          "legendFormat": "{{device}} mean",
           "refId": "A"
         },
         {
-          "expr": "mlx_token_confidence_min{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}} min",
+          "expr": "mlx_token_confidence_min{device=~\"$device\"}",
+          "legendFormat": "{{device}} min",
           "refId": "B"
         }
       ],
@@ -63,7 +64,19 @@
           "unit": "percentunit",
           "min": 0,
           "max": 1,
-          "decimals": 2
+          "decimals": 2,
+          "links": [
+            {
+              "title": "\ud83c\udfaf Drilldown: MLX Quality & Confidence Metrics",
+              "url": "/d/mlx-quality?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: MLX Inference Metrics",
+              "url": "/d/mlx-inference?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
         }
       }
     },
@@ -79,8 +92,8 @@
       },
       "targets": [
         {
-          "expr": "mlx_hallucination_risk{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}}",
+          "expr": "mlx_hallucination_risk{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
       ],
@@ -89,7 +102,19 @@
           "unit": "percentunit",
           "min": 0,
           "max": 1,
-          "decimals": 2
+          "decimals": 2,
+          "links": [
+            {
+              "title": "\ud83c\udfaf Drilldown: MLX Quality & Confidence Metrics",
+              "url": "/d/mlx-quality?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: MLX Inference Metrics",
+              "url": "/d/mlx-inference?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
         }
       }
     },
@@ -105,11 +130,27 @@
       },
       "targets": [
         {
-          "expr": "mlx_output_perplexity{macbook=~\"$device\"}",
-          "legendFormat": "{{macbook}}",
+          "expr": "mlx_output_perplexity{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "links": [
+            {
+              "title": "\ud83c\udfaf Drilldown: MLX Quality & Confidence Metrics",
+              "url": "/d/mlx-quality?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: MLX Inference Metrics",
+              "url": "/d/mlx-inference?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
+        }
+      }
     },
     {
       "type": "graph",
@@ -123,8 +164,8 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_confidence_scored_total{macbook=~\"$device\"}[5m])",
-          "legendFormat": "{{macbook}} {{source}}",
+          "expr": "rate(mlx_confidence_scored_total{device=~\"$device\"}[5m])",
+          "legendFormat": "{{device}} {{source}}",
           "refId": "A"
         }
       ],
@@ -133,6 +174,101 @@
           "unit": "reqps"
         }
       }
+    }
+  ],
+  "uid": "mlx-opik",
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [
+        "mlx"
+      ],
+      "title": "MLX Dashboards",
+      "type": "dashboards"
+    },
+    {
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Cluster Overview",
+      "tooltip": "Fleet-wide health and throughput",
+      "type": "link",
+      "url": "/d/mlx-overview"
+    },
+    {
+      "icon": "heart",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Health",
+      "tooltip": "Square tile matrix and fleet diagnostics",
+      "type": "link",
+      "url": "/d/mlx-device-health"
+    },
+    {
+      "icon": "server",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Detail",
+      "tooltip": "Per-device serving and hardware deep dive",
+      "type": "link",
+      "url": "/d/mlx-detail"
+    },
+    {
+      "icon": "bolt",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Hardware",
+      "tooltip": "CPU, GPU, RAM, Disk telemetry",
+      "type": "link",
+      "url": "/d/mlx-hardware"
+    },
+    {
+      "icon": "process",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Process Profiler",
+      "tooltip": "Top 10 CPU/RSS/Disk/Network/GPU consumers",
+      "type": "link",
+      "url": "/d/mlx-process-profiler"
+    },
+    {
+      "icon": "sitemap",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Network & TB4",
+      "tooltip": "Thunderbolt bridge & 10GbE network throughput",
+      "type": "link",
+      "url": "/d/mlx-network"
+    },
+    {
+      "icon": "cube",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "SBOM Inventory & Drift",
+      "tooltip": "Packages, paths, versions, and drift delta",
+      "type": "link",
+      "url": "/d/mlx-sbom-inventory"
+    },
+    {
+      "icon": "compass",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Opik Traces",
+      "tooltip": "LLM inference traces and token confidence",
+      "type": "link",
+      "url": "/d/mlx-opik"
+    },
+    {
+      "icon": "bell",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Alerts",
+      "tooltip": "Active cluster alerts and silences",
+      "type": "link",
+      "url": "/d/mlx-alerts"
     }
   ]
 }

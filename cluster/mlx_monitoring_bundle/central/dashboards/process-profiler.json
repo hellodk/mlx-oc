@@ -3,6 +3,7 @@
   "uid": "mlx-process-profiler",
   "title": "MLX Process & Resource Profiler",
   "tags": [
+    "cluster",
     "mlx",
     "processes",
     "profiler",
@@ -19,7 +20,7 @@
         "name": "device",
         "type": "query",
         "datasource": "VictoriaMetrics",
-        "query": "label_values(mlx_hw_up, macbook)",
+        "query": "label_values(mlx_hw_up, device)",
         "includeAll": false,
         "multi": false,
         "refresh": 1
@@ -74,7 +75,7 @@
       },
       "targets": [
         {
-          "expr": "topk(1, max by (process, macbook) (process_cpu_percent{macbook=~\"$device\"}))",
+          "expr": "topk(1, max by (process, device) (process_cpu_percent{device=~\"$device\"}))",
           "legendFormat": "{{process}}",
           "refId": "A"
         }
@@ -113,7 +114,7 @@
       },
       "targets": [
         {
-          "expr": "topk(1, max by (process, macbook) (process_memory_rss_bytes{macbook=~\"$device\"}))",
+          "expr": "topk(1, max by (process, device) (process_memory_rss_bytes{device=~\"$device\"}))",
           "legendFormat": "{{process}}",
           "refId": "A"
         }
@@ -148,7 +149,7 @@
       },
       "targets": [
         {
-          "expr": "topk(1, max by (process, macbook) (process_gpu_utilization_percent{macbook=~\"$device\"}))",
+          "expr": "topk(1, max by (process, device) (process_gpu_utilization_percent{device=~\"$device\"}))",
           "legendFormat": "{{process}}",
           "refId": "A"
         }
@@ -184,7 +185,7 @@
       },
       "targets": [
         {
-          "expr": "topk(10, process_cpu_percent{macbook=~\"$device\"})",
+          "expr": "topk(10, process_cpu_percent{device=~\"$device\"})",
           "legendFormat": "{{process}} (PID {{pid}})",
           "refId": "A"
         }
@@ -215,7 +216,7 @@
       },
       "targets": [
         {
-          "expr": "topk(10, process_memory_rss_bytes{macbook=~\"$device\"})",
+          "expr": "topk(10, process_memory_rss_bytes{device=~\"$device\"})",
           "legendFormat": "{{process}} (PID {{pid}})",
           "refId": "A"
         }
@@ -246,12 +247,12 @@
       },
       "targets": [
         {
-          "expr": "topk(5, process_disk_io_bytes_sec{macbook=~\"$device\"})",
+          "expr": "topk(5, process_disk_io_bytes_sec{device=~\"$device\"})",
           "legendFormat": "Disk: {{process}}",
           "refId": "A"
         },
         {
-          "expr": "topk(5, process_network_io_bytes_sec{macbook=~\"$device\"})",
+          "expr": "topk(5, process_network_io_bytes_sec{device=~\"$device\"})",
           "legendFormat": "Net: {{process}}",
           "refId": "B"
         }
@@ -279,12 +280,12 @@
       },
       "targets": [
         {
-          "expr": "topk(5, process_gpu_utilization_percent{macbook=~\"$device\"})",
+          "expr": "topk(5, process_gpu_utilization_percent{device=~\"$device\"})",
           "legendFormat": "GPU: {{process}}",
           "refId": "A"
         },
         {
-          "expr": "topk(5, process_ane_power_watts{macbook=~\"$device\"})",
+          "expr": "topk(5, process_ane_power_watts{device=~\"$device\"})",
           "legendFormat": "ANE: {{process}} (Watts)",
           "refId": "B"
         }
@@ -311,7 +312,7 @@
       },
       "targets": [
         {
-          "expr": "topk(10, process_ranking_info{macbook=~\"$device\"})",
+          "expr": "topk(10, process_ranking_info{device=~\"$device\"})",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -321,8 +322,8 @@
         "defaults": {
           "links": [
             {
-              "title": "\ud83d\udce6 Inspect Installed SBOM Packages for ${__data.fields.macbook}",
-              "url": "/d/mlx-sbom-inventory?var-device=${__data.fields.macbook}",
+              "title": "\ud83d\udce6 Inspect Installed SBOM Packages for ${__data.fields.device}",
+              "url": "/d/mlx-sbom-inventory?var-device=${__data.fields.device}",
               "targetBlank": true
             },
             {
@@ -333,6 +334,100 @@
           ]
         }
       }
+    }
+  ],
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [
+        "mlx"
+      ],
+      "title": "MLX Dashboards",
+      "type": "dashboards"
+    },
+    {
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Cluster Overview",
+      "tooltip": "Fleet-wide health and throughput",
+      "type": "link",
+      "url": "/d/mlx-overview"
+    },
+    {
+      "icon": "heart",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Health",
+      "tooltip": "Square tile matrix and fleet diagnostics",
+      "type": "link",
+      "url": "/d/mlx-device-health"
+    },
+    {
+      "icon": "server",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Device Detail",
+      "tooltip": "Per-device serving and hardware deep dive",
+      "type": "link",
+      "url": "/d/mlx-detail"
+    },
+    {
+      "icon": "bolt",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Hardware",
+      "tooltip": "CPU, GPU, RAM, Disk telemetry",
+      "type": "link",
+      "url": "/d/mlx-hardware"
+    },
+    {
+      "icon": "process",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Process Profiler",
+      "tooltip": "Top 10 CPU/RSS/Disk/Network/GPU consumers",
+      "type": "link",
+      "url": "/d/mlx-process-profiler"
+    },
+    {
+      "icon": "sitemap",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Network & TB4",
+      "tooltip": "Thunderbolt bridge & 10GbE network throughput",
+      "type": "link",
+      "url": "/d/mlx-network"
+    },
+    {
+      "icon": "cube",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "SBOM Inventory & Drift",
+      "tooltip": "Packages, paths, versions, and drift delta",
+      "type": "link",
+      "url": "/d/mlx-sbom-inventory"
+    },
+    {
+      "icon": "compass",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Opik Traces",
+      "tooltip": "LLM inference traces and token confidence",
+      "type": "link",
+      "url": "/d/mlx-opik"
+    },
+    {
+      "icon": "bell",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Alerts",
+      "tooltip": "Active cluster alerts and silences",
+      "type": "link",
+      "url": "/d/mlx-alerts"
     }
   ]
 }

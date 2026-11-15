@@ -474,9 +474,9 @@ nodes = yaml.safe_load(nodes_path.read_text(encoding='utf-8')) or {}
 central_vm = nodes.get('central', {}).get('victoria_metrics', env.get('CENTRAL_VICTORIA_METRICS', '127.0.0.1:8428'))
 otlp_scheme = env.get('OTLP_SCHEME', 'http')
 
-macbooks = [nb for nb in nodes.get('macbooks', []) if nb.get('enabled', True)]
+macbooks = [nb for nb in (nodes.get('devices') or nodes.get('macbooks', [])) if nb.get('enabled', True)]
 macbook = macbooks[0] if macbooks else {}
-macbook_id = os.environ.get('MLX_MACBOOK_ID') or macbook.get('id', 'unknown')
+macbook_id = os.environ.get('MLX_DEVICE_ID') or os.environ.get('MLX_MACBOOK_ID') or macbook.get('id', 'unknown')
 serial = macbook.get('serial', 'unknown')
 
 vmagent_bin = env.get('VMAGENT_BINARY', 'vmagent')
@@ -571,7 +571,7 @@ print(f'Scrape Interval   : {scrape_interval}')
 print(f'Persistent Queue  : {pq if pq else \"[disabled / in-memory buffer]\"}')
 print(f'Queue Capacity    : {capacity} records')
 print(f'Max Shards        : {shards}')
-print(f'External Labels   : macbook={macbook_id}, serial={serial}')
+print(f'External Labels   : device={macbook_id}, macbook={macbook_id}, serial={serial}')
 print('-' * 74)
 print('Scrape Targets (Local Exporters):')
 for job, listen, path, is_up in target_rows:

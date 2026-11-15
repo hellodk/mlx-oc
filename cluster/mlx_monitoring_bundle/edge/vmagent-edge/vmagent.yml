@@ -16,6 +16,7 @@
 global:
   scrape_interval: ${VMAGENT_SCRAPE_INTERVAL:-10s}
   external_labels:
+    device: ${DEVICE_ID:-unknown}
     macbook: ${MACBOOK_ID:-unknown}
     serial: ${MACBOOK_SERIAL:-unknown}
 
