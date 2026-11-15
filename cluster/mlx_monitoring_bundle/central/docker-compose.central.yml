@@ -40,7 +40,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1G
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8428/health"]
       interval: 5s
@@ -62,7 +62,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1G
 
   grafana:
     image: grafana/grafana:13.3.0
@@ -90,7 +90,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1G
     depends_on:
       victoria-metrics:
         condition: service_healthy
@@ -189,7 +189,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1G
 
   redis:
     image: redis:7.2.4-alpine3.19
@@ -354,7 +354,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1G
     environment:
       OPIK_OTEL_SDK_ENABLED: "false"
       PYTHON_CODE_EXECUTOR_STRATEGY: "process"

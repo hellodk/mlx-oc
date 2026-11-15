@@ -45,7 +45,7 @@ import yaml
 # launched from edge/, so add the exporters directory to the import path.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "exporters"))
 
-from mlx_logging import degraded, debug, error, info, setup_logging
+from mlx_logging import degraded, debug, error, info, setup_logging  # noqa: E402
 
 BUNDLE_DIR = Path(__file__).resolve().parent
 CONFIG_DIR = BUNDLE_DIR / "config"

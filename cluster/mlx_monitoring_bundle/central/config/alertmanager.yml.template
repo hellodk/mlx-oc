@@ -51,4 +51,5 @@ inhibit_rules:
       - alertname =~ "MLXDeviceSilent|MLXMacbookSilent"
     target_matchers:
       - alertname =~ "MLX.*"
+      - alertname !~ "MLXDeviceSilent|MLXMacbookSilent"
     equal: ["device"]

@@ -47,9 +47,9 @@ import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-from prometheus_client import CollectorRegistry, Counter, Gauge, generate_latest
+from prometheus_client import CollectorRegistry, Gauge, generate_latest
 
-from mlx_logging import debug, degraded, error, info, setup_logging
+from mlx_logging import debug, error, info, setup_logging
 
 # ---------------------------------------------------------------------------
 # Default Constants

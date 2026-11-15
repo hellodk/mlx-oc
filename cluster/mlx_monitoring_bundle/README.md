@@ -58,12 +58,14 @@ on the device.
 │                                     │      │                                          │
 │  mlx_metrics_proxy      :8080  ─────┼─────▶│  otel-collector        :4318 (OTLP)    │
 │  mlx_hw_telemetry       :9102  ─────┼─────▶│  victoria-metrics      :8428 (remote)  │
-│  mlx_kv_cache_agent     :9104  ─────┼─────▶│                                                    │
+│  mlx_kv_cache_agent     :9104  ─────┼─────▶│                                          │
 │  mlx_server_supervisor  :9105  ─────┼─────▶│  grafana               :3000           │
 │  mlx_server_log_tailer  :9106  ─────┼─────▶│  vmalert + alertmanager                  │
-│                                     │      │  opik server + postgres + clickhouse   │
+│  mlx_process_telemetry  :9107  ─────┼─────▶│  opik server + postgres + clickhouse   │
+│  mlx_sbom_collector     :9108  ─────┼─────▶│                                          │
+│                                     │      │                                          │
 │  vmagent (optional sidecar)         │      │                                          │
-│  scrapes localhost:8080-9106        │      │                                          │
+│  scrapes 127.0.0.1:8080-9108        │      │                                          │
 │  remote_writes to central VM        │      │                                          │
 └─────────────────────────────────────┘      └────────────────────────────────────────┘
        ▲                                               ▲
@@ -75,7 +77,7 @@ on the device.
 
 | Signal | Source | Transport | Destination |
 |--------|--------|-----------|-------------|
-| Prometheus metrics | 5 exporters (`:9102-9106`) + proxy (`:8080`) | vmagent scrape → remote_write | VictoriaMetrics |
+| Prometheus metrics | 7 exporters (`:8080`, `:9102`, `:9104-9108`) | vmagent scrape → remote_write | VictoriaMetrics |
 | OTLP traces | Proxy (OpenTelemetry + Opik SDK) | OTLP HTTP | OTel collector + Opik |
 | OTLP logs | Log tailer | OTLP HTTP | OTel collector → JSONL file |
 | Opik traces | Proxy (Opik SDK) | HTTPS | Opik server → Postgres/ClickHouse |
@@ -116,14 +118,16 @@ cluster/mlx_monitoring_bundle/
 │   │   ├── mlx_hw_telemetry.py                    # :9102 Hardware telemetry
 │   │   ├── mlx_kv_cache_agent.py                  # :9104 KV-cache + context metrics
 │   │   ├── mlx_server_supervisor.py               # :9105 Passive server health/process observer
-│   │   └── mlx_server_log_tailer.py               # :9106 server.log → OTLP logs
+│   │   ├── mlx_server_log_tailer.py               # :9106 server.log → OTLP logs
+│   │   ├── mlx_process_telemetry.py               # :9107 Per-process profiler
+│   │   └── mlx_sbom_collector.py                  # :9108 SBOM inventory + drift collector
 │   ├── vmagent-edge/
 │   │   └── vmagent.yml                            # vmagent scrape config (template vars)
 │   ├── mlx_monitoring_bundle.py                   # Edge entrypoint (start\|stop\|status\|restart)
 │   ├── validate_nodes.py                          # Config + prerequisite validator
 │   ├── requirements.txt                           # pip dependencies
-│   ├── com.mlx.monitoring.bundle.plist            # launchd agent (macOS, auto-restart)
-│   └── com.mlx.monitoring-bundle.service          # systemd unit (Linux, auto-restart)
+│   ├── com.mlx.monitoring.bundle.plist.template   # launchd agent template (macOS)
+│   └── com.mlx.monitoring-bundle.service.template # systemd unit template (Linux)
 │
 ├── central/                                       # === RUNS ON CENTRAL SERVER (CONTAINERS) ===
 │   ├── config/
@@ -133,7 +137,7 @@ cluster/mlx_monitoring_bundle/
 │   │   └── grafana/
 │   │       ├── datasources.yaml                   # VictoriaMetrics datasource
 │   │       └── dashboards.yaml                    # Grafana file provisioning
-│   ├── dashboards/                                # 12 Grafana dashboards (device + IST + 5m)
+│   ├── dashboards/                                # 17 Grafana dashboards (device + IST + 5m)
 │   ├── docker-compose.central.yml                 # Central stack composition (+ Opik profile)
 │   └── opik/                                      # Vendored Opik config (NGINX + ClickHouse)
 │
@@ -191,12 +195,14 @@ ENABLE_SERVER_MONITOR=true
 ENABLE_LOGTAILER=true
 ENABLE_VMAGENT=true
 
-# Listen ports
-PROXY_LISTEN=0.0.0.0:8080
-HW_LISTEN=0.0.0.0:9102
-KV_LISTEN=0.0.0.0:9104
-SUPERVISOR_LISTEN=0.0.0.0:9105
-LOGTAILER_LISTEN=0.0.0.0:9106
+# Listen ports (loopback-only under the push model)
+PROXY_LISTEN=127.0.0.1:8080
+HW_LISTEN=127.0.0.1:9102
+KV_LISTEN=127.0.0.1:9104
+SUPERVISOR_LISTEN=127.0.0.1:9105
+LOGTAILER_LISTEN=127.0.0.1:9106
+PROCESS_LISTEN=127.0.0.1:9107
+SBOM_LISTEN=127.0.0.1:9108
 
 # Proxy guardrails
 MLX_LOGPROBS=3
@@ -427,7 +433,7 @@ SSH. Collects: hostname (id), serial (`system_profiler`), IP, and optional
 
 ### Template Variables
 
-All 12 dashboards use a `$device` template variable (renamed from `$macbook`).
+All 17 dashboards use a `$device` template variable (renamed from `$macbook`).
 The underlying Prometheus label remains `macbook` (set by vmagent
 `external_labels`). The variable queries `label_values(..., macbook)`.
 
@@ -445,7 +451,11 @@ refresh**.
 | Dashboard | File | Purpose |
 |-----------|------|---------|
 | Cluster Overview | `overview.json` | Cross-device request rate, errors, GPU, thermal, risk, confidence |
+| Device Health | `device-health.json` | Host readiness, uptime, scrape target health |
 | Hardware | `hardware.json` | Per-device CPU, memory, disk, temperature, uptime |
+| Process Profiler | `process-profiler.json` | Top-K process CPU, memory, disk/net I/O, GPU/ANE ranking |
+| SBOM Inventory | `sbom-inventory.json` | Python, Homebrew, system binary, and MLX model inventory |
+| SBOM Drift | `sbom-drift.json` | Cross-device baseline comparison and drifted packages |
 | Serving | `serving.json` | `mlx_lm.server` up/ready/loaded, restarts, crashes, state |
 | Inference | `inference.json` | TTFT, generation time, token rate, queue wait, finish reasons, tool calls |
 | Quality | `quality.json` | Hallucination risk, confidence, perplexity, entropy, margin, heuristics |
@@ -574,7 +584,7 @@ On the central server (supports both **Docker** and **Podman**):
 `deploy.sh central` will print the full list of container images to be pulled and prompt for explicit confirmation `(y/N)` before pulling or launching containers.
 
 **Web Endpoints:**
-- **Grafana**: `http://<central-ip>:3000` (provisioned with 13 pre-configured dashboards in IST)
+- **Grafana**: `http://<central-ip>:3000` (provisioned with 17 pre-configured dashboards in IST)
 - **VictoriaMetrics**: `http://<central-ip>:8428`
 - **vmalert**: `http://<central-ip>:8880`
 - **Alertmanager**: `http://<central-ip>:9093`
@@ -692,7 +702,7 @@ When you deploy the monitoring stack and find that **no data is being populated 
 The Doctor executes a 5-stage telemetry traceroute that isolates the failure domain in seconds:
 
 1. **Stage 1 (Central TSDB Ingestion Gate)**: Checks TCP reachability, HTTP `/health`, and total active time-series count in VictoriaMetrics. If this fails, the central TSDB is stopped or unreachable.
-2. **Stage 2 (Edge Telemetry Ingestion Gate)**: Queries VictoriaMetrics for live `up{macbook="<node_id>"}` gauges across the edge exporters (`mlx-proxy`, `mlx-hw`, `mlx-kv`, `mlx-supervisor`, `mlx-logtailer`) and measures sample recency (`time() - max(timestamp(up))`). If samples are >60s old or missing, vmagent on that edge Mac is down or blocked by network/firewall.
+2. **Stage 2 (Edge Telemetry Ingestion Gate)**: Queries VictoriaMetrics for live `up{macbook="<node_id>"}` gauges across the edge exporters (`mlx-proxy`, `mlx-hw`, `mlx-kv`, `mlx-supervisor`, `mlx-logtailer`) and measures sample recency (`time() - max(timestamp(up))`). If samples are >300s old or missing, vmagent on that edge Mac is down or blocked by network/firewall.
 3. **Stage 3 (Alerting & Rule Engine Gate)**: Verifies `vmalert` rule execution and `alertmanager` notification routing.
 4. **Stage 4 (Logs & Traces Ingestion Gate)**: Verifies OTLP HTTP receiver (`:4318`) and Opik Gateway (`:32173`).
 5. **Stage 5 (Grafana & Query Pipeline Gate)**: Validates Grafana HTTP health, credentials/auth, VictoriaMetrics datasource registration, and executes an active datasource proxy query (`count(up)`).

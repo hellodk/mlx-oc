@@ -33,19 +33,16 @@ from typing import Any
 
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, generate_latest
 
-from mlx_logging import debug, error, info, setup_logging
+from mlx_logging import debug, error, info, parse_upstream_url, setup_logging
 
 LISTEN_DEFAULT = "127.0.0.1:9105"
 
 
 def normalize_upstream_url(raw: str) -> str:
     """Ensure upstream URL has an HTTP(S) scheme and no trailing slash."""
-    cleaned = raw.strip()
-    if not cleaned:
-        cleaned = "http://127.0.0.1:11234"
-    if "://" not in cleaned:
-        cleaned = f"http://{cleaned}"
-    return cleaned.rstrip("/")
+    cleaned = (raw or "").strip() or "http://127.0.0.1:11234"
+    _, _, _, base_url = parse_upstream_url(cleaned, default_port=11234)
+    return base_url
 
 
 def _parse_float_env(name: str, default: float) -> float:

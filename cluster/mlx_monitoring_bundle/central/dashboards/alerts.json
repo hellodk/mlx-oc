@@ -18,19 +18,23 @@
         "datasource": "VictoriaMetrics",
         "query": "label_values(mlx_hw_up, device)",
         "includeAll": true,
-        "allValue": ".+",
+        "allValue": ".*",
         "multi": false,
         "refresh": 1
       },
       {
         "name": "severity",
-        "type": "query",
-        "datasource": "VictoriaMetrics",
-        "query": "label_values(ALERTS, severity)",
+        "type": "custom",
+        "query": "critical,warning,info",
+        "options": [
+          {"text": "All", "value": "$__all", "selected": true},
+          {"text": "critical", "value": "critical", "selected": false},
+          {"text": "warning", "value": "warning", "selected": false},
+          {"text": "info", "value": "info", "selected": false}
+        ],
         "includeAll": true,
-        "allValue": ".+",
-        "multi": false,
-        "refresh": 1
+        "allValue": ".*",
+        "multi": false
       },
       {
         "name": "alertname",
@@ -38,7 +42,7 @@
         "datasource": "VictoriaMetrics",
         "query": "label_values(ALERTS, alertname)",
         "includeAll": true,
-        "allValue": ".+",
+        "allValue": ".*",
         "multi": false,
         "refresh": 1
       }

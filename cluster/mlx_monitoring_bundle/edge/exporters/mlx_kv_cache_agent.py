@@ -22,10 +22,10 @@ import re
 import signal
 import sys
 import threading
-import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from prometheus_client import Gauge, generate_latest, CONTENT_TYPE_LATEST
 import requests
 
 from mlx_logging import degraded, debug, error, info, parse_upstream_url, setup_logging
@@ -37,8 +37,6 @@ MAX_SEQ_DEFAULT = 10  # mlx_lm server LRUPromptCache default
 
 CACHE_RE = re.compile(r"Prompt Cache:\s+(\d+)\s+sequences?,\s+([\d.]+)\s+GB")
 TYPE_RE = re.compile(r"-\s+(\w+):\s+(\d+)\s+sequences?,\s+([\d.]+)\s+GB")
-
-from prometheus_client import Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 G_UP = Gauge("mlx_kv_agent_up", "1 if the KV cache agent is running")
 G_SEQ = Gauge(
@@ -220,12 +218,17 @@ def main():
     ap.add_argument("--log-file", default=os.environ.get("MLX_SERVER_LOG"))
     ap.add_argument("--model", default=os.environ.get("MLX_MODEL"))
     ap.add_argument("--model-path", default=os.environ.get("MLX_MODEL_PATH"))
-    ap.add_argument("--upstream", default=os.environ.get("MLX_UPSTREAM",
-             "http://127.0.0.1:8081"),
-             help="upstream mlx_lm.server base URL for model discovery")
+    ap.add_argument(
+        "--upstream",
+        default=os.environ.get("MLX_UPSTREAM", "http://127.0.0.1:8081"),
+        help="upstream mlx_lm.server base URL for model discovery",
+    )
     ap.add_argument("--listen", default=os.environ.get("MLX_KV_LISTEN", LISTEN_DEFAULT))
-    ap.add_argument("--interval", type=float,
-             default=float(os.environ.get("MLX_KV_INTERVAL", POLL_INTERVAL_DEFAULT)))
+    ap.add_argument(
+        "--interval",
+        type=float,
+        default=float(os.environ.get("MLX_KV_INTERVAL", POLL_INTERVAL_DEFAULT)),
+    )
     args = ap.parse_args()
 
     if not args.log_file:

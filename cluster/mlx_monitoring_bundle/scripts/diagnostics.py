@@ -42,6 +42,7 @@ CENTRAL_DIR = BUNDLE_DIR / "central"
 # Helpers: Timezone, Network, and Process Primitives
 # ---------------------------------------------------------------------------
 
+
 def format_ist(ts: float | int | str | None) -> str:
     """Format any unix or ISO timestamp to IST (Asia/Kolkata, UTC+5:30)."""
     if ts is None:
@@ -273,7 +274,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     # -----------------------------------------------------------------------
     engine, eng_ver, daemon_ok = detect_container_engine()
     vm_ok, vm_lat = probe_tcp(cfg["cvm"])
-    
+
     stage1_status = "PASS"
     stage1_notes = []
 
@@ -329,7 +330,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             else:
                 up_jobs = {row["metric"].get("job"): row["value"][1] for row in up_data}
                 down_jobs = [j for j, val in up_jobs.items() if val != "1"]
-                
+
                 recency_str = f"{recency_sec:.1f}s ago" if recency_sec is not None else "unknown"
                 if recency_sec is not None and recency_sec > 300:
                     stage2_status = "FAIL"
@@ -349,7 +350,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                         "impact": "Panels relying on these exporters will be empty.",
                         "fix": f"On node '{nb_id}', restart exporters: './scripts/deploy.sh edge stop && ./scripts/deploy.sh edge daemon'."
                     })
-                    stage2_details.append(f"node {nb_id}: {len(up_jobs)-len(down_jobs)}/{len(up_jobs)} UP ({', '.join(down_jobs)} DOWN)")
+                    stage2_details.append(f"node {nb_id}: {len(up_jobs) - len(down_jobs)}/{len(up_jobs)} UP ({', '.join(down_jobs)} DOWN)")
                 else:
                     stage2_details.append(
                         f"node {nb_id}: {len(up_jobs)}/{len(up_jobs)} UP (last sample {recency_str})"
@@ -454,7 +455,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             # Check Authentication
             auth_header = "Basic " + base64.b64encode(f"{cfg['grafana_user']}:{cfg['grafana_password']}".encode()).decode()
             auth_code, auth_body = probe_http(f"http://{cfg['cgrafana']}/api/users", headers={"Authorization": auth_header})
-            
+
             if auth_code == 401:
                 if not (CENTRAL_DIR / ".env").is_file():
                     stage5_notes.append("Auth check skipped (remote edge)")
@@ -554,7 +555,6 @@ def cmd_review_central(args: argparse.Namespace) -> int:
     for name, cname, addr, health_path, expected_code in services:
         cinfo = inspect_container(engine, cname)
         cstatus = cinfo["status"]
-        uptime = format_ist(cinfo["started_at"]) if cinfo["started_at"] else ""
 
         tcp_ok, lat = probe_tcp(addr)
         http_ok = True
@@ -732,17 +732,17 @@ def cmd_review_vm(args: argparse.Namespace) -> int:
     cfg = load_config()
     engine, eng_ver, daemon_ok = detect_container_engine()
     cinfo = inspect_container(engine, ["central-victoriametrics", "victoria-metrics"])
-    
+
     print("=" * 76)
     print("               VictoriaMetrics TSDB Configuration & Health")
     print("=" * 76)
     print(f"Container Status  : {cinfo['status']} (Started: {format_ist(cinfo['started_at']) if cinfo['started_at'] else 'N/A'})")
     print(f"Service Endpoint  : http://{cfg['cvm']}")
-    
+
     tcp_ok, lat = probe_tcp(cfg["cvm"])
     h_code, _ = probe_http(f"http://{cfg['cvm']}/health")
     print(f"Health Probe      : {'200 OK' if (tcp_ok and h_code == 200) else 'FAILED'}")
-    
+
     if tcp_ok and h_code == 200:
         total = query_vm(cfg["cvm"], "count({__name__=~\".+\"})")
         total_str = total[0]["value"][1] if total else "0"
@@ -790,7 +790,7 @@ def cmd_review_alertmanager(args: argparse.Namespace) -> int:
     print("=" * 76)
     print(f"Container Status  : {cinfo['status']} (Started: {format_ist(cinfo['started_at']) if cinfo['started_at'] else 'N/A'})")
     print(f"Service Endpoint  : http://{cfg['calertmanager']}")
-    
+
     tcp_ok, lat = probe_tcp(cfg["calertmanager"])
     h_code, _ = probe_http(f"http://{cfg['calertmanager']}/-/healthy")
     print(f"Health Probe      : {'200 OK' if (tcp_ok and h_code == 200) else 'FAILED'}")
@@ -874,7 +874,7 @@ def cmd_review_otel(args: argparse.Namespace) -> int:
 
     tcp_ok, lat = probe_tcp(cfg["cotel"])
     print(f"Port 4318 Probe   : {'LISTENING' if tcp_ok else 'UNREACHABLE'}")
-    
+
     cfg_file = CENTRAL_DIR / "config" / "otelcol-config.yaml"
     print(f"Pipeline Config   : {cfg_file} ({'present' if cfg_file.is_file() else 'missing'})")
     print("=" * 76)
@@ -926,7 +926,7 @@ def main():
     p_doc.add_argument("--node", help="target node id to trace (default: all enabled nodes)")
 
     # reviews
-    p_rc = sub.add_parser("review-central", help="comprehensive audit of all central services")
+    sub.add_parser("review-central", help="comprehensive audit of all central services")
     p_re = sub.add_parser("review-edge", help="comprehensive audit of all edge exporters")
     p_re.add_argument("--node", help="target node id to inspect")
 

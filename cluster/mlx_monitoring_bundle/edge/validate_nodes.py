@@ -106,7 +106,7 @@ def main() -> int:
                     help="path to nodes.yml (default: config/nodes.yml)")
     ap.add_argument("--env-file", default=str(DEFAULT_ENV_FILE),
                     help="path to edge.env (default: config/edge.env)")
-    ap.add_argument("--node", default=os.environ.get("MLX_MACBOOK_ID"),
+    ap.add_argument("--node", default=os.environ.get("MLX_DEVICE_ID") or os.environ.get("MLX_MACBOOK_ID"),
                     help="node id to validate (default: auto-select single enabled node)")
     ap.add_argument("--check-ports", action="store_true",
                     help="warn when exporter ports are already in use")
@@ -204,7 +204,22 @@ def main() -> int:
                 errors.append(f"{module} is not importable in {resolved_venv}")
 
     if args.check_ports:
-        for port in (8080, 9102, 9104, 9105, 9106, 9107, 9108):
+        default_ports = (
+            ("PROXY_LISTEN", 8080),
+            ("HW_LISTEN", 9102),
+            ("KV_LISTEN", 9104),
+            ("SUPERVISOR_LISTEN", 9105),
+            ("LOGTAILER_LISTEN", 9106),
+            ("PROCESS_LISTEN", 9107),
+            ("SBOM_LISTEN", 9108),
+        )
+        for env_key, default_port in default_ports:
+            listen_val = env.get(env_key, "")
+            port = default_port
+            if listen_val and ":" in listen_val:
+                _, _, port_str = listen_val.rpartition(":")
+                if port_str.isdigit():
+                    port = int(port_str)
             if not port_free(port):
                 warnings.append(f"port {port} is already in use")
 

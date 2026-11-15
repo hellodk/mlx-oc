@@ -31,6 +31,7 @@ import math
 import os
 import random
 import re
+import signal
 import socket
 import ssl
 import sys
@@ -69,6 +70,7 @@ def _make_upstream_conn(
         return http.client.HTTPSConnection(host, port, timeout=timeout, context=ctx)
     return http.client.HTTPConnection(host, port, timeout=timeout)
 
+
 try:
     from mlx_model_info import model_info as _model_info
 except Exception as exc:
@@ -92,11 +94,11 @@ def _sig_url(endpoint: str, sig: str) -> str:
 
 
 def _setup_otel(endpoint: str, node_name: str, service_name: str = "mlx-metrics-proxy",
-                opik_otlp_endpoint: str = ""):
+                opik_otlp_endpoint: str = "", verify_tls: bool = True):
     if not endpoint and not opik_otlp_endpoint:
         return None
     try:
-        from opentelemetry import trace, metrics, _logs
+        from opentelemetry import trace, _logs
         from opentelemetry.sdk.resources import (
             Resource, SERVICE_NAME, HOST_NAME, SERVICE_INSTANCE_ID,
         )
@@ -111,6 +113,9 @@ def _setup_otel(endpoint: str, node_name: str, service_name: str = "mlx-metrics-
             OTLPLogExporter,
         )
 
+        otlp_session = requests.Session()
+        otlp_session.verify = verify_tls
+
         host = socket.gethostname()
         resource = Resource.create({
             SERVICE_NAME: service_name,
@@ -122,7 +127,12 @@ def _setup_otel(endpoint: str, node_name: str, service_name: str = "mlx-metrics-
         tp = TracerProvider(resource=resource)
         if endpoint:
             tp.add_span_processor(
-                BatchSpanProcessor(OTLPSpanExporter(endpoint=_sig_url(endpoint, "traces")))
+                BatchSpanProcessor(
+                    OTLPSpanExporter(
+                        endpoint=_sig_url(endpoint, "traces"),
+                        session=otlp_session,
+                    )
+                )
             )
         if opik_otlp_endpoint:
             tp.add_span_processor(
@@ -130,6 +140,7 @@ def _setup_otel(endpoint: str, node_name: str, service_name: str = "mlx-metrics-
                     OTLPSpanExporter(
                         endpoint=_sig_url(opik_otlp_endpoint, "traces"),
                         headers={"projectName": "mlx"},
+                        session=otlp_session,
                     )
                 )
             )
@@ -139,7 +150,10 @@ def _setup_otel(endpoint: str, node_name: str, service_name: str = "mlx-metrics-
             lp = LoggerProvider(resource=resource)
             lp.add_log_record_processor(
                 BatchLogRecordProcessor(
-                    OTLPLogExporter(endpoint=_sig_url(endpoint, "logs"))
+                    OTLPLogExporter(
+                        endpoint=_sig_url(endpoint, "logs"),
+                        session=otlp_session,
+                    )
                 )
             )
             _logs.set_logger_provider(lp)
@@ -373,7 +387,7 @@ _STOPWORDS = set(
 
 
 def _trigrams(words):
-    return [" ".join(words[i : i + 3]) for i in range(len(words) - 2)]
+    return [" ".join(words[i:i + 3]) for i in range(len(words) - 2)]
 
 
 def heuristic_repetition(text: str) -> float:
@@ -758,6 +772,24 @@ class Proxy(BaseHTTPRequestHandler):
     model_aliases = []
     _rate_hits = {}
     _rate_lock = threading.Lock()
+    _seen_models: set[str] = set()
+    _seen_models_lock = threading.Lock()
+    _max_model_labels = 20
+
+    @classmethod
+    def _bound_model_label(cls, raw_model: str | None) -> str:
+        name = (raw_model or _MODEL_NAME or "unknown").strip() or "unknown"
+        if len(name) > 120:
+            name = name[:120]
+        if cls.strict_model or name == _MODEL_NAME or name in cls.model_aliases:
+            return name
+        with cls._seen_models_lock:
+            if name in cls._seen_models:
+                return name
+            if len(cls._seen_models) < cls._max_model_labels:
+                cls._seen_models.add(name)
+                return name
+        return "other"
 
     def _rate_limited(self, key):
         now = time.monotonic()
@@ -879,7 +911,7 @@ class Proxy(BaseHTTPRequestHandler):
         if is_chat:
             try:
                 req = json.loads(body or b"{}")
-                model = req.get("model", model)
+                req_model = req.get("model", model)
                 streaming = bool(req.get("stream", False))
                 temperature = req.get("temperature", 0.0)
                 tools_provided = bool(req.get("tools"))
@@ -887,18 +919,19 @@ class Proxy(BaseHTTPRequestHandler):
                 if bool(req.get("enable_thinking", False)):
                     kind = "reasoning"
 
-                if model != _MODEL_NAME and _MODEL_NAME is not None and model not in self.model_aliases:
+                if req_model != _MODEL_NAME and _MODEL_NAME is not None and req_model not in self.model_aliases:
                     if self.strict_model:
                         self._reject(
                             400,
                             {"error": {"message": f"model not loaded (proxy serves "
                              f"{_MODEL_NAME})", "type": "invalid_request_error"}},
-                            model, kind,
+                            self._bound_model_label(req_model), kind,
                         )
                         return
                     else:
-                        degraded(f"model mismatch: request={model} proxy={_MODEL_NAME}; serving anyway (strict_model=false)",
+                        degraded(f"model mismatch: request={req_model} proxy={_MODEL_NAME}; serving anyway (strict_model=false)",
                                  component="proxy")
+                model = self._bound_model_label(req_model)
                 prompt_tokens = sum(
                     len((m.get("content") or "") if isinstance(m.get("content"), str)
                         else json.dumps(m.get("content") or ""))
@@ -907,9 +940,15 @@ class Proxy(BaseHTTPRequestHandler):
                 if prompt_tokens > self.max_prompt_tokens:
                     self._reject(
                         400,
-                        {"error": {"message": f"prompt too long (~{prompt_tokens} "
-                         f"tokens > max {self.max_prompt_tokens})",
-                         "type": "invalid_request_error"}},
+                        {
+                            "error": {
+                                "message": (
+                                    f"prompt too long (~{prompt_tokens} "
+                                    f"tokens > max {self.max_prompt_tokens})"
+                                ),
+                                "type": "invalid_request_error",
+                            }
+                        },
                         model, kind,
                     )
                     return
@@ -1044,8 +1083,8 @@ class Proxy(BaseHTTPRequestHandler):
             is_sse = (resp.getheader("Content-Type", "") or "").startswith(
                 "text/event-stream"
             )
-            rewrite = synth_sse or (
-                lp_source == "injected" and not is_sse and status < 400
+            rewrite = status < 400 and (
+                synth_sse or (lp_source == "injected" and not is_sse)
             )
             self.close_connection = True
             if not rewrite:
@@ -1128,7 +1167,7 @@ class Proxy(BaseHTTPRequestHandler):
                 return
 
             if status >= 400:
-                REQUESTS.labels(model, kind).inc()
+                REQUESTS.labels(model, "true" if streaming else "false", kind).inc()
                 if span is not None:
                     span.set_attribute("http.response.status_code", status)
                     span.set_status("ERROR", f"HTTP {status}")
@@ -1579,7 +1618,10 @@ def main():
     PROMPT_CACHED.labels(model=_MODEL_NAME or "unknown", kind="chat").inc(0)
     _NODE_NAME = args.node_name
     _OTEL = _setup_otel(
-        args.otlp_endpoint, args.node_name, opik_otlp_endpoint=args.opik_otlp_endpoint
+        args.otlp_endpoint,
+        args.node_name,
+        opik_otlp_endpoint=args.opik_otlp_endpoint,
+        verify_tls=args.otlp_verify_tls,
     )
     if args.opik_endpoint:
         try:
@@ -1676,10 +1718,19 @@ def main():
         )
     else:
         info("confidence scoring: disabled (--logprobs 0)", component="proxy")
+
+    def _shutdown(signum, frame):
+        threading.Thread(target=server.shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        server.shutdown()
+        pass
+    finally:
+        server.server_close()
 
 
 if __name__ == "__main__":

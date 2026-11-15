@@ -28,7 +28,7 @@ from prometheus_client import (
     generate_latest,
 )
 
-from mlx_logging import degraded, debug, error, info, setup_logging
+from mlx_logging import debug, error, info, setup_logging
 
 DEFAULT_POLL_INTERVAL = 0.5
 DEFAULT_MAX_RATE = 50.0
@@ -58,6 +58,11 @@ CLASSIFIERS = [
                    r"CUDA|MLX error|RuntimeError)\b", re.I),
         "error",
         "python",
+    ),
+    (
+        re.compile(r'"(?:POST|GET|DELETE|PUT)\s+/[^"]*"\s+[123]\d\d\b'),
+        "info",
+        "http",
     ),
     (
         re.compile(r"\b(error|failed|fault)\b", re.I),
@@ -312,19 +317,28 @@ def main():
     ap.add_argument("--log-file", default=os.environ.get("MLX_SERVER_LOG"))
     ap.add_argument("--otlp-endpoint", default=os.environ.get("MLX_OTLP_ENDPOINT"))
     ap.add_argument("--project", default=os.environ.get("OPIK_PROJECT", "mlx"))
-    ap.add_argument("--listen", default=os.environ.get("MLX_LOGTAILER_LISTEN",
-             "127.0.0.1:9106"))
-    ap.add_argument("--otlp-verify-tls", action="store_true",
-             default=os.environ.get("OTLP_VERIFY_TLS", "false").lower() == "true",
-             help="verify TLS certificates for OTLP endpoints")
-    ap.add_argument("--max-rate", type=float,
-             default=float(os.environ.get("MLX_LOGTAILER_MAX_RATE",
-                                          str(DEFAULT_MAX_RATE))),
-             help="max lines/s shipped to OTLP (0 = unlimited)")
-    ap.add_argument("--backfill", type=int,
-             default=int(os.environ.get("MLX_LOGTAILER_BACKFILL",
-                                        str(DEFAULT_BACKFILL))),
-             help="ship last N log lines on start (crash forensics)")
+    ap.add_argument(
+        "--listen",
+        default=os.environ.get("MLX_LOGTAILER_LISTEN", "127.0.0.1:9106"),
+    )
+    ap.add_argument(
+        "--otlp-verify-tls",
+        action="store_true",
+        default=os.environ.get("OTLP_VERIFY_TLS", "false").lower() == "true",
+        help="verify TLS certificates for OTLP endpoints",
+    )
+    ap.add_argument(
+        "--max-rate",
+        type=float,
+        default=float(os.environ.get("MLX_LOGTAILER_MAX_RATE", str(DEFAULT_MAX_RATE))),
+        help="max lines/s shipped to OTLP (0 = unlimited)",
+    )
+    ap.add_argument(
+        "--backfill",
+        type=int,
+        default=int(os.environ.get("MLX_LOGTAILER_BACKFILL", str(DEFAULT_BACKFILL))),
+        help="ship last N log lines on start (crash forensics)",
+    )
     ap.add_argument("--include-http", action="store_true",
                     help="also ship HTTP access lines")
     ap.add_argument("--all", dest="all_lines", action="store_true",

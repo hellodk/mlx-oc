@@ -36,7 +36,6 @@ from __future__ import annotations
 
 import argparse
 import getpass
-import json
 import os
 import re
 import socket
@@ -73,7 +72,7 @@ def run_ssh(host: str, user: str, key: str | None, cmd: str,
 def get_serial_ssh(host, user, key) -> str:
     out = run_ssh(host, user, key,
                   "system_profiler SPHardwareDataType 2>/dev/null | "
-                  "awk '/Serial Number/{print $4; exit}'")
+                  "awk -F': ' '/Serial Number/{print $2; exit}' | tr -d ' '")
     return out or "unknown"
 
 

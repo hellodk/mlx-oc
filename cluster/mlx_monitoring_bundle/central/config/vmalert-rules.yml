@@ -16,7 +16,7 @@ groups:
     # A Device is considered silent when no telemetry has been received for >3m.
     - alert: MLXDeviceSilent
       # Evaluates per-device: fires when a device that previously reported has sent no telemetry for > 3m.
-      expr: time() - max_over_time(timestamp(up{job="mlx-hw"})[1h]) > 180
+      expr: time() - max_over_time(timestamp(up{job="mlx-hw"})[7d]) > 180
       for: 2m
       labels:
         severity: critical
@@ -31,7 +31,7 @@ groups:
 
     - alert: MLXMacbookSilent
       # Backwards-compatible alias for legacy monitoring scrapers.
-      expr: time() - max_over_time(timestamp(up{job="mlx-hw"})[1h]) > 180
+      expr: time() - max_over_time(timestamp(up{job="mlx-hw"})[7d]) > 180
       for: 2m
       labels:
         severity: critical

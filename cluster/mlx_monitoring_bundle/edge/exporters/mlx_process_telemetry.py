@@ -22,10 +22,8 @@ from __future__ import annotations
 
 import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import math
 import os
 import re
-import shutil
 import signal
 import socket
 import subprocess
@@ -36,7 +34,7 @@ from typing import Any, Dict, List, Tuple
 
 from prometheus_client import CollectorRegistry, Counter, Gauge, generate_latest
 
-from mlx_logging import debug, degraded, error, info, setup_logging
+from mlx_logging import debug, error, info, setup_logging
 
 # ---------------------------------------------------------------------------
 # Default Constants
@@ -221,7 +219,7 @@ def _list_processes() -> List[Dict[str, Any]]:
 
 def _sample_processes(node_name: str, top_k: int = 10) -> None:
     """Collect Top-K consumers for CPU, Memory, Disk, Net, GPU, and ANE."""
-    global _PREV_IO_SNAPSHOTS, _GPU_RESIDENCY_TOTAL, _ANE_POWER_TOTAL_WATTS
+    global _GPU_RESIDENCY_TOTAL, _ANE_POWER_TOTAL_WATTS
 
     procs = _list_processes()
     if not procs:

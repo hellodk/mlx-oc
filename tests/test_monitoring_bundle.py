@@ -1,10 +1,8 @@
-import importlib
 import json
 import os
 import re
 import sys
 from pathlib import Path
-import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -1313,7 +1311,167 @@ def test_bundle_stop_does_not_kill_self(tmp_path, monkeypatch):
     assert any(pid == 999991 for _, pid, _ in killed)
 
 
+def test_proxy_upstream_error_increments_requests_and_skips_synth_sse(monkeypatch):
+    """Verify upstream >=400 increments 3-label REQUESTS and passes through when synth_sse is active."""
+    import json
+    import sys
+    import urllib.error
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    sys.path.insert(0, str(BUNDLE_DIR / "edge" / "exporters"))
+    import mlx_metrics_proxy as p
+    import test_proxy_rewrite as tpr
+
+    server = tpr.ThreadingHTTPServer(("127.0.0.1", 0), tpr.StubUpstream)
+    u_port = server.server_address[1]
+    t_up = tpr.threading.Thread(target=server.serve_forever, daemon=True)
+    t_up.start()
+
+    monkeypatch.setattr(p.Proxy, "upstream", ("127.0.0.1", u_port))
+    monkeypatch.setattr(p.Proxy, "metrics_path", "/metrics")
+    monkeypatch.setattr(p, "_MODEL_NAME", tpr.MODEL)
+    monkeypatch.setattr(p.Proxy, "stream_sample", 1.0)
+    monkeypatch.setattr(p.Proxy, "logprobs_top", 2)
+    monkeypatch.setattr(p.Proxy, "strict_model", False)
+
+    proxy_srv = tpr.ThreadingHTTPServer(("127.0.0.1", 0), p.Proxy)
+    p_port = proxy_srv.server_address[1]
+    t_px = tpr.threading.Thread(target=proxy_srv.serve_forever, daemon=True)
+    t_px.start()
+
+    base = f"http://127.0.0.1:{p_port}"
+    try:
+        before_req = tpr.series(tpr.metrics(base), "mlx_requests_total")
+        tpr.UPSTREAM_MODE["status"] = 503
+        tpr.UPSTREAM_MODE["tool_calls"] = False
+        caught = None
+        try:
+            tpr.post(
+                base,
+                {
+                    "model": tpr.MODEL,
+                    "stream": True,
+                    "messages": [{"role": "user", "content": "hi"}],
+                },
+            )
+        except urllib.error.HTTPError as exc:
+            caught = exc
+        assert caught is not None
+        assert caught.code == 503
+        assert caught.headers.get("Content-Type", "").startswith("application/json")
+        assert json.loads(caught.read())["error"] == "upstream said no"
+
+        after_req = tpr.series(tpr.metrics(base), "mlx_requests_total")
+        assert after_req == before_req + 1
+    finally:
+        tpr.UPSTREAM_MODE["status"] = 200
+        proxy_srv.shutdown()
+        proxy_srv.server_close()
+        server.shutdown()
+        server.server_close()
 
 
+def test_proxy_bound_model_label_caps_unseen_models(monkeypatch):
+    """Verify non-strict mode bounds unseen model labels at _max_model_labels and buckets excess."""
+    import sys
+
+    sys.path.insert(0, str(BUNDLE_DIR / "edge" / "exporters"))
+    import mlx_metrics_proxy as p
+
+    monkeypatch.setattr(p, "_MODEL_NAME", "base-model")
+    monkeypatch.setattr(p.Proxy, "strict_model", False)
+    monkeypatch.setattr(p.Proxy, "model_aliases", set())
+    monkeypatch.setattr(p.Proxy, "_seen_models", set())
+    monkeypatch.setattr(p.Proxy, "_max_model_labels", 3)
+
+    assert p.Proxy._bound_model_label("base-model") == "base-model"
+    assert p.Proxy._bound_model_label("m1") == "m1"
+    assert p.Proxy._bound_model_label("m2") == "m2"
+    assert p.Proxy._bound_model_label("m3") == "m3"
+    assert p.Proxy._bound_model_label("m4") == "other"
+    assert p.Proxy._bound_model_label("m2") == "m2"
 
 
+def test_hw_telemetry_net_iface_cache_and_ps_stats(monkeypatch):
+    """Verify _net_iface caches default-route detection for 60s and _collect_ps_stats returns worker + proc stats."""
+    import subprocess
+    import sys
+
+    sys.path.insert(0, str(BUNDLE_DIR / "edge" / "exporters"))
+    import mlx_hw_telemetry as hw
+
+    calls = {"route": 0}
+
+    def fake_run(cmd, **_kwargs):
+        class Res:
+            stdout = ""
+
+        if cmd[:3] == ["route", "-n", "get"]:
+            calls["route"] += 1
+            Res.stdout = "   interface: en0\n"
+        elif cmd[:2] == ["ps", "-axo"]:
+            Res.stdout = (
+                "  101  12.5  1024 /usr/bin/python -m mlx_lm.server\n"
+                "  102   2.0   512 /usr/bin/python mlx_metrics_proxy.py\n"
+                "  103   99.0  999 /usr/bin/python mlx_hw_telemetry.py\n"
+            )
+        return Res()
+
+    monkeypatch.setattr(hw, "_NET_IFACE", "")
+    monkeypatch.setattr(hw, "_NET_IFACE_CACHE", ("", 0.0))
+    monkeypatch.setattr(hw, "_PROC_MATCH", "mlx_lm.server")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    assert hw._net_iface() == "en0"
+    assert hw._net_iface() == "en0"
+    assert calls["route"] == 1
+
+    (wcpu, wrss), proc_stats = hw._collect_ps_stats()
+    assert wcpu == 12.5
+    assert wrss == 1024 * 1024
+    assert proc_stats["mlx_proxy"] == (2.0, 512 * 1024)
+    assert hw._host_uptime_seconds() >= 0.0
+
+
+def test_validate_nodes_uses_mlx_device_id_and_custom_ports(tmp_path, monkeypatch, capsys):
+    """Verify validate_nodes.py honors MLX_DEVICE_ID env var and custom *_LISTEN ports."""
+    import socket
+    import sys
+
+    sys.path.insert(0, str(BUNDLE_DIR / "edge"))
+    import validate_nodes as vn
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(("127.0.0.1", 0))
+    busy_port = sock.getsockname()[1]
+
+    nodes_file = tmp_path / "nodes.yml"
+    nodes_file.write_text(
+        "central:\n  victoria_metrics: 127.0.0.1:8428\n  otel: 127.0.0.1:4318\n"
+        "devices:\n  - id: dev-a\n    ip: 10.0.0.1\n  - id: dev-b\n    ip: 10.0.0.2\n",
+        encoding="utf8",
+    )
+    env_file = tmp_path / "edge.env"
+    env_file.write_text(
+        f"VENV_PYTHON={sys.executable}\n"
+        "MLX_UPSTREAM=http://127.0.0.1:11234\n"
+        f"PROXY_LISTEN=127.0.0.1:{busy_port}\n",
+        encoding="utf8",
+    )
+
+    monkeypatch.setenv("MLX_DEVICE_ID", "dev-b")
+    monkeypatch.setattr(vn, "REQUIRED_MODULES", ())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["validate_nodes.py", "--nodes", str(nodes_file), "--env-file", str(env_file), "--check-ports"],
+    )
+    try:
+        rc = vn.main()
+    finally:
+        sock.close()
+
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "node     : dev-b" in out
+    assert f"WARN  port {busy_port} is already in use" in out

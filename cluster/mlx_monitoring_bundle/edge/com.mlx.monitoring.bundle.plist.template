@@ -6,12 +6,12 @@
   <string>com.mlx.monitoring.bundle</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/bin/python3</string>
-    <string>/path/to/mlx_monitoring_bundle/edge/mlx_monitoring_bundle.py</string>
+    <string>{{VENV_PYTHON}}</string>
+    <string>{{EDGE_DIR}}/mlx_monitoring_bundle.py</string>
     <string>start</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/path/to/mlx_monitoring_bundle/edge</string>
+  <string>{{EDGE_DIR}}</string>
   <key>RunAtLoad</key>
   <false/>
   <key>KeepAlive</key>
@@ -19,15 +19,15 @@
   <key>ThrottleInterval</key>
   <integer>5</integer>
   <key>StandardOutPath</key>
-  <string>/path/to/mlx_monitoring_bundle/edge/logs/launchd.out.log</string>
+  <string>{{EDGE_DIR}}/logs/launchd.out.log</string>
   <key>StandardErrorPath</key>
-  <string>/path/to/mlx_monitoring_bundle/edge/logs/launchd.err.log</string>
+  <string>{{EDGE_DIR}}/logs/launchd.err.log</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
-    <key>MLX_MACBOOK_ID</key>
-    <string>dk-mac</string>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>MLX_DEVICE_ID</key>
+    <string>{{DEVICE_ID}}</string>
   </dict>
 </dict>
 </plist>

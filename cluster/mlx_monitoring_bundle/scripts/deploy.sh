@@ -271,6 +271,37 @@ _detect_venv() {
   return 1
 }
 
+render_edge_service_units() {
+  local mon_python="${1:-$(bundle_python)}"
+  local device_id="${2:-unknown}"
+  local svc_user
+  local svc_group
+  svc_user="$(id -un 2>/dev/null || echo "${USER:-root}")"
+  svc_group="$(id -gn 2>/dev/null || echo "${svc_user}")"
+
+  local tpl dst
+  for tpl in \
+    "${EDGE_DIR}/com.mlx.monitoring.bundle.plist.template" \
+    "${EDGE_DIR}/com.mlx.monitoring-bundle.service.template"; do
+    [[ -f "${tpl}" ]] || continue
+    dst="${tpl%.template}"
+    "${mon_python}" -c "
+import sys
+tpl_path, dst_path, venv_py, edge_dir, dev_id, s_user, s_grp = sys.argv[1:8]
+text = open(tpl_path, 'r', encoding='utf-8').read()
+for k, v in (
+    ('{{VENV_PYTHON}}', venv_py),
+    ('{{EDGE_DIR}}', edge_dir),
+    ('{{DEVICE_ID}}', dev_id),
+    ('{{SERVICE_USER}}', s_user),
+    ('{{SERVICE_GROUP}}', s_grp),
+):
+    text = text.replace(k, v)
+open(dst_path, 'w', encoding='utf-8').write(text)
+" "${tpl}" "${dst}" "${mon_python}" "${EDGE_DIR}" "${device_id}" "${svc_user}" "${svc_group}"
+  done
+}
+
 cmd_setup_edge() {
   local central_ip="${1:-}"
   local model_id="${2:-}"
@@ -340,6 +371,14 @@ cmd_setup_edge() {
   info "generating ${EDGE_DIR}/config/nodes.yml via discover_nodes.py"
   "${disc_cmd[@]}" > "${EDGE_DIR}/config/nodes.yml"
 
+  local device_id
+  device_id="$("${mon_python}" -c '
+import sys, yaml
+data = yaml.safe_load(open(sys.argv[1], encoding="utf8")) or {}
+devs = data.get("devices") or data.get("macbooks") or []
+print(devs[0].get("id", "unknown") if devs else "unknown")
+' "${EDGE_DIR}/config/nodes.yml" 2>/dev/null || hostname -s)"
+
   info "generating ${ENV_FILE}"
   cat <<EOF > "${ENV_FILE}"
 ENABLE_PROXY=true
@@ -380,7 +419,7 @@ PROCESS_SAMPLE_INTERVAL=5.0
 PROCESS_LISTEN=127.0.0.1:9107
 SBOM_SCAN_INTERVAL=3600.0
 SBOM_LISTEN=127.0.0.1:9108
-SBOM_BASE_DEVICE=mm
+SBOM_BASE_DEVICE=${SBOM_BASE_DEVICE:-${device_id}}
 
 VMAGENT_SCRAPE_INTERVAL=10s
 VMAGENT_QUEUE_CAPACITY=5000
@@ -390,6 +429,8 @@ VMAGENT_PERSISTENT_QUEUE=
 
 OTLP_VERIFY_TLS=false
 EOF
+
+  render_edge_service_units "${mon_python}" "${device_id}"
 
   info "edge setup complete; validating configuration"
   cmd_validate
