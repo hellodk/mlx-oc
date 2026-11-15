@@ -350,6 +350,7 @@ def main():
         G_CRASHES.labels(reason=r).inc(0)
 
     threading.Thread(target=sup.health_loop, daemon=True).start()
+    ThreadingHTTPServer.allow_reuse_address = True
     httpd = ThreadingHTTPServer((host or "0.0.0.0", int(port or 9105)), MetricsHandler)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     info(
