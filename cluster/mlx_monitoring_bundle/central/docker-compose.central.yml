@@ -77,6 +77,11 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
       - GF_USERS_DEFAULT_THEME=light
       - VICTORIAMETRICS_URL=${VICTORIAMETRICS_URL:-http://victoria-metrics:8428}
+      - HTTP_PROXY=
+      - HTTPS_PROXY=
+      - http_proxy=
+      - https_proxy=
+      - NO_PROXY=victoria-metrics,central-victoriametrics,otel-collector,vmalert,alertmanager,localhost,127.0.0.1
     volumes:
       - grafana-data:/var/lib/grafana
       - ./config/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
@@ -101,6 +106,12 @@ services:
     restart: unless-stopped
     ports:
       - "8880:8880"
+    environment:
+      - HTTP_PROXY=
+      - HTTPS_PROXY=
+      - http_proxy=
+      - https_proxy=
+      - NO_PROXY=victoria-metrics,central-victoriametrics,alertmanager,localhost,127.0.0.1
     command:
       - -datasource.url=${VICTORIAMETRICS_URL:-http://victoria-metrics:8428}
       - -remoteWrite.url=${VICTORIAMETRICS_URL:-http://victoria-metrics:8428}
