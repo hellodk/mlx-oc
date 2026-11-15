@@ -267,6 +267,7 @@ cmd_setup_edge() {
   local central_ip="${1:-}"
   local model_id="${2:-}"
   local model_path="${3:-}"
+  local mlx_upstream="${4:-${MLX_UPSTREAM:-}}"
   local vmagent_bin="${MLX_MONITORING_DIR}/bin/vmagent"
 
   info "setting up edge monitoring bundle on local machine"
@@ -281,6 +282,11 @@ cmd_setup_edge() {
   if [[ -z "${central_ip}" ]]; then
     central_ip="$(_prompt_input "Central VictoriaMetrics IP / Host (e.g. 192.168.1.10)")"
     [[ -n "${central_ip}" ]] || die "central_ip is required"
+  fi
+
+  if [[ -z "${mlx_upstream}" ]]; then
+    mlx_upstream="$(_prompt_input "External LLM Upstream URL (e.g. http://127.0.0.1:8000)")"
+    [[ -n "${mlx_upstream}" ]] || die "MLX_UPSTREAM is required (e.g. http://127.0.0.1:8000). Pass as 4th arg, set MLX_UPSTREAM in env, or enter when prompted."
   fi
 
   if [[ -z "${model_id}" ]]; then
@@ -338,7 +344,7 @@ CONFIG_DIR=./config
 VENV_PYTHON=${mon_python}
 
 # External LLM server endpoint. The proxy listens on :8080 and forwards here.
-MLX_UPSTREAM=http://127.0.0.1:11234
+MLX_UPSTREAM=${mlx_upstream}
 MLX_PROXY_STRICT_MODEL=false
 
 MLX_NET_IFACE=
@@ -1962,7 +1968,7 @@ Clean & Reinstall options:
   -y, --yes, -f, --force   skip confirmation prompt
 
 Setup-edge arguments:
-  ./scripts/deploy.sh setup-edge <central_ip> [model_id] [model_path]
+  ./scripts/deploy.sh setup-edge <central_ip> [model_id] [model_path] [mlx_upstream]
   If arguments are omitted, the script asks interactively.
 
 Edge arguments:
