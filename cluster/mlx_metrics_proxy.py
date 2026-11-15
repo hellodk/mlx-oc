@@ -1637,6 +1637,8 @@ def main():
     # instead of "No data" until the first tool call / hallucination flag.
     TOOL_CALLS.labels(model=MODEL_DEFAULT, kind="", tool="", type="").inc(0)
     FLAGS.labels(model=MODEL_DEFAULT).inc(0)
+    ERRORS.labels(model=MODEL_DEFAULT, status="500", kind="chat").inc(0)
+    PROMPT_CACHED.labels(model=MODEL_DEFAULT, kind="chat").inc(0)
     _NODE_NAME = args.node_name
     _OTEL = _setup_otel(
         args.otlp_endpoint, args.node_name, opik_otlp_endpoint=args.opik_otlp_endpoint

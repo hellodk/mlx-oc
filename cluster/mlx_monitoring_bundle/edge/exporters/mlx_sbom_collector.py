@@ -118,6 +118,18 @@ G_SBOM_DRIFT_DIFF = Gauge(
     ["base", "target", "package", "base_version", "target_version", "ecosystem", "path"],
     registry=REGISTRY,
 )
+G_SBOM_DEVICE_DRIFT_SUMMARY = Gauge(
+    "mac_sbom_device_drift_summary",
+    "Summary table of fleet device drift state against baseline",
+    ["device", "base", "status"],
+    registry=REGISTRY,
+)
+G_SBOM_DRIFT_DETAILS = Gauge(
+    "mac_sbom_drift_details",
+    "Granular package delta details against baseline",
+    ["device", "base", "package", "base_version", "target_version", "ecosystem", "path"],
+    registry=REGISTRY,
+)
 
 _SCAN_LOCK = threading.Lock()
 _CURRENT_INVENTORY: List[Dict[str, Any]] = []
@@ -505,6 +517,7 @@ def collect_and_update_metrics(node_name: str, base_device: str) -> None:
     status, mismatch_cnt, missing_cnt, diffs = _evaluate_drift(node_name, base_device, all_items)
 
     G_SBOM_DRIFT_STATUS.labels(device=node_name, base=base_device, status=status).set(1.0)
+    G_SBOM_DEVICE_DRIFT_SUMMARY.labels(device=node_name, base=base_device, status=status).set(1.0)
     G_SBOM_DRIFT_MISMATCH_COUNT.labels(device=node_name, base=base_device).set(mismatch_cnt)
     G_SBOM_MISSING_PACKAGE_COUNT.labels(device=node_name, base=base_device).set(missing_cnt)
 
@@ -512,6 +525,15 @@ def collect_and_update_metrics(node_name: str, base_device: str) -> None:
         G_SBOM_DRIFT_DIFF.labels(
             base=base_device,
             target=node_name,
+            package=d["package"],
+            base_version=d["base_version"],
+            target_version=d["target_version"],
+            ecosystem=d["ecosystem"],
+            path=d["path"],
+        ).set(1.0)
+        G_SBOM_DRIFT_DETAILS.labels(
+            device=node_name,
+            base=base_device,
             package=d["package"],
             base_version=d["base_version"],
             target_version=d["target_version"],

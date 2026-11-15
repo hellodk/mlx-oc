@@ -1104,8 +1104,7 @@ class Proxy(BaseHTTPRequestHandler):
             TOKENS_COMPLETION.labels(model, kind).inc(comp_tokens)
             if usage:
                 cached = int((usage.get("prompt_tokens_details") or {}).get("cached_tokens", 0))
-                if cached > 0:
-                    PROMPT_CACHED.labels(model, kind).inc(cached)
+                PROMPT_CACHED.labels(model, kind).inc(cached)
                 if prompt_tokens > 0:
                     PROMPT_CACHE_RATIO.labels(model=model).set(
                         min(1.0, cached / float(prompt_tokens))
@@ -1501,6 +1500,8 @@ def main():
 
     TOOL_CALLS.labels(model=_MODEL_NAME or "unknown", kind="", tool="", type="").inc(0)
     FLAGS.labels(model=_MODEL_NAME or "unknown").inc(0)
+    ERRORS.labels(model=_MODEL_NAME or "unknown", status="500", kind="chat").inc(0)
+    PROMPT_CACHED.labels(model=_MODEL_NAME or "unknown", kind="chat").inc(0)
     _NODE_NAME = args.node_name
     _OTEL = _setup_otel(
         args.otlp_endpoint, args.node_name, opik_otlp_endpoint=args.opik_otlp_endpoint
