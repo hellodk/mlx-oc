@@ -24,6 +24,7 @@ No Prometheus scraping — devices initiate all outbound connections.
    - [Proxy (`mlx_metrics_proxy.py`)](#proxy-mlx_metrics_proxypy)
    - [Hardware Telemetry (`mlx_hw_telemetry.py`)](#hardware-telemetry-mlx_hw_telemetry-py)
    - [KV Cache Agent (`mlx_kv_cache_agent.py`)](#kv-cache-agent-mlx_kv_cache_agentpy)
+   - [Passive Server Observer (`mlx_server_supervisor.py`)](#passive-server-observer-mlx_server_supervisorpy)
    - [Log Tailer (`mlx_server_log_tailer.py`)](#log-tailer-mlx_server_log_tailer-py)
    - [Node Validator (`validate_nodes.py`)](#node-validator-validate_nodespy)
    - [Node Discovery (`discover_nodes.py`)](#node-discovery-discover_nodespy)
@@ -60,7 +61,8 @@ on the device.
 │  mlx_metrics_proxy      :8080  ─────┼─────▶│  otel-collector        :4318 (OTLP)    │
 │  mlx_hw_telemetry       :9102  ─────┼─────▶│  victoria-metrics      :8428 (remote)  │
 │  mlx_kv_cache_agent     :9104  ─────┼─────▶│                                                    │
-│  mlx_server_log_tailer  :9106  ─────┼─────▶│  grafana               :3000           │
+│  mlx_server_supervisor  :9105  ─────┼─────▶│  grafana               :3000           │
+│  mlx_server_log_tailer  :9106  ─────┼─────▶│  vmalert + alertmanager                  │
 │                                     │      │  opik server + postgres + clickhouse   │
 │  vmagent (optional sidecar)         │      │                                          │
 │  scrapes localhost:8080-9106        │      │                                          │
@@ -88,6 +90,7 @@ on the device.
 | `mlx_metrics_proxy` | 8080 | OpenAI-compatible proxy in front of `mlx_lm.server`; emits Prometheus metrics + OTLP traces + Opik traces |
 | `mlx_hw_telemetry` | 9102 | CPU/memory/disk/GPU power/thermal/network telemetry |
 | `mlx_kv_cache_agent` | 9104 | KV-cache utilization, context length, KV bytes/token |
+| `mlx_server_supervisor` | 9105 | Passive, read-only `mlx_lm.server` health, process/PID-restart, and crash-log observer |
 | `mlx_server_log_tailer` | 9106 | Tails `server.log`, classifies lines, ships to OTLP |
 | `vmagent` | (sidecar) | Scrapes localhost exporters, remote_writes to central VictoriaMetrics |
 | `otel-collector` | 4318 | Receives OTLP traces/logs from devices |
@@ -112,6 +115,7 @@ cluster/mlx_monitoring_bundle/
 │   │   ├── mlx_metrics_proxy.py                   # :8080 Proxy + Prometheus + OTLP + Opik
 │   │   ├── mlx_hw_telemetry.py                    # :9102 Hardware telemetry
 │   │   ├── mlx_kv_cache_agent.py                  # :9104 KV-cache + context metrics
+│   │   ├── mlx_server_supervisor.py               # :9105 Passive server health/process observer
 │   │   └── mlx_server_log_tailer.py               # :9106 server.log → OTLP logs
 │   ├── vmagent-edge/
 │   │   └── vmagent.yml                            # vmagent scrape config (template vars)
@@ -185,6 +189,7 @@ model ids stay stable.
 ENABLE_PROXY=true
 ENABLE_HW_TELEMETRY=true
 ENABLE_KV_AGENT=true
+ENABLE_SERVER_MONITOR=true
 ENABLE_LOGTAILER=true
 ENABLE_VMAGENT=true
 
@@ -192,6 +197,7 @@ ENABLE_VMAGENT=true
 PROXY_LISTEN=0.0.0.0:8080
 HW_LISTEN=0.0.0.0:9102
 KV_LISTEN=0.0.0.0:9104
+SUPERVISOR_LISTEN=0.0.0.0:9105
 LOGTAILER_LISTEN=0.0.0.0:9106
 
 # Proxy guardrails
@@ -370,6 +376,23 @@ Metrics:
 `/v1/models` discovery fails, model-specific gauges are set to 0 and a
 `[degraded]` log is emitted. Throughput and other metrics continue unaffected.
 
+### Passive Server Observer (`mlx_server_supervisor.py`)
+
+Passively monitors an externally run or externally supervised (`launchd`/`systemd`)
+`mlx_lm.server` — **never** starts, stops, kills, or restarts the server.
+
+- Probes `MLX_UPSTREAM/v1/models` to distinguish "process alive" from "serving ready"
+- Tracks local process PID/uptime and counts PID-change restarts (`mlx_server_restarts_total`)
+- Optionally reads exit codes from `MLX_LAUNCHD_LABEL` / `MLX_SYSTEMD_UNIT`
+- Sniffs `server.log` tail on stop/restart to classify crashes (`metal_gpu_error`, `oom`, `python_error`, `exit`, `unknown`)
+
+Metrics:
+- `mlx_server_state` (0=down, 1=running_ready, 2=up_not_ready, 3=backoff)
+- `mlx_server_up` / `mlx_server_ready` / `mlx_model_loaded`
+- `mlx_server_restarts_total`, `mlx_server_crashes_total{reason}`
+- `mlx_server_uptime_seconds`, `mlx_server_last_exit_code`
+- `mlx_server_health_checks_total{result}`, `mlx_server_backoff_seconds`
+
 ### Log Tailer (`mlx_server_log_tailer.py`)
 
 Tails `server.log` incrementally, classifies each line via regex table into
@@ -454,6 +477,10 @@ into a single firing alert.
 | `MLXLoadHigh` | warning | load15 > 90% CPU count |
 | `MLXMemoryPressureHigh` | warning | Free pages < 2% RAM |
 | `MLXDiskFull` | warning | Disk > 85% full |
+| `MLXServerDown` | critical | `mlx_server_up == 0` |
+| `MLXServerNotReady` | warning | Up but `/v1/models` failing |
+| `MLXModelNotLoaded` | warning | Model gauge == 0 |
+| `MLXServerCrashLooping` | critical | ≥3 restarts in 15 min |
 | `MLXProxyDown` | critical | `mlx_up == 0` |
 | `MLXUpstreamDown` | critical | Proxy up but upstream unreachable |
 | `MLXThroughputDrop` | warning | < 0.1 req/s for 15 min |
@@ -666,7 +693,7 @@ When you deploy the monitoring stack and find that **no data is being populated 
 The Doctor executes a 5-stage telemetry traceroute that isolates the failure domain in seconds:
 
 1. **Stage 1 (Central TSDB Ingestion Gate)**: Checks TCP reachability, HTTP `/health`, and total active time-series count in VictoriaMetrics. If this fails, the central TSDB is stopped or unreachable.
-2. **Stage 2 (Edge Telemetry Ingestion Gate)**: Queries VictoriaMetrics for live `up{macbook="<node_id>"}` gauges across the edge exporters (`mlx-proxy`, `mlx-hw`, `mlx-kv`, `mlx-logtailer`) and measures sample recency (`time() - max(timestamp(up))`). If samples are >60s old or missing, vmagent on that edge Mac is down or blocked by network/firewall.
+2. **Stage 2 (Edge Telemetry Ingestion Gate)**: Queries VictoriaMetrics for live `up{macbook="<node_id>"}` gauges across the edge exporters (`mlx-proxy`, `mlx-hw`, `mlx-kv`, `mlx-supervisor`, `mlx-logtailer`) and measures sample recency (`time() - max(timestamp(up))`). If samples are >60s old or missing, vmagent on that edge Mac is down or blocked by network/firewall.
 3. **Stage 3 (Alerting & Rule Engine Gate)**: Verifies `vmalert` rule execution and `alertmanager` notification routing.
 4. **Stage 4 (Logs & Traces Ingestion Gate)**: Verifies OTLP HTTP receiver (`:4318`) and Opik Gateway (`:32173`).
 5. **Stage 5 (Grafana & Query Pipeline Gate)**: Validates Grafana HTTP health, credentials/auth, VictoriaMetrics datasource registration, and executes an active datasource proxy query (`count(up)`).

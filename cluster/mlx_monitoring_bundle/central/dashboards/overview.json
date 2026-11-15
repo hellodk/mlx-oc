@@ -187,7 +187,7 @@
     },
     {
       "type": "graph",
-      "title": "Proxy / Upstream Up by Device",
+      "title": "Server Up / Ready by Device",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 12,
@@ -197,13 +197,13 @@
       },
       "targets": [
         {
-          "expr": "up{job=\"mlx-proxy\", device=~\"$device\"}",
-          "legendFormat": "{{device}} proxy",
+          "expr": "mlx_server_up{device=~\"$device\"}",
+          "legendFormat": "{{device}} up",
           "refId": "A"
         },
         {
-          "expr": "mlx_up{device=~\"$device\"}",
-          "legendFormat": "{{device}} upstream",
+          "expr": "mlx_server_ready{device=~\"$device\"}",
+          "legendFormat": "{{device}} ready",
           "refId": "B"
         }
       ],

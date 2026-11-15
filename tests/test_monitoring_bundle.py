@@ -53,7 +53,7 @@ def test_vmagent_yaml_rendering():
     assert data["global"]["external_labels"]["device"] == "test-mac"
     assert data["global"]["external_labels"]["macbook"] == "test-mac"
     assert data["global"]["external_labels"]["serial"] == "SERIAL12345"
-    assert len(data["scrape_configs"]) == 6
+    assert len(data["scrape_configs"]) == 7
 
 
 def test_vmagent_yaml_rendering_with_defaults():
@@ -111,6 +111,7 @@ def test_vmalert_rules_validity():
     alerts = [r["alert"] for g in data["groups"] for r in g.get("rules", []) if "alert" in r]
     assert "MLXDeviceSilent" in alerts
     assert "MLXMacbookSilent" in alerts
+    assert "MLXServerCrashLooping" in alerts
     assert "MLXHardwareExporterDown" in alerts
     assert "MLXMemoryPressureHigh" in alerts
 
@@ -119,9 +120,11 @@ def test_exporter_listen_defaults_are_local():
     """Verify standalone exporter scripts default to 127.0.0.1 for security."""
     from mlx_hw_telemetry import LISTEN_DEFAULT as hw_listen
     from mlx_kv_cache_agent import LISTEN_DEFAULT as kv_listen
+    from mlx_server_supervisor import LISTEN_DEFAULT as sup_listen
 
     assert hw_listen.startswith("127.0.0.1:"), f"hw_telemetry should bind to 127.0.0.1 by default, got {hw_listen}"
     assert kv_listen.startswith("127.0.0.1:"), f"kv_cache_agent should bind to 127.0.0.1 by default, got {kv_listen}"
+    assert sup_listen.startswith("127.0.0.1:"), f"supervisor should bind to 127.0.0.1 by default, got {sup_listen}"
 
 
 def test_no_magic_container_domains():
@@ -182,6 +185,7 @@ def test_vmagent_custom_listen_ports_rendering():
         "PROXY_LISTEN": "127.0.0.1:18080",
         "HW_LISTEN": "127.0.0.1:19102",
         "KV_LISTEN": "127.0.0.1:19104",
+        "SUPERVISOR_LISTEN": "127.0.0.1:19105",
         "LOGTAILER_LISTEN": "127.0.0.1:19106",
         "PROCESS_LISTEN": "127.0.0.1:19107",
         "SBOM_LISTEN": "127.0.0.1:19108",
@@ -202,6 +206,7 @@ def test_vmagent_custom_listen_ports_rendering():
     assert targets["mlx-proxy"] == "127.0.0.1:18080"
     assert targets["mlx-hw"] == "127.0.0.1:19102"
     assert targets["mlx-kv"] == "127.0.0.1:19104"
+    assert targets["mlx-supervisor"] == "127.0.0.1:19105"
     assert targets["mlx-logtailer"] == "127.0.0.1:19106"
     assert targets["mlx-process"] == "127.0.0.1:19107"
     assert targets["mlx-sbom"] == "127.0.0.1:19108"
@@ -972,7 +977,7 @@ def test_sbom_collector_inventory_and_drift():
 
 
 def test_dashboards_json_validity():
-    """Verify all 16 production dashboards parse cleanly, contain deterministic UIDs, and have header links."""
+    """Verify all 17 production dashboards parse cleanly, contain deterministic UIDs, and have header links."""
     dashboards_dir = BUNDLE_DIR / "central" / "dashboards"
     expected = {
         "alerts.json": "mlx-alerts",
@@ -990,6 +995,7 @@ def test_dashboards_json_validity():
         "quality.json": "mlx-quality",
         "sbom-drift.json": "mlx-sbom-drift",
         "sbom-inventory.json": "mlx-sbom-inventory",
+        "serving.json": "mlx-serving",
         "slo.json": "mlx-slo",
     }
     for fname, expected_uid in expected.items():
@@ -1001,6 +1007,53 @@ def test_dashboards_json_validity():
         assert len(data.get("panels", [])) > 0
         assert len(data.get("links", [])) > 0, f"Dashboard {fname} missing header drill-down links"
         assert "mlx" in data.get("tags", []), f"Dashboard {fname} missing 'mlx' tag for dynamic discovery"
+
+
+def test_passive_server_observer_never_spawns_and_tracks_restarts(tmp_path, monkeypatch):
+    """Verify mlx_server_supervisor.py is strictly passive and tracks PID-change restarts."""
+    import argparse
+    import mlx_server_supervisor as sup
+
+    source = (EDGE_DIR / "exporters" / "mlx_server_supervisor.py").read_text(encoding="utf-8")
+    assert "subprocess.Popen" not in source
+    assert "os.kill" not in source
+
+    log_file = tmp_path / "server.log"
+    log_file.write_text("[METAL] Command buffer execution failed\n", encoding="utf-8")
+
+    args = argparse.Namespace(
+        listen="127.0.0.1:9105",
+        health="http://127.0.0.1:11234/v1/models",
+        model="Qwen3.5-4B",
+        server_log=str(log_file),
+        process_pattern="mlx_lm.server",
+        launchd_label="",
+        systemd_unit="",
+        probe_interval=5.0,
+    )
+    obs = sup.PassiveServerObserver(args)
+
+    # 1. Process alive (pid 101) and serving Qwen3.5-4B
+    monkeypatch.setattr(sup, "find_server_process", lambda _pat: (101, 12.0))
+    monkeypatch.setattr(obs, "_probe_health", lambda: (True, ["Qwen3.5-4B"]))
+    obs.poll_once()
+    assert sup.G_UP._value.get() == 1
+    assert sup.G_READY._value.get() == 1
+    assert sup.G_STATE._value.get() == 1
+    assert sup.G_MODEL.labels(model="Qwen3.5-4B")._value.get() == 1
+
+    # 2. External supervisor restarted process (new pid 202), not yet ready
+    restarts_before = sup.G_RESTARTS._value.get()
+    crashes_before = sup.G_CRASHES.labels(reason="metal_gpu_error")._value.get()
+    monkeypatch.setattr(sup, "find_server_process", lambda _pat: (202, 1.0))
+    monkeypatch.setattr(obs, "_probe_health", lambda: (False, []))
+    obs.poll_once()
+    assert sup.G_RESTARTS._value.get() == restarts_before + 1
+    assert sup.G_CRASHES.labels(reason="metal_gpu_error")._value.get() == crashes_before + 1
+    assert sup.G_UP._value.get() == 1
+    assert sup.G_READY._value.get() == 0
+    assert sup.G_STATE._value.get() == 2
+
 
 
 

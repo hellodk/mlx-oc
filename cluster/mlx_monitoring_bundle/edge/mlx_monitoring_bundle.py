@@ -18,6 +18,7 @@ Components:
   - mlx_metrics_proxy.py     :8080  OpenAI proxy + Prometheus + OTLP + Opik
   - mlx_hw_telemetry.py      :9102  hardware telemetry
   - mlx_kv_cache_agent.py    :9104  KV-cache + context-length gauges
+  - mlx_server_supervisor.py :9105  passive mlx_lm.server health/process observer
   - mlx_server_log_tailer.py :9106  server.log tailer -> OTLP logs
 
 Push-only model: the edge initiates all outbound connections. No inbound
@@ -256,6 +257,7 @@ class Bundle:
         self.enable_proxy = config.get("ENABLE_PROXY", "true").lower() == "true"
         self.enable_hw = config.get("ENABLE_HW_TELEMETRY", "true").lower() == "true"
         self.enable_kv = config.get("ENABLE_KV_AGENT", "true").lower() == "true"
+        self.enable_server_monitor = config.get("ENABLE_SERVER_MONITOR", "true").lower() == "true"
         self.enable_logtailer = config.get("ENABLE_LOGTAILER", "true").lower() == "true"
         self.enable_process = config.get("ENABLE_PROCESS_PROFILER", "true").lower() == "true"
         self.enable_sbom = config.get("ENABLE_SBOM_COLLECTOR", "true").lower() == "true"
@@ -434,6 +436,7 @@ class Bundle:
                 "PROXY_LISTEN": config_val(self.config, "PROXY_LISTEN", "127.0.0.1:8080"),
                 "HW_LISTEN": config_val(self.config, "HW_LISTEN", "127.0.0.1:9102"),
                 "KV_LISTEN": config_val(self.config, "KV_LISTEN", "127.0.0.1:9104"),
+                "SUPERVISOR_LISTEN": config_val(self.config, "SUPERVISOR_LISTEN", "127.0.0.1:9105"),
                 "LOGTAILER_LISTEN": config_val(self.config, "LOGTAILER_LISTEN", "127.0.0.1:9106"),
                 "PROCESS_LISTEN": config_val(self.config, "PROCESS_LISTEN", "127.0.0.1:9107"),
                 "SBOM_LISTEN": config_val(self.config, "SBOM_LISTEN", "127.0.0.1:9108"),
@@ -498,9 +501,34 @@ class Bundle:
         write_pid(self.pid_dir / "vmagent.pid", p.pid)
         info(f"started vmagent (pid={p.pid})", component="bundle")
 
+    def start_server_monitor(self):
+        if not self.enable_server_monitor:
+            return
+        health_url = config_val(
+            self.config,
+            "MLX_HEALTH_URL",
+            f"{self.upstream_url.rstrip('/')}/v1/models",
+        )
+        cmd = [
+            self.venv_python, "mlx_server_supervisor.py",
+            "--listen", config_val(self.config, "SUPERVISOR_LISTEN", "127.0.0.1:9105"),
+            "--health", health_url,
+            "--model", self.model or "",
+            "--server-log", config_val(self.config, "MLX_SERVER_LOG", str(self.exporter_log_dir / "server.log")),
+            "--process-pattern", config_val(self.config, "MLX_PROCESS_PATTERN", "mlx_lm.server"),
+            "--probe-interval", config_val(self.config, "SUPERVISOR_PROBE_INTERVAL", "5"),
+        ]
+        launchd_label = config_val(self.config, "MLX_LAUNCHD_LABEL", "")
+        if launchd_label:
+            cmd += ["--launchd-label", launchd_label]
+        systemd_unit = config_val(self.config, "MLX_SYSTEMD_UNIT", "")
+        if systemd_unit:
+            cmd += ["--systemd-unit", systemd_unit]
+        self._spawn("supervisor", cmd)
+
     def status(self) -> dict:
         pids = {}
-        for name in ["logtailer", "kv", "hw", "proxy", "process", "sbom", "vmagent"]:
+        for name in ["supervisor", "logtailer", "kv", "hw", "proxy", "process", "sbom", "vmagent"]:
             pfile = self.pid_dir / f"{name}.pid"
             pids[name] = read_pid(pfile)
         return {
@@ -528,7 +556,7 @@ class Bundle:
                     os.kill(bp, signal.SIGTERM)
                 except Exception as exc2:
                     debug(f"kill bundle failed: {exc2!r}", component="bundle")
-        for name in ["logtailer", "kv", "hw", "proxy", "process", "sbom", "vmagent"]:
+        for name in ["supervisor", "logtailer", "kv", "hw", "proxy", "process", "sbom", "vmagent"]:
             pfile = self.pid_dir / f"{name}.pid"
             pid = read_pid(pfile)
             if pid:
@@ -562,6 +590,8 @@ class Bundle:
             debug(f"os.setsid failed: {exc!r}", component="bundle")
 
         started = []
+        if self.enable_server_monitor:
+            self.start_server_monitor(); started.append("supervisor:9105")
         if self.enable_kv:
             self.start_kv(); started.append("kv:9104")
         if self.enable_logtailer:

@@ -147,6 +147,78 @@ groups:
           full disk will break downloads and KV cache.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#disk-full"
 
+  - name: mlx.serving
+    rules:
+    - alert: MLXServerDown
+      expr: mlx_server_up == 0
+      for: 3m
+      labels:
+        severity: critical
+        category: serving
+      annotations:
+        summary: "mlx_lm.server down on {{ $labels.device }}"
+        description: |
+          mlx_server_up is 0 on Device {{ $labels.device }} (serial
+          {{ $labels.serial }}). The supervisor may be restarting it; check
+          mlx_server_state and mlx_server_last_exit_code on :9105/metrics.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#server-down"
+
+    - alert: MLXServerNotReady
+      expr: mlx_server_ready == 0 and mlx_server_up == 1
+      for: 5m
+      labels:
+        severity: warning
+        category: serving
+      annotations:
+        summary: "mlx_lm.server not serving on {{ $labels.device }}"
+        description: |
+          Process is alive but /v1/models is not returning 200 on Device
+          {{ $labels.device }} ({{ $labels.node }}). The model may still be
+          loading or the server may be hung.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#server-not-ready"
+
+    - alert: MLXModelNotLoaded
+      expr: mlx_model_loaded == 0 and mlx_server_up == 1
+      for: 10m
+      labels:
+        severity: warning
+        category: serving
+      annotations:
+        summary: "Model not loaded on {{ $labels.device }}"
+        description: |
+          Server is ready but mlx_model_loaded is 0 for model {{ $labels.model }}
+          on Device {{ $labels.device }}. The health probe never observed the
+          model being served.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#model-not-loaded"
+
+    - alert: MLXServerCrashLooping
+      expr: increase(mlx_server_restarts_total[15m]) >= 3
+      labels:
+        severity: critical
+        category: serving
+      annotations:
+        summary: "mlx_lm.server crash-looping on {{ $labels.device }}"
+        description: |
+          mlx_lm.server restarted {{ $value }} times in 15 minutes on Device
+          {{ $labels.device }} ({{ $labels.node }}). Last reason:
+          {{ $labels.mlx_server_last_crash_reason }}. Check server.log for the
+          crash reason.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#crash-looping"
+
+    - alert: MLXServerHung
+      expr: mlx_server_state == 2 and mlx_server_up == 1
+      for: 30s
+      labels:
+        severity: warning
+        category: serving
+      annotations:
+        summary: "Server health degraded on {{ $labels.device }}"
+        description: |
+          mlx_lm.server is alive but not serving (/v1/models failing) on Device
+          {{ $labels.device }} ({{ $labels.node }}). The keep-alive watchdog
+          will kill and restart it after --hang-after seconds.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#server-hung"
+
   - name: mlx.inference
     rules:
     - alert: MLXProxyDown

@@ -127,7 +127,7 @@
           },
           "targets": [
             {
-              "expr": "mlx_up{device=~\"$device\"}",
+              "expr": "mlx_server_state{device=~\"$device\"}",
               "legendFormat": "{{device}}",
               "refId": "A"
             }
@@ -135,13 +135,13 @@
           "fieldConfig": {
             "defaults": {
               "min": 0,
-              "max": 1
+              "max": 3
             }
           }
         },
         {
           "type": "graph",
-          "title": "Proxy / Upstream Up",
+          "title": "Server Ready / Up",
           "datasource": "VictoriaMetrics",
           "gridPos": {
             "x": 8,
@@ -151,20 +151,20 @@
           },
           "targets": [
             {
-              "expr": "up{job=\"mlx-proxy\", device=~\"$device\"}",
-              "legendFormat": "{{device}} proxy",
+              "expr": "mlx_server_up{device=~\"$device\"}",
+              "legendFormat": "{{device}} up",
               "refId": "A"
             },
             {
-              "expr": "mlx_up{device=~\"$device\"}",
-              "legendFormat": "{{device}} upstream",
+              "expr": "mlx_server_ready{device=~\"$device\"}",
+              "legendFormat": "{{device}} ready",
               "refId": "B"
             }
           ]
         },
         {
           "type": "graph",
-          "title": "KV Agent Scrape Up",
+          "title": "Model Loaded",
           "datasource": "VictoriaMetrics",
           "gridPos": {
             "x": 16,
@@ -174,8 +174,8 @@
           },
           "targets": [
             {
-              "expr": "up{job=\"mlx-kv\", device=~\"$device\"}",
-              "legendFormat": "{{device}} kv",
+              "expr": "mlx_model_loaded{device=~\"$device\"}",
+              "legendFormat": "{{device}} {{model}}",
               "refId": "A"
             }
           ]

@@ -187,7 +187,7 @@ def main() -> int:
                 errors.append(f"{module} is not importable in {venv_python}")
 
     if args.check_ports:
-        for port in (8080, 9102, 9104, 9106):
+        for port in (8080, 9102, 9104, 9105, 9106):
             if not port_free(port):
                 warnings.append(f"port {port} is already in use")
 

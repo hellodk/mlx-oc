@@ -604,6 +604,7 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
             ("mlx-proxy", cfg["edge_env"].get("PROXY_LISTEN", "127.0.0.1:8080"), "/metrics"),
             ("mlx-hw", cfg["edge_env"].get("HW_LISTEN", "127.0.0.1:9102"), "/metrics"),
             ("mlx-kv", cfg["edge_env"].get("KV_LISTEN", "127.0.0.1:9104"), "/metrics"),
+            ("mlx-supervisor", cfg["edge_env"].get("SUPERVISOR_LISTEN", "127.0.0.1:9105"), "/metrics"),
             ("mlx-logtailer", cfg["edge_env"].get("LOGTAILER_LISTEN", "127.0.0.1:9106"), "/metrics"),
             ("mlx-process", cfg["edge_env"].get("PROCESS_LISTEN", "127.0.0.1:9107"), "/metrics"),
             ("mlx-sbom", cfg["edge_env"].get("SBOM_LISTEN", "127.0.0.1:9108"), "/metrics"),

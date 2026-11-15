@@ -323,6 +323,7 @@ cmd_setup_edge() {
 ENABLE_PROXY=true
 ENABLE_HW_TELEMETRY=true
 ENABLE_KV_AGENT=true
+ENABLE_SERVER_MONITOR=true
 ENABLE_LOGTAILER=true
 ENABLE_VMAGENT=true
 
@@ -500,6 +501,7 @@ targets = [
     ('mlx-proxy', env.get('PROXY_LISTEN', '127.0.0.1:8080'), '/metrics'),
     ('mlx-hw', env.get('HW_LISTEN', '127.0.0.1:9102'), '/metrics'),
     ('mlx-kv', env.get('KV_LISTEN', '127.0.0.1:9104'), '/metrics'),
+    ('mlx-supervisor', env.get('SUPERVISOR_LISTEN', '127.0.0.1:9105'), '/metrics'),
     ('mlx-logtailer', env.get('LOGTAILER_LISTEN', '127.0.0.1:9106'), '/metrics'),
 ]
 target_rows = []
