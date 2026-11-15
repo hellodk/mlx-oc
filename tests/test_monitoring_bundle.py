@@ -2,7 +2,6 @@ import importlib
 import json
 import os
 import re
-import shlex
 import sys
 from pathlib import Path
 import pytest
@@ -1092,10 +1091,28 @@ def test_passive_server_observer_helpers_and_main(monkeypatch):
     assert sup._parse_etime("02:03:04") == 7384.0
     assert sup._parse_etime("01-02:03:04") == 93784.0
 
-    # _cmdline_matches avoids grep/tail collisions
-    assert sup._cmdline_matches(["python3", "-m", "mlx_lm.server", "--port", "8000"], "python3 -m mlx_lm.server --port 8000", "mlx_lm.server")
-    assert not sup._cmdline_matches(["grep", "mlx_lm.server", "server.log"], "grep mlx_lm.server server.log", "mlx_lm.server")
-    assert not sup._cmdline_matches(["tail", "-f", "/var/log/mlx_lm.server.log"], "tail -f /var/log/mlx_lm.server.log", "mlx_lm.server")
+    # _cmdline_matches avoids grep/tail collisions and supports versioned python
+    assert sup._cmdline_matches(
+        ["python3", "-m", "mlx_lm.server", "--port", "8000"],
+        "python3 -m mlx_lm.server --port 8000",
+        "mlx_lm.server",
+    )
+    assert sup._cmdline_matches(
+        ["/venv/bin/python3.12", "/opt/mlx_lm.server"],
+        "/venv/bin/python3.12 /opt/mlx_lm.server",
+        "mlx_lm.server",
+    )
+    assert not sup._cmdline_matches(
+        ["grep", "mlx_lm.server", "server.log"],
+        "grep mlx_lm.server server.log",
+        "mlx_lm.server",
+    )
+    assert not sup._cmdline_matches(
+        ["tail", "-f", "/var/log/mlx_lm.server.log"],
+        "tail -f /var/log/mlx_lm.server.log",
+        "mlx_lm.server",
+    )
+    assert sup._model_in_served("Qwen3.5-4B", ["/Users/dk/models/Qwen3.5-4B"])
 
     # Remote upstream (pid=None) tracks restarts + hysteresis tolerates transient failures
     obs = sup.PassiveServerObserver(argparse.Namespace(
@@ -1116,14 +1133,43 @@ def test_passive_server_observer_helpers_and_main(monkeypatch):
     assert sup.G_UP._value.get() == 1
     assert obs.had_initial_contact is True
 
-    # Remote goes down then recovers -> G_RESTARTS increments even when pid is None
+    # 1st transient failure tolerated by hysteresis (fail_threshold=2)
     restarts_before = sup.G_RESTARTS._value.get()
     monkeypatch.setattr(obs, "_probe_health", lambda: (False, []))
+    obs.poll_once()
+    assert sup.G_UP._value.get() == 1
+    # 2nd consecutive failure transitions DOWN; recovery increments G_RESTARTS
     obs.poll_once()
     assert sup.G_UP._value.get() == 0
     monkeypatch.setattr(obs, "_probe_health", lambda: (True, ["m1"]))
     obs.poll_once()
     assert sup.G_RESTARTS._value.get() == restarts_before + 1
+
+    # Transient process-discovery failure with same PID returning does NOT double restart
+    obs_pid = sup.PassiveServerObserver(argparse.Namespace(
+        listen="127.0.0.1:9105",
+        health="http://127.0.0.1:8000/v1/models",
+        model="",
+        server_log="",
+        process_pattern="mlx_lm.server",
+        launchd_label="",
+        systemd_unit="",
+        probe_interval=5.0,
+        health_timeout=10.0,
+        fail_threshold=1,
+    ))
+    monkeypatch.setattr(sup, "find_server_process", lambda _pat: (5000, 10.0))
+    monkeypatch.setattr(obs_pid, "_probe_health", lambda: (True, ["m1"]))
+    obs_pid.poll_once()
+    restarts_before = sup.G_RESTARTS._value.get()
+    monkeypatch.setattr(sup, "find_server_process", lambda _pat: None)
+    monkeypatch.setattr(obs_pid, "_probe_health", lambda: (False, []))
+    obs_pid.poll_once()
+    assert sup.G_UP._value.get() == 0
+    monkeypatch.setattr(sup, "find_server_process", lambda _pat: (5000, 20.0))
+    monkeypatch.setattr(obs_pid, "_probe_health", lambda: (True, ["m1"]))
+    obs_pid.poll_once()
+    assert sup.G_RESTARTS._value.get() == restarts_before
 
     # _probe_health accepts HTTP 200 even when JSON has no "data" list
     class _FakeResp:

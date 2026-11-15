@@ -528,6 +528,8 @@ targets = [
     ('mlx-kv', env.get('KV_LISTEN', '127.0.0.1:9104'), '/metrics'),
     ('mlx-supervisor', env.get('SUPERVISOR_LISTEN', '127.0.0.1:9105'), '/metrics'),
     ('mlx-logtailer', env.get('LOGTAILER_LISTEN', '127.0.0.1:9106'), '/metrics'),
+    ('mlx-process', env.get('PROCESS_LISTEN', '127.0.0.1:9107'), '/metrics'),
+    ('mlx-sbom', env.get('SBOM_LISTEN', '127.0.0.1:9108'), '/metrics'),
 ]
 target_rows = []
 up_count = 0
@@ -1635,7 +1637,7 @@ clean_edge() {
   fi
 
   # 3. Terminate any orphaned listeners on standard edge exporter ports
-  local edge_ports=(8080 9102 9104 9105 9106 8429)
+  local edge_ports=(8080 9102 9104 9105 9106 9107 9108 8429)
   if command -v lsof >/dev/null 2>&1; then
     for port in "${edge_ports[@]}"; do
       local pids

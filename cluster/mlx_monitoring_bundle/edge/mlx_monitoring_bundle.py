@@ -4,7 +4,7 @@ mlx_monitoring_bundle.py
 ========================
 Single entrypoint for the mlx monitoring bundle edge node.
 
-Spawns the five Python exporters as subprocesses and manages the vmagent
+Spawns the Python exporters as subprocesses and manages the vmagent
 sidecar (if containerised). All configuration comes from config/nodes.yml,
 config/edge.env, and environment variables - nothing is hardcoded.
 
@@ -29,9 +29,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import logging
 import os
-import shlex
 import signal
 import socket
 import subprocess
@@ -593,7 +591,8 @@ class Bundle:
 
         started = []
         if self.enable_server_monitor:
-            self.start_server_monitor(); started.append("supervisor:9105")
+            self.start_server_monitor()
+            started.append("supervisor:9105")
         if self.enable_kv:
             self.start_kv(); started.append("kv:9104")
         if self.enable_logtailer:

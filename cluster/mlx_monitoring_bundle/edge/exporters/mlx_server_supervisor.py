@@ -102,6 +102,7 @@ CRASH_REASONS = [
         "metal_gpu_error",
     ),
     (re.compile(r"\b(out of memory|OOM|allocation failed)\b", re.I), "oom"),
+    (re.compile(r"\bkilled(?::\s*9)?\b", re.I), "oom"),
     (
         re.compile(
             r"(Traceback \(most recent call last\):|segmentation fault|SIGABRT|SIGSEGV)",
@@ -202,7 +203,9 @@ def _parse_etime(etime_str: str) -> float:
     return 0.0
 
 
-def _cmdline_matches(cmdline_tokens: list[str], cmdline_str: str, pattern: str) -> bool:
+def _cmdline_matches(
+    cmdline_tokens: list[str], cmdline_str: str, pattern: str
+) -> bool:
     """Match server process without colliding with grep/tail/vim or self."""
     if "mlx_server_supervisor.py" in cmdline_str:
         return False
@@ -211,7 +214,8 @@ def _cmdline_matches(cmdline_tokens: list[str], cmdline_str: str, pattern: str) 
             if tok == "mlx_lm.server" and idx > 0 and cmdline_tokens[idx - 1] == "-m":
                 return True
             if tok.endswith("/mlx_lm.server") or tok == "mlx_lm.server":
-                if idx == 0 or cmdline_tokens[0].endswith(("python", "python3")):
+                exe_name = Path(cmdline_tokens[0]).name if cmdline_tokens else ""
+                if idx == 0 or re.fullmatch(r"python(?:3(?:\.\d+)?)?", exe_name):
                     return True
         return False
     return pattern in cmdline_str
@@ -228,7 +232,10 @@ def find_server_process(pattern: str) -> tuple[int, float] | None:
         now = time.time()
         for proc in psutil.process_iter(["pid", "cmdline", "create_time", "status"]):
             try:
-                pid = int(proc.info["pid"])
+                raw_pid = proc.info.get("pid")
+                if raw_pid is None:
+                    continue
+                pid = int(raw_pid)
                 if pid == self_pid:
                     continue
                 if proc.info.get("status") == psutil.STATUS_ZOMBIE:
@@ -238,11 +245,13 @@ def find_server_process(pattern: str) -> tuple[int, float] | None:
                 if _cmdline_matches(tokens, cmdline, pattern):
                     ct = proc.info.get("create_time") or now
                     return pid, max(0.0, now - float(ct))
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
+            except (psutil.Error, KeyError, TypeError, ValueError):
                 continue
         return None
     except ImportError:
         pass
+    except Exception as exc:
+        debug(f"psutil scan failed, falling back to ps: {exc!r}", component="supervisor")
 
     try:
         out = subprocess.check_output(
@@ -317,6 +326,17 @@ def query_external_supervisor_status(
     return None, None, False
 
 
+def _model_in_served(expected: str, served_models: list[str]) -> bool:
+    """Match expected model id verbatim or by basename of path-qualified ids."""
+    if expected in served_models:
+        return True
+    for sm in served_models:
+        cleaned = sm.rstrip("/")
+        if cleaned.endswith(f"/{expected}") or Path(cleaned).name == expected:
+            return True
+    return False
+
+
 class PassiveServerObserver:
     """Passively monitors an external mlx_lm.server and its supervisor."""
 
@@ -367,11 +387,17 @@ class PassiveServerObserver:
             debug(f"health check failed: {exc!r}", component="supervisor")
         return False, []
 
-    def _record_transition_down(self, exit_code: int | None) -> None:
+    def _record_transition_down(
+        self, exit_code: int | None, sniffed: str
+    ) -> None:
         """Record a stop/crash transition without double-counting clean stops."""
         G_EXIT.set(exit_code if exit_code is not None else -1)
-        sniffed = self.sniffer.sniff_new()
-        is_crash = sniffed != "exit" or (exit_code is not None and exit_code != 0)
+        if exit_code == 0:
+            is_crash = False
+        elif exit_code is not None and exit_code != 0:
+            is_crash = True
+        else:
+            is_crash = sniffed not in ("exit", "unknown")
         if is_crash:
             G_CRASHES.labels(reason=sniffed).inc()
         for reason in KNOWN_REASONS:
@@ -401,8 +427,8 @@ class PassiveServerObserver:
             self.sniffer.advance_to_end()
         else:
             self.consecutive_failures += 1
-            if self.last_ok and self.consecutive_failures < fail_threshold and pid is not None:
-                # Hysteresis: tolerate transient LLM GIL/Metal latency bursts while PID lives
+            if self.last_ok and self.consecutive_failures < fail_threshold:
+                # Hysteresis: tolerate transient LLM GIL/Metal latency bursts
                 ok = True
                 served_models = self.last_served_models
             else:
@@ -410,16 +436,25 @@ class PassiveServerObserver:
         self.last_ok = ok
 
         is_up = (pid is not None) or ok
+        pid_changed = (
+            pid is not None and self.last_pid is not None and pid != self.last_pid
+        )
+        transitioned_down = (pid_changed and self.was_up) or (
+            self.was_up and not is_up
+        )
+        # Perform log disk I/O before acquiring metrics_lock
+        sniffed = self.sniffer.sniff_new() if transitioned_down else "unknown"
 
         with self.metrics_lock:
-            if pid is not None and self.last_pid is not None and pid != self.last_pid:
+            if pid_changed:
                 G_RESTARTS.inc()
                 if self.was_up:
-                    self._record_transition_down(ext_exit)
+                    self._record_transition_down(ext_exit, sniffed)
             elif self.was_up and not is_up:
-                self._record_transition_down(ext_exit)
+                self._record_transition_down(ext_exit, sniffed)
             elif not self.was_up and self.had_initial_contact and is_up:
-                G_RESTARTS.inc()
+                if pid is None or self.last_pid is None or pid != self.last_pid:
+                    G_RESTARTS.inc()
 
             if is_up:
                 self.had_initial_contact = True
@@ -453,7 +488,7 @@ class PassiveServerObserver:
             # Prune stale dynamically-discovered models so unloaded models do not
             # leave permanent MLXModelNotLoaded alerts or leak cardinality.
             for m in list(self.known_models):
-                if m != self.args.model and m not in served_models and ok:
+                if m != self.args.model and not _model_in_served(m, served_models) and ok:
                     self.known_models.discard(m)
                     try:
                         G_MODEL.remove(m)
@@ -462,7 +497,7 @@ class PassiveServerObserver:
             for m in served_models:
                 self.known_models.add(m)
             for m in list(self.known_models):
-                loaded = 1 if (ok and m in served_models) else 0
+                loaded = 1 if (ok and _model_in_served(m, served_models)) else 0
                 G_MODEL.labels(model=m).set(loaded)
 
     def run(self) -> None:
@@ -470,7 +505,7 @@ class PassiveServerObserver:
         with self.metrics_lock:
             G_STATE.set(0)
             G_BACKOFF.set(0)
-            G_EXIT.set(0)
+            G_EXIT.set(-1)
         info(
             f"passive server observer started health={self.args.health} "
             f"pattern={self.args.process_pattern!r}",
@@ -494,7 +529,8 @@ class MetricsHandler(BaseHTTPRequestHandler):
     metrics_lock: threading.Lock = threading.Lock()
 
     def do_GET(self) -> None:
-        if self.path == "/metrics":
+        path = self.path.split("?", 1)[0]
+        if path == "/metrics":
             with self.metrics_lock:
                 body = generate_latest()
             self.send_response(200)
@@ -502,12 +538,15 @@ class MetricsHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
-        elif self.path in ("/health", "/healthz"):
+        elif path in ("/health", "/healthz"):
             self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", "2")
             self.end_headers()
             self.wfile.write(b"ok")
         else:
             self.send_response(404)
+            self.send_header("Content-Length", "0")
             self.end_headers()
 
     def log_message(self, *args: Any, **kwargs: Any) -> None:

@@ -159,8 +159,9 @@ groups:
         summary: "mlx_lm.server down on {{ $labels.device }}"
         description: |
           mlx_server_up is 0 on Device {{ $labels.device }} (serial
-          {{ $labels.serial }}). The supervisor may be restarting it; check
-          mlx_server_state and mlx_server_last_exit_code on :9105/metrics.
+          {{ $labels.serial }}). Check the external supervisor
+          (launchd/systemd), mlx_server_state, and mlx_server_last_exit_code
+          on :9105/metrics.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#server-down"
 
     - alert: MLXServerNotReady
@@ -173,12 +174,12 @@ groups:
         summary: "mlx_lm.server not serving on {{ $labels.device }}"
         description: |
           Process is alive but /v1/models is not returning 200 on Device
-          {{ $labels.device }} ({{ $labels.node }}). The model may still be
+          {{ $labels.device }} ({{ $labels.macbook }}). The model may still be
           loading or the server may be hung.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#server-not-ready"
 
     - alert: MLXModelNotLoaded
-      expr: mlx_model_loaded == 0 and mlx_server_up == 1
+      expr: mlx_model_loaded == 0 and mlx_server_ready == 1
       for: 10m
       labels:
         severity: warning
@@ -200,7 +201,7 @@ groups:
         summary: "mlx_lm.server crash-looping on {{ $labels.device }}"
         description: |
           mlx_lm.server restarted {{ $value }} times in 15 minutes on Device
-          {{ $labels.device }} ({{ $labels.node }}). Query
+          {{ $labels.device }} ({{ $labels.macbook }}). Query
           mlx_server_last_crash_reason{device="{{ $labels.device }}"} == 1
           and check server.log for the crash reason.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#crash-looping"
@@ -215,7 +216,7 @@ groups:
         summary: "Passive server observer down on {{ $labels.device }}"
         description: |
           vmagent cannot scrape mlx_server_supervisor (:9105) on Device
-          {{ $labels.device }} ({{ $labels.node }}). Server up/ready and
+          {{ $labels.device }} ({{ $labels.macbook }}). Server up/ready and
           crash-loop alerts may be stale until the exporter recovers.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#supervisor-down"
 

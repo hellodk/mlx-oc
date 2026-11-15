@@ -101,7 +101,7 @@
       "targets": [
         {
           "expr": "mlx_model_loaded{device=~\"$device\"}",
-          "legendFormat": "{{device}}",
+          "legendFormat": "{{device}} ({{model}})",
           "refId": "A"
         }
       ],

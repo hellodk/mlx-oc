@@ -22,9 +22,12 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import socket
+import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 
@@ -76,8 +79,6 @@ def select_node(data: dict, explicit: str | None) -> dict:
 
 def module_available(python: str, module: str) -> bool:
     try:
-        import subprocess
-
         proc = subprocess.run(
             [python, "-c", f"import {module}"],
             capture_output=True, text=True, timeout=15,
@@ -172,23 +173,35 @@ def main() -> int:
                 errors.append(f"model path does not contain config.json: {cfg}")
 
     venv_python = env.get("VENV_PYTHON", "python3")
-    venv_path = Path(venv_python).expanduser()
-    if not (venv_path.is_file() and os.access(venv_path, os.X_OK)):
-        errors.append(f"VENV_PYTHON is not executable: {venv_path}")
+    venv_candidate = Path(venv_python).expanduser()
+    resolved_venv = (
+        str(venv_candidate)
+        if venv_candidate.is_file() and os.access(venv_candidate, os.X_OK)
+        else (shutil.which(venv_python) or "")
+    )
+    if not resolved_venv:
+        errors.append(f"VENV_PYTHON is not executable: {venv_python}")
     else:
-        print(f"{'VENV_PYTHON':16}: {venv_path}")
+        print(f"{'VENV_PYTHON':16}: {resolved_venv}")
 
     raw_upstream = env.get("MLX_UPSTREAM", "").strip()
     if raw_upstream:
-        from urllib.parse import urlparse
-        parsed_up = urlparse(raw_upstream if "://" in raw_upstream else f"http://{raw_upstream}")
-        if not parsed_up.hostname or any(ch.isspace() for ch in raw_upstream):
+        with_scheme = (
+            raw_upstream if "://" in raw_upstream else f"http://{raw_upstream}"
+        )
+        parsed_up = urlparse(with_scheme)
+        try:
+            _ = parsed_up.port
+            port_ok = True
+        except ValueError:
+            port_ok = False
+        if not parsed_up.hostname or not port_ok or any(ch.isspace() for ch in raw_upstream):
             errors.append(f"MLX_UPSTREAM is invalid: {raw_upstream!r}")
 
-    if Path(venv_python).is_file():
+    if resolved_venv:
         for module in REQUIRED_MODULES:
-            if not module_available(venv_python, module):
-                errors.append(f"{module} is not importable in {venv_python}")
+            if not module_available(resolved_venv, module):
+                errors.append(f"{module} is not importable in {resolved_venv}")
 
     if args.check_ports:
         for port in (8080, 9102, 9104, 9105, 9106, 9107, 9108):

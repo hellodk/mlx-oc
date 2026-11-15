@@ -341,7 +341,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                     })
                     stage2_details.append(f"node {nb_id}: {len(up_jobs)-len(down_jobs)}/{len(up_jobs)} UP ({', '.join(down_jobs)} DOWN)")
                 else:
-                    stage2_details.append(f"node {nb_id}: 5/5 UP (last sample {recency_str})")
+                    stage2_details.append(
+                        f"node {nb_id}: {len(up_jobs)}/{len(up_jobs)} UP (last sample {recency_str})"
+                    )
 
         print(f"[Stage 2/5] Edge Exporters & Nodes   : {stage2_status} ({'; '.join(stage2_details)})")
 
@@ -629,10 +631,14 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
                     details = f"HTTP {h_code}"
 
             disabled_flags = {
+                "mlx-proxy": cfg["edge_env"].get("ENABLE_PROXY", "true").lower() != "true",
+                "mlx-hw": cfg["edge_env"].get("ENABLE_HW_TELEMETRY", "true").lower() != "true",
+                "mlx-kv": cfg["edge_env"].get("ENABLE_KV_AGENT", "true").lower() != "true",
                 "mlx-supervisor": cfg["edge_env"].get(
                     "ENABLE_SERVER_MONITOR",
                     cfg["edge_env"].get("ENABLE_SUPERVISOR", "true"),
                 ).lower() != "true",
+                "mlx-logtailer": cfg["edge_env"].get("ENABLE_LOGTAILER", "true").lower() != "true",
                 "mlx-process": cfg["edge_env"].get("ENABLE_PROCESS_PROFILER", "true").lower() != "true",
                 "mlx-sbom": cfg["edge_env"].get("ENABLE_SBOM_COLLECTOR", "true").lower() != "true",
             }
@@ -671,8 +677,12 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
         parsed_up = urllib.parse.urlparse(raw_upstream if "://" in raw_upstream else f"http://{raw_upstream}")
         srv_scheme = parsed_up.scheme or "http"
         srv_host = parsed_up.hostname or "127.0.0.1"
-        default_port = 443 if srv_scheme == "https" else 80 if "://" in raw_upstream and parsed_up.port is None else 11234
-        srv_port = str(parsed_up.port or default_port)
+        try:
+            parsed_port = parsed_up.port
+        except ValueError:
+            parsed_port = None
+        default_port = 443 if srv_scheme == "https" else 80 if "://" in raw_upstream and parsed_port is None else 11234
+        srv_port = str(parsed_port or default_port)
         srv_path = parsed_up.path.rstrip("/")
         srv_addr = f"{srv_host if is_local else nb_ip}:{srv_port}"
         srv_ok, _ = probe_tcp(srv_addr, timeout=0.5)
@@ -686,6 +696,9 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
                     srv_info = f"serving: {', '.join(m_names)}"
                 except Exception:
                     srv_info = "model endpoint OK"
+            else:
+                srv_ok = False
+                srv_info = f"HTTP {s_code}"
         elif not srv_ok and not is_local:
             vm_up = query_vm(cfg["cvm"], f'(mlx_up{{device="{nb_id}"}} or mlx_up{{macbook="{nb_id}"}})')
             if vm_up and len(vm_up) > 0 and vm_up[0].get("value", [0, "0"])[1] == "1":
