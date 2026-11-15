@@ -68,6 +68,16 @@ CLASSIFIERS = [
         "python",
     ),
     (
+        re.compile(r'"(?:POST|GET|DELETE|PUT)\s+/[^"]*"\s+5\d\d\b'),
+        "error",
+        "http",
+    ),
+    (
+        re.compile(r'"(?:POST|GET|DELETE|PUT)\s+/[^"]*"\s+4\d\d\b'),
+        "warning",
+        "http",
+    ),
+    (
         re.compile(r'"(?:POST|GET|DELETE|PUT)\s+/[^"]*"\s+[123]\d\d\b'),
         "info",
         "http",
@@ -266,6 +276,7 @@ class Tailer:
             self._handle_line(text)
             self._update_queue_gauge()
 
+        initial_open = True
         while not self.stop.is_set():
             if not self.log_path.exists():
                 info(f"{self.log_path} not found; waiting for it",
@@ -281,17 +292,21 @@ class Tailer:
                     cur_inode = (st.st_dev, st.st_ino)
                     partial_buf.clear()
                     partial_started_at = None
-                    if self.backfill:
-                        fh.seek(0, os.SEEK_END)
-                        size = fh.tell()
-                        approx_bytes = self.backfill * 200
-                        if size > approx_bytes:
-                            fh.seek(size - approx_bytes)
-                            fh.readline()
+                    if initial_open:
+                        initial_open = False
+                        if self.backfill:
+                            fh.seek(0, os.SEEK_END)
+                            size = fh.tell()
+                            approx_bytes = self.backfill * 200
+                            if size > approx_bytes:
+                                fh.seek(size - approx_bytes)
+                                fh.readline()
+                            else:
+                                fh.seek(0)
                         else:
-                            fh.seek(0)
+                            fh.seek(0, os.SEEK_END)
                     else:
-                        fh.seek(0, os.SEEK_END)
+                        fh.seek(0)
                     G_UP.set(1)
 
                     while not self.stop.is_set():
@@ -383,7 +398,7 @@ class Tailer:
         severity, category = classify(line)
         G_LINES.labels(severity=severity, category=category).inc()
 
-        if category == "http" and not self.include_http:
+        if category == "http" and severity == "info" and not self.include_http:
             G_DROPPED.labels(reason="http_filter").inc()
             return
         if not self._bucket.take():
@@ -486,6 +501,7 @@ def main():
 
     host, port = parse_listen_addr(args.listen, default_host="0.0.0.0", default_port=9106)
     ThreadingHTTPServer.allow_reuse_address = True
+    ThreadingHTTPServer.address_family = socket.AF_INET6 if ":" in host else socket.AF_INET
     server = ThreadingHTTPServer((host, port), Handler)
 
     def _shutdown(signum, frame):

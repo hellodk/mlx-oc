@@ -22,6 +22,7 @@ import json
 import os
 import re
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -630,6 +631,7 @@ def main() -> None:
     metrics_lock = threading.Lock()
     MetricsHandler.metrics_lock = metrics_lock
     observer = PassiveServerObserver(args, metrics_lock=metrics_lock)
+    _ReusableHTTPServer.address_family = socket.AF_INET6 if ":" in host else socket.AF_INET
     httpd = _ReusableHTTPServer((host, port), MetricsHandler)
 
     shutdown_once = threading.Event()

@@ -526,3 +526,43 @@ def test_streaming_multibyte_utf8_split_across_chunks(stack):
     assert "Hello \U0001f30d" in decoded
     assert "\ufffd" not in decoded
     assert series(metrics(stack), "mlx_requests_total") == before + 1
+
+
+def test_post_metrics_405_transfer_encoding_400_and_cors_headers(stack):
+    """POST /metrics returns 405, Transfer-Encoding returns 400, and OPTIONS allows X-Mlx-Trace."""
+    req_post_metrics = urllib.request.Request(
+        stack + "/metrics",
+        data=b"hello",
+        method="POST",
+    )
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        urllib.request.urlopen(req_post_metrics, timeout=10)
+    assert exc.value.code == 405
+
+    parsed = urlsplit(stack)
+    with socket.create_connection((parsed.hostname, parsed.port), timeout=5) as sock:
+        raw_req = (
+            f"POST /v1/chat/completions HTTP/1.1\r\n"
+            f"Host: {parsed.netloc}\r\n"
+            f"Transfer-Encoding: chunked\r\n"
+            f"Connection: close\r\n\r\n"
+        ).encode()
+        sock.sendall(raw_req)
+        resp = b""
+        while True:
+            chunk = sock.recv(4096)
+            if not chunk:
+                break
+            resp += chunk
+    text = resp.decode("utf-8", "replace")
+    assert text.startswith("HTTP/1.1 400") or text.startswith("HTTP/1.0 400")
+    assert "Transfer-Encoding" in text
+
+    req_opt = urllib.request.Request(
+        stack + "/v1/chat/completions",
+        method="OPTIONS",
+    )
+    with urllib.request.urlopen(req_opt, timeout=10) as r:
+        assert r.status == 204
+        allow_hdrs = r.headers.get("Access-Control-Allow-Headers", "")
+        assert "X-Mlx-Trace" in allow_hdrs

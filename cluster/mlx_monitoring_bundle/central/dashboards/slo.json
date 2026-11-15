@@ -117,7 +117,7 @@
       "targets": [
         {
           "expr": "sum by (device) (rate(mlx_requests_total{device=~\"$device\"}[1h]))",
-          "legendFormat": "{{device}} req/h",
+          "legendFormat": "{{device}} req/s",
           "refId": "A"
         }
       ],

@@ -744,10 +744,20 @@ class Bundle:
                     if name in restart_at:
                         if now >= restart_at[name] and name in spawn_specs:
                             cmd, cwd, env, log_filename = spawn_specs[name]
-                            new_pid = self._spawn_process(name, cmd, cwd, env, log_filename)
-                            proc_started_at[name] = now
-                            restart_at.pop(name, None)
-                            info(f"restarted child process {name} (pid={new_pid})", component="bundle")
+                            try:
+                                new_pid = self._spawn_process(name, cmd, cwd, env, log_filename)
+                                proc_started_at[name] = now
+                                restart_at.pop(name, None)
+                                info(f"restarted child process {name} (pid={new_pid})", component="bundle")
+                            except Exception as exc:
+                                cur_backoff = min(60.0, backoff_s.get(name, 1.0) * 2.0)
+                                backoff_s[name] = cur_backoff
+                                restart_at[name] = now + cur_backoff
+                                error(
+                                    f"failed to respawn child process {name}: {exc!r}; "
+                                    f"retrying in {cur_backoff:.0f}s",
+                                    component="bundle",
+                                )
                         continue
                     rc = proc.poll()
                     if rc is not None:

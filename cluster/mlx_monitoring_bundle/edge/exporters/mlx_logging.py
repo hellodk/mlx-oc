@@ -32,7 +32,6 @@ from urllib.parse import urlparse
 
 BUNDLE_DIR = Path(__file__).resolve().parent
 LOG_DIR = BUNDLE_DIR.parent / "logs"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 SERVICE = os.environ.get("MLX_SERVICE_NAME", "mlx-exporter")
 MACBOOK = os.environ.get("MLX_MACBOOK_ID", "unknown")

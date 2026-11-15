@@ -35,6 +35,7 @@ import os
 from pathlib import Path
 import random
 import re
+import secrets
 import signal
 import socket
 import ssl
@@ -86,7 +87,8 @@ def _make_upstream_conn(
     else:
         scheme, host, port, _ = upstream
     if scheme == "https":
-        verify = os.environ.get("OTLP_VERIFY_TLS", "true").lower() != "false"
+        verify_env = os.environ.get("MLX_VERIFY_TLS", os.environ.get("OTLP_VERIFY_TLS", "true"))
+        verify = verify_env.lower() != "false"
         ctx = ssl.create_default_context() if verify else ssl._create_unverified_context()
         return http.client.HTTPSConnection(host, port, timeout=timeout, context=ctx)
     return http.client.HTTPConnection(host, port, timeout=timeout)
@@ -912,12 +914,31 @@ class Proxy(BaseHTTPRequestHandler):
         clean_path = urlsplit(req_path).path.rstrip("/") or "/"
         metrics_norm = self.metrics_path.rstrip("/") or "/"
         if clean_path == metrics_norm:
+            if self.command not in ("GET", "HEAD"):
+                self.send_response(405)
+                self.send_header("Allow", "GET, HEAD")
+                self.send_header("Content-Length", "0")
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.close_connection = True
+                return
             payload = generate_latest()
             self.send_response(200)
             self.send_header("Content-Type", CONTENT_TYPE_LATEST)
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
-            self.wfile.write(payload)
+            if self.command != "HEAD":
+                self.wfile.write(payload)
+            return
+
+        if self.headers.get("Transfer-Encoding"):
+            self._reject(
+                400,
+                {"error": {"message": "Transfer-Encoding is not supported; provide Content-Length",
+                           "type": "invalid_request_error"}},
+                _MODEL_NAME or "unknown",
+                "chat",
+            )
             return
 
         raw_len = self.headers.get("Content-Length", "0") or "0"
@@ -942,7 +963,9 @@ class Proxy(BaseHTTPRequestHandler):
             )
             return
 
-        if self.api_key and self.headers.get("Authorization") != f"Bearer {self.api_key}":
+        if self.api_key and not secrets.compare_digest(
+            self.headers.get("Authorization") or "", f"Bearer {self.api_key}"
+        ):
             self._reject(401, {"error": {"message": "unauthorized",
                                          "type": "authentication_error"}},
                          _MODEL_NAME or "unknown", "auth")
@@ -1571,23 +1594,61 @@ class Proxy(BaseHTTPRequestHandler):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Mlx-Trace")
         self.send_header("Connection", "close")
         self.end_headers()
         self.close_connection = True
 
 
+def _set_model_info_gauges(info_obj, model_name: str) -> None:
+    global _CTX_MAX_TOKENS
+    _CTX_MAX_TOKENS = info_obj.max_context_tokens
+    CONTEXT_MAX.labels(model=model_name).set(info_obj.max_context_tokens)
+    KV_BYTES_PER_TOKEN.labels(model=model_name).set(info_obj.kv_bytes_per_token)
+    for attr, val in (
+        ("max_context_tokens", info_obj.max_context_tokens),
+        ("kv_bytes_per_token", info_obj.kv_bytes_per_token),
+        ("layer_count", info_obj.num_layers),
+        ("attention_layers", info_obj.attention_layers),
+        ("linear_layers", info_obj.linear_layers),
+        ("kv_heads", info_obj.num_key_value_heads),
+        ("head_dim", info_obj.head_dim),
+        ("hidden_size", info_obj.hidden_size),
+        ("attention_heads", info_obj.num_attention_heads),
+        ("vocab_size", info_obj.vocab_size),
+        ("intermediate_size", info_obj.intermediate_size),
+        ("quant_bits", info_obj.quant_bits),
+        ("quant_group_size", info_obj.quant_group_size),
+        ("linear_key_heads", info_obj.linear_key_heads),
+        ("linear_value_heads", info_obj.linear_value_heads),
+        ("linear_key_head_dim", info_obj.linear_key_head_dim),
+        ("linear_value_head_dim", info_obj.linear_value_head_dim),
+        ("linear_conv_kernel_dim", info_obj.linear_conv_kernel_dim),
+        ("mtp_layers", info_obj.mtp_layers),
+        ("tie_word_embeddings", int(info_obj.tie_word_embeddings)),
+    ):
+        MODEL_INFO.labels(model=model_name, attr=attr).set(val)
+    if info_obj.arch or info_obj.dtype:
+        MODEL_ARCH.labels(
+            model=model_name,
+            arch=info_obj.arch or "unknown",
+            dtype=info_obj.dtype or "unknown",
+        ).set(1)
+
+
 def _health_watch(upstream, args_model: str | None = None, model_path: str | None = None):
-    global _MODEL_NAME, _CTX_MAX_TOKENS
+    global _MODEL_NAME
     while True:
         try:
             c = _make_upstream_conn(upstream, timeout=3)
-            c.request("GET", "/v1/models")
-            r = c.getresponse()
-            r.read()
-            is_ok = r.status == 200
+            try:
+                c.request("GET", "/v1/models")
+                r = c.getresponse()
+                r.read()
+                is_ok = r.status == 200
+            finally:
+                c.close()
             UPSTREAM_UP.set(1 if is_ok else 0)
-            c.close()
             if is_ok and _MODEL_NAME is None:
                 upstream_url = _upstream_base_url(upstream)
                 discovered = _resolve_model(args_model, upstream_url, model_path)
@@ -1600,8 +1661,7 @@ def _health_watch(upstream, args_model: str | None = None, model_path: str | Non
                                 _MODEL_NAME, model_path=model_path, upstream_url=upstream_url
                             )
                             if info_obj is not None:
-                                _CTX_MAX_TOKENS = info_obj.max_context_tokens
-                                CONTEXT_MAX.labels(model=_MODEL_NAME).set(_CTX_MAX_TOKENS)
+                                _set_model_info_gauges(info_obj, _MODEL_NAME)
                         except Exception as exc:
                             debug(f"retry model_info lookup failed: {exc!r}", component="proxy")
         except Exception as exc:
@@ -1611,7 +1671,7 @@ def _health_watch(upstream, args_model: str | None = None, model_path: str | Non
 
 
 def main():
-    global _OTEL, _OPIK, _OPIK_OTLP, _NODE_NAME, _MODEL_NAME, _CTX_MAX_TOKENS
+    global _OTEL, _OPIK, _OPIK_OTLP, _NODE_NAME, _MODEL_NAME
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--listen", default=os.environ.get("MLX_PROXY_LISTEN", "127.0.0.1:8080"))
     ap.add_argument("--upstream", default=os.environ.get("MLX_UPSTREAM", "127.0.0.1:11234"))
@@ -1730,7 +1790,8 @@ def main():
 
     TOOL_CALLS.labels(model=_MODEL_NAME or "unknown", kind="", tool="", type="").inc(0)
     FLAGS.labels(model=_MODEL_NAME or "unknown").inc(0)
-    ERRORS.labels(model=_MODEL_NAME or "unknown", status="500", kind="chat").inc(0)
+    ERRORS.labels(model=_MODEL_NAME or "unknown", status="4xx", kind="chat").inc(0)
+    ERRORS.labels(model=_MODEL_NAME or "unknown", status="5xx", kind="chat").inc(0)
     PROMPT_CACHED.labels(model=_MODEL_NAME or "unknown", kind="chat").inc(0)
     _NODE_NAME = args.node_name
     _OTEL = _setup_otel(
@@ -1766,37 +1827,7 @@ def main():
             if not _MODEL_NAME or _MODEL_NAME.startswith(("/", "~", "./", "../")):
                 _MODEL_NAME = info_obj.model_id
 
-            _CTX_MAX_TOKENS = info_obj.max_context_tokens
-            CONTEXT_MAX.labels(model=_MODEL_NAME).set(info_obj.max_context_tokens)
-            KV_BYTES_PER_TOKEN.labels(model=_MODEL_NAME).set(info_obj.kv_bytes_per_token)
-            for attr, val in (
-                ("max_context_tokens", info_obj.max_context_tokens),
-                ("kv_bytes_per_token", info_obj.kv_bytes_per_token),
-                ("layer_count", info_obj.num_layers),
-                ("attention_layers", info_obj.attention_layers),
-                ("linear_layers", info_obj.linear_layers),
-                ("kv_heads", info_obj.num_key_value_heads),
-                ("head_dim", info_obj.head_dim),
-                ("hidden_size", info_obj.hidden_size),
-                ("attention_heads", info_obj.num_attention_heads),
-                ("vocab_size", info_obj.vocab_size),
-                ("intermediate_size", info_obj.intermediate_size),
-                ("quant_bits", info_obj.quant_bits),
-                ("quant_group_size", info_obj.quant_group_size),
-                ("linear_key_heads", info_obj.linear_key_heads),
-                ("linear_value_heads", info_obj.linear_value_heads),
-                ("linear_key_head_dim", info_obj.linear_key_head_dim),
-                ("linear_value_head_dim", info_obj.linear_value_head_dim),
-                ("linear_conv_kernel_dim", info_obj.linear_conv_kernel_dim),
-                ("mtp_layers", info_obj.mtp_layers),
-                ("tie_word_embeddings", int(info_obj.tie_word_embeddings)),
-            ):
-                MODEL_INFO.labels(model=_MODEL_NAME, attr=attr).set(val)
-            if info_obj.arch or info_obj.dtype:
-                MODEL_ARCH.labels(
-                    model=_MODEL_NAME, arch=info_obj.arch or "unknown",
-                    dtype=info_obj.dtype or "unknown",
-                ).set(1)
+            _set_model_info_gauges(info_obj, _MODEL_NAME)
             info(
                 f"model ctx={info_obj.max_context_tokens} kv={info_obj.kv_bytes_per_token} B/tok "
                 f"layers={info_obj.num_layers} attention_layers={info_obj.attention_layers} "
@@ -1818,6 +1849,7 @@ def main():
     ).start()
 
     ThreadingHTTPServer.allow_reuse_address = True
+    ThreadingHTTPServer.address_family = socket.AF_INET6 if ":" in host else socket.AF_INET
     server = ThreadingHTTPServer((host, port), Proxy)
     info(
         f"listening on {host}:{port} "

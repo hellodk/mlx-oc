@@ -66,13 +66,13 @@
           },
           "links": [
             {
-              "title": "\ud83d\udcca Drilldown: Per-Device Detail for ${__field.labels.device}",
-              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail",
+              "url": "/d/mlx-detail?var-device=${device}",
               "targetBlank": false
             },
             {
               "title": "\u26a1 Drilldown: Device Health & Matrix",
-              "url": "/d/mlx-device-health?var-device=${__field.labels.device}",
+              "url": "/d/mlx-device-health?var-device=${device}",
               "targetBlank": false
             }
           ]
@@ -115,7 +115,7 @@
       },
       "targets": [
         {
-          "expr": "avg(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\"}[1m]) / rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\"}[1m]))",
+          "expr": "avg(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\"}[1m]) / (rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\"}[1m]) > 0))",
           "legendFormat": "tok/s",
           "refId": "A"
         }
@@ -216,7 +216,7 @@
               "targetBlank": false
             },
             {
-              "title": "\u26a1 Drilldown: Device Health & Matrix",
+              "title": "\u26a1 Drilldown: Device Health & Matrix for ${__field.labels.device}",
               "url": "/d/mlx-device-health?var-device=${__field.labels.device}",
               "targetBlank": false
             }

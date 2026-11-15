@@ -346,6 +346,8 @@ cmd_setup_edge() {
     central_ip="${BASH_REMATCH[1]}"
   elif [[ "${central_ip}" =~ ^([^:]+)(:[0-9]+)$ ]]; then
     central_ip="${BASH_REMATCH[1]}"
+  elif [[ "${central_ip}" =~ :.*: && "${central_ip}" != \[*\] ]]; then
+    central_ip="[${central_ip}]"
   fi
 
   if [[ -z "${mlx_upstream}" ]]; then
@@ -427,6 +429,13 @@ VENV_PYTHON=${mon_python}
 # External LLM server endpoint. The proxy listens on :8080 and forwards here.
 MLX_UPSTREAM=${mlx_upstream}
 MLX_PROXY_STRICT_MODEL=false
+MLX_LOGPROBS=3
+MLX_LOGPROBS_STREAM_SAMPLE=0.0
+MLX_LOW_CONFIDENCE=0.5
+MAX_PROMPT_TOKENS=12000
+MAX_TOKENS_CAP=4096
+RATE_LIMIT=0
+RATE_WINDOW=10.0
 
 MLX_NET_IFACE=
 
@@ -456,6 +465,7 @@ VMAGENT_MAX_SHARDS=200
 VMAGENT_BINARY=${vmagent_bin}
 VMAGENT_PERSISTENT_QUEUE=
 
+OTLP_SCHEME=http
 OTLP_VERIFY_TLS=false
 EOF
 
@@ -1146,6 +1156,9 @@ render_alertmanager_config() {
 
   local oncall_url="${ONCALL_WEBHOOK_URL:-${ALERT_WEBHOOK_URL:-}}"
   local default_url="${ALERT_WEBHOOK_URL:-}"
+  if [[ -f "${dst}" && -z "${oncall_url}" && -z "${default_url}" ]] && ! grep -q '{{' "${dst}" 2>/dev/null; then
+    return 0
+  fi
 
   local oncall_cfg="webhook_configs: []"
   if [[ -n "${oncall_url}" ]]; then
@@ -1660,6 +1673,7 @@ clean_central() {
     local central_volumes=(
       "mlx-central_vm-data" "central_vm-data" "vm-data"
       "mlx-central_grafana-data" "central_grafana-data" "grafana-data"
+      "mlx-central_alertmanager-data" "central_alertmanager-data" "alertmanager-data"
       "mlx-central_central-otel-logs" "central_central-otel-logs" "central-otel-logs"
       "mlx-central_opik-mysql" "central_opik-mysql" "opik-mysql"
       "mlx-central_opik-clickhouse" "central_opik-clickhouse" "opik-clickhouse"

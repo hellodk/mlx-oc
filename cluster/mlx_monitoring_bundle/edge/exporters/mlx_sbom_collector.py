@@ -383,6 +383,10 @@ def _scan_mlx_models() -> List[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Drift & Delta Engine
 # ---------------------------------------------------------------------------
+def _pkg_key(item: Dict[str, Any]) -> str:
+    return f"{item.get('ecosystem', 'unknown')}::{item['package']}"
+
+
 def _load_or_save_baseline_reference(
     node_name: str,
     base_device: str,
@@ -392,8 +396,8 @@ def _load_or_save_baseline_reference(
     ref_file = CONFIG_DIR / "sbom_base_reference.json"
 
     if node_name == base_device:
-        # We are the baseline authority; write reference
-        ref_data = {item["package"]: item for item in current_items}
+        # We are the baseline authority; write reference keyed by ecosystem::package
+        ref_data = {_pkg_key(item): item for item in current_items}
         try:
             ref_file.write_text(json.dumps(ref_data, indent=2), encoding="utf8")
         except Exception as exc:
@@ -404,7 +408,14 @@ def _load_or_save_baseline_reference(
         try:
             ref_data = json.loads(ref_file.read_text(encoding="utf8"))
             if isinstance(ref_data, dict):
-                return ref_data
+                normalized: Dict[str, Dict[str, Any]] = {}
+                for k, val in ref_data.items():
+                    if isinstance(val, dict):
+                        norm_k = k if "::" in k else _pkg_key(
+                            {"ecosystem": val.get("ecosystem", "unknown"), "package": val.get("package", k)}
+                        )
+                        normalized[norm_k] = val
+                return normalized
         except Exception as exc:
             debug(f"failed to read base reference: {exc!r}", component="sbom")
 
@@ -421,14 +432,15 @@ def _evaluate_drift(
     baseline = _load_or_save_baseline_reference(node_name, base_device, current_items)
     if baseline is None:
         return "NO_REFERENCE", 0, 0, []
-    curr_map = {item["package"]: item for item in current_items}
+    curr_map = {_pkg_key(item): item for item in current_items}
 
     diffs: List[Dict[str, Any]] = []
     missing_count = 0
     mismatch_count = 0
 
-    for pkg_name, base_item in baseline.items():
-        if pkg_name not in curr_map:
+    for pkg_key, base_item in baseline.items():
+        pkg_name = base_item.get("package") or pkg_key.split("::", 1)[-1]
+        if pkg_key not in curr_map:
             missing_count += 1
             diffs.append({
                 "package": pkg_name,
@@ -438,7 +450,7 @@ def _evaluate_drift(
                 "path": base_item.get("path", "none"),
             })
         else:
-            curr_item = curr_map[pkg_name]
+            curr_item = curr_map[pkg_key]
             if curr_item.get("version") != base_item.get("version"):
                 mismatch_count += 1
                 diffs.append({
@@ -449,8 +461,9 @@ def _evaluate_drift(
                     "path": curr_item.get("path", "none"),
                 })
 
-    for pkg_name, curr_item in curr_map.items():
-        if pkg_name not in baseline:
+    for pkg_key, curr_item in curr_map.items():
+        if pkg_key not in baseline:
+            pkg_name = curr_item.get("package") or pkg_key.split("::", 1)[-1]
             mismatch_count += 1
             diffs.append({
                 "package": pkg_name,
@@ -715,6 +728,7 @@ def main() -> int:
     host, port = parse_listen_addr(args.listen, default_host="127.0.0.1", default_port=9108)
 
     ThreadingHTTPServer.allow_reuse_address = True
+    ThreadingHTTPServer.address_family = socket.AF_INET6 if ":" in host else socket.AF_INET
     server = ThreadingHTTPServer((host, port), SbomHandler)
     info(f"sbom collector listening on {host}:{port}", component="sbom")
 

@@ -152,6 +152,7 @@ def load_config() -> dict:
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
                 edge_env[k.strip()] = v.strip().strip("\"'")
+    edge_env.update(os.environ)
 
     central_env = {}
     if central_env_path.is_file():
@@ -334,7 +335,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     # -----------------------------------------------------------------------
     target_nodes = cfg["macbooks"]
     if args.node:
-        target_nodes = [nb for nb in target_nodes if nb.get("id") == args.node]
+        target_nodes = [
+            nb for nb in target_nodes
+            if (nb.get("id") or nb.get("node_id")) == args.node
+        ]
 
     stage2_status = "PASS"
     stage2_details = []
@@ -351,7 +355,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         print("[Stage 2/5] Edge Exporters & Nodes   : FAIL (no enabled device nodes matched)")
     else:
         for nb in target_nodes:
-            nb_id = nb.get("id", "unknown")
+            nb_id = nb.get("id") or nb.get("node_id", "unknown")
             nb_ip = nb.get("ip", "unknown")
 
             # Query VictoriaMetrics for up targets reported by vmagent (supports device and legacy macbook label)
@@ -606,7 +610,8 @@ def cmd_review_central(args: argparse.Namespace) -> int:
             http_ok = (h_code == expected_code)
             h_str = f"HTTP {h_code}" if http_ok else f"HTTP {h_code} (FAILED)"
 
-        is_healthy = cinfo["running"] and tcp_ok and http_ok
+        container_ok = cinfo["running"] if cstatus not in ("NOT_DEPLOYED", "NO_ENGINE") else True
+        is_healthy = container_ok and tcp_ok and http_ok
         if not is_healthy and name != "Opik Gateway":
             all_ok = False
 
@@ -635,7 +640,10 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
 
     nodes = cfg["macbooks"]
     if args.node:
-        nodes = [nb for nb in nodes if nb.get("id") == args.node]
+        nodes = [
+            nb for nb in nodes
+            if (nb.get("id") or nb.get("node_id")) == args.node
+        ]
 
     if not nodes:
         print("No enabled edge nodes found in nodes.yml.")
@@ -646,7 +654,7 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
     all_ok = True
 
     for nb in nodes:
-        nb_id = nb.get("id", "unknown")
+        nb_id = nb.get("id") or nb.get("node_id", "unknown")
         nb_ip = nb.get("ip", "127.0.0.1")
         is_local = (nb_ip in local_ips) or (nb_ip == "127.0.0.1")
 
@@ -751,7 +759,8 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
         srv_ok, _ = probe_tcp(srv_addr, timeout=0.5)
         srv_info = "server unreachable"
         if srv_ok:
-            s_code, s_body = probe_http(f"{srv_scheme}://{srv_addr}{srv_path}/v1/models", timeout=1.0)
+            models_path = f"{srv_path}/models" if srv_path.endswith("/v1") else f"{srv_path}/v1/models"
+            s_code, s_body = probe_http(f"{srv_scheme}://{srv_addr}{models_path}", timeout=1.0)
             if s_code == 200:
                 try:
                     models = json.loads(s_body).get("data", [])

@@ -20,6 +20,7 @@ import argparse
 import os
 import re
 import signal
+import socket
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -287,6 +288,7 @@ def main():
 
     host, port = parse_listen_addr(args.listen, default_host="0.0.0.0", default_port=9104)
     ThreadingHTTPServer.allow_reuse_address = True
+    ThreadingHTTPServer.address_family = socket.AF_INET6 if ":" in host else socket.AF_INET
     server = ThreadingHTTPServer((host, port), Handler)
     info(f"tailing {args.log_file}", component="kv-agent")
 

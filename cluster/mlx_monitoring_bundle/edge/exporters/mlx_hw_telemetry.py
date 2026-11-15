@@ -28,6 +28,7 @@ from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATE
 from mlx_logging import degraded, debug, error, info, parse_listen_addr, setup_logging
 
 NODE_DEFAULT = "unknown"
+NODE: str = NODE_DEFAULT
 LISTEN_DEFAULT = "127.0.0.1:9102"
 SAMPLE_INTERVAL_DEFAULT = 5.0
 GPU_SAMPLE_INTERVAL_DEFAULT = 15.0
@@ -387,7 +388,12 @@ def _collect_ps_stats():
                 rss = int(parts[2]) * 1024
             except ValueError:
                 continue
-            if (_PROC_MATCH and _PROC_MATCH in line) and "mlx_metrics_proxy" not in line:
+            if (
+                _PROC_MATCH
+                and _PROC_MATCH in line
+                and "mlx_metrics_proxy" not in line
+                and "mlx_server_supervisor" not in line
+            ):
                 wcpu += cpu
                 wrss += rss
             for name, needle in _PROC_COMPONENTS.items():
@@ -508,10 +514,10 @@ def _net_stats(iface: str | None):
                     if dev.strip() != iface:
                         continue
                     fields = rest.split()
-                    if len(fields) >= 10:
+                    if len(fields) >= 11:
                         return (
                             int(fields[0]), int(fields[8]),
-                            int(fields[1]), int(fields[9]),
+                            int(fields[2]), int(fields[10]),
                         )
         except Exception as exc:
             debug(f"/proc/net/dev stats failed: {exc!r}", component="hw")
@@ -735,6 +741,7 @@ def main():
                      daemon=True).start()
 
     ThreadingHTTPServer.allow_reuse_address = True
+    ThreadingHTTPServer.address_family = socket.AF_INET6 if ":" in LISTEN[0] else socket.AF_INET
     server = ThreadingHTTPServer(LISTEN, Handler)
     info(f"node={NODE} listening on {LISTEN[0]}:{LISTEN[1]}",
          component="hw")

@@ -154,8 +154,12 @@ def main() -> int:
     elif node:
         print(f"node     : {node.get('id', 'unknown')} "
               f"({node.get('ip', 'no ip')})")
-        model = env.get("MLX_MODEL") or node.get("model")
-        model_path = env.get("MLX_MODEL_PATH") or node.get("model_path")
+        model = os.environ.get("MLX_MODEL") or env.get("MLX_MODEL") or node.get("model")
+        model_path = (
+            os.environ.get("MLX_MODEL_PATH")
+            or env.get("MLX_MODEL_PATH")
+            or node.get("model_path")
+        )
         if model:
             print(f"model    : {model}")
         elif node.get("model_path"):
@@ -175,7 +179,7 @@ def main() -> int:
             else:
                 errors.append(f"model path does not contain config.json: {cfg}")
 
-    venv_python = env.get("VENV_PYTHON", "python3")
+    venv_python = os.environ.get("VENV_PYTHON") or env.get("VENV_PYTHON", "python3")
     venv_candidate = Path(venv_python).expanduser()
     resolved_venv = (
         str(venv_candidate)
@@ -187,7 +191,7 @@ def main() -> int:
     else:
         print(f"{'VENV_PYTHON':16}: {resolved_venv}")
 
-    raw_upstream = env.get("MLX_UPSTREAM", "").strip()
+    raw_upstream = (os.environ.get("MLX_UPSTREAM") or env.get("MLX_UPSTREAM", "")).strip()
     if raw_upstream:
         with_scheme = (
             raw_upstream if "://" in raw_upstream else f"http://{raw_upstream}"

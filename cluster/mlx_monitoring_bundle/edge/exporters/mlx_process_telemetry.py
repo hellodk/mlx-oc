@@ -465,6 +465,7 @@ def main() -> int:
     host, port = parse_listen_addr(args.listen, default_host="127.0.0.1", default_port=9107)
 
     ThreadingHTTPServer.allow_reuse_address = True
+    ThreadingHTTPServer.address_family = socket.AF_INET6 if ":" in host else socket.AF_INET
     server = ThreadingHTTPServer((host, port), MetricsHandler)
     info(f"process profiler listening on {host}:{port}", component="process-profiler")
 

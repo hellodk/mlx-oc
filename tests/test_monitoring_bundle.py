@@ -347,7 +347,7 @@ def _make_hermetic_diag_env(tmp_path: Path):
                 yaml.safe_dump({
                     "central": {"victoria_metrics": addr, "otel": addr, "opik": addr},
                     "devices": [{
-                        "node_id": "test-node",
+                        "id": "test-node",
                         "ip": "127.0.0.1",
                         "role": "edge",
                         "enabled": True,
@@ -574,6 +574,8 @@ def test_clean_edge_unit_reuse_and_recreate(tmp_path):
     script_reuse = f"""
     export SKIP_GIT_PULL=1
     source "{deploy_sh}"
+    lsof() {{ return 1; }}
+    pkill() {{ return 0; }}
     EDGE_DIR="{edge_dir}"
     ENV_FILE="{cfg_dir / 'edge.env'}"
     clean_edge reuse
@@ -591,6 +593,8 @@ def test_clean_edge_unit_reuse_and_recreate(tmp_path):
     script_recreate = f"""
     export SKIP_GIT_PULL=1
     source "{deploy_sh}"
+    lsof() {{ return 1; }}
+    pkill() {{ return 0; }}
     EDGE_DIR="{edge_dir}"
     ENV_FILE="{cfg_dir / 'edge.env'}"
     clean_edge recreate
@@ -1703,16 +1707,16 @@ def test_log_tailer_partial_line_traceback_and_queue_gauge(tmp_path, monkeypatch
 
 
 def test_hw_telemetry_proc_net_dev_parsing(tmp_path, monkeypatch):
-    """Verify Linux /proc/net/dev fallback parses bytes and packets accurately."""
+    """Verify Linux /proc/net/dev fallback parses rx/tx bytes and rx/tx error counts."""
     import builtins
     import mlx_hw_telemetry as hw
 
     proc_dev = tmp_path / "net_dev"
     proc_dev.write_text(
         "Inter-|   Receive                                                |  Transmit\n"
-        " face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets\n"
-        "    lo:  100      1    0    0    0     0          0         0      200      2\n"
-        "  en0: 1000     10    0    0    0     0          0         0     2000     20   0 0 0 0 0 0\n",
+        " face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs\n"
+        "    lo:  100      1    0    0    0     0          0         0      200      2    0\n"
+        "  en0: 1000     10    3    0    0     0          0         0     2000     20    4 0 0 0 0 0\n",
         encoding="utf8",
     )
 
@@ -1730,7 +1734,7 @@ def test_hw_telemetry_proc_net_dev_parsing(tmp_path, monkeypatch):
         lambda file, *a, **kw: real_open(proc_dev, *a, **kw) if file == "/proc/net/dev" else real_open(file, *a, **kw),
     )
 
-    assert hw._net_stats("en0") == (1000, 2000, 10, 20)
+    assert hw._net_stats("en0") == (1000, 2000, 3, 4)
     assert hw._net_stats("eth99") is None
 
 
@@ -1985,3 +1989,114 @@ def test_discover_nodes_tailscale_exclusion(monkeypatch):
     monkeypatch.setattr(socket, "socket", lambda *a, **kw: _FakeSock())
     monkeypatch.setattr(socket, "gethostbyname", lambda _h: "192.168.1.50")
     assert dn.get_ip_local("192.168.1.10") == "192.168.1.50"
+
+
+def test_log_tailer_rotation_seeks_zero_and_http_5xx_not_dropped(tmp_path, monkeypatch):
+    """Verify HTTP 5xx logs bypass http_filter and rotated files read from byte 0."""
+    import threading
+    import time
+    import mlx_server_log_tailer as lt
+
+    log_path = tmp_path / "server.log"
+    log_path.write_text("initial line before start\n", encoding="utf8")
+
+    monkeypatch.setattr(lt.Tailer, "_prepare_exporter", lambda self, _ep: None)
+    tailer = lt.Tailer(
+        log_path=log_path,
+        exporter="http://127.0.0.1:4318",
+        rate=100.0,
+        include_http=False,
+        all_lines=False,
+        backfill=0,
+        project="proj",
+        macbook="mac-1",
+    )
+    emitted: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(tailer, "_emit", lambda msg, sev, cat: emitted.append((msg, sev, cat)))
+
+    # 1. HTTP 200 is filtered out when include_http=False, but HTTP 500 is emitted as error
+    tailer._handle_line('127.0.0.1 - - "POST /v1/chat/completions HTTP/1.1" 200 -\n')
+    assert emitted == []
+    tailer._handle_line('127.0.0.1 - - "POST /v1/chat/completions HTTP/1.1" 500 -\n')
+    assert len(emitted) == 1
+    assert emitted[0][1] == "error"
+    assert emitted[0][2] == "http"
+
+    # 2. Rotation with backfill=0 reads new file from offset 0
+    emitted.clear()
+    monkeypatch.setattr(lt, "DEFAULT_POLL_INTERVAL", 0.01)
+    t = threading.Thread(target=tailer.run, daemon=True)
+    t.start()
+    try:
+        time.sleep(0.05)
+        assert emitted == []  # initial line skipped because backfill=0
+        rotated_tmp = tmp_path / "server.log.new"
+        rotated_tmp.write_text("first line in rotated file\n", encoding="utf8")
+        os.replace(rotated_tmp, log_path)
+        deadline = time.monotonic() + 2.0
+        while not emitted and time.monotonic() < deadline:
+            time.sleep(0.02)
+    finally:
+        tailer.stop.set()
+        t.join(timeout=2.0)
+
+    assert len(emitted) == 1
+    assert emitted[0][0] == "first line in rotated file"
+
+
+def test_sbom_cross_ecosystem_collision_and_supervisor_ps_filter(tmp_path, monkeypatch):
+    """Verify SBOM keys by ecosystem::package and hw_telemetry excludes mlx_server_supervisor."""
+    import subprocess
+    import mlx_sbom_collector as sb
+    import mlx_hw_telemetry as hw
+
+    cfg_dir = tmp_path / "config"
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(sb, "CONFIG_DIR", cfg_dir)
+
+    base_items = [
+        {"package": "git", "version": "2.39.0", "ecosystem": "system", "path": "/usr/bin/git", "hash": "h1"},
+        {"package": "git", "version": "2.44.0", "ecosystem": "brew", "path": "/opt/homebrew/bin/git", "hash": "h2"},
+    ]
+    edge_items = [
+        {"package": "git", "version": "2.39.0", "ecosystem": "system", "path": "/usr/bin/git", "hash": "h1"},
+        {"package": "git", "version": "2.43.0", "ecosystem": "brew", "path": "/opt/homebrew/bin/git", "hash": "h3"},
+    ]
+    sb._evaluate_drift("base-mac", "base-mac", base_items)
+    status, mismatch_cnt, missing_cnt, diffs = sb._evaluate_drift("edge-mac", "base-mac", edge_items)
+    assert status == "DEVIATED"
+    assert mismatch_cnt == 1
+    assert missing_cnt == 0
+    assert diffs[0]["ecosystem"] == "brew"
+
+    fake_ps = (
+        "  101  25.0  102400 python3 -m mlx_lm.server --port 11234\n"
+        "  102   5.0   20480 python3 mlx_server_supervisor.py --process-pattern mlx_lm.server\n"
+    )
+    monkeypatch.setattr(hw, "_PROC_MATCH", "mlx_lm.server")
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *a, **kw: subprocess.CompletedProcess(a[0], 0, stdout=fake_ps, stderr=""),
+    )
+    (wcpu, wrss), _ = hw._collect_ps_stats()
+    assert wcpu == 25.0
+    assert wrss == 102400 * 1024
+
+
+def test_diagnostics_v1_upstream_suffix_and_env_precedence(tmp_path):
+    """Verify MLX_UPSTREAM with /v1 suffix and env precedence in review-edge."""
+    import subprocess
+    diag_script = BUNDLE_DIR / "scripts" / "diagnostics.py"
+    with _make_hermetic_diag_env(tmp_path) as env:
+        env["MLX_UPSTREAM"] = f"http://{env['CENTRAL_VICTORIA_METRICS']}/v1"
+        proc = subprocess.run(
+            [sys.executable, str(diag_script), "review-edge"],
+            capture_output=True,
+            text=True,
+            cwd=str(BUNDLE_DIR),
+            env=env,
+            timeout=15,
+        )
+    assert proc.returncode == 0, f"review-edge failed with /v1 upstream: {proc.stdout}\n{proc.stderr}"
+    assert "serving: test-model" in proc.stdout

@@ -133,16 +133,23 @@ cluster/mlx_monitoring_bundle/
 │   ├── config/
 │   │   ├── otelcol-config.yaml                    # OTLP receiver config
 │   │   ├── alertmanager.yml                       # Alert routing + inhibit rules
+│   │   ├── alertmanager.yml.template              # Alertmanager rendering template
 │   │   ├── vmalert-rules.yml                      # Multi-device alert rules
 │   │   └── grafana/
 │   │       ├── datasources.yaml                   # VictoriaMetrics datasource
+│   │       ├── datasources.yaml.template          # Datasource rendering template
 │   │       └── dashboards.yaml                    # Grafana file provisioning
 │   ├── dashboards/                                # 17 Grafana dashboards (device + IST + 5m)
+│   ├── Dockerfile.central                         # Self-contained central image build
+│   ├── .dockerignore                              # Container build secret/cache exclusions
+│   ├── .env.template                              # Central environment template
 │   ├── docker-compose.central.yml                 # Central stack composition (+ Opik profile)
 │   └── opik/                                      # Vendored Opik config (NGINX + ClickHouse)
 │
 ├── scripts/                                       # === SHARED, NODE-AGNOSTIC ===
 │   ├── deploy.sh                                  # validate / edge / central [--opik]
+│   ├── diagnostics.py                             # End-to-end doctor & service audits
+│   ├── build_and_push.sh                          # Container image builder & publisher
 │   └── discover_nodes.py                          # Auto-generate nodes.yml via SSH / local inspection
 │
 └── logs/                                          # Runtime rotating file logs (gitignored)
@@ -435,13 +442,13 @@ SSH. Collects: hostname (id), serial (`system_profiler`), IP, and optional
 
 ### Template Variables
 
-All 17 dashboards use a `$device` template variable (renamed from `$macbook`).
-The underlying Prometheus label remains `macbook` (set by vmagent
-`external_labels`). The variable queries `label_values(..., macbook)`.
+All 17 dashboards use a `$device` template variable (with dual `device` and
+legacy `macbook` labels set by `vmagent` `external_labels`). The variable
+queries `label_values(..., device)`.
 
 | Variable | Type | Query |
 |----------|------|-------|
-| `$device` | query | `label_values(mlx_hw_up, macbook)` |
+| `$device` | query | `label_values(mlx_hw_up, device)` |
 | `$node` | query | `label_values(mlx_hw_up, node)` (where applicable) |
 | `$kind` | query | `label_values(mlx_requests_total, kind)` (inference dashboard) |
 

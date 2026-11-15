@@ -225,7 +225,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_health_checks_total{device=~\"$device\"}",
+          "expr": "rate(mlx_server_health_checks_total{device=~\"$device\"}[5m])",
           "legendFormat": "{{device}} {{result}}",
           "refId": "A"
         }
