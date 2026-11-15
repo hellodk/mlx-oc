@@ -444,6 +444,7 @@ def main() -> int:
     host, port_str = args.listen.rsplit(":", 1) if ":" in args.listen else ("127.0.0.1", args.listen)
     port = int(port_str)
 
+    ThreadingHTTPServer.allow_reuse_address = True
     server = ThreadingHTTPServer((host, port), MetricsHandler)
     info(f"process profiler listening on {host}:{port}", component="process-profiler")
 
