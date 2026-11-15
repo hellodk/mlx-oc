@@ -56,11 +56,32 @@ login() {
   "${ENGINE}" login "${REGISTRY_HOST}" || true
 }
 
+STAGE_DIR="$(mktemp -d)"
+trap 'rm -rf "${STAGE_DIR}"' EXIT
+
+cp -R "${CENTRAL_DIR}/." "${STAGE_DIR}/"
+rm -f "${STAGE_DIR}/.env" "${STAGE_DIR}/.env."* "${STAGE_DIR}/"*.bak*
+find "${STAGE_DIR}" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find "${STAGE_DIR}" -type f -name "*.bak*" -delete 2>/dev/null || true
+
+# Render clean non-secret defaults from templates for image reproducibility
+if [[ -f "${STAGE_DIR}/config/alertmanager.yml.template" ]]; then
+  sed \
+    -e 's|{{ONCALL_WEBHOOK_CONFIG}}|webhook_configs: []|g' \
+    -e 's|{{DEFAULT_WEBHOOK_CONFIG}}|webhook_configs: []|g' \
+    "${STAGE_DIR}/config/alertmanager.yml.template" > "${STAGE_DIR}/config/alertmanager.yml"
+fi
+if [[ -f "${STAGE_DIR}/config/grafana/datasources.yaml.template" ]]; then
+  sed \
+    -e 's|{{VICTORIAMETRICS_URL}}|http://victoria-metrics:8428|g' \
+    "${STAGE_DIR}/config/grafana/datasources.yaml.template" > "${STAGE_DIR}/config/grafana/datasources.yaml"
+fi
+
 full="${REGISTRY}/${REPO}:${TAG}"
-info "building ${full} from ${CENTRAL_DIR}/Dockerfile.central"
+info "building ${full} from staged context (${STAGE_DIR}/Dockerfile.central)"
 "${ENGINE}" build --tag "${full}" \
-  --file "${CENTRAL_DIR}/Dockerfile.central" \
-  "${CENTRAL_DIR}"
+  --file "${STAGE_DIR}/Dockerfile.central" \
+  "${STAGE_DIR}"
 
 if [[ "${DRY_RUN}" == "1" ]]; then
   info "dry-run: built ${full} (not pushed)"

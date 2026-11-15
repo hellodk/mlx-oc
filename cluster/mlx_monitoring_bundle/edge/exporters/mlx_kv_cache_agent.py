@@ -28,7 +28,15 @@ from pathlib import Path
 from prometheus_client import Gauge, generate_latest, CONTENT_TYPE_LATEST
 import requests
 
-from mlx_logging import degraded, debug, error, info, parse_upstream_url, setup_logging
+from mlx_logging import (
+    degraded,
+    debug,
+    error,
+    info,
+    parse_listen_addr,
+    parse_upstream_url,
+    setup_logging,
+)
 from mlx_model_info import model_info as _model_info
 
 LISTEN_DEFAULT = "127.0.0.1:9104"
@@ -106,18 +114,21 @@ def _pick_served_model(models: list, model_path: str | None) -> str | None:
     if not ids:
         return None
 
+    non_default = [mid for mid in ids if mid != "default_model"]
+    candidates = non_default or ids
+
     if model_path:
         target_name = Path(model_path.rstrip("/")).name
-        for mid in reversed(ids):
+        for mid in reversed(candidates):
             if str(mid).rstrip("/") == str(model_path).rstrip("/"):
                 return target_name
             if Path(str(mid)).name == target_name:
                 return target_name
 
-    for mid in reversed(ids):
+    for mid in reversed(candidates):
         if str(mid).startswith("/"):
             return Path(str(mid)).name
-    return ids[0]
+    return candidates[0]
 
 
 def _discover_model_from_upstream(upstream_url: str,
@@ -231,13 +242,13 @@ def main():
     )
     args = ap.parse_args()
 
+    macbook_id = os.environ.get("MLX_DEVICE_ID") or os.environ.get("MLX_MACBOOK_ID") or "unknown"
+    setup_logging(service="mlx-kv-agent", macbook=macbook_id)
+
     if not args.log_file:
         error("MLX_SERVER_LOG not set and --log-file not given; cannot run",
               component="kv-agent")
         sys.exit(1)
-
-    setup_logging(service="mlx-kv-agent",
-                  macbook=os.environ.get("MLX_MACBOOK_ID", "unknown"))
 
     try:
         _, _, _, upstream_base = parse_upstream_url(args.upstream, default_port=8081)
@@ -274,9 +285,9 @@ def main():
 
     threading.Thread(target=_poll, daemon=True).start()
 
-    host, _, port = args.listen.rpartition(":")
+    host, port = parse_listen_addr(args.listen, default_host="0.0.0.0", default_port=9104)
     ThreadingHTTPServer.allow_reuse_address = True
-    server = ThreadingHTTPServer((host or "0.0.0.0", int(port or 9104)), Handler)
+    server = ThreadingHTTPServer((host, port), Handler)
     info(f"tailing {args.log_file}", component="kv-agent")
 
     def _shutdown(signum, frame):

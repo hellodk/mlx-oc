@@ -424,7 +424,11 @@ class PassiveServerObserver:
             self.sniffer.advance_to_end()
         else:
             self.consecutive_failures += 1
-            if self.last_ok and self.consecutive_failures < fail_threshold:
+            if pid is None and self.args.process_pattern:
+                # Never apply latency hysteresis when the configured OS process is gone.
+                ok = False
+                self.consecutive_failures = fail_threshold
+            elif self.last_ok and self.consecutive_failures < fail_threshold:
                 # Hysteresis: tolerate transient LLM GIL/Metal latency bursts
                 ok = True
                 served_models = self.last_served_models

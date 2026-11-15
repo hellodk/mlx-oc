@@ -25,10 +25,14 @@ entry.
 from __future__ import annotations
 
 import argparse
+import codecs
+import http.client
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import logging
 import math
 import os
+from pathlib import Path
 import random
 import re
 import signal
@@ -37,9 +41,7 @@ import ssl
 import sys
 import threading
 import time
-import http.client
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+from urllib.parse import urlsplit
 
 import requests
 
@@ -51,7 +53,26 @@ from prometheus_client import (
     CONTENT_TYPE_LATEST,
 )
 
-from mlx_logging import degraded, debug, error, info, parse_upstream_url, setup_logging
+from mlx_logging import (
+    degraded,
+    debug,
+    error,
+    info,
+    parse_listen_addr,
+    parse_upstream_url,
+    setup_logging,
+)
+
+
+def _upstream_base_url(
+    upstream: tuple[str, int] | tuple[str, str, int, str],
+) -> str:
+    """Return the http(s)://host:port base URL from either a 2-tuple or 4-tuple upstream."""
+    if len(upstream) >= 4:
+        return upstream[3]
+    host = upstream[0]
+    host_str = f"[{host}]" if ":" in host and not host.startswith("[") else host
+    return f"http://{host_str}:{upstream[1]}"
 
 
 def _make_upstream_conn(
@@ -164,6 +185,8 @@ def _setup_otel(endpoint: str, node_name: str, service_name: str = "mlx-metrics-
 
         class Otel:
             tracer = tp.get_tracer("mlx.proxy")
+            tracer_provider = tp
+            logger_provider = lp if endpoint else None
 
             @staticmethod
             def span(name, **attrs):
@@ -626,6 +649,7 @@ class _StreamParser:
     def __init__(self):
         self._buf = ""
         self.content_parts = []
+        self.reasoning_parts = []
         self._tool_calls = {}
         self.usage = None
         self.finish_reason = None
@@ -644,20 +668,31 @@ class _StreamParser:
                 obj = json.loads(payload)
             except json.JSONDecodeError:
                 continue
-            if "usage" in obj:
+            if not isinstance(obj, dict):
+                continue
+            if obj.get("usage"):
                 self.usage = obj["usage"]
             choices = obj.get("choices") or []
-            if not choices:
+            if not choices or not isinstance(choices[0], dict):
                 continue
             self.finish_reason = choices[0].get("finish_reason")
             delta = choices[0].get("delta") or {}
+            if not isinstance(delta, dict):
+                continue
             if delta.get("content"):
                 self.content_parts.append(delta["content"])
+            reasoning_txt = delta.get("reasoning_content") or delta.get("reasoning")
+            if reasoning_txt:
+                self.reasoning_parts.append(reasoning_txt)
             for tc in delta.get("tool_calls") or []:
-                tid = tc.get("id")
-                if not tid:
+                if not isinstance(tc, dict):
                     continue
-                entry = self._tool_calls.setdefault(tid, {"type": None, "name": ""})
+                idx = tc.get("index")
+                tid = tc.get("id")
+                key = f"idx:{idx}" if idx is not None else tid
+                if not key:
+                    continue
+                entry = self._tool_calls.setdefault(key, {"type": None, "name": ""})
                 if tc.get("type"):
                     entry["type"] = tc["type"]
                 name_frag = (tc.get("function") or {}).get("name")
@@ -667,6 +702,10 @@ class _StreamParser:
     @property
     def content(self) -> str:
         return "".join(self.content_parts)
+
+    @property
+    def reasoning(self) -> str:
+        return "".join(self.reasoning_parts)
 
     @property
     def tool_calls(self) -> int:
@@ -683,7 +722,8 @@ class _StreamParser:
     def completion_tokens(self) -> int:
         if self.usage and self.usage.get("completion_tokens"):
             return int(self.usage["completion_tokens"])
-        return len(self.content.split())
+        combined = " ".join(p for p in (self.content, self.reasoning) if p)
+        return len(combined.split())
 
 
 def _pick_served_model(models: list, model_path: str | None) -> str | None:
@@ -702,10 +742,13 @@ def _pick_served_model(models: list, model_path: str | None) -> str | None:
     if not ids:
         return None
 
+    non_default = [mid for mid in ids if mid != "default_model"]
+    candidates = non_default or ids
+
     target_name = None
     if model_path:
         target_name = Path(model_path.rstrip("/")).name
-        for mid in reversed(ids):
+        for mid in reversed(candidates):
             if str(mid).rstrip("/") == str(model_path).rstrip("/"):
                 return target_name
             if Path(str(mid)).name == target_name:
@@ -713,10 +756,10 @@ def _pick_served_model(models: list, model_path: str | None) -> str | None:
 
     # The served model path is appended last and is absolute. Prefer it over
     # arbitrary Hugging Face cache repository ids.
-    for mid in reversed(ids):
+    for mid in reversed(candidates):
         if str(mid).startswith("/"):
             return Path(str(mid)).name
-    return ids[0]
+    return candidates[0]
 
 
 def _discover_model_from_upstream(upstream_url: str,
@@ -778,10 +821,10 @@ class Proxy(BaseHTTPRequestHandler):
 
     @classmethod
     def _bound_model_label(cls, raw_model: str | None) -> str:
-        name = (raw_model or _MODEL_NAME or "unknown").strip() or "unknown"
+        name = (str(raw_model) if raw_model is not None else (_MODEL_NAME or "unknown")).strip() or "unknown"
         if len(name) > 120:
             name = name[:120]
-        if cls.strict_model or name == _MODEL_NAME or name in cls.model_aliases:
+        if name == _MODEL_NAME or name in cls.model_aliases:
             return name
         with cls._seen_models_lock:
             if name in cls._seen_models:
@@ -866,7 +909,9 @@ class Proxy(BaseHTTPRequestHandler):
     def _forward(self):
         t_arrival = time.monotonic()
         req_path = self.path
-        if self.path == self.metrics_path:
+        clean_path = urlsplit(req_path).path.rstrip("/") or "/"
+        metrics_norm = self.metrics_path.rstrip("/") or "/"
+        if clean_path == metrics_norm:
             payload = generate_latest()
             self.send_response(200)
             self.send_header("Content-Type", CONTENT_TYPE_LATEST)
@@ -875,7 +920,27 @@ class Proxy(BaseHTTPRequestHandler):
             self.wfile.write(payload)
             return
 
-        length = int(self.headers.get("Content-Length", 0) or 0)
+        raw_len = self.headers.get("Content-Length", "0") or "0"
+        try:
+            length = int(raw_len)
+        except (ValueError, TypeError):
+            self._reject(
+                400,
+                {"error": {"message": "invalid Content-Length",
+                           "type": "invalid_request_error"}},
+                _MODEL_NAME or "unknown",
+                "chat",
+            )
+            return
+        if length < 0:
+            self._reject(
+                400,
+                {"error": {"message": "invalid Content-Length",
+                           "type": "invalid_request_error"}},
+                _MODEL_NAME or "unknown",
+                "chat",
+            )
+            return
 
         if self.api_key and self.headers.get("Authorization") != f"Bearer {self.api_key}":
             self._reject(401, {"error": {"message": "unauthorized",
@@ -905,17 +970,44 @@ class Proxy(BaseHTTPRequestHandler):
         lp_source = ""
         synth_sse = False
         kind = "chat"
-        is_chat = self.command == "POST" and req_path.endswith(
+        is_chat = self.command == "POST" and clean_path.endswith(
             "/v1/chat/completions"
         )
         if is_chat:
             try:
                 req = json.loads(body or b"{}")
-                req_model = req.get("model", model)
+            except (json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError):
+                self._reject(
+                    400,
+                    {"error": {"message": "invalid JSON request body",
+                               "type": "invalid_request_error"}},
+                    model, kind,
+                )
+                return
+            if not isinstance(req, dict):
+                self._reject(
+                    400,
+                    {"error": {"message": "request JSON body must be an object",
+                               "type": "invalid_request_error"}},
+                    model, kind,
+                )
+                return
+            try:
+                raw_req_model = req.get("model", model)
+                req_model = raw_req_model if isinstance(raw_req_model, str) else model
                 streaming = bool(req.get("stream", False))
-                temperature = req.get("temperature", 0.0)
+                raw_temp = req.get("temperature", 0.0)
+                try:
+                    temperature = float(raw_temp) if raw_temp is not None else 0.0
+                except (ValueError, TypeError):
+                    temperature = 0.0
                 tools_provided = bool(req.get("tools"))
-                messages = req.get("messages") or []
+                raw_messages = req.get("messages")
+                messages = (
+                    [m for m in raw_messages if isinstance(m, dict)]
+                    if isinstance(raw_messages, list)
+                    else []
+                )
                 if bool(req.get("enable_thinking", False)):
                     kind = "reasoning"
 
@@ -954,11 +1046,17 @@ class Proxy(BaseHTTPRequestHandler):
                     return
                 mt = req.get("max_tokens")
                 body_dirty = False
-                if mt is None:
+                try:
+                    if mt is None or isinstance(mt, bool):
+                        raise TypeError("unset or bool max_tokens")
+                    mt_val = int(mt)
+                except (ValueError, TypeError):
+                    mt_val = None
+                if mt_val is None or mt_val > self.max_tokens_cap:
                     req["max_tokens"] = self.max_tokens_cap
                     body_dirty = True
-                elif mt > self.max_tokens_cap:
-                    req["max_tokens"] = self.max_tokens_cap
+                elif isinstance(mt, str):
+                    req["max_tokens"] = mt_val
                     body_dirty = True
 
                 if req.get("logprobs"):
@@ -977,8 +1075,8 @@ class Proxy(BaseHTTPRequestHandler):
                         body_dirty = True
                 if body_dirty:
                     body = json.dumps(req).encode("utf-8")
-            except json.JSONDecodeError as exc:
-                debug(f"invalid JSON chat body: {exc!r}", component="proxy")
+            except (json.JSONDecodeError, TypeError, ValueError, AttributeError) as exc:
+                debug(f"invalid chat body metadata: {exc!r}", component="proxy")
             if _OPIK is not None and self.headers.get("X-Mlx-Trace", "1") != "0":
                 try:
                     opik_trace = _OPIK.trace(
@@ -1095,16 +1193,25 @@ class Proxy(BaseHTTPRequestHandler):
                 self.end_headers()
 
             parser = _StreamParser()
+            utf8_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
             content_bytes = []
             client_disconnected = False
 
             while True:
                 chunk = resp.read1(65536)
                 if not chunk:
+                    if is_sse:
+                        tail = utf8_decoder.decode(b"", final=True)
+                        if tail:
+                            parser.feed(tail)
                     break
                 if is_sse:
-                    parser.feed(chunk.decode("utf-8", "replace"))
-                    if t_first_token is None and parser.content_parts:
+                    parser.feed(utf8_decoder.decode(chunk))
+                    if t_first_token is None and (
+                        parser.content_parts
+                        or parser.reasoning_parts
+                        or parser.tool_calls > 0
+                    ):
                         t_first_token = time.monotonic()
                 else:
                     content_bytes.append(chunk)
@@ -1119,8 +1226,10 @@ class Proxy(BaseHTTPRequestHandler):
             t_done = time.monotonic()
 
             resp_obj = None
+            reasoning = ""
             if is_sse:
                 content = parser.content
+                reasoning = parser.reasoning
                 tool_calls = parser.tool_calls
                 tools = parser.tools
                 usage = parser.usage
@@ -1133,22 +1242,26 @@ class Proxy(BaseHTTPRequestHandler):
                 finish_reason = None
                 try:
                     obj = json.loads(b"".join(content_bytes).decode("utf-8", "replace"))
-                    resp_obj = obj
-                    choice = (obj.get("choices") or [{}])[0]
-                    msg = choice.get("message") or {}
-                    content = msg.get("content") or ""
-                    calls = msg.get("tool_calls") or []
-                    tool_calls = len(calls)
-                    tools = [
-                        {
-                            "type": tc.get("type") or "unknown",
-                            "name": (tc.get("function") or {}).get("name")
-                            or tc.get("type") or "unknown",
-                        }
-                        for tc in calls
-                    ]
-                    usage = obj.get("usage")
-                    finish_reason = choice.get("finish_reason")
+                    if isinstance(obj, dict):
+                        resp_obj = obj
+                        choices = obj.get("choices") or [{}]
+                        choice = choices[0] if isinstance(choices[0], dict) else {}
+                        msg = choice.get("message") or {}
+                        if isinstance(msg, dict):
+                            content = msg.get("content") or ""
+                            reasoning = msg.get("reasoning_content") or msg.get("reasoning") or ""
+                            calls = msg.get("tool_calls") or []
+                            tool_calls = len(calls)
+                            tools = [
+                                {
+                                    "type": tc.get("type") or "unknown",
+                                    "name": (tc.get("function") or {}).get("name")
+                                    or tc.get("type") or "unknown",
+                                }
+                                for tc in calls if isinstance(tc, dict)
+                            ]
+                        usage = obj.get("usage")
+                        finish_reason = choice.get("finish_reason")
                 except json.JSONDecodeError:
                     pass
 
@@ -1192,7 +1305,8 @@ class Proxy(BaseHTTPRequestHandler):
                 prompt_tokens = sum(
                     len(str(m.get("content", "")).split()) for m in messages
                 )
-                comp_tokens = len(content.split())
+                combined_comp = " ".join(p for p in (content, reasoning) if p)
+                comp_tokens = len(combined_comp.split())
             TOKENS_PROMPT.labels(model, kind).inc(prompt_tokens)
             TOKENS_COMPLETION.labels(model, kind).inc(comp_tokens)
             if usage:
@@ -1445,11 +1559,6 @@ class Proxy(BaseHTTPRequestHandler):
                     span.end()
                 except Exception as exc2:
                     debug(f"span.end failed: {exc2!r}", component="proxy")
-            if _OPIK is not None and (opik_trace is not None or opik_span is not None):
-                try:
-                    _OPIK.flush()
-                except Exception as exc2:
-                    debug(f"opik flush failed: {exc2!r}", component="proxy")
             conn.close()
 
     def do_GET(self):
@@ -1480,13 +1589,16 @@ def _health_watch(upstream, args_model: str | None = None, model_path: str | Non
             UPSTREAM_UP.set(1 if is_ok else 0)
             c.close()
             if is_ok and _MODEL_NAME is None:
-                discovered = _resolve_model(args_model, upstream[3], model_path)
+                upstream_url = _upstream_base_url(upstream)
+                discovered = _resolve_model(args_model, upstream_url, model_path)
                 if discovered:
                     _MODEL_NAME = discovered
                     info(f"model discovered on health retry: {_MODEL_NAME}", component="proxy")
                     if _model_info is not None:
                         try:
-                            info_obj = _model_info(_MODEL_NAME, model_path=model_path, upstream_url=upstream[3])
+                            info_obj = _model_info(
+                                _MODEL_NAME, model_path=model_path, upstream_url=upstream_url
+                            )
                             if info_obj is not None:
                                 _CTX_MAX_TOKENS = info_obj.max_context_tokens
                                 CONTEXT_MAX.labels(model=_MODEL_NAME).set(_CTX_MAX_TOKENS)
@@ -1587,10 +1699,14 @@ def main():
     )
     args = ap.parse_args()
 
-    setup_logging(service="mlx-proxy",
-                  macbook=os.environ.get("MLX_MACBOOK_ID", "unknown"))
+    macbook_id = os.environ.get("MLX_DEVICE_ID") or os.environ.get("MLX_MACBOOK_ID") or "unknown"
+    setup_logging(service="mlx-proxy", macbook=macbook_id)
 
-    host, _, port = args.listen.rpartition(":")
+    try:
+        host, port = parse_listen_addr(args.listen, default_host="0.0.0.0", default_port=8080)
+    except ValueError as exc:
+        error(f"invalid listen address {args.listen!r}: {exc}", component="proxy")
+        sys.exit(1)
     try:
         Proxy.upstream = parse_upstream_url(args.upstream, default_port=8000)
     except ValueError as exc:
@@ -1702,10 +1818,10 @@ def main():
     ).start()
 
     ThreadingHTTPServer.allow_reuse_address = True
-    server = ThreadingHTTPServer((host or "0.0.0.0", int(port or 8080)), Proxy)
+    server = ThreadingHTTPServer((host, port), Proxy)
     info(
-        f"listening on {host or '0.0.0.0'}:{port or 8080} "
-        f"-> upstream {Proxy.upstream[3]} "
+        f"listening on {host}:{port} "
+        f"-> upstream {_upstream_base_url(Proxy.upstream)} "
         f"(metrics at {args.metrics_path})",
         component="proxy",
     )
@@ -1730,6 +1846,20 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
+        if _OPIK is not None:
+            try:
+                _OPIK.flush()
+            except Exception as exc:
+                debug(f"opik shutdown flush failed: {exc!r}", component="proxy")
+        if _OTEL is not None:
+            for prov in (getattr(_OTEL, "tracer_provider", None),
+                         getattr(_OTEL, "logger_provider", None)):
+                if prov is not None:
+                    try:
+                        prov.force_flush(timeout_millis=3000)
+                        prov.shutdown()
+                    except Exception as exc:
+                        debug(f"otel provider shutdown failed: {exc!r}", component="proxy")
         server.server_close()
 
 

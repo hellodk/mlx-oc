@@ -35,8 +35,8 @@ import urllib.request
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 BUNDLE_DIR = SCRIPT_DIR.parent
-EDGE_DIR = BUNDLE_DIR / "edge"
-CENTRAL_DIR = BUNDLE_DIR / "central"
+EDGE_DIR = Path(os.environ.get("MLX_EDGE_DIR") or (BUNDLE_DIR / "edge"))
+CENTRAL_DIR = Path(os.environ.get("MLX_CENTRAL_DIR") or (BUNDLE_DIR / "central"))
 
 # ---------------------------------------------------------------------------
 # Helpers: Timezone, Network, and Process Primitives
@@ -113,6 +113,20 @@ def probe_http(url: str, timeout: float = 2.0, headers: dict | None = None) -> t
         return 0, str(exc)
 
 
+def _normalize_endpoint(endpoint: str, default_port: int) -> tuple[str, str, str, int]:
+    """Return (scheme, host:port, bare_host, port) from host:port or full URL."""
+    raw = (endpoint or "").strip()
+    parsed = urllib.parse.urlsplit(raw if "://" in raw else f"http://{raw}")
+    scheme = parsed.scheme or "http"
+    host = parsed.hostname or "127.0.0.1"
+    try:
+        port = parsed.port or (443 if scheme == "https" and "://" in raw else default_port)
+    except ValueError:
+        port = default_port
+    formatted_host = f"[{host}]" if ":" in host else host
+    return scheme, f"{formatted_host}:{port}", host, port
+
+
 # ---------------------------------------------------------------------------
 # Configuration Loader (Zero Hardcoding)
 # ---------------------------------------------------------------------------
@@ -148,11 +162,23 @@ def load_config() -> dict:
                 central_env[k.strip()] = v.strip().strip("\"'")
 
     central_cfg = nodes.get("central", {})
-    cvm = os.environ.get("CENTRAL_VICTORIA_METRICS") or central_cfg.get("victoria_metrics", "127.0.0.1:8428")
-    cotel = os.environ.get("CENTRAL_OTEL") or central_cfg.get("otel", "127.0.0.1:4318")
-    copik = os.environ.get("CENTRAL_OPIK") or central_cfg.get("opik", "127.0.0.1:32173")
+    raw_cvm = os.environ.get("CENTRAL_VICTORIA_METRICS") or central_cfg.get("victoria_metrics", "127.0.0.1:8428")
+    raw_cotel = os.environ.get("CENTRAL_OTEL") or central_cfg.get("otel", "127.0.0.1:4318")
+    raw_copik = os.environ.get("CENTRAL_OPIK") or central_cfg.get("opik", "127.0.0.1:32173")
 
-    central_host = cvm.split(":")[0] if ":" in cvm else "127.0.0.1"
+    cvm_scheme, cvm, raw_host, _ = _normalize_endpoint(raw_cvm, 8428)
+    cotel_scheme, cotel, _, _ = _normalize_endpoint(raw_cotel, 4318)
+    copik_scheme, copik, _, _ = _normalize_endpoint(raw_copik, 32173)
+
+    central_host = f"[{raw_host}]" if ":" in raw_host else raw_host
+    default_scheme = os.environ.get("CENTRAL_SCHEME") or (cvm_scheme if "://" in str(raw_cvm) else "http")
+
+    raw_cgrafana = os.environ.get("CENTRAL_GRAFANA") or central_cfg.get("grafana") or f"{central_host}:3000"
+    raw_cvmalert = os.environ.get("CENTRAL_VMALERT") or central_cfg.get("vmalert") or f"{central_host}:8880"
+    raw_calertmanager = os.environ.get("CENTRAL_ALERTMANAGER") or central_cfg.get("alertmanager") or f"{central_host}:9093"
+    cgf_scheme, cgrafana, _, _ = _normalize_endpoint(raw_cgrafana, 3000)
+    cva_scheme, cvmalert, _, _ = _normalize_endpoint(raw_cvmalert, 8880)
+    cam_scheme, calertmanager, _, _ = _normalize_endpoint(raw_calertmanager, 9093)
 
     macbooks = [
         nb for nb in (nodes.get("devices") or nodes.get("macbooks") or [])
@@ -163,13 +189,19 @@ def load_config() -> dict:
         "nodes": nodes,
         "edge_env": edge_env,
         "central_env": central_env,
-        "central_host": central_host,
+        "central_host": raw_host,
         "cvm": cvm,
+        "cvm_scheme": cvm_scheme,
         "cotel": cotel,
+        "cotel_scheme": cotel_scheme,
         "copik": copik,
-        "cgrafana": f"{central_host}:3000",
-        "cvmalert": f"{central_host}:8880",
-        "calertmanager": f"{central_host}:9093",
+        "copik_scheme": copik_scheme,
+        "cgrafana": cgrafana,
+        "cgrafana_scheme": cgf_scheme if "://" in str(raw_cgrafana) else default_scheme,
+        "cvmalert": cvmalert,
+        "cvmalert_scheme": cva_scheme if "://" in str(raw_cvmalert) else default_scheme,
+        "calertmanager": calertmanager,
+        "calertmanager_scheme": cam_scheme if "://" in str(raw_calertmanager) else default_scheme,
         "macbooks": macbooks,
         "grafana_user": (
             os.environ.get("GRAFANA_ADMIN_USER")
@@ -234,11 +266,13 @@ def inspect_container(engine: str | None, container_names: str | list[str]) -> d
 # VictoriaMetrics Query Helper
 # ---------------------------------------------------------------------------
 
-def query_vm(cvm_endpoint: str, query: str) -> list[dict] | None:
+def query_vm(cvm_endpoint: str, query: str, scheme: str = "http") -> list[dict] | None:
     """Execute MetricsQL query against VictoriaMetrics."""
     try:
+        parsed_scheme, hostport, _, _ = _normalize_endpoint(cvm_endpoint, 8428)
+        eff_scheme = parsed_scheme if "://" in str(cvm_endpoint) else (scheme or "http")
         q = urllib.parse.quote(query)
-        url = f"http://{cvm_endpoint}/api/v1/query?query={q}"
+        url = f"{eff_scheme}://{hostport}/api/v1/query?query={q}"
         status, body = probe_http(url, timeout=2.5)
         if status == 200:
             data = json.loads(body)
@@ -258,12 +292,12 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     print("            MLX Observability Pipeline Doctor (Data Flow Tracer)")
     print("=" * 76)
     print("Configured Endpoints:")
-    print(f"  • Central VictoriaMetrics : http://{cfg['cvm']}")
-    print(f"  • Central Grafana         : http://{cfg['cgrafana']}")
-    print(f"  • Central Alertmanager    : http://{cfg['calertmanager']}")
-    print(f"  • Central vmalert         : http://{cfg['cvmalert']}")
-    print(f"  • Central OTel Collector  : http://{cfg['cotel']}")
-    print(f"  • Central Opik Gateway    : http://{cfg['copik']}")
+    print(f"  • Central VictoriaMetrics : {cfg['cvm_scheme']}://{cfg['cvm']}")
+    print(f"  • Central Grafana         : {cfg['cgrafana_scheme']}://{cfg['cgrafana']}")
+    print(f"  • Central Alertmanager    : {cfg['calertmanager_scheme']}://{cfg['calertmanager']}")
+    print(f"  • Central vmalert         : {cfg['cvmalert_scheme']}://{cfg['cvmalert']}")
+    print(f"  • Central OTel Collector  : {cfg['cotel_scheme']}://{cfg['cotel']}")
+    print(f"  • Central Opik Gateway    : {cfg['copik_scheme']}://{cfg['copik']}")
     print("-" * 76)
 
     stages_passed = True
@@ -289,7 +323,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         })
     else:
         stage1_notes.append(f"reachable in {vm_lat:.1f}ms")
-        series_data = query_vm(cfg["cvm"], "count({__name__=~\".+\"})")
+        series_data = query_vm(cfg["cvm"], "count({__name__=~\".+\"})", scheme=cfg["cvm_scheme"])
         total_series = series_data[0]["value"][1] if series_data else "0"
         stage1_notes.append(f"{total_series} total series active")
 
@@ -306,15 +340,23 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     stage2_details = []
 
     if not target_nodes:
-        print("[Stage 2/5] Edge Exporters & Nodes   : WARN (no enabled device nodes found in nodes.yml)")
+        stage2_status = "FAIL"
+        stages_passed = False
+        breaks.append({
+            "stage": "Stage 2: Edge Exporters & Nodes",
+            "issue": f"No enabled device nodes matched{f' --node {args.node}' if args.node else ' in edge/config/nodes.yml'}.",
+            "impact": "Cannot verify edge node telemetry ingestion.",
+            "fix": "Configure enabled devices in edge/config/nodes.yml or pass a valid --node id."
+        })
+        print("[Stage 2/5] Edge Exporters & Nodes   : FAIL (no enabled device nodes matched)")
     else:
         for nb in target_nodes:
             nb_id = nb.get("id", "unknown")
             nb_ip = nb.get("ip", "unknown")
 
             # Query VictoriaMetrics for up targets reported by vmagent (supports device and legacy macbook label)
-            up_data = query_vm(cfg["cvm"], f"(up{{device=\"{nb_id}\"}} or up{{macbook=\"{nb_id}\"}})") if vm_ok else None
-            recency_data = query_vm(cfg["cvm"], f"time() - max(timestamp(up{{device=\"{nb_id}\"}} or up{{macbook=\"{nb_id}\"}}))") if vm_ok else None
+            up_data = query_vm(cfg["cvm"], f"(up{{device=\"{nb_id}\"}} or up{{macbook=\"{nb_id}\"}})", scheme=cfg["cvm_scheme"]) if vm_ok else None
+            recency_data = query_vm(cfg["cvm"], f"time() - max(timestamp(up{{device=\"{nb_id}\"}} or up{{macbook=\"{nb_id}\"}}))", scheme=cfg["cvm_scheme"]) if vm_ok else None
             recency_sec = float(recency_data[0]["value"][1]) if recency_data else None
 
             if up_data is None or len(up_data) == 0:
@@ -367,7 +409,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     stage3_notes = []
 
     if va_ok:
-        va_h_status, _ = probe_http(f"http://{cfg['cvmalert']}/health")
+        va_h_status, _ = probe_http(f"{cfg['cvmalert_scheme']}://{cfg['cvmalert']}/health")
         if va_h_status == 200:
             stage3_notes.append("vmalert 200 OK")
         else:
@@ -378,7 +420,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         stage3_notes.append("vmalert port 8880 unreachable")
 
     if am_ok:
-        am_h_status, _ = probe_http(f"http://{cfg['calertmanager']}/-/healthy")
+        am_h_status, _ = probe_http(f"{cfg['calertmanager_scheme']}://{cfg['calertmanager']}/-/healthy")
         if am_h_status == 200:
             stage3_notes.append("alertmanager 200 OK")
         else:
@@ -405,9 +447,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         stage4_notes.append("OTel 4318 unreachable")
 
     if opik_ok:
-        opik_h, _ = probe_http(f"http://{cfg['copik']}/health")
+        opik_h, _ = probe_http(f"{cfg['copik_scheme']}://{cfg['copik']}/health")
         if opik_h == 200:
-            api_h, _ = probe_http(f"http://{cfg['copik']}/api/health-check")
+            api_h, _ = probe_http(f"{cfg['copik_scheme']}://{cfg['copik']}/api/health-check")
             if api_h == 200:
                 stage4_notes.append("Opik UI & API 200 OK")
             else:
@@ -433,13 +475,13 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         stages_passed = False
         breaks.append({
             "stage": "Stage 5: Grafana Service",
-            "issue": f"Grafana is not reachable on http://{cfg['cgrafana']}.",
+            "issue": f"Grafana is not reachable on {cfg['cgrafana_scheme']}://{cfg['cgrafana']}.",
             "impact": "Dashboards cannot be accessed.",
             "fix": "Run './scripts/deploy.sh review-grafana' to inspect container state and logs."
         })
     else:
         # Check HTTP health
-        h_code, h_body = probe_http(f"http://{cfg['cgrafana']}/api/health")
+        h_code, h_body = probe_http(f"{cfg['cgrafana_scheme']}://{cfg['cgrafana']}/api/health")
         if h_code != 200:
             stage5_status = "FAIL"
             stages_passed = False
@@ -454,7 +496,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
             # Check Authentication
             auth_header = "Basic " + base64.b64encode(f"{cfg['grafana_user']}:{cfg['grafana_password']}".encode()).decode()
-            auth_code, auth_body = probe_http(f"http://{cfg['cgrafana']}/api/users", headers={"Authorization": auth_header})
+            auth_code, auth_body = probe_http(f"{cfg['cgrafana_scheme']}://{cfg['cgrafana']}/api/users", headers={"Authorization": auth_header})
 
             if auth_code == 401:
                 if not (CENTRAL_DIR / ".env").is_file():
@@ -475,13 +517,13 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                 stage5_notes.append("Auth OK")
 
                 # Check Datasource connection
-                ds_code, ds_body = probe_http(f"http://{cfg['cgrafana']}/api/datasources/name/VictoriaMetrics", headers={"Authorization": auth_header})
+                ds_code, ds_body = probe_http(f"{cfg['cgrafana_scheme']}://{cfg['cgrafana']}/api/datasources/name/VictoriaMetrics", headers={"Authorization": auth_header})
                 if ds_code == 200:
                     try:
                         ds_info = json.loads(ds_body)
                         ds_uid = ds_info.get("uid")
                         ds_url = ds_info.get("url", "http://victoria-metrics:8428")
-                        dh_code, dh_body = probe_http(f"http://{cfg['cgrafana']}/api/datasources/uid/{ds_uid}/health", headers={"Authorization": auth_header})
+                        dh_code, dh_body = probe_http(f"{cfg['cgrafana_scheme']}://{cfg['cgrafana']}/api/datasources/uid/{ds_uid}/health", headers={"Authorization": auth_header})
                         if dh_code == 200 and json.loads(dh_body).get("status") == "OK":
                             stage5_notes.append("Datasource VictoriaMetrics OK")
                         else:
@@ -543,16 +585,16 @@ def cmd_review_central(args: argparse.Namespace) -> int:
     print("-" * 76)
 
     services = [
-        ("VictoriaMetrics", ["central-victoriametrics", "victoria-metrics"], cfg["cvm"], "/health", 200),
-        ("Grafana", ["central-grafana", "grafana"], cfg["cgrafana"], "/api/health", 200),
-        ("vmalert", ["central-vmalert", "vmalert"], cfg["cvmalert"], "/health", 200),
-        ("Alertmanager", ["central-alertmanager", "alertmanager"], cfg["calertmanager"], "/-/healthy", 200),
-        ("OTel Collector", ["central-otelcol", "central-otel-collector", "otel-collector"], cfg["cotel"], "", None),
-        ("Opik Gateway", ["central-opik-frontend", "opik-frontend", "frontend"], cfg["copik"], "/health", 200),
+        ("VictoriaMetrics", ["central-victoriametrics", "victoria-metrics"], cfg["cvm_scheme"], cfg["cvm"], "/health", 200),
+        ("Grafana", ["central-grafana", "grafana"], cfg["cgrafana_scheme"], cfg["cgrafana"], "/api/health", 200),
+        ("vmalert", ["central-vmalert", "vmalert"], cfg["cvmalert_scheme"], cfg["cvmalert"], "/health", 200),
+        ("Alertmanager", ["central-alertmanager", "alertmanager"], cfg["calertmanager_scheme"], cfg["calertmanager"], "/-/healthy", 200),
+        ("OTel Collector", ["central-otelcol", "central-otel-collector", "otel-collector"], cfg["cotel_scheme"], cfg["cotel"], "", None),
+        ("Opik Gateway", ["central-opik-frontend", "opik-frontend", "frontend"], cfg["copik_scheme"], cfg["copik"], "/health", 200),
     ]
 
     all_ok = True
-    for name, cname, addr, health_path, expected_code in services:
+    for name, cname, scheme, addr, health_path, expected_code in services:
         cinfo = inspect_container(engine, cname)
         cstatus = cinfo["status"]
 
@@ -560,7 +602,7 @@ def cmd_review_central(args: argparse.Namespace) -> int:
         http_ok = True
         h_str = ""
         if tcp_ok and health_path:
-            h_code, _ = probe_http(f"http://{addr}{health_path}")
+            h_code, _ = probe_http(f"{scheme}://{addr}{health_path}")
             http_ok = (h_code == expected_code)
             h_str = f"HTTP {h_code}" if http_ok else f"HTTP {h_code} (FAILED)"
 
@@ -626,8 +668,9 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
             # If checking local host, probe directly
             probe_addr = listen
             if not is_local:
-                port = listen.split(":")[-1]
-                probe_addr = f"{nb_ip}:{port}"
+                _, _, port = listen.rpartition(":")
+                nb_host = f"[{nb_ip}]" if ":" in nb_ip and not nb_ip.startswith("[") else nb_ip
+                probe_addr = f"{nb_host}:{port}"
 
             tcp_ok, lat = probe_tcp(probe_addr, timeout=0.5)
             metric_count = 0
@@ -661,9 +704,17 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
                 status_tag = "[OK]"
             elif not tcp_ok and not is_local:
                 # Edge exporters bind to loopback for security; check VictoriaMetrics telemetry ingestion
-                vm_data = query_vm(cfg["cvm"], f'(up{{device="{nb_id}", job="{exp_name}"}} or up{{macbook="{nb_id}", job="{exp_name}"}})')
+                vm_data = query_vm(
+                    cfg["cvm"],
+                    f'(up{{device="{nb_id}", job="{exp_name}"}} or up{{macbook="{nb_id}", job="{exp_name}"}})',
+                    scheme=cfg["cvm_scheme"],
+                )
                 if vm_data and len(vm_data) > 0 and vm_data[0].get("value", [0, "0"])[1] == "1":
-                    rec = query_vm(cfg["cvm"], f'time() - timestamp(up{{device="{nb_id}", job="{exp_name}"}} or up{{macbook="{nb_id}", job="{exp_name}"}})')
+                    rec = query_vm(
+                        cfg["cvm"],
+                        f'time() - timestamp(up{{device="{nb_id}", job="{exp_name}"}} or up{{macbook="{nb_id}", job="{exp_name}"}})',
+                        scheme=cfg["cvm_scheme"],
+                    )
                     sec_str = f"last sample {float(rec[0]['value'][1]):.1f}s ago" if rec else "active"
                     status_tag = "[OK]"
                     details = f"scraped by local vmagent (UP in TSDB, {sec_str})"
@@ -694,7 +745,9 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
         default_port = 443 if srv_scheme == "https" else 80 if "://" in raw_upstream and parsed_port is None else 11234
         srv_port = str(parsed_port or default_port)
         srv_path = parsed_up.path.rstrip("/")
-        srv_addr = f"{srv_host if is_local else nb_ip}:{srv_port}"
+        eff_host = srv_host if is_local else nb_ip
+        eff_host_fmt = f"[{eff_host}]" if ":" in eff_host and not eff_host.startswith("[") else eff_host
+        srv_addr = f"{eff_host_fmt}:{srv_port}"
         srv_ok, _ = probe_tcp(srv_addr, timeout=0.5)
         srv_info = "server unreachable"
         if srv_ok:
@@ -710,7 +763,12 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
                 srv_ok = False
                 srv_info = f"HTTP {s_code}"
         elif not srv_ok and not is_local:
-            vm_up = query_vm(cfg["cvm"], f'(mlx_up{{device="{nb_id}"}} or mlx_up{{macbook="{nb_id}"}})')
+            vm_up = query_vm(
+                cfg["cvm"],
+                f'(mlx_server_up{{device="{nb_id}"}} or mlx_up{{device="{nb_id}"}} '
+                f'or mlx_server_ready{{device="{nb_id}"}} or mlx_up{{macbook="{nb_id}"}})',
+                scheme=cfg["cvm_scheme"],
+            )
             if vm_up and len(vm_up) > 0 and vm_up[0].get("value", [0, "0"])[1] == "1":
                 srv_ok = True
                 srv_info = f"healthy (upstream confirmed by proxy in TSDB, model: {nb.get('model', 'none')})"
@@ -737,37 +795,37 @@ def cmd_review_vm(args: argparse.Namespace) -> int:
     print("               VictoriaMetrics TSDB Configuration & Health")
     print("=" * 76)
     print(f"Container Status  : {cinfo['status']} (Started: {format_ist(cinfo['started_at']) if cinfo['started_at'] else 'N/A'})")
-    print(f"Service Endpoint  : http://{cfg['cvm']}")
+    print(f"Service Endpoint  : {cfg['cvm_scheme']}://{cfg['cvm']}")
 
     tcp_ok, lat = probe_tcp(cfg["cvm"])
-    h_code, _ = probe_http(f"http://{cfg['cvm']}/health")
+    h_code, _ = probe_http(f"{cfg['cvm_scheme']}://{cfg['cvm']}/health")
     print(f"Health Probe      : {'200 OK' if (tcp_ok and h_code == 200) else 'FAILED'}")
 
     if tcp_ok and h_code == 200:
-        total = query_vm(cfg["cvm"], "count({__name__=~\".+\"})")
+        total = query_vm(cfg["cvm"], "count({__name__=~\".+\"})", scheme=cfg["cvm_scheme"])
         total_str = total[0]["value"][1] if total else "0"
         print(f"Total Series      : {total_str} active time series")
 
         # Nodes reporting
         label_data = []
         try:
-            with urllib.request.urlopen(f"http://{cfg['cvm']}/api/v1/label/device/values", timeout=2) as r:
+            with urllib.request.urlopen(f"{cfg['cvm_scheme']}://{cfg['cvm']}/api/v1/label/device/values", timeout=2) as r:
                 label_data = json.loads(r.read().decode())["data"]
         except Exception:
             pass
         if not label_data:
             try:
-                with urllib.request.urlopen(f"http://{cfg['cvm']}/api/v1/label/macbook/values", timeout=2) as r:
+                with urllib.request.urlopen(f"{cfg['cvm_scheme']}://{cfg['cvm']}/api/v1/label/macbook/values", timeout=2) as r:
                     label_data = json.loads(r.read().decode())["data"]
             except Exception:
                 pass
         print(f"Reporting Nodes   : {', '.join(label_data) if label_data else 'None'}")
         for node in label_data:
             rec_q = f'time() - max(timestamp({{device="{node}"}} or {{macbook="{node}"}}))'
-            recency = query_vm(cfg["cvm"], rec_q)
+            recency = query_vm(cfg["cvm"], rec_q, scheme=cfg["cvm_scheme"])
             sec = float(recency[0]["value"][1]) if recency else None
             cnt_q = f'count({{device="{node}"}} or {{macbook="{node}"}})'
-            count_res = query_vm(cfg["cvm"], cnt_q)
+            count_res = query_vm(cfg["cvm"], cnt_q, scheme=cfg["cvm_scheme"])
             c_str = count_res[0]["value"][1] if count_res else "0"
             rec_str = f"{sec:.1f}s ago" if sec is not None else "no data"
             print(f"  • Node '{node}': {c_str} series (last sample {rec_str})")
@@ -789,17 +847,17 @@ def cmd_review_alertmanager(args: argparse.Namespace) -> int:
     print("                  Alertmanager Configuration & Health")
     print("=" * 76)
     print(f"Container Status  : {cinfo['status']} (Started: {format_ist(cinfo['started_at']) if cinfo['started_at'] else 'N/A'})")
-    print(f"Service Endpoint  : http://{cfg['calertmanager']}")
+    print(f"Service Endpoint  : {cfg['calertmanager_scheme']}://{cfg['calertmanager']}")
 
     tcp_ok, lat = probe_tcp(cfg["calertmanager"])
-    h_code, _ = probe_http(f"http://{cfg['calertmanager']}/-/healthy")
+    h_code, _ = probe_http(f"{cfg['calertmanager_scheme']}://{cfg['calertmanager']}/-/healthy")
     print(f"Health Probe      : {'200 OK' if (tcp_ok and h_code == 200) else 'FAILED'}")
 
     am_cfg_path = CENTRAL_DIR / "config" / "alertmanager.yml"
     print(f"Config File       : {am_cfg_path} ({'present' if am_cfg_path.is_file() else 'missing'})")
 
     if tcp_ok and h_code == 200:
-        a_code, a_body = probe_http(f"http://{cfg['calertmanager']}/api/v2/alerts")
+        a_code, a_body = probe_http(f"{cfg['calertmanager_scheme']}://{cfg['calertmanager']}/api/v2/alerts")
         if a_code == 200:
             try:
                 alerts = json.loads(a_body)
@@ -823,17 +881,17 @@ def cmd_review_vmalert(args: argparse.Namespace) -> int:
     print("                      vmalert Configuration & Health")
     print("=" * 76)
     print(f"Container Status  : {cinfo['status']} (Started: {format_ist(cinfo['started_at']) if cinfo['started_at'] else 'N/A'})")
-    print(f"Service Endpoint  : http://{cfg['cvmalert']}")
+    print(f"Service Endpoint  : {cfg['cvmalert_scheme']}://{cfg['cvmalert']}")
 
     tcp_ok, lat = probe_tcp(cfg["cvmalert"])
-    h_code, _ = probe_http(f"http://{cfg['cvmalert']}/health")
+    h_code, _ = probe_http(f"{cfg['cvmalert_scheme']}://{cfg['cvmalert']}/health")
     print(f"Health Probe      : {'200 OK' if (tcp_ok and h_code == 200) else 'FAILED'}")
 
     rules_path = CENTRAL_DIR / "config" / "vmalert-rules.yml"
     print(f"Rules File        : {rules_path} ({'present' if rules_path.is_file() else 'missing'})")
 
     if tcp_ok and h_code == 200:
-        r_code, r_body = probe_http(f"http://{cfg['cvmalert']}/api/v1/rules")
+        r_code, r_body = probe_http(f"{cfg['cvmalert_scheme']}://{cfg['cvmalert']}/api/v1/rules")
         if r_code == 200:
             try:
                 r_data = json.loads(r_body).get("data", {})
@@ -843,7 +901,7 @@ def cmd_review_vmalert(args: argparse.Namespace) -> int:
             except Exception:
                 pass
 
-        a_code, a_body = probe_http(f"http://{cfg['cvmalert']}/api/v1/alerts")
+        a_code, a_body = probe_http(f"{cfg['cvmalert_scheme']}://{cfg['cvmalert']}/api/v1/alerts")
         if a_code == 200:
             try:
                 a_data = json.loads(a_body).get("data", {}).get("alerts", [])
@@ -870,7 +928,7 @@ def cmd_review_otel(args: argparse.Namespace) -> int:
     print("              OpenTelemetry Collector Configuration & Health")
     print("=" * 76)
     print(f"Container Status  : {cinfo['status']} (Started: {format_ist(cinfo['started_at']) if cinfo['started_at'] else 'N/A'})")
-    print(f"OTLP HTTP Receiver: http://{cfg['cotel']}")
+    print(f"OTLP HTTP Receiver: {cfg['cotel_scheme']}://{cfg['cotel']}")
 
     tcp_ok, lat = probe_tcp(cfg["cotel"])
     print(f"Port 4318 Probe   : {'LISTENING' if tcp_ok else 'UNREACHABLE'}")
@@ -892,10 +950,10 @@ def cmd_review_opik(args: argparse.Namespace) -> int:
     print("=" * 76)
     print("                   Opik Tracing Suite Health & Config")
     print("=" * 76)
-    print(f"Gateway Endpoint  : http://{cfg['copik']}")
+    print(f"Gateway Endpoint  : {cfg['copik_scheme']}://{cfg['copik']}")
 
     tcp_ok, lat = probe_tcp(cfg["copik"])
-    h_code, _ = probe_http(f"http://{cfg['copik']}/health")
+    h_code, _ = probe_http(f"{cfg['copik_scheme']}://{cfg['copik']}/health")
     print(f"Health Probe      : {'200 OK' if (tcp_ok and h_code == 200) else 'FAILED / NOT RUNNING'}")
 
     opik_containers = [

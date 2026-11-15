@@ -19,12 +19,15 @@ Run:
 """
 
 import json
+import socket
 import sys
 import threading
+import time
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -34,7 +37,7 @@ import mlx_metrics_proxy as p  # noqa: E402
 
 MODEL = "test/model-1bit"
 UPSTREAM_SEEN = []      # request bodies the stub upstream received
-UPSTREAM_MODE = {"tool_calls": False, "status": 200}
+UPSTREAM_MODE = {"tool_calls": False, "status": 200, "split_utf8": False}
 
 
 def _logprobs_block(n_top):
@@ -94,16 +97,33 @@ class StubUpstream(BaseHTTPRequestHandler):
             self.send_header("Connection", "close")
             self.end_headers()
             self.close_connection = True
-            for piece in ("Hello", " world"):
+            if UPSTREAM_MODE.get("split_utf8"):
                 chunk = {
                     "id": "chatcmpl-stub", "object": "chat.completion.chunk",
                     "created": 1, "model": MODEL,
                     "choices": [{"index": 0, "finish_reason": None,
                                  "delta": {"role": "assistant",
-                                           "content": piece}}],
+                                           "content": "Hello \U0001f30d"}}],
                 }
-                self.wfile.write(("data: " + json.dumps(chunk) + "\n\n").encode())
+                raw_sse = ("data: " + json.dumps(chunk, ensure_ascii=False) + "\n\n").encode("utf-8")
+                globe_bytes = "\U0001f30d".encode("utf-8")
+                split_at = raw_sse.index(globe_bytes) + 2
+                self.wfile.write(raw_sse[:split_at])
                 self.wfile.flush()
+                time.sleep(0.01)
+                self.wfile.write(raw_sse[split_at:])
+                self.wfile.flush()
+            else:
+                for piece in ("Hello", " world"):
+                    chunk = {
+                        "id": "chatcmpl-stub", "object": "chat.completion.chunk",
+                        "created": 1, "model": MODEL,
+                        "choices": [{"index": 0, "finish_reason": None,
+                                     "delta": {"role": "assistant",
+                                               "content": piece}}],
+                    }
+                    self.wfile.write(("data: " + json.dumps(chunk) + "\n\n").encode())
+                    self.wfile.flush()
             done = {
                 "id": "chatcmpl-stub", "object": "chat.completion.chunk",
                 "created": 1, "model": MODEL,
@@ -195,7 +215,7 @@ def series(text, name):
 @pytest.fixture(autouse=True)
 def reset():
     UPSTREAM_SEEN.clear()
-    UPSTREAM_MODE.update(tool_calls=False, status=200, cached=0)
+    UPSTREAM_MODE.update(tool_calls=False, status=200, cached=0, split_utf8=False)
     p.Proxy.stream_sample = 0.0
     p.Proxy.logprobs_top = 2
 
@@ -385,3 +405,124 @@ def test_queue_wait_histogram_ignores_model_list(stack):
     with urllib.request.urlopen(stack + "/v1/models", timeout=10) as r:
         assert r.status == 200
     assert series(metrics(stack), "mlx_queue_wait_seconds_count") == before
+
+
+def test_query_string_routing_metrics_and_chat_completions(stack):
+    """Query strings on /metrics and /v1/chat/completions still route accurately."""
+    with urllib.request.urlopen(stack + "/metrics?foo=1", timeout=10) as r:
+        assert r.status == 200
+        assert "mlx_requests_total" in r.read().decode()
+
+    before = series(metrics(stack), "mlx_requests_total")
+    req = urllib.request.Request(
+        stack + "/v1/chat/completions?foo=bar",
+        data=json.dumps({
+            "model": MODEL,
+            "messages": [{"role": "user", "content": "hi"}],
+        }).encode(),
+        headers={"Content-Type": "application/json", "X-Mlx-Trace": "0"},
+    )
+    with urllib.request.urlopen(req, timeout=10) as r:
+        assert r.status == 200
+    assert series(metrics(stack), "mlx_requests_total") == before + 1
+
+
+def test_malformed_content_length_returns_400(stack):
+    """Non-integer or negative Content-Length must fail with HTTP 400."""
+    parsed = urlsplit(stack)
+    for bad_len in ("not-an-int", "-5"):
+        with socket.create_connection((parsed.hostname, parsed.port), timeout=5) as sock:
+            raw_req = (
+                f"POST /v1/chat/completions HTTP/1.1\r\n"
+                f"Host: {parsed.netloc}\r\n"
+                f"Content-Length: {bad_len}\r\n"
+                f"Connection: close\r\n\r\n"
+            ).encode()
+            sock.sendall(raw_req)
+            resp = b""
+            while True:
+                chunk = sock.recv(4096)
+                if not chunk:
+                    break
+                resp += chunk
+        text = resp.decode("utf-8", "replace")
+        assert text.startswith("HTTP/1.1 400") or text.startswith("HTTP/1.0 400")
+        assert "invalid Content-Length" in text
+
+
+def test_non_dict_json_body_returns_400(stack):
+    """Non-object JSON payload on chat/completions must fail with HTTP 400."""
+    req = urllib.request.Request(
+        stack + "/v1/chat/completions",
+        data=json.dumps([1, 2, 3]).encode(),
+        headers={"Content-Type": "application/json", "X-Mlx-Trace": "0"},
+    )
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        urllib.request.urlopen(req, timeout=10)
+    assert exc.value.code == 400
+
+
+def test_stream_parser_reasoning_null_usage_and_indexed_tool_calls():
+    """Verify _StreamParser merges split tool_calls by index and handles null usage."""
+    parser = p._StreamParser()
+    chunks = [
+        {"choices": [{"index": 0, "finish_reason": None,
+                      "delta": {"reasoning_content": "step one"}}],
+         "usage": None},
+        {"choices": [{"index": 0, "finish_reason": None,
+                      "delta": {"tool_calls": [{"index": 0, "id": "call_0",
+                                                "type": "function",
+                                                "function": {"name": "get_"}}]}}]},
+        {"choices": [{"index": 0, "finish_reason": None,
+                      "delta": {"tool_calls": [{"index": 0,
+                                                "function": {"name": "weather"}}]}}]},
+        {"choices": [{"index": 0, "finish_reason": "tool_calls",
+                      "delta": {"content": "done",
+                                "tool_calls": [{"index": 1, "id": "call_1",
+                                                "type": "function",
+                                                "function": {"name": "search"}}]}}],
+         "usage": None},
+    ]
+    sse = "".join("data: " + json.dumps(c) + "\n\n" for c in chunks) + "data: [DONE]\n\n"
+    parser.feed(sse)
+
+    assert parser.reasoning == "step one"
+    assert parser.content == "done"
+    assert parser.tool_calls == 2
+    assert [t["name"] for t in parser.tools] == ["get_weather", "search"]
+    assert parser.completion_tokens() >= 3
+
+
+def test_strict_model_still_caps_cardinality():
+    """Enabling strict_model must NOT bypass _max_model_labels cardinality cap."""
+    orig_strict = p.Proxy.strict_model
+    orig_max = p.Proxy._max_model_labels
+    orig_seen = set(p.Proxy._seen_models)
+    try:
+        p.Proxy.strict_model = True
+        p.Proxy._max_model_labels = 2
+        p.Proxy._seen_models.clear()
+        assert p.Proxy._bound_model_label("unseen-1") == "unseen-1"
+        assert p.Proxy._bound_model_label("unseen-2") == "unseen-2"
+        assert p.Proxy._bound_model_label("unseen-3") == "other"
+    finally:
+        p.Proxy.strict_model = orig_strict
+        p.Proxy._max_model_labels = orig_max
+        p.Proxy._seen_models.clear()
+        p.Proxy._seen_models.update(orig_seen)
+
+
+def test_streaming_multibyte_utf8_split_across_chunks(stack):
+    """Streaming UTF-8 split mid-codepoint must decode cleanly without replacement chars."""
+    before = series(metrics(stack), "mlx_requests_total")
+    UPSTREAM_MODE["split_utf8"] = True
+    status, _, body = post(stack, {
+        "model": MODEL,
+        "messages": [{"role": "user", "content": "hi"}],
+        "stream": True,
+    })
+    assert status == 200
+    decoded = body.decode("utf-8")
+    assert "Hello \U0001f30d" in decoded
+    assert "\ufffd" not in decoded
+    assert series(metrics(stack), "mlx_requests_total") == before + 1

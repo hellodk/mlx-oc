@@ -134,7 +134,7 @@ groups:
         runbook: "https://docs.example.com/mlx-monitoring/runbook#memory-pressure"
 
     - alert: MLXDiskFull
-      expr: (mlx_hw_disk_used_bytes / mlx_hw_disk_total_bytes) > 0.85
+      expr: ((mlx_hw_disk_used_bytes / mlx_hw_disk_total_bytes) * 100) > 85
       for: 15m
       labels:
         severity: warning
@@ -301,7 +301,7 @@ groups:
         runbook: "https://docs.example.com/mlx-monitoring/runbook#upstream-down"
 
     - alert: MLXThroughputDrop
-      expr: (rate(mlx_requests_total[5m]) < 0.1) and (rate(mlx_requests_total[1h]) > 0)
+      expr: (sum by (device, macbook) (rate(mlx_requests_total[5m])) < 0.1) and (sum by (device, macbook) (rate(mlx_requests_total[1h])) > 0)
       for: 15m
       labels:
         severity: warning

@@ -193,6 +193,8 @@ ENABLE_HW_TELEMETRY=true
 ENABLE_KV_AGENT=true
 ENABLE_SERVER_MONITOR=true
 ENABLE_LOGTAILER=true
+ENABLE_PROCESS_PROFILER=true
+ENABLE_SBOM_COLLECTOR=true
 ENABLE_VMAGENT=true
 
 # Listen ports (loopback-only under the push model)
@@ -312,7 +314,7 @@ Single entrypoint with four actions: `start`, `stop`, `status`, `restart`.
 - **status**: Prints JSON of running PIDs, node identity, model path, and central endpoints.
 - **restart**: stop → wait 2s → start.
 
-Spawn order: supervisor → kv → logtailer → proxy → hw.
+Spawn order: supervisor → kv → logtailer → proxy → hw → process → sbom → vmagent.
 
 ### Proxy (`mlx_metrics_proxy.py`)
 
@@ -702,7 +704,7 @@ When you deploy the monitoring stack and find that **no data is being populated 
 The Doctor executes a 5-stage telemetry traceroute that isolates the failure domain in seconds:
 
 1. **Stage 1 (Central TSDB Ingestion Gate)**: Checks TCP reachability, HTTP `/health`, and total active time-series count in VictoriaMetrics. If this fails, the central TSDB is stopped or unreachable.
-2. **Stage 2 (Edge Telemetry Ingestion Gate)**: Queries VictoriaMetrics for live `up{macbook="<node_id>"}` gauges across the edge exporters (`mlx-proxy`, `mlx-hw`, `mlx-kv`, `mlx-supervisor`, `mlx-logtailer`) and measures sample recency (`time() - max(timestamp(up))`). If samples are >300s old or missing, vmagent on that edge Mac is down or blocked by network/firewall.
+2. **Stage 2 (Edge Telemetry Ingestion Gate)**: Queries VictoriaMetrics for live `up{device="<node_id>"}` gauges across the edge exporters (`mlx-proxy`, `mlx-hw`, `mlx-kv`, `mlx-supervisor`, `mlx-logtailer`, `mlx-process`, `mlx-sbom`) and measures sample recency (`time() - max(timestamp(up))`). If samples are >300s old or missing, vmagent on that edge Mac is down or blocked by network/firewall.
 3. **Stage 3 (Alerting & Rule Engine Gate)**: Verifies `vmalert` rule execution and `alertmanager` notification routing.
 4. **Stage 4 (Logs & Traces Ingestion Gate)**: Verifies OTLP HTTP receiver (`:4318`) and Opik Gateway (`:32173`).
 5. **Stage 5 (Grafana & Query Pipeline Gate)**: Validates Grafana HTTP health, credentials/auth, VictoriaMetrics datasource registration, and executes an active datasource proxy query (`count(up)`).

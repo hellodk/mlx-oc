@@ -60,7 +60,7 @@ class _JsonFormatter(logging.Formatter):
             val = getattr(record, key, None)
             if val:
                 payload[key] = val
-        return json.dumps(payload, ensure_ascii=False)
+        return json.dumps(payload, ensure_ascii=False, default=str)
 
 
 def setup_logging(service: str, macbook: str, level: str = "INFO",
@@ -200,5 +200,38 @@ def parse_upstream_url(
         port = 443
     else:
         port = default_port
-    base_url = f"{scheme}://{host}:{port}"
+    host_str = f"[{host}]" if ":" in host and not host.startswith("[") else host
+    base_url = f"{scheme}://{host_str}:{port}"
     return scheme, host, port, base_url
+
+
+def parse_listen_addr(
+    raw: str,
+    default_host: str = "127.0.0.1",
+    default_port: int = 8080,
+) -> tuple[str, int]:
+    """Parse a listen address (``host:port``, ``[ipv6]:port``, or ``port``) cleanly."""
+    value = (raw or "").strip()
+    if not value:
+        return default_host, default_port
+    if value.startswith("["):
+        host_part, sep, port_part = value[1:].partition("]")
+        if not sep:
+            raise ValueError(f"invalid IPv6 listen address: {raw!r}")
+        host = host_part.strip() or default_host
+        port_str = port_part.lstrip(":").strip()
+        port = int(port_str) if port_str else default_port
+    elif ":" in value:
+        host_part, _, port_part = value.rpartition(":")
+        if ":" in host_part:
+            raise ValueError(
+                f"unbracketed IPv6 listen address {raw!r}; use [addr]:port"
+            )
+        host = host_part.strip() or default_host
+        port = int(port_part.strip()) if port_part.strip() else default_port
+    else:
+        host = default_host
+        port = int(value)
+    if not (1 <= port <= 65535):
+        raise ValueError(f"listen port out of range (1..65535): {port}")
+    return host, port

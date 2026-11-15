@@ -48,6 +48,12 @@ inhibit_rules:
     equal: ["device"]
 
   - source_matchers:
+      - alertname = "MLXDeviceSilent"
+    target_matchers:
+      - alertname = "MLXMacbookSilent"
+    equal: ["device"]
+
+  - source_matchers:
       - alertname =~ "MLXDeviceSilent|MLXMacbookSilent"
     target_matchers:
       - alertname =~ "MLX.*"

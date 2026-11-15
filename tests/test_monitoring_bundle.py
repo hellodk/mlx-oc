@@ -268,18 +268,152 @@ def test_deploy_review_grafana_command():
     assert "Fail Checks & Health:" in proc.stdout
 
 
-def test_diagnostics_doctor_command():
-    """Verify diagnostics doctor runs end-to-end pipeline traceroute."""
+def _make_hermetic_diag_env(tmp_path: Path):
+    """Build isolated central/edge dirs and a local stub HTTP server for diagnostics tests."""
+    import contextlib
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class _StubDiagHandler(BaseHTTPRequestHandler):
+        def log_message(self, fmt, *args):
+            return
+
+        def do_GET(self):
+            path = self.path.split("?", 1)[0]
+            ctype = "application/json"
+            if path in ("/health", "/-/healthy"):
+                code, body = 200, "OK"
+                ctype = "text/plain"
+            elif path == "/api/health":
+                code, body = 200, json.dumps({"database": "ok", "version": "10.0.0"})
+            elif path == "/api/health-check":
+                code, body = 200, json.dumps({"healthy": True})
+            elif path == "/api/users":
+                code, body = 200, json.dumps([{"login": "admin"}])
+            elif path == "/api/datasources/name/VictoriaMetrics":
+                code, body = 200, json.dumps({"id": 1, "uid": "vm-uid", "name": "VictoriaMetrics"})
+            elif path == "/api/datasources/uid/vm-uid/health":
+                code, body = 200, json.dumps({"status": "OK"})
+            elif path == "/api/v1/query":
+                code, body = 200, json.dumps({
+                    "status": "success",
+                    "data": {
+                        "resultType": "vector",
+                        "result": [{
+                            "metric": {"device": "test-node", "macbook": "test-node"},
+                            "value": [1700000000, "1"],
+                        }],
+                    },
+                })
+            elif path in ("/api/v1/label/device/values", "/api/v1/label/macbook/values"):
+                code, body = 200, json.dumps({"status": "success", "data": ["test-node"]})
+            elif path == "/api/v2/alerts":
+                code, body = 200, json.dumps([])
+            elif path == "/api/v1/rules":
+                code, body = 200, json.dumps({
+                    "status": "success",
+                    "data": {"groups": [{"name": "mlx", "rules": [{"name": "TestRule", "state": "ok", "health": "ok"}]}]},
+                })
+            elif path == "/api/v1/alerts":
+                code, body = 200, json.dumps({"status": "success", "data": {"alerts": []}})
+            elif path == "/metrics":
+                code, body = 200, "# HELP mlx_up ok\n# TYPE mlx_up gauge\nmlx_up 1\n"
+                ctype = "text/plain"
+            elif path == "/v1/models":
+                code, body = 200, json.dumps({"object": "list", "data": [{"id": "test-model"}]})
+            else:
+                code, body = 404, json.dumps({"error": "not found"})
+
+            raw = body.encode("utf-8")
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+    @contextlib.contextmanager
+    def _ctx():
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), _StubDiagHandler)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            port = srv.server_address[1]
+            addr = f"127.0.0.1:{port}"
+            edge_dir = tmp_path / "edge"
+            central_dir = tmp_path / "central"
+            (edge_dir / "config").mkdir(parents=True, exist_ok=True)
+            (central_dir / "config").mkdir(parents=True, exist_ok=True)
+
+            (edge_dir / "config" / "nodes.yml").write_text(
+                yaml.safe_dump({
+                    "central": {"victoria_metrics": addr, "otel": addr, "opik": addr},
+                    "devices": [{
+                        "node_id": "test-node",
+                        "ip": "127.0.0.1",
+                        "role": "edge",
+                        "enabled": True,
+                        "upstream": f"http://{addr}",
+                        "model": "test-model",
+                        "model_path": str(tmp_path / "model"),
+                    }],
+                }),
+                encoding="utf8",
+            )
+            (edge_dir / "config" / "edge.env").write_text(
+                "\n".join([
+                    f"CENTRAL_VICTORIA_METRICS={addr}",
+                    f"MLX_UPSTREAM=http://{addr}",
+                    f"PROXY_LISTEN={addr}",
+                    f"HW_LISTEN={addr}",
+                    f"KV_LISTEN={addr}",
+                    f"SUPERVISOR_LISTEN={addr}",
+                    f"LOGTAILER_LISTEN={addr}",
+                    f"PROCESS_LISTEN={addr}",
+                    f"SBOM_LISTEN={addr}",
+                ]) + "\n",
+                encoding="utf8",
+            )
+            (central_dir / ".env").write_text(
+                "GRAFANA_ADMIN_USER=admin\nGRAFANA_ADMIN_PASSWORD=admin\n",
+                encoding="utf8",
+            )
+            (central_dir / "config" / "alertmanager.yml").write_text("route: {}\n", encoding="utf8")
+            (central_dir / "config" / "vmalert-rules.yml").write_text("groups: []\n", encoding="utf8")
+            (central_dir / "config" / "otelcol-config.yaml").write_text("receivers: {}\n", encoding="utf8")
+
+            env = dict(
+                os.environ,
+                SKIP_GIT_PULL="1",
+                MLX_EDGE_DIR=str(edge_dir),
+                MLX_CENTRAL_DIR=str(central_dir),
+                CENTRAL_VICTORIA_METRICS=addr,
+                CENTRAL_OTEL=addr,
+                CENTRAL_OPIK=addr,
+                CENTRAL_GRAFANA=addr,
+                CENTRAL_VMALERT=addr,
+                CENTRAL_ALERTMANAGER=addr,
+            )
+            yield env
+        finally:
+            srv.shutdown()
+            srv.server_close()
+
+    return _ctx()
+
+
+def test_diagnostics_doctor_command(tmp_path):
+    """Verify diagnostics doctor runs end-to-end pipeline traceroute against stub central/edge."""
     import subprocess
     diag_script = BUNDLE_DIR / "scripts" / "diagnostics.py"
-    proc = subprocess.run(
-        [sys.executable, str(diag_script), "doctor"],
-        capture_output=True,
-        text=True,
-        cwd=str(BUNDLE_DIR),
-        timeout=15,
-    )
-    assert proc.returncode == 0, f"diagnostics doctor failed: {proc.stderr}"
+    with _make_hermetic_diag_env(tmp_path) as env:
+        proc = subprocess.run(
+            [sys.executable, str(diag_script), "doctor"],
+            capture_output=True,
+            text=True,
+            cwd=str(BUNDLE_DIR),
+            env=env,
+            timeout=15,
+        )
+    assert proc.returncode == 0, f"diagnostics doctor failed: {proc.stdout}\n{proc.stderr}"
     assert "MLX Observability Pipeline Doctor" in proc.stdout
     assert "[Stage 1/5] Central TSDB Ingestion" in proc.stdout
     assert "[Stage 2/5] Edge Exporters & Nodes" in proc.stdout
@@ -288,43 +422,47 @@ def test_diagnostics_doctor_command():
     assert "[Stage 5/5] Grafana & Query Pipeline" in proc.stdout
 
 
-def test_diagnostics_review_central_command():
-    """Verify review-central audits all central services."""
+def test_diagnostics_review_central_command(tmp_path):
+    """Verify review-central audits all central services against stub server."""
     import subprocess
     diag_script = BUNDLE_DIR / "scripts" / "diagnostics.py"
-    proc = subprocess.run(
-        [sys.executable, str(diag_script), "review-central"],
-        capture_output=True,
-        text=True,
-        cwd=str(BUNDLE_DIR),
-        timeout=15,
-    )
-    assert proc.returncode == 0, f"review-central failed: {proc.stderr}"
+    with _make_hermetic_diag_env(tmp_path) as env:
+        proc = subprocess.run(
+            [sys.executable, str(diag_script), "review-central"],
+            capture_output=True,
+            text=True,
+            cwd=str(BUNDLE_DIR),
+            env=env,
+            timeout=15,
+        )
+    assert proc.returncode == 0, f"review-central failed: {proc.stdout}\n{proc.stderr}"
     assert "Central Observability Stack Health & Config Audit" in proc.stdout
     assert "VictoriaMetrics" in proc.stdout
     assert "Grafana" in proc.stdout
     assert "Alertmanager" in proc.stdout
 
 
-def test_diagnostics_review_edge_command():
-    """Verify review-edge audits edge nodes and exporters."""
+def test_diagnostics_review_edge_command(tmp_path):
+    """Verify review-edge audits edge nodes and exporters against stub server."""
     import subprocess
     diag_script = BUNDLE_DIR / "scripts" / "diagnostics.py"
-    proc = subprocess.run(
-        [sys.executable, str(diag_script), "review-edge"],
-        capture_output=True,
-        text=True,
-        cwd=str(BUNDLE_DIR),
-        timeout=15,
-    )
-    assert proc.returncode == 0, f"review-edge failed: {proc.stderr}"
+    with _make_hermetic_diag_env(tmp_path) as env:
+        proc = subprocess.run(
+            [sys.executable, str(diag_script), "review-edge"],
+            capture_output=True,
+            text=True,
+            cwd=str(BUNDLE_DIR),
+            env=env,
+            timeout=15,
+        )
+    assert proc.returncode == 0, f"review-edge failed: {proc.stdout}\n{proc.stderr}"
     assert "Edge Monitoring Stack Health & Config Audit" in proc.stdout
     assert "mlx-proxy" in proc.stdout
     assert "mlx-hw" in proc.stdout
     assert "mlx-server" in proc.stdout
 
 
-def test_diagnostics_granular_service_reviews():
+def test_diagnostics_granular_service_reviews(tmp_path):
     """Verify granular review commands for VM, Alertmanager, vmalert, OTel, and Opik."""
     import subprocess
     diag_script = BUNDLE_DIR / "scripts" / "diagnostics.py"
@@ -335,37 +473,35 @@ def test_diagnostics_granular_service_reviews():
         ("review-otel", "OpenTelemetry Collector Configuration & Health"),
         ("review-opik", "Opik Tracing Suite Health & Config"),
     ]
-    for subcmd, expected_header in subcommands:
-        proc = subprocess.run(
-            [sys.executable, str(diag_script), subcmd],
-            capture_output=True,
-            text=True,
-            cwd=str(BUNDLE_DIR),
-            timeout=15,
-        )
-        if subcmd == "review-opik":
-            # Opik is an optional compose profile (--opik)
-            assert proc.returncode in (0, 1), f"{subcmd} failed unexpectedly: {proc.stderr}"
-        else:
-            assert proc.returncode == 0, f"{subcmd} failed: {proc.stderr}"
-        assert expected_header in proc.stdout, f"{subcmd} missing header {expected_header}"
+    with _make_hermetic_diag_env(tmp_path) as env:
+        for subcmd, expected_header in subcommands:
+            proc = subprocess.run(
+                [sys.executable, str(diag_script), subcmd],
+                capture_output=True,
+                text=True,
+                cwd=str(BUNDLE_DIR),
+                env=env,
+                timeout=15,
+            )
+            assert proc.returncode == 0, f"{subcmd} failed: {proc.stdout}\n{proc.stderr}"
+            assert expected_header in proc.stdout, f"{subcmd} missing header {expected_header}"
 
 
-def test_deploy_sh_cli_dispatcher_doctor():
-    """Verify deploy.sh doctor CLI subcommand dispatches to diagnostics.py."""
+def test_deploy_sh_cli_dispatcher_doctor(tmp_path):
+    """Verify deploy.sh doctor CLI subcommand dispatches to diagnostics.py hermetically."""
     import subprocess
     deploy_sh = BUNDLE_DIR / "scripts" / "deploy.sh"
-    env = dict(os.environ, SKIP_GIT_PULL="1")
-    proc = subprocess.run(
-        [str(deploy_sh), "doctor"],
-        capture_output=True,
-        text=True,
-        cwd=str(REPO_ROOT),
-        stdin=subprocess.DEVNULL,
-        env=env,
-        timeout=15,
-    )
-    assert proc.returncode == 0, f"deploy.sh doctor failed: {proc.stderr}"
+    with _make_hermetic_diag_env(tmp_path) as env:
+        proc = subprocess.run(
+            [str(deploy_sh), "doctor"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            stdin=subprocess.DEVNULL,
+            env=env,
+            timeout=15,
+        )
+    assert proc.returncode == 0, f"deploy.sh doctor failed: {proc.stdout}\n{proc.stderr}"
     assert "MLX Observability Pipeline Doctor" in proc.stdout
     assert "ALL PIPELINE GATES PASSED" in proc.stdout
 
@@ -1295,13 +1431,24 @@ def test_bundle_stop_does_not_kill_self(tmp_path, monkeypatch):
     bundle_pid_file.write_text(str(os.getpid()), encoding="utf8")
     (pid_dir / "hw.pid").write_text("999991", encoding="utf8")
 
+    alive = {999991: True, os.getpid(): True}
     monkeypatch.setattr(mb, "PID_FILE", bundle_pid_file)
-    monkeypatch.setattr(mb, "pid_alive", lambda _p: True)
+    monkeypatch.setattr(mb, "pid_alive", lambda p: alive.get(p, False))
+    monkeypatch.setattr(mb, "_pid_matches_service", lambda p, _tokens: p == 999991)
 
     killed = []
+
+    def _rec_killpg(pgid, sig):
+        killed.append(("killpg", pgid, sig))
+        alive[pgid] = False
+
+    def _rec_kill(pid, sig):
+        killed.append(("kill", pid, sig))
+        alive[pid] = False
+
     monkeypatch.setattr(os, "getpgid", lambda p: p)
-    monkeypatch.setattr(os, "killpg", lambda pgid, sig: killed.append(("killpg", pgid, sig)))
-    monkeypatch.setattr(os, "kill", lambda pid, sig: killed.append(("kill", pid, sig)))
+    monkeypatch.setattr(os, "killpg", _rec_killpg)
+    monkeypatch.setattr(os, "kill", _rec_kill)
 
     bundle = object.__new__(mb.Bundle)
     bundle.pid_dir = pid_dir
@@ -1475,3 +1622,366 @@ def test_validate_nodes_uses_mlx_device_id_and_custom_ports(tmp_path, monkeypatc
     assert rc == 0
     assert "node     : dev-b" in out
     assert f"WARN  port {busy_port} is already in use" in out
+
+
+def test_log_tailer_partial_line_traceback_and_queue_gauge(tmp_path, monkeypatch):
+    """Verify log tailer partial-line idle flush, traceback grouping, and queue gauge."""
+    import collections
+    import queue
+    import threading
+    import time
+    import mlx_server_log_tailer as lt
+
+    log_path = tmp_path / "server.log"
+    log_path.write_text("", encoding="utf8")
+
+    monkeypatch.setattr(lt.Tailer, "_prepare_exporter", lambda self, _ep: None)
+    tailer = lt.Tailer(
+        log_path=log_path,
+        exporter="http://127.0.0.1:4318",
+        rate=100.0,
+        include_http=True,
+        all_lines=True,
+        backfill=10,
+        project="proj",
+        macbook="mac-1",
+    )
+
+    emitted: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(tailer, "_emit", lambda msg, sev, cat: emitted.append((msg, sev, cat)))
+
+    # 1. Multi-line traceback grouping
+    tailer._handle_line("Traceback (most recent call last):\n")
+    tailer._handle_line('  File "app.py", line 10, in run\n')
+    assert len(emitted) == 0
+    tailer._handle_line("ValueError: bad input\n")
+    assert len(emitted) == 1
+    msg, sev, cat = emitted[0]
+    assert "Traceback (most recent call last):" in msg
+    assert "ValueError: bad input" in msg
+    assert sev == "error"
+    assert cat == "python"
+
+    # 2. _update_queue_gauge with both Queue (qsize) and deque (len)
+    class _FakeProc:
+        def __init__(self, q):
+            self._queue = q
+
+    q = queue.Queue()
+    q.put("a")
+    q.put("b")
+    tailer._processor = _FakeProc(q)
+    tailer._update_queue_gauge()
+    assert lt.G_QUEUE._value.get() == 2
+
+    dq = collections.deque(["x", "y", "z"])
+    tailer._processor = _FakeProc(dq)
+    tailer._update_queue_gauge()
+    assert lt.G_QUEUE._value.get() == 3
+
+    # 3. Partial-line buffering + idle flush
+    emitted.clear()
+    monkeypatch.setattr(lt, "PARTIAL_LINE_FLUSH_TIMEOUT_S", 0.05)
+    monkeypatch.setattr(lt, "DEFAULT_POLL_INTERVAL", 0.01)
+
+    t = threading.Thread(target=tailer.run, daemon=True)
+    t.start()
+    try:
+        time.sleep(0.05)
+        with open(log_path, "ab") as fh:
+            fh.write(b"partial without newline")
+            fh.flush()
+        deadline = time.monotonic() + 2.0
+        while not emitted and time.monotonic() < deadline:
+            time.sleep(0.02)
+    finally:
+        tailer.stop.set()
+        t.join(timeout=2.0)
+
+    assert len(emitted) == 1
+    assert emitted[0][0] == "partial without newline"
+
+
+def test_hw_telemetry_proc_net_dev_parsing(tmp_path, monkeypatch):
+    """Verify Linux /proc/net/dev fallback parses bytes and packets accurately."""
+    import builtins
+    import mlx_hw_telemetry as hw
+
+    proc_dev = tmp_path / "net_dev"
+    proc_dev.write_text(
+        "Inter-|   Receive                                                |  Transmit\n"
+        " face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets\n"
+        "    lo:  100      1    0    0    0     0          0         0      200      2\n"
+        "  en0: 1000     10    0    0    0     0          0         0     2000     20   0 0 0 0 0 0\n",
+        encoding="utf8",
+    )
+
+    real_exists = os.path.exists
+    real_open = builtins.open
+
+    monkeypatch.setattr(
+        os.path,
+        "exists",
+        lambda p: True if p == "/proc/net/dev" else real_exists(p),
+    )
+    monkeypatch.setattr(
+        builtins,
+        "open",
+        lambda file, *a, **kw: real_open(proc_dev, *a, **kw) if file == "/proc/net/dev" else real_open(file, *a, **kw),
+    )
+
+    assert hw._net_stats("en0") == (1000, 2000, 10, 20)
+    assert hw._net_stats("eth99") is None
+
+
+def test_process_telemetry_gpu_share_and_stale_label_pruning(monkeypatch):
+    """Verify AI GPU/ANE attribution sums <= 100% of totals and dead PIDs prune cleanly."""
+    import mlx_process_telemetry as pt
+
+    monkeypatch.setattr(pt, "_probe_apple_silicon_gpu_and_ane", lambda: (80.0, 4.0))
+    monkeypatch.setattr(pt, "psutil", None)
+
+    sample_set = [
+        [
+            {"pid": 101, "user": "dk", "cpu_pct": 75.0, "rss_bytes": 1024 * 1024 * 500,
+             "process": "python3", "command": "python3 -m mlx_lm.server"},
+            {"pid": 102, "user": "dk", "cpu_pct": 25.0, "rss_bytes": 1024 * 1024 * 200,
+             "process": "python3", "command": "python3 worker.py"},
+        ],
+        [
+            {"pid": 101, "user": "dk", "cpu_pct": 80.0, "rss_bytes": 1024 * 1024 * 500,
+             "process": "python3", "command": "python3 -m mlx_lm.server"},
+        ],
+    ]
+    idx = {"i": 0}
+    monkeypatch.setattr(pt, "_list_processes", lambda: sample_set[idx["i"]])
+
+    pt._sample_processes("node1", top_k=10)
+    gpu_samples = [
+        s.value for s in pt.G_PROCESS_GPU.collect()[0].samples
+        if s.name == "process_gpu_utilization_percent" and s.labels.get("device") == "node1"
+    ]
+    ane_samples = [
+        s.value for s in pt.G_PROCESS_ANE.collect()[0].samples
+        if s.name == "process_ane_power_watts" and s.labels.get("device") == "node1"
+    ]
+    assert len(gpu_samples) == 2
+    assert 0 < sum(gpu_samples) <= 80.2
+    assert len(ane_samples) == 2
+    assert 0 < sum(ane_samples) <= 4.01
+
+    idx["i"] = 1
+    pt._sample_processes("node1", top_k=10)
+    cpu_pids = {
+        s.labels.get("pid")
+        for s in pt.G_PROCESS_CPU.collect()[0].samples
+        if s.name == "process_cpu_percent" and s.labels.get("device") == "node1"
+    }
+    assert cpu_pids == {"101"}
+
+
+def test_sbom_reverse_drift_stale_cleanup_and_skip_package_metrics(tmp_path, monkeypatch):
+    """Verify reverse extra-package drift, stale gauge clearing on sync, and skip_package_metrics."""
+    import mlx_sbom_collector as sb
+
+    log_dir = tmp_path / "logs"
+    cfg_dir = tmp_path / "config"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(sb, "LOG_DIR", log_dir)
+    monkeypatch.setattr(sb, "CONFIG_DIR", cfg_dir)
+
+    base_items = [{"package": "mlx", "version": "0.19", "ecosystem": "pip", "path": "/venv", "hash": "h1"}]
+    extra_items = [
+        {"package": "mlx", "version": "0.19", "ecosystem": "pip", "path": "/venv", "hash": "h1"},
+        {"package": "extra-pkg", "version": "2.0", "ecosystem": "pip", "path": "/venv", "hash": "h2"},
+    ]
+
+    # Save baseline reference via base-mac scan
+    state = {"items": base_items}
+    monkeypatch.setattr(sb, "_scan_pip_venvs", lambda: list(state["items"]))
+    monkeypatch.setattr(sb, "_scan_homebrew", lambda: [])
+    monkeypatch.setattr(sb, "_scan_system_binaries", lambda: [])
+    monkeypatch.setattr(sb, "_scan_mlx_models", lambda: [])
+
+    sb.collect_and_update_metrics("base-mac", "base-mac")
+    assert (cfg_dir / "sbom_base_reference.json").is_file()
+
+    # Reverse extra package detection on edge-mac
+    state["items"] = extra_items
+    status, mismatch_cnt, missing_cnt, diffs = sb._evaluate_drift("edge-mac", "base-mac", extra_items)
+    assert status == "DEVIATED"
+    assert missing_cnt == 0
+    assert mismatch_cnt == 1
+    assert diffs == [{
+        "package": "extra-pkg",
+        "base_version": "MISSING",
+        "target_version": "2.0",
+        "ecosystem": "pip",
+        "path": "/venv",
+    }]
+
+    sb.collect_and_update_metrics("edge-mac", "base-mac", skip_package_metrics=True)
+    pkg_samples = [
+        s for s in sb.G_SBOM_PACKAGE_INFO.collect()[0].samples
+        if s.name == "mac_sbom_package_info"
+    ]
+    assert pkg_samples == []
+    drift_samples = [
+        s for s in sb.G_SBOM_DRIFT_DETAILS.collect()[0].samples
+        if s.name == "mac_sbom_drift_details"
+    ]
+    assert len(drift_samples) == 1
+    assert drift_samples[0].labels["base_version"] == "MISSING"
+
+    # Rescan after extra package removed -> stale drift gauge sample must be cleared
+    state["items"] = base_items
+    sb.collect_and_update_metrics("edge-mac", "base-mac")
+    drift_after = [
+        s for s in sb.G_SBOM_DRIFT_DETAILS.collect()[0].samples
+        if s.name == "mac_sbom_drift_details"
+    ]
+    assert drift_after == []
+
+
+def test_bundle_reused_pid_sigkill_multi_device_and_vmagent_flags(tmp_path, monkeypatch):
+    """Verify Bundle reused-PID skip, SIGKILL escalation, multi-device guard, and vmagent flags."""
+    import signal
+    import time
+    import pytest
+    import mlx_monitoring_bundle as mb
+
+    # 1. Reused PID must NOT be signaled
+    pid_dir = tmp_path / "bin"
+    pid_dir.mkdir(parents=True, exist_ok=True)
+    (pid_dir / "proxy.pid").write_text("888881\n", encoding="utf8")
+    monkeypatch.setattr(mb, "PID_FILE", tmp_path / "bundle.pid")
+    monkeypatch.setattr(mb, "pid_alive", lambda p: p == 888881)
+    monkeypatch.setattr(mb, "_pid_matches_service", lambda _p, _t: False)
+
+    signaled = []
+    monkeypatch.setattr(os, "getpgid", lambda p: p)
+    monkeypatch.setattr(os, "killpg", lambda pgid, sig: signaled.append(("killpg", pgid, sig)))
+    monkeypatch.setattr(os, "kill", lambda pid, sig: signaled.append(("kill", pid, sig)))
+
+    bundle = object.__new__(mb.Bundle)
+    bundle.pid_dir = pid_dir
+    bundle.stop()
+    assert not any(pid == 888881 for _, pid, _ in signaled)
+
+    # 2. SIGKILL escalation after 5s timeout if SIGTERM didn't terminate verified PID
+    (pid_dir / "hw.pid").write_text("777771\n", encoding="utf8")
+    monkeypatch.setattr(mb, "pid_alive", lambda p: p == 777771)
+    monkeypatch.setattr(mb, "_pid_matches_service", lambda p, _t: p == 777771)
+    ticks = iter([0.0, 0.1, 10.0])
+    monkeypatch.setattr(time, "monotonic", lambda: next(ticks, 10.0))
+    monkeypatch.setattr(time, "sleep", lambda _s: None)
+    signaled.clear()
+    bundle.stop()
+    sigs_for_777 = [sig for _, pid, sig in signaled if pid == 777771]
+    assert signal.SIGTERM in sigs_for_777
+    assert signal.SIGKILL in sigs_for_777
+
+    # 3. Multi-device ambiguity fail-fast when no MLX_DEVICE_ID matches
+    monkeypatch.setattr(mb, "select_node_config", lambda _c: {})
+    with pytest.raises(SystemExit):
+        mb.Bundle({
+            "devices": [
+                {"node_id": "node-a", "enabled": True},
+                {"node_id": "node-b", "enabled": True},
+            ],
+        })
+
+    # 4. vmagent flags use -remoteWrite.tmpDataPath (not invalid persistentQueue flags)
+    pq_dir = tmp_path / "vmagent-pq"
+    b2 = mb.Bundle({
+        "MLX_DEVICE_ID": "mac-a",
+        "CENTRAL_VICTORIA_METRICS": "127.0.0.1:8428",
+        "VMAGENT_PERSISTENT_QUEUE": str(pq_dir),
+        "LOG_DIR": str(tmp_path / "logs"),
+        "PID_DIR": str(tmp_path / "pids"),
+        "EXPORTER_LOG_DIR": str(tmp_path / "logs"),
+    })
+    spawned_cmds = []
+    monkeypatch.setattr(b2, "_render_vmagent_config", lambda: True)
+    monkeypatch.setattr(b2, "_spawn_process", lambda name, cmd, **_kw: spawned_cmds.append(cmd) or 12345)
+    b2.start_vmagent()
+    assert len(spawned_cmds) == 1
+    cmd = spawned_cmds[0]
+    assert "-remoteWrite.tmpDataPath" in cmd
+    assert str(pq_dir) in cmd
+    assert not any("persistentQueue" in arg for arg in cmd)
+
+
+def test_diagnostics_https_preservation_and_stage2_empty_nodes_fail(tmp_path, monkeypatch):
+    """Verify HTTPS scheme preservation in diagnostics and Stage 2 FAIL on empty target nodes."""
+    import subprocess
+    if str(BUNDLE_DIR / "scripts") not in sys.path:
+        sys.path.insert(0, str(BUNDLE_DIR / "scripts"))
+    import diagnostics as dg
+
+    edge_dir = tmp_path / "edge"
+    central_dir = tmp_path / "central"
+    (edge_dir / "config").mkdir(parents=True, exist_ok=True)
+    central_dir.mkdir(parents=True, exist_ok=True)
+    (edge_dir / "config" / "nodes.yml").write_text("devices: []\n", encoding="utf8")
+
+    monkeypatch.setattr(dg, "EDGE_DIR", edge_dir)
+    monkeypatch.setattr(dg, "CENTRAL_DIR", central_dir)
+    monkeypatch.setenv("CENTRAL_VICTORIA_METRICS", "https://vm.example.com:8443")
+
+    cfg = dg.load_config()
+    assert cfg["cvm_scheme"] == "https"
+    assert cfg["cvm"] == "vm.example.com:8443"
+
+    seen_urls = []
+
+    def _fake_probe(url, timeout=2.0, headers=None):
+        seen_urls.append(url)
+        return 200, json.dumps({"status": "success", "data": {"result": []}})
+
+    monkeypatch.setattr(dg, "probe_http", _fake_probe)
+    assert dg.query_vm("https://vm.example.com:8443", "up") == []
+    assert seen_urls[0].startswith("https://vm.example.com:8443/api/v1/query")
+
+    # Stage 2 FAIL when devices: []
+    with _make_hermetic_diag_env(tmp_path) as env:
+        empty_nodes = Path(env["MLX_EDGE_DIR"]) / "config" / "nodes.yml"
+        empty_nodes.write_text("devices: []\n", encoding="utf8")
+        diag_script = BUNDLE_DIR / "scripts" / "diagnostics.py"
+        proc = subprocess.run(
+            [sys.executable, str(diag_script), "doctor"],
+            capture_output=True,
+            text=True,
+            cwd=str(BUNDLE_DIR),
+            env=env,
+            timeout=15,
+        )
+    assert proc.returncode == 1
+    assert "[Stage 2/5] Edge Exporters & Nodes   : FAIL (no enabled device nodes matched)" in proc.stdout
+
+
+def test_discover_nodes_tailscale_exclusion(monkeypatch):
+    """Verify Tailscale 100.64.0.0/10 addresses are detected and bypassed when LAN IP exists."""
+    import socket
+    sys.path.insert(0, str(BUNDLE_DIR / "scripts"))
+    import discover_nodes as dn
+
+    assert dn._is_tailscale_ip("100.64.0.1") is True
+    assert dn._is_tailscale_ip("100.127.255.254") is True
+    assert dn._is_tailscale_ip("192.168.1.50") is False
+    assert dn._is_tailscale_ip("not-an-ip") is False
+
+    class _FakeSock:
+        def connect(self, _addr):
+            return None
+
+        def getsockname(self):
+            return ("100.100.1.5", 0)
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr(socket, "socket", lambda *a, **kw: _FakeSock())
+    monkeypatch.setattr(socket, "gethostbyname", lambda _h: "192.168.1.50")
+    assert dn.get_ip_local("192.168.1.10") == "192.168.1.50"

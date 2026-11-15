@@ -15,7 +15,7 @@ StartLimitIntervalSec=60
 User={{SERVICE_USER}}
 Group={{SERVICE_GROUP}}
 Environment=MLX_DEVICE_ID={{DEVICE_ID}}
-EnvironmentFile={{EDGE_DIR}}/config/edge.env
+EnvironmentFile=-{{EDGE_DIR}}/config/edge.env
 StandardOutput=append:{{EDGE_DIR}}/logs/systemd.out.log
 StandardError=append:{{EDGE_DIR}}/logs/systemd.err.log
 

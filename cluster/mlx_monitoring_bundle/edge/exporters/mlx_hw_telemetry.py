@@ -18,13 +18,14 @@ import shutil
 import signal
 import socket
 import subprocess
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
-from mlx_logging import degraded, debug, error, info, setup_logging
+from mlx_logging import degraded, debug, error, info, parse_listen_addr, setup_logging
 
 NODE_DEFAULT = "unknown"
 LISTEN_DEFAULT = "127.0.0.1:9102"
@@ -214,6 +215,24 @@ def _mem_info():
 
 
 def _cpu_temp():
+    if sys.platform != "darwin":
+        try:
+            import glob
+
+            temps = []
+            for path in sorted(glob.glob("/sys/class/thermal/thermal_zone*/temp")):
+                try:
+                    with open(path, "r", encoding="utf8") as fh:
+                        raw = fh.read().strip()
+                    if raw.lstrip("-").isdigit():
+                        c = int(raw) / 1000.0
+                        if 0.0 < c < 150.0:
+                            temps.append(c)
+                except OSError:
+                    continue
+            return max(temps) if temps else 0.0
+        except Exception:
+            return 0.0
     try:
         with _POWERMETRICS_LOCK:
             out = subprocess.run(
@@ -233,6 +252,8 @@ def _cpu_temp():
 
 def _gpu_iokit_stats():
     used = alloc = total = util = float("nan")
+    if sys.platform != "darwin":
+        return used, alloc, total, util
     try:
         out = subprocess.run(
             ["ioreg", "-c", "IOAccelerator", "-r", "-d", "2"],
@@ -262,6 +283,16 @@ def _gpu_iokit_stats():
 def _gpu_power_stats():
     global _GPU_STATS
     util = freq = gpu_power = pkg_power = cpu_power = ane_power = float("nan")
+    if sys.platform != "darwin":
+        with _GPU_LOCK:
+            _GPU_STATS = {
+                "util": util, "freq": freq,
+                "gpu_power": gpu_power, "pkg_power": pkg_power,
+                "cpu_power": cpu_power, "ane_power": ane_power,
+                "gpu_mem_used": util, "gpu_mem_alloc": util,
+                "gpu_mem_total": util, "gpu_util_iokit": util,
+            }
+        return
     try:
         with _POWERMETRICS_LOCK:
             out = subprocess.run(
@@ -303,6 +334,8 @@ def _gpu_power_stats():
 
 
 def _thermal_pressure():
+    if sys.platform != "darwin":
+        return 0.0
     try:
         out = subprocess.run(
             ["pmset", "-g", "therm"], capture_output=True, text=True, timeout=3
@@ -318,13 +351,18 @@ def _thermal_pressure():
         return float("nan")
 
 
-def _gpu_sampler_loop(interval: float):
-    while True:
+def _gpu_sampler_loop(interval: float, stop_event: threading.Event | None = None):
+    if sys.platform != "darwin":
+        return
+    while stop_event is None or not stop_event.is_set():
         try:
             _gpu_power_stats()
         except Exception as exc:
             error(f"gpu sampler error: {exc!r}", component="hw")
-        time.sleep(interval)
+        if stop_event is not None:
+            stop_event.wait(interval)
+        else:
+            time.sleep(interval)
 
 
 def _collect_ps_stats():
@@ -459,6 +497,25 @@ def _net_iface():
 
 def _net_stats(iface: str | None):
     if not iface:
+        return None
+    if os.path.exists("/proc/net/dev"):
+        try:
+            with open("/proc/net/dev", "r", encoding="utf8") as fh:
+                for line in fh:
+                    if ":" not in line:
+                        continue
+                    dev, rest = line.split(":", 1)
+                    if dev.strip() != iface:
+                        continue
+                    fields = rest.split()
+                    if len(fields) >= 10:
+                        return (
+                            int(fields[0]), int(fields[8]),
+                            int(fields[1]), int(fields[9]),
+                        )
+        except Exception as exc:
+            debug(f"/proc/net/dev stats failed: {exc!r}", component="hw")
+    if sys.platform != "darwin":
         return None
     try:
         out = subprocess.run(
@@ -612,9 +669,14 @@ def main():
     global _NET_IFACE, _CONTAINER_STATS
 
     ap = argparse.ArgumentParser(description="MLX hardware telemetry agent")
+    device_id = (
+        os.environ.get("MLX_DEVICE_ID")
+        or os.environ.get("MLX_MACBOOK_ID")
+        or socket.gethostname()
+    )
     ap.add_argument(
         "--node-name",
-        default=os.environ.get("MLX_MACBOOK_ID", socket.gethostname()),
+        default=device_id,
     )
     ap.add_argument("--listen", default=os.environ.get("MLX_HW_LISTEN", LISTEN_DEFAULT))
     ap.add_argument(
@@ -644,17 +706,19 @@ def main():
     args = ap.parse_args()
 
     NODE = args.node_name
-    LISTEN = (args.listen.rsplit(":", 1)[0],
-              int(args.listen.rsplit(":", 1)[1]))
+    setup_logging(service="mlx-hw-telemetry", macbook=NODE)
+
+    LISTEN = parse_listen_addr(args.listen, default_host="127.0.0.1", default_port=9102)
     SAMPLE_INTERVAL = max(1.0, args.interval)
     _PROC_MATCH = args.worker_match
     _NET_IFACE = args.net_iface or ""
     _CONTAINER_STATS = bool(args.container_stats)
-    _MEM_TOTAL = int(_sysctl("hw.memsize", "0") or 0)
     _parse_page_size()
-
-    setup_logging(service="mlx-hw-telemetry",
-                  macbook=os.environ.get("MLX_MACBOOK_ID", "unknown"))
+    if sys.platform == "darwin":
+        _MEM_TOTAL = int(_sysctl("hw.memsize", "0") or 0)
+    else:
+        _MEM_TOTAL = 0
+        _mem_info()
 
     stop_event = threading.Event()
 
@@ -667,7 +731,7 @@ def main():
             stop_event.wait(SAMPLE_INTERVAL)
 
     threading.Thread(target=_loop, daemon=True).start()
-    threading.Thread(target=_gpu_sampler_loop, args=(args.gpu_interval,),
+    threading.Thread(target=_gpu_sampler_loop, args=(args.gpu_interval, stop_event),
                      daemon=True).start()
 
     ThreadingHTTPServer.allow_reuse_address = True

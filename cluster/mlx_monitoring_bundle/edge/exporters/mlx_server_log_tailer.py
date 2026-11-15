@@ -28,11 +28,19 @@ from prometheus_client import (
     generate_latest,
 )
 
-from mlx_logging import debug, error, info, setup_logging
+from mlx_logging import debug, error, info, parse_listen_addr, setup_logging
 
 DEFAULT_POLL_INTERVAL = 0.5
 DEFAULT_MAX_RATE = 50.0
 DEFAULT_BACKFILL = 0
+PARTIAL_LINE_FLUSH_TIMEOUT_S = 2.0
+MAX_PARTIAL_LINE_BYTES = 65536
+MAX_TRACEBACK_LINES = 50
+TRACEBACK_FLUSH_TIMEOUT_S = 1.5
+
+_EXC_LINE_RE = re.compile(
+    r"^[A-Za-z_][\w.]*(?:Error|Exception|Interrupt|Exit|Warning)(?:\s*:|$)"
+)
 
 SEVERITY_NUMBER = {"debug": 1, "info": 9, "warning": 13, "error": 17, "fatal": 21}
 
@@ -63,6 +71,11 @@ CLASSIFIERS = [
         re.compile(r'"(?:POST|GET|DELETE|PUT)\s+/[^"]*"\s+[123]\d\d\b'),
         "info",
         "http",
+    ),
+    (
+        re.compile(r"\b[A-Z][A-Za-z0-9_]*(?:Error|Exception)\b"),
+        "error",
+        "python",
     ),
     (
         re.compile(r"\b(error|failed|fault)\b", re.I),
@@ -153,6 +166,8 @@ class Tailer:
         self._provider = None
         self._logger = None
         self._processor = None
+        self._traceback_lines: list[str] = []
+        self._traceback_started_at: float | None = None
         self._prepare_exporter(exporter)
 
     def _prepare_exporter(self, endpoint: str) -> None:
@@ -209,13 +224,48 @@ class Tailer:
 
     def _update_queue_gauge(self) -> None:
         q = getattr(self._processor, "_queue", None)
-        if q is not None:
-            try:
+        if q is None:
+            return
+        try:
+            qsize_fn = getattr(q, "qsize", None)
+            if callable(qsize_fn):
+                G_QUEUE.set(qsize_fn())
+            else:
                 G_QUEUE.set(len(q))
-            except TypeError:
-                pass
+        except (AttributeError, NotImplementedError, TypeError):
+            pass
+
+    def _flush_traceback(self) -> None:
+        if not self._traceback_lines:
+            return
+        lines = self._traceback_lines
+        self._traceback_lines = []
+        self._traceback_started_at = None
+        G_LINES.labels(severity="error", category="python").inc(len(lines))
+        if not self._bucket.take():
+            G_DROPPED.labels(reason="rate_limit").inc()
+            return
+        try:
+            self._emit("\n".join(lines), "error", "python")
+        except Exception as exc:
+            G_ERRORS.inc()
+            error(f"export error: {exc!r}", component="logtailer")
 
     def run(self) -> None:
+        partial_buf = bytearray()
+        partial_started_at: float | None = None
+
+        def _flush_partial() -> None:
+            nonlocal partial_started_at
+            if not partial_buf:
+                partial_started_at = None
+                return
+            text = bytes(partial_buf).decode("utf-8", "replace")
+            partial_buf.clear()
+            partial_started_at = None
+            self._handle_line(text)
+            self._update_queue_gauge()
+
         while not self.stop.is_set():
             if not self.log_path.exists():
                 info(f"{self.log_path} not found; waiting for it",
@@ -229,6 +279,8 @@ class Tailer:
                 with open(self.log_path, "rb") as fh:
                     st = os.fstat(fh.fileno())
                     cur_inode = (st.st_dev, st.st_ino)
+                    partial_buf.clear()
+                    partial_started_at = None
                     if self.backfill:
                         fh.seek(0, os.SEEK_END)
                         size = fh.tell()
@@ -243,12 +295,30 @@ class Tailer:
                     G_UP.set(1)
 
                     while not self.stop.is_set():
-                        line = fh.readline()
-                        if line:
+                        chunk = fh.readline()
+                        if chunk:
                             G_POS.set(fh.tell())
-                            self._handle_line(line.decode("utf-8", "replace"))
-                            self._update_queue_gauge()
+                            partial_buf.extend(chunk)
+                            if chunk.endswith(b"\n") or len(partial_buf) >= MAX_PARTIAL_LINE_BYTES:
+                                _flush_partial()
+                            elif partial_started_at is None:
+                                partial_started_at = time.monotonic()
                             continue
+
+                        now = time.monotonic()
+                        if (
+                            partial_buf
+                            and partial_started_at is not None
+                            and (now - partial_started_at) >= PARTIAL_LINE_FLUSH_TIMEOUT_S
+                        ):
+                            _flush_partial()
+                        if (
+                            self._traceback_lines
+                            and self._traceback_started_at is not None
+                            and (now - self._traceback_started_at) >= TRACEBACK_FLUSH_TIMEOUT_S
+                        ):
+                            self._flush_traceback()
+
                         self._update_queue_gauge()
                         # Detect rename rotation or copytruncate
                         try:
@@ -256,15 +326,22 @@ class Tailer:
                             if (path_st.st_dev, path_st.st_ino) != cur_inode:
                                 info(f"{self.log_path} rotated (inode changed); reopening",
                                      component="logtailer")
+                                _flush_partial()
+                                self._flush_traceback()
                                 break
                             if path_st.st_size < fh.tell():
                                 info(f"{self.log_path} truncated; seeking to 0",
                                      component="logtailer")
+                                partial_buf.clear()
+                                partial_started_at = None
+                                self._flush_traceback()
                                 fh.seek(0)
                                 G_POS.set(0)
                         except FileNotFoundError:
                             info(f"{self.log_path} missing during rotation; waiting",
                                  component="logtailer")
+                            _flush_partial()
+                            self._flush_traceback()
                             break
                         self.stop.wait(DEFAULT_POLL_INTERVAL)
             except OSError as exc:
@@ -273,11 +350,36 @@ class Tailer:
                 error(f"log tailer I/O error on {self.log_path}: {exc!r}",
                       component="logtailer")
                 self.stop.wait(1.0)
+        _flush_partial()
+        self._flush_traceback()
 
     def _handle_line(self, raw: str) -> None:
         line = raw.rstrip("\n").rstrip("\r")
         if not line:
+            if self._traceback_lines:
+                self._flush_traceback()
             return
+        if "Traceback (most recent call last):" in line:
+            if self._traceback_lines:
+                self._flush_traceback()
+            self._traceback_lines = [line]
+            self._traceback_started_at = time.monotonic()
+            return
+        if self._traceback_lines:
+            is_continuation = (
+                line.startswith((" ", "\t"))
+                or "During handling of the above exception" in line
+                or "The above exception was the direct cause" in line
+            )
+            if is_continuation and len(self._traceback_lines) < MAX_TRACEBACK_LINES:
+                self._traceback_lines.append(line)
+                return
+            if _EXC_LINE_RE.match(line) and len(self._traceback_lines) < MAX_TRACEBACK_LINES:
+                self._traceback_lines.append(line)
+                self._flush_traceback()
+                return
+            self._flush_traceback()
+
         severity, category = classify(line)
         G_LINES.labels(severity=severity, category=category).inc()
 
@@ -345,6 +447,13 @@ def main():
                     help="ship every line (no severity/category filter)")
     args = ap.parse_args()
 
+    device_id = (
+        os.environ.get("MLX_DEVICE_ID")
+        or os.environ.get("MLX_MACBOOK_ID")
+        or "unknown"
+    )
+    setup_logging(service="mlx-logtailer", macbook=device_id)
+
     if not args.log_file:
         error("MLX_SERVER_LOG not set and --log-file not given; cannot run",
               component="logtailer")
@@ -353,9 +462,6 @@ def main():
         error("MLX_OTLP_ENDPOINT not set and --otlp-endpoint not given; cannot run",
               component="logtailer")
         sys.exit(1)
-
-    setup_logging(service="mlx-logtailer",
-                  macbook=os.environ.get("MLX_MACBOOK_ID", "unknown"))
 
     G_UP.set(1)
     info(
@@ -374,13 +480,13 @@ def main():
         all_lines=args.all_lines,
         backfill=args.backfill,
         project=args.project,
-        macbook=os.environ.get("MLX_MACBOOK_ID", "unknown"),
+        macbook=device_id,
         verify_tls=args.otlp_verify_tls,
     )
 
-    host, _, port = args.listen.rpartition(":")
+    host, port = parse_listen_addr(args.listen, default_host="0.0.0.0", default_port=9106)
     ThreadingHTTPServer.allow_reuse_address = True
-    server = ThreadingHTTPServer((host or "0.0.0.0", int(port or 9106)), Handler)
+    server = ThreadingHTTPServer((host, port), Handler)
 
     def _shutdown(signum, frame):
         tailer.stop.set()

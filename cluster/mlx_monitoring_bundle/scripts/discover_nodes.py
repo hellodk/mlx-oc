@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import ipaddress
 import os
 import re
 import socket
@@ -88,6 +89,16 @@ def _strip_scheme(endpoint: str) -> str:
     return endpoint.split("/")[0]
 
 
+_TAILSCALE_CGNAT = ipaddress.ip_network("100.64.0.0/10")
+
+
+def _is_tailscale_ip(ip: str) -> bool:
+    try:
+        return ipaddress.ip_address(ip) in _TAILSCALE_CGNAT
+    except ValueError:
+        return False
+
+
 def get_ip_ssh(host, user, key, target_network: str | None = None) -> str:
     if target_network:
         prefix = target_network.replace(".", r"\.")
@@ -95,7 +106,16 @@ def get_ip_ssh(host, user, key, target_network: str | None = None) -> str:
                       f"ifconfig | awk '/inet {prefix}/{{print $2; exit}}'")
         if out:
             return out
-    # Fallback to any non-loopback IPv4 address
+    # Prefer direct LAN / non-Tailscale IPv4 over CGNAT 100.64.0.0/10
+    out = run_ssh(
+        host,
+        user,
+        key,
+        r"ifconfig | awk '/inet / && !/127\.0\.0\.1/ && "
+        r"!/ 100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./{print $2; exit}'",
+    )
+    if out:
+        return out
     out = run_ssh(host, user, key,
                   r"ifconfig | awk '/inet / && !/127\.0\.0\.1/{print $2; exit}'")
     return out or host
@@ -109,6 +129,13 @@ def get_ip_local(target_host: str | None = None) -> str:
         s.connect((probe_host, 80))
         ip = s.getsockname()[0]
         s.close()
+        if _is_tailscale_ip(ip) and (not target_host or not _is_tailscale_ip(probe_host)):
+            try:
+                host_ip = socket.gethostbyname(socket.gethostname())
+                if host_ip and not host_ip.startswith("127.") and not _is_tailscale_ip(host_ip):
+                    return host_ip
+            except Exception:
+                pass
         return ip
     except Exception:
         # Fallback to local hostname lookup
@@ -124,7 +151,15 @@ def get_hostname_ssh(host, user, key) -> str:
 
 
 def get_hostname_local() -> str:
-    return socket.gethostname()
+    try:
+        out = subprocess.run(
+            ["hostname", "-s"], capture_output=True, text=True, timeout=2
+        ).stdout.strip()
+        if out:
+            return out
+    except Exception:
+        pass
+    return socket.gethostname().split(".")[0]
 
 
 def main() -> int:

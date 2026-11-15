@@ -172,7 +172,12 @@ def _candidate_configs(model_id: str | None, model_path: str | None) -> list[Pat
                 hf_dir = root / f"models--{org}--{name}"
                 snapshots = hf_dir / "snapshots"
                 if snapshots.is_dir():
-                    for snap in sorted(snapshots.iterdir(), reverse=True):
+                    try:
+                        snaps = sorted(snapshots.iterdir(), reverse=True)
+                    except OSError as exc:
+                        debug(f"unable to list {snapshots}: {exc!r}", component="model-info")
+                        snaps = []
+                    for snap in snaps:
                         add(snap / "config.json")
     return out
 

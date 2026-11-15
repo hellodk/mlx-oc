@@ -157,6 +157,47 @@ def _resolve_python(configured: str | None, fallback_default: str) -> str:
     return _sys.executable
 
 
+_SERVICE_MATCH_TOKENS: dict[str, tuple[str, ...]] = {
+    "supervisor": ("mlx_server_supervisor.py",),
+    "logtailer": ("mlx_server_log_tailer.py",),
+    "kv": ("mlx_kv_cache_agent.py",),
+    "hw": ("mlx_hw_telemetry.py",),
+    "proxy": ("mlx_metrics_proxy.py",),
+    "process": ("mlx_process_telemetry.py",),
+    "sbom": ("mlx_sbom_collector.py",),
+    "vmagent": ("vmagent",),
+}
+MAX_BUNDLE_LOG_BYTES = 10 * 1024 * 1024
+
+
+def _pid_matches_service(pid: int, tokens: tuple[str, ...] | list[str]) -> bool:
+    """Return True if the live process cmdline contains any expected service token."""
+    cmdline = ""
+    proc_cmdline = Path(f"/proc/{pid}/cmdline")
+    try:
+        if proc_cmdline.is_file():
+            raw = proc_cmdline.read_bytes()
+            cmdline = raw.replace(b"\x00", b" ").decode("utf-8", "replace").strip()
+    except OSError:
+        cmdline = ""
+    if not cmdline:
+        try:
+            res = subprocess.run(
+                ["ps", "-p", str(pid), "-o", "args="],
+                capture_output=True,
+                text=True,
+                timeout=2.0,
+            )
+            if res.returncode == 0:
+                cmdline = res.stdout.strip()
+        except Exception as exc:
+            debug(f"ps inspection failed for pid={pid}: {exc!r}", component="bundle")
+            return False
+    if not cmdline:
+        return False
+    return any(tok in cmdline for tok in tokens)
+
+
 def pid_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
@@ -190,11 +231,26 @@ class Bundle:
     def __init__(self, config: dict):
         self.config = config
         self.node_config = select_node_config(config)
-        self.macbook = (
+        explicit_id = (
             config.get("MLX_DEVICE_ID")
             or config.get("DEVICE_ID")
             or config.get("MLX_MACBOOK_ID")
             or config.get("MACBOOK_ID")
+        )
+        enabled_devices = [
+            nb for nb in (config.get("devices") or config.get("macbooks") or [])
+            if isinstance(nb, dict) and nb.get("enabled", True)
+        ]
+        if not self.node_config and not explicit_id and len(enabled_devices) > 1:
+            msg = (
+                "multiple enabled devices in nodes.yml and no MLX_DEVICE_ID / "
+                "MLX_MACBOOK_ID specified; cannot select node unambiguously"
+            )
+            print(msg, file=sys.stderr)
+            error(msg, component="bundle")
+            sys.exit(1)
+        self.macbook = (
+            explicit_id
             or self.node_config.get("id")
             or socket.gethostname()
         )
@@ -303,12 +359,24 @@ class Bundle:
         env["MLX_SERVER_LOG"] = config_val(self.config, "MLX_SERVER_LOG", str(self.exporter_log_dir / "server.log"))
         return env
 
-    def _spawn(self, name: str, cmd: list) -> int:
-        env = self._child_env(name)
-        with open(self.log_dir / f"{name}.bundle.log", "a", encoding="utf8") as logf:
+    def _open_rotated_log(self, log_path: Path):
+        try:
+            if log_path.is_file() and log_path.stat().st_size > MAX_BUNDLE_LOG_BYTES:
+                log_path.replace(log_path.with_name(f"{log_path.name}.1"))
+        except OSError as exc:
+            debug(f"log rotation skipped for {log_path}: {exc!r}", component="bundle")
+        return open(log_path, "a", encoding="utf8")
+
+    def _spawn_process(
+        self, name: str, cmd: list, cwd: Path, env: dict, log_filename: str
+    ) -> int:
+        if not hasattr(self, "_spawn_specs"):
+            self._spawn_specs = {}
+        self._spawn_specs[name] = (list(cmd), cwd, dict(env), log_filename)
+        with self._open_rotated_log(self.log_dir / log_filename) as logf:
             p = subprocess.Popen(
                 cmd,
-                cwd=str(BUNDLE_DIR / "exporters"),
+                cwd=str(cwd),
                 env=env,
                 stdout=logf,
                 stderr=logf,
@@ -317,6 +385,16 @@ class Bundle:
         self.procs[name] = p
         write_pid(self.pid_dir / f"{name}.pid", p.pid)
         return p.pid
+
+    def _spawn(self, name: str, cmd: list) -> int:
+        env = self._child_env(name)
+        return self._spawn_process(
+            name=name,
+            cmd=cmd,
+            cwd=BUNDLE_DIR / "exporters",
+            env=env,
+            log_filename=f"{name}.bundle.log",
+        )
 
     def start_proxy(self):
         if not self.enable_proxy:
@@ -406,7 +484,7 @@ class Bundle:
     def start_sbom(self):
         if not self.enable_sbom:
             return
-        base_dev = config_val(self.config, "SBOM_BASE_DEVICE", "mm")
+        base_dev = config_val(self.config, "SBOM_BASE_DEVICE", "") or self.macbook
         cmd = [
             self.venv_python, "mlx_sbom_collector.py",
             "--node-name", self.macbook,
@@ -414,6 +492,8 @@ class Bundle:
             "--interval", config_val(self.config, "SBOM_SCAN_INTERVAL", "3600.0"),
             "--base-device", base_dev,
         ]
+        if config_val(self.config, "SBOM_SKIP_PACKAGE_METRICS", "false").lower() == "true":
+            cmd.append("--skip-package-metrics")
         self._spawn("sbom", cmd)
 
     def _render_vmagent_config(self) -> bool:
@@ -479,28 +559,23 @@ class Bundle:
         ]
         pq_dir = config_val(self.config, "VMAGENT_PERSISTENT_QUEUE", "")
         if pq_dir:
-            cmd += [
-                "-remoteWrite.persistentQueue", "true",
-                "-remoteWrite.persistentQueueDir", pq_dir,
-                "-remoteWrite.persistentQueueMaxSize", "10GB",
-            ]
+            pq_path = Path(pq_dir).expanduser()
+            pq_path.mkdir(parents=True, exist_ok=True)
+            cmd += ["-remoteWrite.tmpDataPath", str(pq_path)]
         if self.otlp_scheme == "https" and not self.otlp_verify_tls:
             cmd.append("-remoteWrite.tlsSkipVerify=true")
         env = dict(os.environ)
         env["MLX_SERVICE_NAME"] = "vmagent"
+        env["MLX_DEVICE_ID"] = self.device
         env["MLX_MACBOOK_ID"] = self.macbook
-        with open(self.log_dir / "vmagent.bundle.log", "a", encoding="utf8") as logf:
-            p = subprocess.Popen(
-                cmd,
-                cwd=str(BUNDLE_DIR),
-                env=env,
-                stdout=logf,
-                stderr=logf,
-                start_new_session=True,
-            )
-        self.procs["vmagent"] = p
-        write_pid(self.pid_dir / "vmagent.pid", p.pid)
-        info(f"started vmagent (pid={p.pid})", component="bundle")
+        pid = self._spawn_process(
+            name="vmagent",
+            cmd=cmd,
+            cwd=BUNDLE_DIR,
+            env=env,
+            log_filename="vmagent.bundle.log",
+        )
+        info(f"started vmagent (pid={pid})", component="bundle")
 
     def start_server_monitor(self):
         if not self.enable_server_monitor:
@@ -546,37 +621,65 @@ class Bundle:
             },
         }
 
+    def _signal_pid(self, pid: int, sig: int, label: str) -> None:
+        try:
+            os.killpg(os.getpgid(pid), sig)
+        except OSError as exc:
+            debug(f"killpg {label} failed: {exc!r}", component="bundle")
+            try:
+                os.kill(pid, sig)
+            except OSError as exc2:
+                debug(f"kill {label} failed: {exc2!r}", component="bundle")
+
     def stop(self):
-        # Stop child exporters before signalling any external bundle PID so an
-        # in-process signal handler never kills itself mid-cleanup.
+        # Stop verified child exporters before signalling any external bundle PID so an
+        # in-process signal handler never kills itself mid-cleanup, and reused PIDs are safe.
+        pending: list[tuple[str, int, tuple[str, ...]]] = []
         for name in ["supervisor", "logtailer", "kv", "hw", "proxy", "process", "sbom", "vmagent"]:
             pfile = self.pid_dir / f"{name}.pid"
             pid = read_pid(pfile)
-            if pid and pid != os.getpid():
-                try:
-                    os.killpg(os.getpgid(pid), signal.SIGTERM)
-                except OSError as exc:
-                    debug(f"killpg {name} failed: {exc!r}", component="bundle")
-                    try:
-                        os.kill(pid, signal.SIGTERM)
-                    except OSError as exc2:
-                        debug(f"kill {name} failed: {exc2!r}", component="bundle")
+            tokens = _SERVICE_MATCH_TOKENS.get(name, (name,))
+            if pid and pid != os.getpid() and pid_alive(pid) and _pid_matches_service(pid, tokens):
+                self._signal_pid(pid, signal.SIGTERM, name)
+                pending.append((name, pid, tokens))
+            elif pid and pid != os.getpid() and pid_alive(pid):
+                debug(f"skipping stale/reused pid={pid} for {name}", component="bundle")
             remove_pid(pfile)
+
+        if pending:
+            deadline = time.monotonic() + 5.0
+            while pending and time.monotonic() < deadline:
+                still_alive = [
+                    (name, pid, tokens) for (name, pid, tokens) in pending
+                    if pid_alive(pid)
+                ]
+                pending = still_alive
+                if pending:
+                    time.sleep(0.1)
+            for name, pid, tokens in pending:
+                if pid_alive(pid) and _pid_matches_service(pid, tokens):
+                    degraded(f"{name} (pid={pid}) did not exit on SIGTERM; sending SIGKILL",
+                             component="bundle")
+                    self._signal_pid(pid, signal.SIGKILL, name)
+
         bp = read_pid(PID_FILE)
-        if bp and bp != os.getpid() and pid_alive(bp):
-            try:
-                os.killpg(os.getpgid(bp), signal.SIGTERM)
-            except OSError as exc:
-                debug(f"killpg bundle failed: {exc!r}", component="bundle")
-                try:
-                    os.kill(bp, signal.SIGTERM)
-                except OSError as exc2:
-                    debug(f"kill bundle failed: {exc2!r}", component="bundle")
+        if (
+            bp
+            and bp != os.getpid()
+            and pid_alive(bp)
+            and _pid_matches_service(bp, ("mlx_monitoring_bundle",))
+        ):
+            self._signal_pid(bp, signal.SIGTERM, "bundle")
+            deadline = time.monotonic() + 5.0
+            while pid_alive(bp) and time.monotonic() < deadline:
+                time.sleep(0.1)
+            if pid_alive(bp) and _pid_matches_service(bp, ("mlx_monitoring_bundle",)):
+                self._signal_pid(bp, signal.SIGKILL, "bundle")
         remove_pid(PID_FILE)
 
     def start(self):
         bp = read_pid(PID_FILE)
-        if bp and pid_alive(bp):
+        if bp and pid_alive(bp) and _pid_matches_service(bp, ("mlx_monitoring_bundle",)):
             info("bundle already running", component="bundle")
             return
         if not self.central_vm or not self.central_otel:
@@ -628,15 +731,35 @@ class Bundle:
         signal.signal(signal.SIGTERM, _handle_exit)
         signal.signal(signal.SIGINT, _handle_exit)
 
-        reported_exits: set[str] = set()
+        now_start = time.monotonic()
+        proc_started_at: dict[str, float] = {n: now_start for n in self.procs}
+        backoff_s: dict[str, float] = {}
+        restart_at: dict[str, float] = {}
+        spawn_specs = getattr(self, "_spawn_specs", {})
+
         try:
-            while not stop_event.wait(10):
+            while not stop_event.wait(2):
+                now = time.monotonic()
                 for name, proc in list(self.procs.items()):
+                    if name in restart_at:
+                        if now >= restart_at[name] and name in spawn_specs:
+                            cmd, cwd, env, log_filename = spawn_specs[name]
+                            new_pid = self._spawn_process(name, cmd, cwd, env, log_filename)
+                            proc_started_at[name] = now
+                            restart_at.pop(name, None)
+                            info(f"restarted child process {name} (pid={new_pid})", component="bundle")
+                        continue
                     rc = proc.poll()
-                    if rc is not None and name not in reported_exits:
-                        reported_exits.add(name)
+                    if rc is not None:
+                        uptime = now - proc_started_at.get(name, now)
+                        cur_backoff = 1.0 if uptime > 60.0 else min(60.0, backoff_s.get(name, 1.0) * 2.0)
+                        if uptime > 60.0:
+                            cur_backoff = 1.0
+                        backoff_s[name] = cur_backoff
+                        restart_at[name] = now + cur_backoff
                         error(
-                            f"child process {name} (pid={proc.pid}) exited unexpectedly with rc={rc}",
+                            f"child process {name} (pid={proc.pid}) exited unexpectedly "
+                            f"with rc={rc} after {uptime:.1f}s; restarting in {cur_backoff:.0f}s",
                             component="bundle",
                         )
         except KeyboardInterrupt:

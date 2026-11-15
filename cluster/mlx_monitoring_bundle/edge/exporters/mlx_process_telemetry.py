@@ -34,7 +34,12 @@ from typing import Any, Dict, List, Tuple
 
 from prometheus_client import CollectorRegistry, Counter, Gauge, generate_latest
 
-from mlx_logging import debug, error, info, setup_logging
+try:
+    import psutil  # optional dependency for per-PID disk I/O
+except ImportError:
+    psutil = None  # type: ignore[assignment]
+
+from mlx_logging import debug, error, info, parse_listen_addr, setup_logging
 
 # ---------------------------------------------------------------------------
 # Default Constants
@@ -106,8 +111,24 @@ G_PROCESS_RANKING = Gauge(
 # Global sampler lock and states
 _SAMPLE_LOCK = threading.Lock()
 _PREV_IO_SNAPSHOTS: Dict[int, Tuple[float, float, float]] = {}  # pid -> (read_b, write_b, timestamp)
+_ACTIVE_LABELS: Dict[int, set[Tuple[str, ...]]] = {}
 _GPU_RESIDENCY_TOTAL = 0.0
 _ANE_POWER_TOTAL_WATTS = 0.0
+
+
+def _update_gauge_series(gauge: Gauge, next_values: Dict[Tuple[str, ...], float]) -> None:
+    """Set current series values and remove only vanished label tuples."""
+    gid = id(gauge)
+    prev_keys = _ACTIVE_LABELS.get(gid, set())
+    new_keys = set(next_values.keys())
+    for labels, value in next_values.items():
+        gauge.labels(*labels).set(value)
+    for stale in prev_keys - new_keys:
+        try:
+            gauge.remove(*stale)
+        except KeyError:
+            pass
+    _ACTIVE_LABELS[gid] = new_keys
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +138,8 @@ def _probe_apple_silicon_gpu_and_ane() -> Tuple[float, float]:
     """Read global GPU active residency % and ANE power in Watts from IOKit or powermetrics."""
     gpu_util = 0.0
     ane_watts = 0.0
+    if sys.platform != "darwin":
+        return gpu_util, ane_watts
 
     # 1. Try ioreg for non-root IOAccelerator GPU utilization
     try:
@@ -198,8 +221,8 @@ def _list_processes() -> List[Dict[str, Any]]:
                 comm = os.path.basename(parts[4])
                 args = parts[5] if len(parts) > 5 else comm
 
-                # Skip PID 0 or profiler itself
-                if pid <= 0 or pid == os.getpid():
+                # Skip PID 0, profiler itself, or transient ps probe
+                if pid <= 0 or pid == os.getpid() or comm == "ps":
                     continue
 
                 procs.append({
@@ -230,32 +253,23 @@ def _sample_processes(node_name: str, top_k: int = 10) -> None:
     _GPU_RESIDENCY_TOTAL = gpu_residency
     _ANE_POWER_TOTAL_WATTS = ane_watts
 
-    # Reset dynamic gauges before setting new top values
-    G_PROCESS_CPU.clear()
-    G_PROCESS_MEMORY.clear()
-    G_PROCESS_DISK_IO.clear()
-    G_PROCESS_NET_IO.clear()
-    G_PROCESS_GPU.clear()
-    G_PROCESS_ANE.clear()
-    G_PROCESS_RANKING.clear()
+    cpu_vals: Dict[Tuple[str, ...], float] = {}
+    mem_vals: Dict[Tuple[str, ...], float] = {}
+    disk_vals: Dict[Tuple[str, ...], float] = {}
+    net_vals: Dict[Tuple[str, ...], float] = {}
+    gpu_vals: Dict[Tuple[str, ...], float] = {}
+    ane_vals: Dict[Tuple[str, ...], float] = {}
+    rank_vals: Dict[Tuple[str, ...], float] = {}
 
     # 1. Top CPU Consumers
     sorted_by_cpu = sorted(procs, key=lambda p: p["cpu_pct"], reverse=True)[:top_k]
     for p in sorted_by_cpu:
-        G_PROCESS_CPU.labels(
-            device=node_name,
-            process=p["process"],
-            pid=str(p["pid"]),
-        ).set(p["cpu_pct"])
+        cpu_vals[(node_name, p["process"], str(p["pid"]))] = p["cpu_pct"]
 
     # 2. Top Memory RSS Consumers
     sorted_by_rss = sorted(procs, key=lambda p: p["rss_bytes"], reverse=True)[:top_k]
     for p in sorted_by_rss:
-        G_PROCESS_MEMORY.labels(
-            device=node_name,
-            process=p["process"],
-            pid=str(p["pid"]),
-        ).set(p["rss_bytes"])
+        mem_vals[(node_name, p["process"], str(p["pid"]))] = p["rss_bytes"]
 
     # 3. Top Process Disk & Network I/O (real psutil counters when available; 0.0 otherwise)
     top_io_procs = sorted(
@@ -269,11 +283,6 @@ def _sample_processes(node_name: str, top_k: int = 10) -> None:
         if stale_pid not in active_pids:
             del _PREV_IO_SNAPSHOTS[stale_pid]
 
-    try:
-        import psutil  # optional dependency
-    except ImportError:
-        psutil = None
-
     for p in top_io_procs:
         disk_rate = 0.0
         if psutil is not None:
@@ -283,28 +292,20 @@ def _sample_processes(node_name: str, top_k: int = 10) -> None:
                 cur_write = float(getattr(io, "write_bytes", 0))
                 prev = _PREV_IO_SNAPSHOTS.get(p["pid"])
                 _PREV_IO_SNAPSHOTS[p["pid"]] = (cur_read, cur_write, now)
-                if prev is not None and now > prev[2]:
+                if prev is not None and (now - prev[2]) >= 0.5:
                     dt = now - prev[2]
-                    delta_bytes = max(0.0, (cur_read - prev[0]) + (cur_write - prev[1]))
-                    disk_rate = delta_bytes / dt
+                    d_read = (cur_read - prev[0]) if cur_read >= prev[0] else 0.0
+                    d_write = (cur_write - prev[1]) if cur_write >= prev[1] else 0.0
+                    disk_rate = (d_read + d_write) / dt
             except Exception:
                 disk_rate = 0.0
 
         # Per-PID network I/O is not exposed portably by POSIX ps/psutil; report 0.0
         # rather than fabricating synthetic estimates.
         net_rate = 0.0
-
-        G_PROCESS_DISK_IO.labels(
-            device=node_name,
-            process=p["process"],
-            pid=str(p["pid"]),
-        ).set(round(disk_rate, 2))
-
-        G_PROCESS_NET_IO.labels(
-            device=node_name,
-            process=p["process"],
-            pid=str(p["pid"]),
-        ).set(round(net_rate, 2))
+        io_key = (node_name, p["process"], str(p["pid"]))
+        disk_vals[io_key] = round(disk_rate, 2)
+        net_vals[io_key] = round(net_rate, 2)
 
     # 4. Top GPU & Apple Neural Engine Consumers
     # Detect MLX / Python / Metal / AI inference workloads
@@ -316,39 +317,25 @@ def _sample_processes(node_name: str, top_k: int = 10) -> None:
     if not ai_candidates:
         ai_candidates = sorted_by_cpu[:3]
 
-    # Attribute active GPU residency and ANE power
+    # Attribute active GPU residency and ANE power (normalized so shares sum <= 1.0)
     if ai_candidates and (gpu_residency > 0 or ane_watts > 0):
-        total_cand_cpu = sum(p["cpu_pct"] for p in ai_candidates) or 1.0
-        for p in ai_candidates[:5]:
-            share = max(0.1, p["cpu_pct"] / total_cand_cpu)
-            p_gpu = round(gpu_residency * share, 1)
-            p_ane = round(ane_watts * share, 3)
-
-            G_PROCESS_GPU.labels(
-                device=node_name,
-                process=p["process"],
-                pid=str(p["pid"]),
-            ).set(p_gpu)
-
-            G_PROCESS_ANE.labels(
-                device=node_name,
-                process=p["process"],
-                pid=str(p["pid"]),
-            ).set(p_ane)
+        top_cands = ai_candidates[:5]
+        total_cand_cpu = sum(p["cpu_pct"] for p in top_cands)
+        for p in top_cands:
+            if total_cand_cpu > 0:
+                share = min(1.0, max(0.0, p["cpu_pct"] / total_cand_cpu))
+            else:
+                share = 1.0 / len(top_cands)
+            key = (node_name, p["process"], str(p["pid"]))
+            gpu_vals[key] = round(gpu_residency * share, 1)
+            ane_vals[key] = round(ane_watts * share, 3)
     else:
         # Fallback minimal gauges for primary CPU consumer
         if sorted_by_cpu:
             p0 = sorted_by_cpu[0]
-            G_PROCESS_GPU.labels(
-                device=node_name,
-                process=p0["process"],
-                pid=str(p0["pid"]),
-            ).set(0.0)
-            G_PROCESS_ANE.labels(
-                device=node_name,
-                process=p0["process"],
-                pid=str(p0["pid"]),
-            ).set(0.0)
+            key = (node_name, p0["process"], str(p0["pid"]))
+            gpu_vals[key] = 0.0
+            ane_vals[key] = 0.0
 
     # 5. Composite Live Leaderboard Ranking Info
     # Composite score: CPU% + normalized RSS + GPU activity
@@ -359,13 +346,15 @@ def _sample_processes(node_name: str, top_k: int = 10) -> None:
     )[:top_k]
 
     for rank, p in enumerate(composite_ranked, 1):
-        G_PROCESS_RANKING.labels(
-            device=node_name,
-            process=p["process"],
-            pid=str(p["pid"]),
-            user=p["user"],
-            command=p["command"],
-        ).set(rank)
+        rank_vals[(node_name, p["process"], str(p["pid"]), p["user"], p["command"])] = rank
+
+    _update_gauge_series(G_PROCESS_CPU, cpu_vals)
+    _update_gauge_series(G_PROCESS_MEMORY, mem_vals)
+    _update_gauge_series(G_PROCESS_DISK_IO, disk_vals)
+    _update_gauge_series(G_PROCESS_NET_IO, net_vals)
+    _update_gauge_series(G_PROCESS_GPU, gpu_vals)
+    _update_gauge_series(G_PROCESS_ANE, ane_vals)
+    _update_gauge_series(G_PROCESS_RANKING, rank_vals)
 
     G_PROFILER_UP.labels(device=node_name).set(1)
     G_PROFILER_SAMPLES.labels(device=node_name).inc()
@@ -404,12 +393,20 @@ class MetricsHandler(BaseHTTPRequestHandler):
 # ---------------------------------------------------------------------------
 # Daemon Sampling Loop
 # ---------------------------------------------------------------------------
-def _profiling_loop(node_name: str, interval: float, top_k: int, stop_event: threading.Event) -> None:
+def _profiling_loop(
+    node_name: str,
+    interval: float,
+    top_k: int,
+    stop_event: threading.Event,
+    initial_delay: float = 0.0,
+) -> None:
     """Continuously sample top processes at the specified interval."""
     info(
         f"starting process profiling loop: node={node_name}, interval={interval}s, top_k={top_k}",
         component="process-profiler",
     )
+    if initial_delay > 0 and stop_event.wait(initial_delay):
+        return
     while not stop_event.is_set():
         try:
             with _SAMPLE_LOCK:
@@ -456,16 +453,16 @@ def main() -> int:
     # Initial synchronous sample so metrics are available immediately on startup
     _sample_processes(node_name=args.node_name, top_k=args.top_k)
 
+    interval = max(1.0, args.interval)
     stop_event = threading.Event()
     sampler_thread = threading.Thread(
         target=_profiling_loop,
-        args=(args.node_name, max(1.0, args.interval), args.top_k, stop_event),
+        args=(args.node_name, interval, args.top_k, stop_event, interval),
         daemon=True,
     )
     sampler_thread.start()
 
-    host, port_str = args.listen.rsplit(":", 1) if ":" in args.listen else ("127.0.0.1", args.listen)
-    port = int(port_str)
+    host, port = parse_listen_addr(args.listen, default_host="127.0.0.1", default_port=9107)
 
     ThreadingHTTPServer.allow_reuse_address = True
     server = ThreadingHTTPServer((host, port), MetricsHandler)

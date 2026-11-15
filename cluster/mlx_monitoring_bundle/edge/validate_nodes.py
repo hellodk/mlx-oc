@@ -35,7 +35,7 @@ BUNDLE_DIR = Path(__file__).resolve().parent
 DEFAULT_NODES_FILE = BUNDLE_DIR / "config" / "nodes.yml"
 DEFAULT_ENV_FILE = BUNDLE_DIR / "config" / "edge.env"
 
-REQUIRED_MODULES = ("yaml", "prometheus_client", "requests", "psutil")
+REQUIRED_MODULES = ("yaml", "prometheus_client", "requests", "psutil", "opentelemetry")
 
 
 def load_yaml(path: Path) -> dict:
@@ -116,7 +116,10 @@ def main() -> int:
     if not nodes_path.is_absolute():
         nodes_path = BUNDLE_DIR / nodes_path
     data = load_yaml(nodes_path)
-    env = load_env_file(Path(args.env_file))
+    env_path = Path(args.env_file)
+    if not env_path.is_absolute():
+        env_path = BUNDLE_DIR / env_path
+    env = load_env_file(env_path)
 
     errors: list[str] = []
     warnings: list[str] = []
@@ -126,9 +129,9 @@ def main() -> int:
         ("victoria_metrics", "CENTRAL_VICTORIA_METRICS"),
         ("otel", "CENTRAL_OTEL"),
     ):
-        if not (central.get(key) or env.get(env_key)):
+        if not (central.get(key) or os.environ.get(env_key) or env.get(env_key)):
             errors.append(f"central.{key} is not configured (or set {env_key})")
-    if not (central.get("opik") or env.get("CENTRAL_OPIK")):
+    if not (central.get("opik") or os.environ.get("CENTRAL_OPIK") or env.get("CENTRAL_OPIK")):
         warnings.append("central.opik is not configured; Opik tracing will be skipped")
 
     macbooks = [
@@ -214,7 +217,7 @@ def main() -> int:
             ("SBOM_LISTEN", 9108),
         )
         for env_key, default_port in default_ports:
-            listen_val = env.get(env_key, "")
+            listen_val = os.environ.get(env_key) or env.get(env_key, "")
             port = default_port
             if listen_val and ":" in listen_val:
                 _, _, port_str = listen_val.rpartition(":")
