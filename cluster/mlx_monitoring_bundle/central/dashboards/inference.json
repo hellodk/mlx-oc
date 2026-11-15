@@ -71,7 +71,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_requests_total{device=~\"$device\", kind=\"$kind\"}[1m])",
+          "expr": "rate(mlx_requests_total{device=~\"$device\", kind=~\"$kind\"}[1m])",
           "legendFormat": "{{device}} {{kind}}",
           "refId": "A"
         }
@@ -186,12 +186,12 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_tokens_prompt_total{device=~\"$device\", kind=\"$kind\"}[1m])",
+          "expr": "rate(mlx_tokens_prompt_total{device=~\"$device\", kind=~\"$kind\"}[1m])",
           "legendFormat": "{{device}} prompt {{kind}}",
           "refId": "A"
         },
         {
-          "expr": "rate(mlx_tokens_completion_total{device=~\"$device\", kind=\"$kind\"}[1m])",
+          "expr": "rate(mlx_tokens_completion_total{device=~\"$device\", kind=~\"$kind\"}[1m])",
           "legendFormat": "{{device}} completion {{kind}}",
           "refId": "B"
         }
@@ -214,7 +214,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_finish_reason_total{device=~\"$device\", kind=\"$kind\"}[5m])",
+          "expr": "rate(mlx_finish_reason_total{device=~\"$device\", kind=~\"$kind\"}[5m])",
           "legendFormat": "{{device}} {{reason}} {{kind}}",
           "refId": "A"
         }
@@ -232,7 +232,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_tool_calls_total{device=~\"$device\", kind=\"$kind\"}[5m])",
+          "expr": "rate(mlx_tool_calls_total{device=~\"$device\", kind=~\"$kind\"}[5m])",
           "legendFormat": "{{device}} {{tool}} {{type}} {{kind}}",
           "refId": "A"
         }

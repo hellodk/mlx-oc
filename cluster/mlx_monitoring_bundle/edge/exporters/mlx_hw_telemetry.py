@@ -193,18 +193,18 @@ def _mem_info():
 def _cpu_temp():
     try:
         out = subprocess.run(
-            ["sudo", "-n", "powermetrics", "-n", "1", "--samplers", "smc", "-f", "text"],
+            ["sudo", "-n", "powermetrics", "-n", "1", "--samplers", "thermal", "-f", "text"],
             capture_output=True, text=True, timeout=6,
         ).stdout
         for line in out.splitlines():
-            m = re.search(r"(?:CPU die temperature|package.*temperature)\s*:\s*([\d.]+)",
+            m = re.search(r"(?:CPU die temperature|package.*temperature|temperature)\s*:\s*([\d.]+)",
                           line, re.I)
             if m:
                 return float(m.group(1))
-        return float("nan")
+        return 0.0
     except Exception as exc:
         degraded(f"CPU temperature unavailable (powermetrics/sudo): {exc!r}", component="hw")
-        return float("nan")
+        return 0.0
 
 
 def _gpu_iokit_stats():

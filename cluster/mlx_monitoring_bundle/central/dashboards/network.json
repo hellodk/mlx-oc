@@ -58,7 +58,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_net_rx_bytes_total{device=~\"$device\", node=~\"$node\", iface=\"$iface\"}[1m])",
+          "expr": "rate(mlx_net_rx_bytes_total{device=~\"$device\", node=~\"$node\", iface=~\"$iface\"}[1m])",
           "legendFormat": "{{device}} {{iface}} rx",
           "refId": "A"
         }
@@ -93,7 +93,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_net_tx_bytes_total{device=~\"$device\", node=~\"$node\", iface=\"$iface\"}[1m])",
+          "expr": "rate(mlx_net_tx_bytes_total{device=~\"$device\", node=~\"$node\", iface=~\"$iface\"}[1m])",
           "legendFormat": "{{device}} {{iface}} tx",
           "refId": "A"
         }
@@ -128,7 +128,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_net_rx_errors_total{device=~\"$device\", node=~\"$node\", iface=\"$iface\"}[5m])",
+          "expr": "rate(mlx_net_rx_errors_total{device=~\"$device\", node=~\"$node\", iface=~\"$iface\"}[5m])",
           "legendFormat": "{{device}} {{iface}} rx_err",
           "refId": "A"
         }
@@ -163,7 +163,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_net_tx_errors_total{device=~\"$device\", node=~\"$node\", iface=\"$iface\"}[5m])",
+          "expr": "rate(mlx_net_tx_errors_total{device=~\"$device\", node=~\"$node\", iface=~\"$iface\"}[5m])",
           "legendFormat": "{{device}} {{iface}} tx_err",
           "refId": "A"
         }

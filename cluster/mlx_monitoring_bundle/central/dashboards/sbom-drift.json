@@ -50,7 +50,7 @@
       },
       "targets": [
         {
-          "expr": "count(count by (device) (mac_sbom_drift_status{device!=~\"$base_device\", status=\"DEVIATED\"})) or vector(4)",
+          "expr": "count(count by (device) (mac_sbom_drift_status{device!~\"$base_device\", status=\"DEVIATED\"})) or vector(0)",
           "legendFormat": "Deviated Nodes",
           "refId": "A"
         }
@@ -88,7 +88,7 @@
       },
       "targets": [
         {
-          "expr": "sum(mac_sbom_drift_mismatch_count{base=\"$base_device\"}) or vector(4)",
+          "expr": "sum(mac_sbom_drift_mismatch_count{base=~\"$base_device\"}) or vector(0)",
           "legendFormat": "Version Drifts",
           "refId": "A"
         }
@@ -126,7 +126,7 @@
       },
       "targets": [
         {
-          "expr": "sum(mac_sbom_missing_package_count{base=\"$base_device\"}) or vector(2)",
+          "expr": "sum(mac_sbom_missing_package_count{base=~\"$base_device\"}) or vector(0)",
           "legendFormat": "Missing",
           "refId": "A"
         }
@@ -208,7 +208,7 @@
       },
       "targets": [
         {
-          "expr": "mac_sbom_device_drift_summary{base=\"$base_device\", device=~\"$target_device\"}",
+          "expr": "mac_sbom_device_drift_summary{base=~\"$base_device\", device=~\"$target_device\"}",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -244,7 +244,7 @@
       },
       "targets": [
         {
-          "expr": "mac_sbom_drift_details{base=\"$base_device\", device=~\"$target_device\"}",
+          "expr": "mac_sbom_drift_details{base=~\"$base_device\", device=~\"$target_device\"}",
           "format": "table",
           "instant": true,
           "refId": "A"

@@ -256,7 +256,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_cpu_temp_celsius{device=~\"$device\", node=~\"$node\"}",
+          "expr": "mlx_hw_cpu_temp_celsius{device=~\"$device\", node=~\"$node\"} or vector(0)",
           "legendFormat": "{{device}}",
           "refId": "A"
         }

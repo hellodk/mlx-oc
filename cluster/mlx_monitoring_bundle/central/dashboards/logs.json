@@ -81,7 +81,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_log_tailer_lines_total{device=~\"$device\", severity=\"$severity\", category=\"$category\"}[1m])",
+          "expr": "rate(mlx_log_tailer_lines_total{device=~\"$device\", severity=~\"$severity\", category=~\"$category\"}[1m])",
           "legendFormat": "{{device}} {{severity}} {{category}}",
           "refId": "A"
         }
@@ -104,7 +104,7 @@
       },
       "targets": [
         {
-          "expr": "rate(mlx_log_tailer_shipped_total{device=~\"$device\", severity=\"$severity\"}[1m])",
+          "expr": "rate(mlx_log_tailer_shipped_total{device=~\"$device\", severity=~\"$severity\"}[1m])",
           "legendFormat": "{{device}} {{severity}}",
           "refId": "A"
         }

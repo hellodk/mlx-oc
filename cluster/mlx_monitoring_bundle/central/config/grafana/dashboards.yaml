@@ -4,7 +4,7 @@ providers:
     orgId: 1
     folder: MLX Cluster
     type: file
-    disableDeletion: true
+    disableDeletion: false
     updateIntervalSeconds: 10
     allowUiUpdates: false
     options:
