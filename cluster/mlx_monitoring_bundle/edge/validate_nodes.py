@@ -32,7 +32,7 @@ BUNDLE_DIR = Path(__file__).resolve().parent
 DEFAULT_NODES_FILE = BUNDLE_DIR / "config" / "nodes.yml"
 DEFAULT_ENV_FILE = BUNDLE_DIR / "config" / "edge.env"
 
-REQUIRED_MODULES = ("yaml", "prometheus_client", "requests")
+REQUIRED_MODULES = ("yaml", "prometheus_client", "requests", "psutil")
 
 
 def load_yaml(path: Path) -> dict:
@@ -172,14 +172,18 @@ def main() -> int:
                 errors.append(f"model path does not contain config.json: {cfg}")
 
     venv_python = env.get("VENV_PYTHON", "python3")
-    for label, executable in (
-        ("VENV_PYTHON", venv_python),
-    ):
-        path = Path(executable).expanduser()
-        if not (path.is_file() and os.access(path, os.X_OK)):
-            errors.append(f"{label} is not executable: {path}")
-        else:
-            print(f"{label:16}: {path}")
+    venv_path = Path(venv_python).expanduser()
+    if not (venv_path.is_file() and os.access(venv_path, os.X_OK)):
+        errors.append(f"VENV_PYTHON is not executable: {venv_path}")
+    else:
+        print(f"{'VENV_PYTHON':16}: {venv_path}")
+
+    raw_upstream = env.get("MLX_UPSTREAM", "").strip()
+    if raw_upstream:
+        from urllib.parse import urlparse
+        parsed_up = urlparse(raw_upstream if "://" in raw_upstream else f"http://{raw_upstream}")
+        if not parsed_up.hostname or any(ch.isspace() for ch in raw_upstream):
+            errors.append(f"MLX_UPSTREAM is invalid: {raw_upstream!r}")
 
     if Path(venv_python).is_file():
         for module in REQUIRED_MODULES:
@@ -187,7 +191,7 @@ def main() -> int:
                 errors.append(f"{module} is not importable in {venv_python}")
 
     if args.check_ports:
-        for port in (8080, 9102, 9104, 9105, 9106):
+        for port in (8080, 9102, 9104, 9105, 9106, 9107, 9108):
             if not port_free(port):
                 warnings.append(f"port {port} is already in use")
 

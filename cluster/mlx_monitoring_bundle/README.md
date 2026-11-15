@@ -34,12 +34,10 @@ No Prometheus scraping — devices initiate all outbound connections.
 6. [Alerts](#alerts)
 7. [Commands & Execution](#commands--execution)
    - [Prerequisites](#prerequisites)
-   - [Step 1: Generate nodes.yml](#step-1-generate-nodesyml)
-   - [Step 2: Validate SSH Connectivity](#step-2-validate-ssh-connectivity)
-   - [Step 3: Configure edge.env](#step-3-configure-edgeenv)
-   - [Step 4: Start the Edge Bundle](#step-4-start-the-edge-bundle)
-   - [Step 5: Deploy Central Stack](#step-5-deploy-central-stack)
-   - [Step 6: vmagent Config (Automatic)](#step-6-vmagent-config-automatic)
+   - [Step 1: Automated Edge Setup](#step-1-automated-edge-setup)
+   - [Step 2: Manage the Edge Daemon](#step-2-manage-the-edge-daemon)
+   - [Step 3: Deploy Central Stack](#step-3-deploy-central-stack)
+   - [Step 4: vmagent Config (Automatic)](#step-4-vmagent-config-automatic)
 8. [Opik SDK Tracing](#opik-sdk-tracing)
 9. [Security](#security)
 10. [Troubleshooting](#troubleshooting)
@@ -92,6 +90,8 @@ on the device.
 | `mlx_kv_cache_agent` | 9104 | KV-cache utilization, context length, KV bytes/token |
 | `mlx_server_supervisor` | 9105 | Passive, read-only `mlx_lm.server` health, process/PID-restart, and crash-log observer |
 | `mlx_server_log_tailer` | 9106 | Tails `server.log`, classifies lines, ships to OTLP |
+| `mlx_process_telemetry` | 9107 | Per-process CPU, RSS, open FDs, and thread telemetry |
+| `mlx_sbom_collector` | 9108 | Python/OS package SBOM inventory and drift metrics |
 | `vmagent` | (sidecar) | Scrapes localhost exporters, remote_writes to central VictoriaMetrics |
 | `otel-collector` | 4318 | Receives OTLP traces/logs from devices |
 
@@ -479,6 +479,7 @@ into a single firing alert.
 | `MLXServerNotReady` | warning | Up but `/v1/models` failing |
 | `MLXModelNotLoaded` | warning | Model gauge == 0 |
 | `MLXServerCrashLooping` | critical | ≥3 restarts in 15 min |
+| `MLXSupervisorExporterDown` | warning | Passive server observer (`:9105`) not reporting |
 | `MLXProxyDown` | critical | `mlx_up == 0` |
 | `MLXUpstreamDown` | critical | Proxy up but upstream unreachable |
 | `MLXThroughputDrop` | warning | < 0.1 req/s for 15 min |

@@ -628,6 +628,18 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
                 else:
                     details = f"HTTP {h_code}"
 
+            disabled_flags = {
+                "mlx-supervisor": cfg["edge_env"].get(
+                    "ENABLE_SERVER_MONITOR",
+                    cfg["edge_env"].get("ENABLE_SUPERVISOR", "true"),
+                ).lower() != "true",
+                "mlx-process": cfg["edge_env"].get("ENABLE_PROCESS_PROFILER", "true").lower() != "true",
+                "mlx-sbom": cfg["edge_env"].get("ENABLE_SBOM_COLLECTOR", "true").lower() != "true",
+            }
+            if disabled_flags.get(exp_name, False):
+                print(f"    [OFF]    {exp_name:<16} -> {probe_addr:<22} (disabled in edge.env)")
+                continue
+
             is_optional = exp_name in ("mlx-process", "mlx-sbom")
             if tcp_ok and metric_count > 0:
                 status_tag = "[OK]"
@@ -657,13 +669,16 @@ def cmd_review_edge(args: argparse.Namespace) -> int:
         # Check upstream model server
         raw_upstream = cfg["edge_env"].get("MLX_UPSTREAM", "http://127.0.0.1:11234")
         parsed_up = urllib.parse.urlparse(raw_upstream if "://" in raw_upstream else f"http://{raw_upstream}")
+        srv_scheme = parsed_up.scheme or "http"
         srv_host = parsed_up.hostname or "127.0.0.1"
-        srv_port = str(parsed_up.port or 11234)
+        default_port = 443 if srv_scheme == "https" else 80 if "://" in raw_upstream and parsed_up.port is None else 11234
+        srv_port = str(parsed_up.port or default_port)
+        srv_path = parsed_up.path.rstrip("/")
         srv_addr = f"{srv_host if is_local else nb_ip}:{srv_port}"
         srv_ok, _ = probe_tcp(srv_addr, timeout=0.5)
         srv_info = "server unreachable"
         if srv_ok:
-            s_code, s_body = probe_http(f"http://{srv_addr}/v1/models", timeout=1.0)
+            s_code, s_body = probe_http(f"{srv_scheme}://{srv_addr}{srv_path}/v1/models", timeout=1.0)
             if s_code == 200:
                 try:
                     models = json.loads(s_body).get("data", [])

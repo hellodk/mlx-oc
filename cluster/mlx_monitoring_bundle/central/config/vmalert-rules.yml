@@ -200,24 +200,24 @@ groups:
         summary: "mlx_lm.server crash-looping on {{ $labels.device }}"
         description: |
           mlx_lm.server restarted {{ $value }} times in 15 minutes on Device
-          {{ $labels.device }} ({{ $labels.node }}). Last reason:
-          {{ $labels.mlx_server_last_crash_reason }}. Check server.log for the
-          crash reason.
+          {{ $labels.device }} ({{ $labels.node }}). Query
+          mlx_server_last_crash_reason{device="{{ $labels.device }}"} == 1
+          and check server.log for the crash reason.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#crash-looping"
 
-    - alert: MLXServerHung
-      expr: mlx_server_state == 2 and mlx_server_up == 1
-      for: 5m
+    - alert: MLXSupervisorExporterDown
+      expr: up{job="mlx-supervisor"} == 0
+      for: 2m
       labels:
         severity: warning
         category: serving
       annotations:
-        summary: "Server health degraded on {{ $labels.device }}"
+        summary: "Passive server observer down on {{ $labels.device }}"
         description: |
-          mlx_lm.server is alive but not serving (/v1/models failing) on Device
-          {{ $labels.device }} ({{ $labels.node }}). Check the external
-          supervisor and server.log.
-        runbook: "https://docs.example.com/mlx-monitoring/runbook#server-hung"
+          vmagent cannot scrape mlx_server_supervisor (:9105) on Device
+          {{ $labels.device }} ({{ $labels.node }}). Server up/ready and
+          crash-loop alerts may be stale until the exporter recovers.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#supervisor-down"
 
   - name: mlx.inference
     rules:

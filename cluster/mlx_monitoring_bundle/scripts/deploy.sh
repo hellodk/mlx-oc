@@ -254,7 +254,7 @@ _detect_venv() {
   )
   for c in "${candidates[@]}"; do
     if [[ -n "${c}" && -x "${c}" ]]; then
-      if "${c}" -c 'import yaml, prometheus_client' >/dev/null 2>&1; then
+      if "${c}" -c 'import yaml, prometheus_client, psutil' >/dev/null 2>&1; then
         printf '%s' "${c}"
         return 0
       fi
@@ -288,6 +288,11 @@ cmd_setup_edge() {
     mlx_upstream="$(_prompt_input "External LLM Upstream URL (e.g. http://127.0.0.1:8000)")"
     [[ -n "${mlx_upstream}" ]] || die "MLX_UPSTREAM is required (e.g. http://127.0.0.1:8000). Pass as 4th arg, set MLX_UPSTREAM in env, or enter when prompted."
   fi
+  mlx_upstream="${mlx_upstream#"${mlx_upstream%%[![:space:]]*}"}"
+  mlx_upstream="${mlx_upstream%"${mlx_upstream##*[![:space:]]}"}"
+  [[ "${mlx_upstream}" != *[[:space:]]* ]] || die "Invalid MLX_UPSTREAM '${mlx_upstream}': URL must not contain whitespace"
+  [[ "${mlx_upstream}" == *"://"* ]] || mlx_upstream="http://${mlx_upstream}"
+  mlx_upstream="${mlx_upstream%/}"
 
   if [[ -z "${model_id}" ]]; then
     model_id="$(_prompt_input "Model ID (press Enter to skip or specify served model)")"
@@ -331,6 +336,8 @@ ENABLE_HW_TELEMETRY=true
 ENABLE_KV_AGENT=true
 ENABLE_SERVER_MONITOR=true
 ENABLE_LOGTAILER=true
+ENABLE_PROCESS_PROFILER=true
+ENABLE_SBOM_COLLECTOR=true
 ENABLE_VMAGENT=true
 
 LOG_LEVEL=INFO
@@ -351,6 +358,18 @@ MLX_NET_IFACE=
 
 ENABLE_CONTAINER_STATS=false
 MLX_SERVER_LOG=${EDGE_DIR}/logs/server.log
+
+# Passive process/external-supervisor monitoring overrides
+MLX_PROCESS_PATTERN=mlx_lm.server
+MLX_LAUNCHD_LABEL=
+MLX_SYSTEMD_UNIT=
+
+# Process Profiler & SBOM Collector
+PROCESS_SAMPLE_INTERVAL=5.0
+PROCESS_LISTEN=127.0.0.1:9107
+SBOM_SCAN_INTERVAL=3600.0
+SBOM_LISTEN=127.0.0.1:9108
+SBOM_BASE_DEVICE=mm
 
 VMAGENT_SCRAPE_INTERVAL=10s
 VMAGENT_QUEUE_CAPACITY=5000

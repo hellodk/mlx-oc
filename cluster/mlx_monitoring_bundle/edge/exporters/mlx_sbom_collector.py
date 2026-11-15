@@ -216,10 +216,9 @@ def _scan_pip_venvs() -> List[Dict[str, Any]]:
     seen: set[Tuple[str, str, str]] = set()
 
     pythons = [sys.executable]
-    for env_var in ("VENV_PYTHON",):
-        val = os.environ.get(env_var)
-        if val and os.path.isfile(val) and val not in pythons:
-            pythons.append(val)
+    venv_py = os.environ.get("VENV_PYTHON")
+    if venv_py and os.path.isfile(venv_py) and venv_py not in pythons:
+        pythons.append(venv_py)
 
     # Common search paths
     for cand in (
