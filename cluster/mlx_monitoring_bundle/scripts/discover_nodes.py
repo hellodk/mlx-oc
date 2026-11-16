@@ -35,7 +35,8 @@ Output is YAML written to stdout. Review before deploying.
 from __future__ import annotations
 
 import argparse
-import json
+import getpass
+import ipaddress
 import os
 import re
 import socket
@@ -72,13 +73,13 @@ def run_ssh(host: str, user: str, key: str | None, cmd: str,
 def get_serial_ssh(host, user, key) -> str:
     out = run_ssh(host, user, key,
                   "system_profiler SPHardwareDataType 2>/dev/null | "
-                  "awk '/Serial Number/{print $4; exit}'")
+                  "awk -F': ' '/Serial Number/{print $2; exit}' | tr -d ' '")
     return out or "unknown"
 
 
 def get_serial_local() -> str:
     out = run_local(["system_profiler", "SPHardwareDataType"])
-    m = re.search(r"Serial Number\s*:\s*(\S+)", out)
+    m = re.search(r"Serial Number[^:]*:\s*(\S+)", out)
     return m.group(1) if m else "unknown"
 
 
@@ -88,6 +89,16 @@ def _strip_scheme(endpoint: str) -> str:
     return endpoint.split("/")[0]
 
 
+_TAILSCALE_CGNAT = ipaddress.ip_network("100.64.0.0/10")
+
+
+def _is_tailscale_ip(ip: str) -> bool:
+    try:
+        return ipaddress.ip_address(ip) in _TAILSCALE_CGNAT
+    except ValueError:
+        return False
+
+
 def get_ip_ssh(host, user, key, target_network: str | None = None) -> str:
     if target_network:
         prefix = target_network.replace(".", r"\.")
@@ -95,7 +106,16 @@ def get_ip_ssh(host, user, key, target_network: str | None = None) -> str:
                       f"ifconfig | awk '/inet {prefix}/{{print $2; exit}}'")
         if out:
             return out
-    # Fallback to any non-loopback IPv4 address
+    # Prefer direct LAN / non-Tailscale IPv4 over CGNAT 100.64.0.0/10
+    out = run_ssh(
+        host,
+        user,
+        key,
+        r"ifconfig | awk '/inet / && !/127\.0\.0\.1/ && "
+        r"!/ 100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./{print $2; exit}'",
+    )
+    if out:
+        return out
     out = run_ssh(host, user, key,
                   r"ifconfig | awk '/inet / && !/127\.0\.0\.1/{print $2; exit}'")
     return out or host
@@ -109,6 +129,13 @@ def get_ip_local(target_host: str | None = None) -> str:
         s.connect((probe_host, 80))
         ip = s.getsockname()[0]
         s.close()
+        if _is_tailscale_ip(ip) and (not target_host or not _is_tailscale_ip(probe_host)):
+            try:
+                host_ip = socket.gethostbyname(socket.gethostname())
+                if host_ip and not host_ip.startswith("127.") and not _is_tailscale_ip(host_ip):
+                    return host_ip
+            except Exception:
+                pass
         return ip
     except Exception:
         # Fallback to local hostname lookup
@@ -124,7 +151,15 @@ def get_hostname_ssh(host, user, key) -> str:
 
 
 def get_hostname_local() -> str:
-    return socket.gethostname()
+    try:
+        out = subprocess.run(
+            ["hostname", "-s"], capture_output=True, text=True, timeout=2
+        ).stdout.strip()
+        if out:
+            return out
+    except Exception:
+        pass
+    return socket.gethostname().split(".")[0]
 
 
 def main() -> int:
@@ -136,8 +171,8 @@ def main() -> int:
     ap.add_argument("--ssh-key", help="SSH private key for remote discovery")
     ap.add_argument("--model", help="pinned model id (optional, auto-discovered if unset)")
     ap.add_argument("--model-path", help="local model directory (optional)")
-    ap.add_argument("--enabled", action="store_true", default=True,
-                    help="mark node as enabled (default: true)")
+    ap.add_argument("--enabled", action=argparse.BooleanOptionalAction, default=True,
+                    help="mark node as enabled (default: true; --no-enabled to disable)")
     ap.add_argument("--central-victoria-metrics", required=True,
                     help="VictoriaMetrics host:port (required, no default)")
     ap.add_argument("--central-otel", required=True,
@@ -154,7 +189,7 @@ def main() -> int:
 
     if args.local:
         host = args.host or get_ip_local(target_vm_host)
-        user = args.ssh_user or os.environ.get("USER", "dk")
+        user = args.ssh_user or os.environ.get("USER") or getpass.getuser()
         key = args.ssh_key
         serial = get_serial_local()
         ip = get_ip_local(target_vm_host)

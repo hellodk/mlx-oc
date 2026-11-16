@@ -1,0 +1,6 @@
+.env
+.env.*
+!.env.template
+*.bak*
+__pycache__/
+*.pyc

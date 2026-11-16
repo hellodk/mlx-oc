@@ -18,13 +18,8 @@ macbooks:
     serial: "<SERIAL_NUMBER>"    # system_profiler SPHardwareDataType
     ip: "<NODE_IP>"
     enabled: true
-    # Optional. When both are set, the server is started from model_path's
-    # parent and the model id is used for API requests.
+    # Optional model identity / directory for observability tagging
     model: "<MODEL_ID>"
     model_path: "<MODEL_DIRECTORY>"
     # Optional list of model aliases accepted by strict model checking
     # model_aliases: ["alias-1", "alias-2"]
-    # Optional per-node MLX server port override (default: 11234)
-    # mlx_server_port: 11234
-    # Optional per-node supervisor launch command override
-    # mlx_server_cmd: ""

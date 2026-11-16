@@ -35,7 +35,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from mlx_logging import debug, degraded, info
+from mlx_logging import debug, degraded, info, parse_upstream_url
 
 _DEFAULT_ROOTS = (
     "~/mlx-models",
@@ -46,6 +46,7 @@ _DEFAULT_ROOTS = (
 )
 
 _CACHE_TTL_SECONDS = 300.0
+_NEGATIVE_CACHE_TTL_SECONDS = 15.0
 _cache_lock = threading.Lock()
 _cache: dict[tuple[str, str, str], tuple[float, "ModelInfo | None"]] = {}
 
@@ -171,7 +172,12 @@ def _candidate_configs(model_id: str | None, model_path: str | None) -> list[Pat
                 hf_dir = root / f"models--{org}--{name}"
                 snapshots = hf_dir / "snapshots"
                 if snapshots.is_dir():
-                    for snap in sorted(snapshots.iterdir(), reverse=True):
+                    try:
+                        snaps = sorted(snapshots.iterdir(), reverse=True)
+                    except OSError as exc:
+                        debug(f"unable to list {snapshots}: {exc!r}", component="model-info")
+                        snaps = []
+                    for snap in snaps:
                         add(snap / "config.json")
     return out
 
@@ -195,10 +201,12 @@ def _as_int(value: Any, default: int = 0) -> int:
 
 def _first_int(source: dict[str, Any], *keys: str, default: int = 0) -> int:
     for key in keys:
-        if source.get(key) is not None:
-            value = _as_int(source.get(key), default)
-            if value:
-                return value
+        raw = source.get(key)
+        if raw is not None:
+            try:
+                return int(raw)
+            except (TypeError, ValueError):
+                continue
     return default
 
 
@@ -315,16 +323,34 @@ def _parse_config(path: Path, model_id: str, data: dict[str, Any]) -> ModelInfo:
     )
 
 
+def _pick_served_model_id(models: list[Any]) -> str | None:
+    """Pick the active served model id from /v1/models (prefer non-default_model)."""
+    fallback: str | None = None
+    for entry in reversed(models):
+        if isinstance(entry, dict):
+            mid = entry.get("id")
+            if isinstance(mid, str) and mid:
+                if mid != "default_model":
+                    return mid
+                fallback = fallback or mid
+    return fallback
+
+
 def _discover_from_upstream(upstream_url: str) -> str | None:
     import urllib.request
 
-    url = upstream_url.rstrip("/") + "/v1/models"
+    try:
+        _, _, _, base_url = parse_upstream_url(upstream_url)
+    except ValueError as exc:
+        debug(f"invalid upstream URL ({upstream_url!r}): {exc}", component="model-info")
+        return None
+    url = base_url.rstrip("/") + "/v1/models"
     try:
         with urllib.request.urlopen(url, timeout=5) as resp:
             data = json.loads(resp.read().decode("utf8"))
         models = data.get("data") or []
-        if models and isinstance(models[0], dict):
-            return models[0].get("id")
+        if isinstance(models, list):
+            return _pick_served_model_id(models)
     except Exception as exc:
         debug(f"upstream model discovery failed ({url}): {exc!r}",
               component="model-info")
@@ -361,8 +387,10 @@ def model_info(
     if not refresh:
         with _cache_lock:
             cached = _cache.get(cache_key)
-        if cached and now - cached[0] < _CACHE_TTL_SECONDS:
-            return cached[1]
+        if cached:
+            ttl = _CACHE_TTL_SECONDS if cached[1] is not None else _NEGATIVE_CACHE_TTL_SECONDS
+            if now - cached[0] < ttl:
+                return cached[1]
 
     if not effective_id and upstream_url:
         effective_id = _discover_from_upstream(upstream_url)

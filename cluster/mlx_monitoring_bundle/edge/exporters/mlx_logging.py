@@ -26,13 +26,12 @@ import logging
 import logging.handlers
 import os
 import sys
-import traceback
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 BUNDLE_DIR = Path(__file__).resolve().parent
 LOG_DIR = BUNDLE_DIR.parent / "logs"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 SERVICE = os.environ.get("MLX_SERVICE_NAME", "mlx-exporter")
 MACBOOK = os.environ.get("MLX_MACBOOK_ID", "unknown")
@@ -52,11 +51,15 @@ class _JsonFormatter(logging.Formatter):
         }
         if record.exc_info:
             payload["err"] = self.formatException(record.exc_info)
+        else:
+            err_text = getattr(record, "err", None)
+            if err_text:
+                payload["err"] = err_text
         for key in ("trace_id", "span_id"):
             val = getattr(record, key, None)
             if val:
                 payload[key] = val
-        return json.dumps(payload, ensure_ascii=False)
+        return json.dumps(payload, ensure_ascii=False, default=str)
 
 
 def setup_logging(service: str, macbook: str, level: str = "INFO",
@@ -75,15 +78,26 @@ def setup_logging(service: str, macbook: str, level: str = "INFO",
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
     logger.propagate = False
 
-    # Clear any pre-existing handlers (avoid duplicate logs on re-setup)
-    logger.handlers.clear()
+    # Close and remove pre-existing handlers to avoid FD leaks and duplicate logs
+    for handler in list(logger.handlers):
+        logger.removeHandler(handler)
+        try:
+            handler.close()
+        except OSError:
+            pass
 
     sh = logging.StreamHandler(sys.stderr)
     sh.setFormatter(_JsonFormatter())
     logger.addHandler(sh)
 
-    max_mb = int(os.environ.get("LOG_ROTATION_MAX_MB", "50"))
-    backups = int(os.environ.get("LOG_ROTATION_BACKUPS", "5"))
+    try:
+        max_mb = max(1, int(os.environ.get("LOG_ROTATION_MAX_MB", "50")))
+    except ValueError:
+        max_mb = 50
+    try:
+        backups = max(0, int(os.environ.get("LOG_ROTATION_BACKUPS", "5")))
+    except ValueError:
+        backups = 5
     fh = logging.handlers.RotatingFileHandler(
         log_dir / f"{service}.log",
         maxBytes=max_mb * 1024 * 1024,
@@ -109,6 +123,9 @@ def log(level: str, msg: str, component: str = "general",
     level_no = getattr(logging, level.upper(), logging.INFO)
     if not logger.isEnabledFor(level_no):
         return
+    active_exc = sys.exc_info() if exc_info else None
+    if active_exc is not None and active_exc[0] is None:
+        active_exc = None
     record = logging.LogRecord(
         name=f"mlx.{SERVICE}",
         level=level_no,
@@ -116,7 +133,7 @@ def log(level: str, msg: str, component: str = "general",
         lineno=0,
         msg=msg,
         args=(),
-        exc_info=None,
+        exc_info=active_exc,
     )
     record.service = SERVICE
     record.component = component
@@ -126,23 +143,6 @@ def log(level: str, msg: str, component: str = "general",
     if span_id:
         record.span_id = span_id
     logger.handle(record)
-    if exc_info:
-        # Emit a second record carrying the formatted exception stack.
-        tb = traceback.format_exc()
-        err_record = logging.LogRecord(
-            name=f"mlx.{SERVICE}",
-            level=logging.ERROR,
-            pathname="",
-            lineno=0,
-            msg="exception detail",
-            args=(),
-            exc_info=None,
-        )
-        err_record.service = SERVICE
-        err_record.component = component
-        err_record.macbook = macbook or MACBOOK
-        err_record.err = tb.strip()
-        logger.handle(err_record)
 
 
 def degraded(msg: str, component: str = "general",
@@ -169,3 +169,68 @@ def warning(msg: str, component: str = "general",
 def debug(msg: str, component: str = "general",
           trace_id: str | None = None, span_id: str | None = None) -> None:
     log("debug", msg, component=component, trace_id=trace_id, span_id=span_id)
+
+
+def parse_upstream_url(
+    raw: str,
+    default_scheme: str = "http",
+    default_port: int = 8080,
+) -> tuple[str, str, int, str]:
+    """Normalize an upstream target (host:port or URL) into (scheme, host, port, base_url).
+
+    Accepts forms like ``127.0.0.1:8000``, ``http://127.0.0.1:8000``,
+    ``https://llm.internal/v1``, or ``localhost``.
+    """
+    value = (raw or "").strip()
+    if not value:
+        raise ValueError("upstream URL/address must not be empty")
+    if "://" not in value:
+        value = f"{default_scheme}://{value}"
+    parsed = urlparse(value)
+    scheme = (parsed.scheme or default_scheme).lower()
+    if scheme not in ("http", "https"):
+        raise ValueError(f"unsupported upstream scheme: {scheme!r}")
+    host = parsed.hostname
+    if not host:
+        raise ValueError(f"missing upstream hostname in {raw!r}")
+    if parsed.port is not None:
+        port = parsed.port
+    elif scheme == "https":
+        port = 443
+    else:
+        port = default_port
+    host_str = f"[{host}]" if ":" in host and not host.startswith("[") else host
+    base_url = f"{scheme}://{host_str}:{port}"
+    return scheme, host, port, base_url
+
+
+def parse_listen_addr(
+    raw: str,
+    default_host: str = "127.0.0.1",
+    default_port: int = 8080,
+) -> tuple[str, int]:
+    """Parse a listen address (``host:port``, ``[ipv6]:port``, or ``port``) cleanly."""
+    value = (raw or "").strip()
+    if not value:
+        return default_host, default_port
+    if value.startswith("["):
+        host_part, sep, port_part = value[1:].partition("]")
+        if not sep:
+            raise ValueError(f"invalid IPv6 listen address: {raw!r}")
+        host = host_part.strip() or default_host
+        port_str = port_part.lstrip(":").strip()
+        port = int(port_str) if port_str else default_port
+    elif ":" in value:
+        host_part, _, port_part = value.rpartition(":")
+        if ":" in host_part:
+            raise ValueError(
+                f"unbracketed IPv6 listen address {raw!r}; use [addr]:port"
+            )
+        host = host_part.strip() or default_host
+        port = int(port_part.strip()) if port_part.strip() else default_port
+    else:
+        host = default_host
+        port = int(value)
+    if not (1 <= port <= 65535):
+        raise ValueError(f"listen port out of range (1..65535): {port}")
+    return host, port

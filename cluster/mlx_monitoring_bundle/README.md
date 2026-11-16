@@ -24,7 +24,7 @@ No Prometheus scraping — devices initiate all outbound connections.
    - [Proxy (`mlx_metrics_proxy.py`)](#proxy-mlx_metrics_proxypy)
    - [Hardware Telemetry (`mlx_hw_telemetry.py`)](#hardware-telemetry-mlx_hw_telemetry-py)
    - [KV Cache Agent (`mlx_kv_cache_agent.py`)](#kv-cache-agent-mlx_kv_cache_agentpy)
-   - [Server Supervisor (`mlx_server_supervisor.py`)](#server-supervisor-mlx_server_supervisor-py)
+   - [Passive Server Observer (`mlx_server_supervisor.py`)](#passive-server-observer-mlx_server_supervisorpy)
    - [Log Tailer (`mlx_server_log_tailer.py`)](#log-tailer-mlx_server_log_tailer-py)
    - [Node Validator (`validate_nodes.py`)](#node-validator-validate_nodespy)
    - [Node Discovery (`discover_nodes.py`)](#node-discovery-discover_nodespy)
@@ -34,12 +34,10 @@ No Prometheus scraping — devices initiate all outbound connections.
 6. [Alerts](#alerts)
 7. [Commands & Execution](#commands--execution)
    - [Prerequisites](#prerequisites)
-   - [Step 1: Generate nodes.yml](#step-1-generate-nodesyml)
-   - [Step 2: Validate SSH Connectivity](#step-2-validate-ssh-connectivity)
-   - [Step 3: Configure edge.env](#step-3-configure-edgeenv)
-   - [Step 4: Start the Edge Bundle](#step-4-start-the-edge-bundle)
-   - [Step 5: Deploy Central Stack](#step-5-deploy-central-stack)
-   - [Step 6: vmagent Config (Automatic)](#step-6-vmagent-config-automatic)
+   - [Step 1: Automated Edge Setup](#step-1-automated-edge-setup)
+   - [Step 2: Manage the Edge Daemon](#step-2-manage-the-edge-daemon)
+   - [Step 3: Deploy Central Stack](#step-3-deploy-central-stack)
+   - [Step 4: vmagent Config (Automatic)](#step-4-vmagent-config-automatic)
 8. [Opik SDK Tracing](#opik-sdk-tracing)
 9. [Security](#security)
 10. [Troubleshooting](#troubleshooting)
@@ -60,12 +58,14 @@ on the device.
 │                                     │      │                                          │
 │  mlx_metrics_proxy      :8080  ─────┼─────▶│  otel-collector        :4318 (OTLP)    │
 │  mlx_hw_telemetry       :9102  ─────┼─────▶│  victoria-metrics      :8428 (remote)  │
-│  mlx_kv_cache_agent     :9104  ─────┼─────▶│                                                    │
+│  mlx_kv_cache_agent     :9104  ─────┼─────▶│                                          │
 │  mlx_server_supervisor  :9105  ─────┼─────▶│  grafana               :3000           │
 │  mlx_server_log_tailer  :9106  ─────┼─────▶│  vmalert + alertmanager                  │
-│                                     │      │  opik server + postgres + clickhouse   │
+│  mlx_process_telemetry  :9107  ─────┼─────▶│  opik server + postgres + clickhouse   │
+│  mlx_sbom_collector     :9108  ─────┼─────▶│                                          │
+│                                     │      │                                          │
 │  vmagent (optional sidecar)         │      │                                          │
-│  scrapes localhost:8080-9106        │      │                                          │
+│  scrapes 127.0.0.1:8080-9108        │      │                                          │
 │  remote_writes to central VM        │      │                                          │
 └─────────────────────────────────────┘      └────────────────────────────────────────┘
        ▲                                               ▲
@@ -77,7 +77,7 @@ on the device.
 
 | Signal | Source | Transport | Destination |
 |--------|--------|-----------|-------------|
-| Prometheus metrics | 5 exporters (`:9102-9106`) + proxy (`:8080`) | vmagent scrape → remote_write | VictoriaMetrics |
+| Prometheus metrics | 7 exporters (`:8080`, `:9102`, `:9104-9108`) | vmagent scrape → remote_write | VictoriaMetrics |
 | OTLP traces | Proxy (OpenTelemetry + Opik SDK) | OTLP HTTP | OTel collector + Opik |
 | OTLP logs | Log tailer | OTLP HTTP | OTel collector → JSONL file |
 | Opik traces | Proxy (Opik SDK) | HTTPS | Opik server → Postgres/ClickHouse |
@@ -90,8 +90,10 @@ on the device.
 | `mlx_metrics_proxy` | 8080 | OpenAI-compatible proxy in front of `mlx_lm.server`; emits Prometheus metrics + OTLP traces + Opik traces |
 | `mlx_hw_telemetry` | 9102 | CPU/memory/disk/GPU power/thermal/network telemetry |
 | `mlx_kv_cache_agent` | 9104 | KV-cache utilization, context length, KV bytes/token |
-| `mlx_server_supervisor` | 9105 | `mlx_lm.server` process supervisor with crash auto-restart + health probes |
+| `mlx_server_supervisor` | 9105 | Passive, read-only `mlx_lm.server` health, process/PID-restart, and crash-log observer |
 | `mlx_server_log_tailer` | 9106 | Tails `server.log`, classifies lines, ships to OTLP |
+| `mlx_process_telemetry` | 9107 | Per-process CPU, RSS, open FDs, and thread telemetry |
+| `mlx_sbom_collector` | 9108 | Python/OS package SBOM inventory and drift metrics |
 | `vmagent` | (sidecar) | Scrapes localhost exporters, remote_writes to central VictoriaMetrics |
 | `otel-collector` | 4318 | Receives OTLP traces/logs from devices |
 
@@ -115,30 +117,39 @@ cluster/mlx_monitoring_bundle/
 │   │   ├── mlx_metrics_proxy.py                   # :8080 Proxy + Prometheus + OTLP + Opik
 │   │   ├── mlx_hw_telemetry.py                    # :9102 Hardware telemetry
 │   │   ├── mlx_kv_cache_agent.py                  # :9104 KV-cache + context metrics
-│   │   ├── mlx_server_supervisor.py               # :9105 mlx_lm.server supervisor + auto-restart
-│   │   └── mlx_server_log_tailer.py               # :9106 server.log → OTLP logs
+│   │   ├── mlx_server_supervisor.py               # :9105 Passive server health/process observer
+│   │   ├── mlx_server_log_tailer.py               # :9106 server.log → OTLP logs
+│   │   ├── mlx_process_telemetry.py               # :9107 Per-process profiler
+│   │   └── mlx_sbom_collector.py                  # :9108 SBOM inventory + drift collector
 │   ├── vmagent-edge/
 │   │   └── vmagent.yml                            # vmagent scrape config (template vars)
 │   ├── mlx_monitoring_bundle.py                   # Edge entrypoint (start\|stop\|status\|restart)
 │   ├── validate_nodes.py                          # Config + prerequisite validator
 │   ├── requirements.txt                           # pip dependencies
-│   ├── com.mlx.monitoring.bundle.plist            # launchd agent (macOS, auto-restart)
-│   └── com.mlx.monitoring-bundle.service          # systemd unit (Linux, auto-restart)
+│   ├── com.mlx.monitoring.bundle.plist.template   # launchd agent template (macOS)
+│   └── com.mlx.monitoring-bundle.service.template # systemd unit template (Linux)
 │
 ├── central/                                       # === RUNS ON CENTRAL SERVER (CONTAINERS) ===
 │   ├── config/
 │   │   ├── otelcol-config.yaml                    # OTLP receiver config
 │   │   ├── alertmanager.yml                       # Alert routing + inhibit rules
+│   │   ├── alertmanager.yml.template              # Alertmanager rendering template
 │   │   ├── vmalert-rules.yml                      # Multi-device alert rules
 │   │   └── grafana/
 │   │       ├── datasources.yaml                   # VictoriaMetrics datasource
+│   │       ├── datasources.yaml.template          # Datasource rendering template
 │   │       └── dashboards.yaml                    # Grafana file provisioning
-│   ├── dashboards/                                # 12 Grafana dashboards (device + IST + 5m)
+│   ├── dashboards/                                # 17 Grafana dashboards (device + IST + 5m)
+│   ├── Dockerfile.central                         # Self-contained central image build
+│   ├── .dockerignore                              # Container build secret/cache exclusions
+│   ├── .env.template                              # Central environment template
 │   ├── docker-compose.central.yml                 # Central stack composition (+ Opik profile)
 │   └── opik/                                      # Vendored Opik config (NGINX + ClickHouse)
 │
 ├── scripts/                                       # === SHARED, NODE-AGNOSTIC ===
 │   ├── deploy.sh                                  # validate / edge / central [--opik]
+│   ├── diagnostics.py                             # End-to-end doctor & service audits
+│   ├── build_and_push.sh                          # Container image builder & publisher
 │   └── discover_nodes.py                          # Auto-generate nodes.yml via SSH / local inspection
 │
 └── logs/                                          # Runtime rotating file logs (gitignored)
@@ -175,9 +186,7 @@ macbooks:
 ```
 
 `model_path` lets the exporters read `config.json` directly instead of guessing
-architecture values. When it is set, the supervisor starts `mlx_lm.server` from
-the model's parent directory and passes the basename as `--model`, so request
-model ids stay stable.
+architecture values and keeps reported model ids stable.
 
 ### edge.env (Runtime Overrides)
 
@@ -189,16 +198,20 @@ model ids stay stable.
 ENABLE_PROXY=true
 ENABLE_HW_TELEMETRY=true
 ENABLE_KV_AGENT=true
-ENABLE_SUPERVISOR=true
+ENABLE_SERVER_MONITOR=true
 ENABLE_LOGTAILER=true
+ENABLE_PROCESS_PROFILER=true
+ENABLE_SBOM_COLLECTOR=true
 ENABLE_VMAGENT=true
 
-# Listen ports
-PROXY_LISTEN=0.0.0.0:8080
-HW_LISTEN=0.0.0.0:9102
-KV_LISTEN=0.0.0.0:9104
-SUPERVISOR_LISTEN=0.0.0.0:9105
-LOGTAILER_LISTEN=0.0.0.0:9106
+# Listen ports (loopback-only under the push model)
+PROXY_LISTEN=127.0.0.1:8080
+HW_LISTEN=127.0.0.1:9102
+KV_LISTEN=127.0.0.1:9104
+SUPERVISOR_LISTEN=127.0.0.1:9105
+LOGTAILER_LISTEN=127.0.0.1:9106
+PROCESS_LISTEN=127.0.0.1:9107
+SBOM_LISTEN=127.0.0.1:9108
 
 # Proxy guardrails
 MLX_LOGPROBS=3
@@ -219,16 +232,11 @@ LOG_DIR=./logs
 PID_DIR=./bin
 CONFIG_DIR=./config
 
-# Python venvs
+# Python venv
 VENV_PYTHON=/Users/dk/bench/venv-mon/bin/python
-MLX_VENV_PYTHON=/Users/dk/venvs/mlx/bin/python
 
-# Upstream mlx_lm.server endpoint consumed by the proxy / KV agent
+# External LLM server endpoint consumed by the proxy / KV agent
 MLX_UPSTREAM=http://127.0.0.1:11234
-MLX_SERVER_PORT=11234
-
-# Adopt an already-healthy server instead of spawning a duplicate
-SUPERVISOR_ATTACH_HEALTHY=true
 
 # Reject requests whose model id does not match the served model
 MLX_PROXY_STRICT_MODEL=true
@@ -313,7 +321,7 @@ Single entrypoint with four actions: `start`, `stop`, `status`, `restart`.
 - **status**: Prints JSON of running PIDs, node identity, model path, and central endpoints.
 - **restart**: stop → wait 2s → start.
 
-Spawn order: supervisor → kv → logtailer → proxy → hw.
+Spawn order: supervisor → kv → logtailer → proxy → hw → process → sbom → vmagent.
 
 ### Proxy (`mlx_metrics_proxy.py`)
 
@@ -381,31 +389,22 @@ Metrics:
 `/v1/models` discovery fails, model-specific gauges are set to 0 and a
 `[degraded]` log is emitted. Throughput and other metrics continue unaffected.
 
-### Server Supervisor (`mlx_server_supervisor.py`)
+### Passive Server Observer (`mlx_server_supervisor.py`)
 
-Starts `mlx_lm.server`, watches the child process, and restarts with
-exponential backoff on crash. Probes `/v1/models` to distinguish "process alive"
-from "serving ready."
+Passively monitors an externally run or externally supervised (`launchd`/`systemd`)
+`mlx_lm.server` — **never** starts, stops, kills, or restarts the server.
 
-If a healthy server is already answering when the supervisor starts, it adopts
-that process instead of spawning a duplicate (`SUPERVISOR_ATTACH_HEALTHY=true`,
-disable with `--no-attach`). When `model_path` is configured the server is
-launched from the model's parent directory with the basename as `--model`, so
-request model ids stay stable.
+- Probes `MLX_UPSTREAM/v1/models` to distinguish "process alive" from "serving ready"
+- Tracks local process PID/uptime and counts PID-change restarts (`mlx_server_restarts_total`)
+- Optionally reads exit codes from `MLX_LAUNCHD_LABEL` / `MLX_SYSTEMD_UNIT`
+- Sniffs `server.log` tail on stop/restart to classify crashes (`metal_gpu_error`, `oom`, `python_error`, `exit`, `unknown`)
 
 Metrics:
-- `mlx_server_state` (0=idle, 1=running, 2=starting, 3=backoff)
+- `mlx_server_state` (0=down, 1=running_ready, 2=up_not_ready, 3=backoff)
 - `mlx_server_up` / `mlx_server_ready` / `mlx_model_loaded`
 - `mlx_server_restarts_total`, `mlx_server_crashes_total{reason}`
 - `mlx_server_uptime_seconds`, `mlx_server_last_exit_code`
 - `mlx_server_health_checks_total{result}`, `mlx_server_backoff_seconds`
-
-**Crash reason sniffing:** On exit, scans the tail of `server.log` for patterns:
-metal GPU errors, OOM, python errors → classified as `metal_gpu_error`, `oom`,
-`python_error`, `hung`, `exit`, or `unknown`.
-
-**Keep-alive:** If the process is alive but `/v1/models` stops answering for
-`--hang-after` seconds, the supervisor kills and restarts it.
 
 ### Log Tailer (`mlx_server_log_tailer.py`)
 
@@ -443,13 +442,13 @@ SSH. Collects: hostname (id), serial (`system_profiler`), IP, and optional
 
 ### Template Variables
 
-All 12 dashboards use a `$device` template variable (renamed from `$macbook`).
-The underlying Prometheus label remains `macbook` (set by vmagent
-`external_labels`). The variable queries `label_values(..., macbook)`.
+All 17 dashboards use a `$device` template variable (with dual `device` and
+legacy `macbook` labels set by `vmagent` `external_labels`). The variable
+queries `label_values(..., device)`.
 
 | Variable | Type | Query |
 |----------|------|-------|
-| `$device` | query | `label_values(mlx_hw_up, macbook)` |
+| `$device` | query | `label_values(mlx_hw_up, device)` |
 | `$node` | query | `label_values(mlx_hw_up, node)` (where applicable) |
 | `$kind` | query | `label_values(mlx_requests_total, kind)` (inference dashboard) |
 
@@ -461,7 +460,11 @@ refresh**.
 | Dashboard | File | Purpose |
 |-----------|------|---------|
 | Cluster Overview | `overview.json` | Cross-device request rate, errors, GPU, thermal, risk, confidence |
+| Device Health | `device-health.json` | Host readiness, uptime, scrape target health |
 | Hardware | `hardware.json` | Per-device CPU, memory, disk, temperature, uptime |
+| Process Profiler | `process-profiler.json` | Top-K process CPU, memory, disk/net I/O, GPU/ANE ranking |
+| SBOM Inventory | `sbom-inventory.json` | Python, Homebrew, system binary, and MLX model inventory |
+| SBOM Drift | `sbom-drift.json` | Cross-device baseline comparison and drifted packages |
 | Serving | `serving.json` | `mlx_lm.server` up/ready/loaded, restarts, crashes, state |
 | Inference | `inference.json` | TTFT, generation time, token rate, queue wait, finish reasons, tool calls |
 | Quality | `quality.json` | Hallucination risk, confidence, perplexity, entropy, margin, heuristics |
@@ -495,6 +498,7 @@ into a single firing alert.
 | `MLXServerNotReady` | warning | Up but `/v1/models` failing |
 | `MLXModelNotLoaded` | warning | Model gauge == 0 |
 | `MLXServerCrashLooping` | critical | ≥3 restarts in 15 min |
+| `MLXSupervisorExporterDown` | warning | Passive server observer (`:9105`) not reporting |
 | `MLXProxyDown` | critical | `mlx_up == 0` |
 | `MLXUpstreamDown` | critical | Proxy up but upstream unreachable |
 | `MLXThroughputDrop` | warning | < 0.1 req/s for 15 min |
@@ -530,7 +534,7 @@ Run the interactive setup on the Mac (no root access required):
 ```
 Or pass parameters directly:
 ```bash
-./scripts/deploy.sh setup-edge <CENTRAL_IP> [MODEL_ID] [MODEL_PATH]
+./scripts/deploy.sh setup-edge <CENTRAL_IP> [MODEL_ID] [MODEL_PATH] [MLX_UPSTREAM]
 ```
 
 **What this automatically does:**
@@ -589,7 +593,7 @@ On the central server (supports both **Docker** and **Podman**):
 `deploy.sh central` will print the full list of container images to be pulled and prompt for explicit confirmation `(y/N)` before pulling or launching containers.
 
 **Web Endpoints:**
-- **Grafana**: `http://<central-ip>:3000` (provisioned with 13 pre-configured dashboards in IST)
+- **Grafana**: `http://<central-ip>:3000` (provisioned with 17 pre-configured dashboards in IST)
 - **VictoriaMetrics**: `http://<central-ip>:8428`
 - **vmalert**: `http://<central-ip>:8880`
 - **Alertmanager**: `http://<central-ip>:9093`
@@ -707,7 +711,7 @@ When you deploy the monitoring stack and find that **no data is being populated 
 The Doctor executes a 5-stage telemetry traceroute that isolates the failure domain in seconds:
 
 1. **Stage 1 (Central TSDB Ingestion Gate)**: Checks TCP reachability, HTTP `/health`, and total active time-series count in VictoriaMetrics. If this fails, the central TSDB is stopped or unreachable.
-2. **Stage 2 (Edge Telemetry Ingestion Gate)**: Queries VictoriaMetrics for live `up{macbook="<node_id>"}` gauges across all 5 exporters (`mlx-proxy`, `mlx-hw`, `mlx-kv`, `mlx-supervisor`, `mlx-logtailer`) and measures sample recency (`time() - max(timestamp(up))`). If samples are >60s old or missing, vmagent on that edge Mac is down or blocked by network/firewall.
+2. **Stage 2 (Edge Telemetry Ingestion Gate)**: Queries VictoriaMetrics for live `up{device="<node_id>"}` gauges across the edge exporters (`mlx-proxy`, `mlx-hw`, `mlx-kv`, `mlx-supervisor`, `mlx-logtailer`, `mlx-process`, `mlx-sbom`) and measures sample recency (`time() - max(timestamp(up))`). If samples are >300s old or missing, vmagent on that edge Mac is down or blocked by network/firewall.
 3. **Stage 3 (Alerting & Rule Engine Gate)**: Verifies `vmalert` rule execution and `alertmanager` notification routing.
 4. **Stage 4 (Logs & Traces Ingestion Gate)**: Verifies OTLP HTTP receiver (`:4318`) and Opik Gateway (`:32173`).
 5. **Stage 5 (Grafana & Query Pipeline Gate)**: Validates Grafana HTTP health, credentials/auth, VictoriaMetrics datasource registration, and executes an active datasource proxy query (`count(up)`).
@@ -722,8 +726,6 @@ The Doctor executes a 5-stage telemetry traceroute that isolates the failure dom
 | Model gauges at 0 | no `MLX_MODEL`/`MLX_MODEL_PATH` and `/v1/models` unreachable | Set `model_path` in `nodes.yml` or ensure upstream is reachable |
 | Opik traces missing | `central.opik` not set or Opik profile not running | Run `./scripts/deploy.sh review-opik`; start with `deploy.sh central --opik` |
 | Proxy rejects model id | strict model matching | Send the served model id or set `MLX_PROXY_STRICT_MODEL=false` |
-| Duplicate `mlx_lm.server` | attach mode disabled while a server was already up | Keep `SUPERVISOR_ATTACH_HEALTHY=true` or stop the old process first |
-| Crash loop on restart | Server dying repeatedly | Check `server.log` and `mlx_server_crashes_total{reason}` |
 | Permission denied on logs | `LOG_DIR` not writable | Set `LOG_DIR` to a user-writable path in `edge.env` |
 
 ---

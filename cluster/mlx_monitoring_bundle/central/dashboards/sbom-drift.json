@@ -164,7 +164,7 @@
       },
       "targets": [
         {
-          "expr": "(1 - (count(mac_sbom_drift_status{status=\"DEVIATED\"}) / count(count by (device) (mac_sbom_package_info)))) * 100 or vector(98.4)",
+          "expr": "(1 - (count(mac_sbom_drift_status{status=\"DEVIATED\"}) / count(count by (device) (mac_sbom_package_info)))) * 100 or vector(0)",
           "legendFormat": "Conformity %",
           "refId": "A"
         }

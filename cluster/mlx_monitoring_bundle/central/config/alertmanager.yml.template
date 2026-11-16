@@ -38,7 +38,7 @@ inhibit_rules:
   - source_matchers:
       - alertname = "MLXProxyDown"
     target_matchers:
-      - alertname =~ "MLXUpstreamDown|MLXThroughputDrop|MLXInferenceStalled"
+      - alertname =~ "MLXUpstreamDown|MLXThroughputDrop"
     equal: ["device"]
 
   - source_matchers:
@@ -48,7 +48,14 @@ inhibit_rules:
     equal: ["device"]
 
   - source_matchers:
+      - alertname = "MLXDeviceSilent"
+    target_matchers:
+      - alertname = "MLXMacbookSilent"
+    equal: ["device"]
+
+  - source_matchers:
       - alertname =~ "MLXDeviceSilent|MLXMacbookSilent"
     target_matchers:
       - alertname =~ "MLX.*"
+      - alertname !~ "MLXDeviceSilent|MLXMacbookSilent"
     equal: ["device"]

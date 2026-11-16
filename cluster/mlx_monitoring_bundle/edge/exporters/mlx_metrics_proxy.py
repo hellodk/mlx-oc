@@ -25,19 +25,24 @@ entry.
 from __future__ import annotations
 
 import argparse
+import codecs
+import http.client
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import logging
 import math
 import os
+from pathlib import Path
 import random
 import re
+import secrets
+import signal
 import socket
+import ssl
 import sys
 import threading
 import time
-import http.client
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+from urllib.parse import urlsplit
 
 import requests
 
@@ -49,7 +54,45 @@ from prometheus_client import (
     CONTENT_TYPE_LATEST,
 )
 
-from mlx_logging import degraded, debug, error, info, setup_logging
+from mlx_logging import (
+    degraded,
+    debug,
+    error,
+    info,
+    parse_listen_addr,
+    parse_upstream_url,
+    setup_logging,
+)
+
+
+def _upstream_base_url(
+    upstream: tuple[str, int] | tuple[str, str, int, str],
+) -> str:
+    """Return the http(s)://host:port base URL from either a 2-tuple or 4-tuple upstream."""
+    if len(upstream) >= 4:
+        return upstream[3]
+    host = upstream[0]
+    host_str = f"[{host}]" if ":" in host and not host.startswith("[") else host
+    return f"http://{host_str}:{upstream[1]}"
+
+
+def _make_upstream_conn(
+    upstream: tuple[str, int] | tuple[str, str, int, str],
+    timeout: int = 300,
+) -> http.client.HTTPConnection:
+    """Create an HTTP(S) connection to the normalized upstream endpoint."""
+    if len(upstream) == 2:
+        scheme = "http"
+        host, port = upstream
+    else:
+        scheme, host, port, _ = upstream
+    if scheme == "https":
+        verify_env = os.environ.get("MLX_VERIFY_TLS", os.environ.get("OTLP_VERIFY_TLS", "true"))
+        verify = verify_env.lower() != "false"
+        ctx = ssl.create_default_context() if verify else ssl._create_unverified_context()
+        return http.client.HTTPSConnection(host, port, timeout=timeout, context=ctx)
+    return http.client.HTTPConnection(host, port, timeout=timeout)
+
 
 try:
     from mlx_model_info import model_info as _model_info
@@ -74,11 +117,11 @@ def _sig_url(endpoint: str, sig: str) -> str:
 
 
 def _setup_otel(endpoint: str, node_name: str, service_name: str = "mlx-metrics-proxy",
-                opik_otlp_endpoint: str = ""):
+                opik_otlp_endpoint: str = "", verify_tls: bool = True):
     if not endpoint and not opik_otlp_endpoint:
         return None
     try:
-        from opentelemetry import trace, metrics, _logs
+        from opentelemetry import trace, _logs
         from opentelemetry.sdk.resources import (
             Resource, SERVICE_NAME, HOST_NAME, SERVICE_INSTANCE_ID,
         )
@@ -93,6 +136,9 @@ def _setup_otel(endpoint: str, node_name: str, service_name: str = "mlx-metrics-
             OTLPLogExporter,
         )
 
+        otlp_session = requests.Session()
+        otlp_session.verify = verify_tls
+
         host = socket.gethostname()
         resource = Resource.create({
             SERVICE_NAME: service_name,
@@ -104,7 +150,12 @@ def _setup_otel(endpoint: str, node_name: str, service_name: str = "mlx-metrics-
         tp = TracerProvider(resource=resource)
         if endpoint:
             tp.add_span_processor(
-                BatchSpanProcessor(OTLPSpanExporter(endpoint=_sig_url(endpoint, "traces")))
+                BatchSpanProcessor(
+                    OTLPSpanExporter(
+                        endpoint=_sig_url(endpoint, "traces"),
+                        session=otlp_session,
+                    )
+                )
             )
         if opik_otlp_endpoint:
             tp.add_span_processor(
@@ -112,6 +163,7 @@ def _setup_otel(endpoint: str, node_name: str, service_name: str = "mlx-metrics-
                     OTLPSpanExporter(
                         endpoint=_sig_url(opik_otlp_endpoint, "traces"),
                         headers={"projectName": "mlx"},
+                        session=otlp_session,
                     )
                 )
             )
@@ -121,7 +173,10 @@ def _setup_otel(endpoint: str, node_name: str, service_name: str = "mlx-metrics-
             lp = LoggerProvider(resource=resource)
             lp.add_log_record_processor(
                 BatchLogRecordProcessor(
-                    OTLPLogExporter(endpoint=_sig_url(endpoint, "logs"))
+                    OTLPLogExporter(
+                        endpoint=_sig_url(endpoint, "logs"),
+                        session=otlp_session,
+                    )
                 )
             )
             _logs.set_logger_provider(lp)
@@ -132,6 +187,8 @@ def _setup_otel(endpoint: str, node_name: str, service_name: str = "mlx-metrics-
 
         class Otel:
             tracer = tp.get_tracer("mlx.proxy")
+            tracer_provider = tp
+            logger_provider = lp if endpoint else None
 
             @staticmethod
             def span(name, **attrs):
@@ -355,7 +412,7 @@ _STOPWORDS = set(
 
 
 def _trigrams(words):
-    return [" ".join(words[i : i + 3]) for i in range(len(words) - 2)]
+    return [" ".join(words[i:i + 3]) for i in range(len(words) - 2)]
 
 
 def heuristic_repetition(text: str) -> float:
@@ -427,9 +484,10 @@ def perplexity(confidences) -> float:
         return 0.0
     mean_logp = sum(math.log(max(p, _EPS)) for p in confidences) / len(confidences)
     try:
-        return math.exp(-mean_logp)
+        val = math.exp(-mean_logp)
+        return val if math.isfinite(val) else 0.0
     except OverflowError:
-        return float("inf")
+        return 0.0
 
 
 def confidence_stats(confidences) -> tuple:
@@ -593,6 +651,7 @@ class _StreamParser:
     def __init__(self):
         self._buf = ""
         self.content_parts = []
+        self.reasoning_parts = []
         self._tool_calls = {}
         self.usage = None
         self.finish_reason = None
@@ -611,20 +670,31 @@ class _StreamParser:
                 obj = json.loads(payload)
             except json.JSONDecodeError:
                 continue
-            if "usage" in obj:
+            if not isinstance(obj, dict):
+                continue
+            if obj.get("usage"):
                 self.usage = obj["usage"]
             choices = obj.get("choices") or []
-            if not choices:
+            if not choices or not isinstance(choices[0], dict):
                 continue
             self.finish_reason = choices[0].get("finish_reason")
             delta = choices[0].get("delta") or {}
+            if not isinstance(delta, dict):
+                continue
             if delta.get("content"):
                 self.content_parts.append(delta["content"])
+            reasoning_txt = delta.get("reasoning_content") or delta.get("reasoning")
+            if reasoning_txt:
+                self.reasoning_parts.append(reasoning_txt)
             for tc in delta.get("tool_calls") or []:
-                tid = tc.get("id")
-                if not tid:
+                if not isinstance(tc, dict):
                     continue
-                entry = self._tool_calls.setdefault(tid, {"type": None, "name": ""})
+                idx = tc.get("index")
+                tid = tc.get("id")
+                key = f"idx:{idx}" if idx is not None else tid
+                if not key:
+                    continue
+                entry = self._tool_calls.setdefault(key, {"type": None, "name": ""})
                 if tc.get("type"):
                     entry["type"] = tc["type"]
                 name_frag = (tc.get("function") or {}).get("name")
@@ -634,6 +704,10 @@ class _StreamParser:
     @property
     def content(self) -> str:
         return "".join(self.content_parts)
+
+    @property
+    def reasoning(self) -> str:
+        return "".join(self.reasoning_parts)
 
     @property
     def tool_calls(self) -> int:
@@ -650,7 +724,8 @@ class _StreamParser:
     def completion_tokens(self) -> int:
         if self.usage and self.usage.get("completion_tokens"):
             return int(self.usage["completion_tokens"])
-        return len(self.content.split())
+        combined = " ".join(p for p in (self.content, self.reasoning) if p)
+        return len(combined.split())
 
 
 def _pick_served_model(models: list, model_path: str | None) -> str | None:
@@ -669,10 +744,13 @@ def _pick_served_model(models: list, model_path: str | None) -> str | None:
     if not ids:
         return None
 
+    non_default = [mid for mid in ids if mid != "default_model"]
+    candidates = non_default or ids
+
     target_name = None
     if model_path:
         target_name = Path(model_path.rstrip("/")).name
-        for mid in reversed(ids):
+        for mid in reversed(candidates):
             if str(mid).rstrip("/") == str(model_path).rstrip("/"):
                 return target_name
             if Path(str(mid)).name == target_name:
@@ -680,10 +758,10 @@ def _pick_served_model(models: list, model_path: str | None) -> str | None:
 
     # The served model path is appended last and is absolute. Prefer it over
     # arbitrary Hugging Face cache repository ids.
-    for mid in reversed(ids):
+    for mid in reversed(candidates):
         if str(mid).startswith("/"):
             return Path(str(mid)).name
-    return ids[0]
+    return candidates[0]
 
 
 def _discover_model_from_upstream(upstream_url: str,
@@ -738,17 +816,37 @@ class Proxy(BaseHTTPRequestHandler):
     strict_model = True
     model_aliases = []
     _rate_hits = {}
+    _rate_lock = threading.Lock()
+    _seen_models: set[str] = set()
+    _seen_models_lock = threading.Lock()
+    _max_model_labels = 20
+
+    @classmethod
+    def _bound_model_label(cls, raw_model: str | None) -> str:
+        name = (str(raw_model) if raw_model is not None else (_MODEL_NAME or "unknown")).strip() or "unknown"
+        if len(name) > 120:
+            name = name[:120]
+        if name == _MODEL_NAME or name in cls.model_aliases:
+            return name
+        with cls._seen_models_lock:
+            if name in cls._seen_models:
+                return name
+            if len(cls._seen_models) < cls._max_model_labels:
+                cls._seen_models.add(name)
+                return name
+        return "other"
 
     def _rate_limited(self, key):
         now = time.monotonic()
-        hits = [t for t in self._rate_hits.get(key, [])
-                if now - t < self.rate_window]
-        if len(hits) >= self.rate_limit:
+        with self._rate_lock:
+            hits = [t for t in self._rate_hits.get(key, [])
+                    if now - t < self.rate_window]
+            if len(hits) >= self.rate_limit:
+                self._rate_hits[key] = hits
+                return True
+            hits.append(now)
             self._rate_hits[key] = hits
-            return True
-        hits.append(now)
-        self._rate_hits[key] = hits
-        return False
+            return False
 
     def log_message(self, fmt, *args):
         line = "%s - %s" % (self.address_string(), fmt % args)
@@ -812,12 +910,70 @@ class Proxy(BaseHTTPRequestHandler):
 
     def _forward(self):
         t_arrival = time.monotonic()
-        length = int(self.headers.get("Content-Length", 0) or 0)
+        req_path = self.path
+        clean_path = urlsplit(req_path).path.rstrip("/") or "/"
+        metrics_norm = self.metrics_path.rstrip("/") or "/"
+        if clean_path == metrics_norm:
+            if self.command not in ("GET", "HEAD"):
+                self.send_response(405)
+                self.send_header("Allow", "GET, HEAD")
+                self.send_header("Content-Length", "0")
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.close_connection = True
+                return
+            payload = generate_latest()
+            self.send_response(200)
+            self.send_header("Content-Type", CONTENT_TYPE_LATEST)
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(payload)
+            return
 
-        if self.api_key and self.headers.get("Authorization") != f"Bearer {self.api_key}":
+        if self.headers.get("Transfer-Encoding"):
+            self._reject(
+                400,
+                {"error": {"message": "Transfer-Encoding is not supported; provide Content-Length",
+                           "type": "invalid_request_error"}},
+                _MODEL_NAME or "unknown",
+                "chat",
+            )
+            return
+
+        raw_len = self.headers.get("Content-Length", "0") or "0"
+        try:
+            length = int(raw_len)
+        except (ValueError, TypeError):
+            self._reject(
+                400,
+                {"error": {"message": "invalid Content-Length",
+                           "type": "invalid_request_error"}},
+                _MODEL_NAME or "unknown",
+                "chat",
+            )
+            return
+        if length < 0:
+            self._reject(
+                400,
+                {"error": {"message": "invalid Content-Length",
+                           "type": "invalid_request_error"}},
+                _MODEL_NAME or "unknown",
+                "chat",
+            )
+            return
+
+        if self.api_key and not secrets.compare_digest(
+            self.headers.get("Authorization") or "", f"Bearer {self.api_key}"
+        ):
             self._reject(401, {"error": {"message": "unauthorized",
                                          "type": "authentication_error"}},
                          _MODEL_NAME or "unknown", "auth")
+            return
+        if self.rate_limit > 0 and self._rate_limited(self.client_address[0]):
+            self._reject(429, {"error": {"message": "rate limit exceeded",
+                                         "type": "rate_limit_error"}},
+                         _MODEL_NAME or "unknown", "rate_limit")
             return
         if length > self.max_body_bytes:
             self._reject(413, {"error": {"message": "request body too large",
@@ -826,16 +982,6 @@ class Proxy(BaseHTTPRequestHandler):
             return
 
         body = self.rfile.read(length) if length else b""
-
-        req_path = self.path
-        if self.path == self.metrics_path:
-            payload = generate_latest()
-            self.send_response(200)
-            self.send_header("Content-Type", CONTENT_TYPE_LATEST)
-            self.send_header("Content-Length", str(len(payload)))
-            self.end_headers()
-            self.wfile.write(payload)
-            return
 
         model = _MODEL_NAME or "unknown"
         streaming = False
@@ -847,32 +993,60 @@ class Proxy(BaseHTTPRequestHandler):
         lp_source = ""
         synth_sse = False
         kind = "chat"
-        is_chat = self.command == "POST" and req_path.endswith(
+        is_chat = self.command == "POST" and clean_path.endswith(
             "/v1/chat/completions"
         )
         if is_chat:
             try:
                 req = json.loads(body or b"{}")
-                model = req.get("model", model)
+            except (json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError):
+                self._reject(
+                    400,
+                    {"error": {"message": "invalid JSON request body",
+                               "type": "invalid_request_error"}},
+                    model, kind,
+                )
+                return
+            if not isinstance(req, dict):
+                self._reject(
+                    400,
+                    {"error": {"message": "request JSON body must be an object",
+                               "type": "invalid_request_error"}},
+                    model, kind,
+                )
+                return
+            try:
+                raw_req_model = req.get("model", model)
+                req_model = raw_req_model if isinstance(raw_req_model, str) else model
                 streaming = bool(req.get("stream", False))
-                temperature = req.get("temperature", 0.0)
+                raw_temp = req.get("temperature", 0.0)
+                try:
+                    temperature = float(raw_temp) if raw_temp is not None else 0.0
+                except (ValueError, TypeError):
+                    temperature = 0.0
                 tools_provided = bool(req.get("tools"))
-                messages = req.get("messages") or []
+                raw_messages = req.get("messages")
+                messages = (
+                    [m for m in raw_messages if isinstance(m, dict)]
+                    if isinstance(raw_messages, list)
+                    else []
+                )
                 if bool(req.get("enable_thinking", False)):
                     kind = "reasoning"
 
-                if model != _MODEL_NAME and _MODEL_NAME is not None and model not in self.model_aliases:
+                if req_model != _MODEL_NAME and _MODEL_NAME is not None and req_model not in self.model_aliases:
                     if self.strict_model:
                         self._reject(
                             400,
                             {"error": {"message": f"model not loaded (proxy serves "
                              f"{_MODEL_NAME})", "type": "invalid_request_error"}},
-                            model, kind,
+                            self._bound_model_label(req_model), kind,
                         )
                         return
                     else:
-                        degraded(f"model mismatch: request={model} proxy={_MODEL_NAME}; serving anyway (strict_model=false)",
+                        degraded(f"model mismatch: request={req_model} proxy={_MODEL_NAME}; serving anyway (strict_model=false)",
                                  component="proxy")
+                model = self._bound_model_label(req_model)
                 prompt_tokens = sum(
                     len((m.get("content") or "") if isinstance(m.get("content"), str)
                         else json.dumps(m.get("content") or ""))
@@ -881,18 +1055,32 @@ class Proxy(BaseHTTPRequestHandler):
                 if prompt_tokens > self.max_prompt_tokens:
                     self._reject(
                         400,
-                        {"error": {"message": f"prompt too long (~{prompt_tokens} "
-                         f"tokens > max {self.max_prompt_tokens})",
-                         "type": "invalid_request_error"}},
+                        {
+                            "error": {
+                                "message": (
+                                    f"prompt too long (~{prompt_tokens} "
+                                    f"tokens > max {self.max_prompt_tokens})"
+                                ),
+                                "type": "invalid_request_error",
+                            }
+                        },
                         model, kind,
                     )
                     return
                 mt = req.get("max_tokens")
-                if mt is None:
+                body_dirty = False
+                try:
+                    if mt is None or isinstance(mt, bool):
+                        raise TypeError("unset or bool max_tokens")
+                    mt_val = int(mt)
+                except (ValueError, TypeError):
+                    mt_val = None
+                if mt_val is None or mt_val > self.max_tokens_cap:
                     req["max_tokens"] = self.max_tokens_cap
-                elif mt > self.max_tokens_cap:
-                    req["max_tokens"] = self.max_tokens_cap
-                    body = json.dumps(req).encode("utf-8")
+                    body_dirty = True
+                elif isinstance(mt, str):
+                    req["max_tokens"] = mt_val
+                    body_dirty = True
 
                 if req.get("logprobs"):
                     lp_source = "client" if not streaming else ""
@@ -907,9 +1095,11 @@ class Proxy(BaseHTTPRequestHandler):
                         req["top_logprobs"] = self.logprobs_top
                         if synth_sse:
                             req["stream"] = False
-                        body = json.dumps(req).encode("utf-8")
-            except json.JSONDecodeError:
-                pass
+                        body_dirty = True
+                if body_dirty:
+                    body = json.dumps(req).encode("utf-8")
+            except (json.JSONDecodeError, TypeError, ValueError, AttributeError) as exc:
+                debug(f"invalid chat body metadata: {exc!r}", component="proxy")
             if _OPIK is not None and self.headers.get("X-Mlx-Trace", "1") != "0":
                 try:
                     opik_trace = _OPIK.trace(
@@ -935,15 +1125,12 @@ class Proxy(BaseHTTPRequestHandler):
                             "messages": messages,
                         },
                     )
-                    _OPIK.flush()
                 except Exception as exc:
                     error(f"opik trace start failed ({exc!r})", component="proxy")
                     opik_trace = None
                     opik_span = None
 
-        conn = http.client.HTTPConnection(
-            self.upstream[0], self.upstream[1], timeout=300
-        )
+        conn = _make_upstream_conn(self.upstream, timeout=300)
         headers = {}
         for k, v in self.headers.items():
             if k.lower() in (
@@ -1017,8 +1204,8 @@ class Proxy(BaseHTTPRequestHandler):
             is_sse = (resp.getheader("Content-Type", "") or "").startswith(
                 "text/event-stream"
             )
-            rewrite = synth_sse or (
-                lp_source == "injected" and not is_sse and status < 400
+            rewrite = status < 400 and (
+                synth_sse or (lp_source == "injected" and not is_sse)
             )
             self.close_connection = True
             if not rewrite:
@@ -1029,27 +1216,43 @@ class Proxy(BaseHTTPRequestHandler):
                 self.end_headers()
 
             parser = _StreamParser()
+            utf8_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
             content_bytes = []
+            client_disconnected = False
 
             while True:
                 chunk = resp.read1(65536)
                 if not chunk:
+                    if is_sse:
+                        tail = utf8_decoder.decode(b"", final=True)
+                        if tail:
+                            parser.feed(tail)
                     break
                 if is_sse:
-                    parser.feed(chunk.decode("utf-8", "replace"))
-                    if t_first_token is None and parser.content_parts:
+                    parser.feed(utf8_decoder.decode(chunk))
+                    if t_first_token is None and (
+                        parser.content_parts
+                        or parser.reasoning_parts
+                        or parser.tool_calls > 0
+                    ):
                         t_first_token = time.monotonic()
                 else:
                     content_bytes.append(chunk)
-                if not rewrite:
-                    self.wfile.write(chunk)
-                    self.wfile.flush()
+                if not rewrite and not client_disconnected:
+                    try:
+                        self.wfile.write(chunk)
+                        self.wfile.flush()
+                    except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                        client_disconnected = True
+                        debug("downstream client disconnected mid-stream", component="proxy")
 
             t_done = time.monotonic()
 
             resp_obj = None
+            reasoning = ""
             if is_sse:
                 content = parser.content
+                reasoning = parser.reasoning
                 tool_calls = parser.tool_calls
                 tools = parser.tools
                 usage = parser.usage
@@ -1062,48 +1265,75 @@ class Proxy(BaseHTTPRequestHandler):
                 finish_reason = None
                 try:
                     obj = json.loads(b"".join(content_bytes).decode("utf-8", "replace"))
-                    resp_obj = obj
-                    choice = (obj.get("choices") or [{}])[0]
-                    msg = choice.get("message") or {}
-                    content = msg.get("content") or ""
-                    calls = msg.get("tool_calls") or []
-                    tool_calls = len(calls)
-                    tools = [
-                        {
-                            "type": tc.get("type") or "unknown",
-                            "name": (tc.get("function") or {}).get("name")
-                            or tc.get("type") or "unknown",
-                        }
-                        for tc in calls
-                    ]
-                    usage = obj.get("usage")
-                    finish_reason = choice.get("finish_reason")
+                    if isinstance(obj, dict):
+                        resp_obj = obj
+                        choices = obj.get("choices") or [{}]
+                        choice = choices[0] if isinstance(choices[0], dict) else {}
+                        msg = choice.get("message") or {}
+                        if isinstance(msg, dict):
+                            content = msg.get("content") or ""
+                            reasoning = msg.get("reasoning_content") or msg.get("reasoning") or ""
+                            calls = msg.get("tool_calls") or []
+                            tool_calls = len(calls)
+                            tools = [
+                                {
+                                    "type": tc.get("type") or "unknown",
+                                    "name": (tc.get("function") or {}).get("name")
+                                    or tc.get("type") or "unknown",
+                                }
+                                for tc in calls if isinstance(tc, dict)
+                            ]
+                        usage = obj.get("usage")
+                        finish_reason = choice.get("finish_reason")
                 except json.JSONDecodeError:
                     pass
 
             lp_obj = choice_logprobs(resp_obj) if lp_source else None
 
-            if rewrite:
-                self._send_rewritten(
-                    status, resp_headers, resp_obj, content_bytes,
-                    synth_sse, model,
-                )
+            if rewrite and not client_disconnected:
+                try:
+                    self._send_rewritten(
+                        status, resp_headers, resp_obj, content_bytes,
+                        synth_sse, model,
+                    )
+                except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                    debug("downstream client disconnected before rewritten send", component="proxy")
 
             if not is_chat:
                 return
 
+            if status >= 400:
+                REQUESTS.labels(model, "true" if streaming else "false", kind).inc()
+                if span is not None:
+                    span.set_attribute("http.response.status_code", status)
+                    span.set_status("ERROR", f"HTTP {status}")
+                    span.end()
+                    span = None
+                if opik_span is not None:
+                    try:
+                        opik_span.end(error_info={"exception_type": f"HTTP{status}", "exception_message": f"upstream returned {status}"})
+                    except Exception as exc2:
+                        debug(f"opik_span.end failed: {exc2!r}", component="proxy")
+                if opik_trace is not None:
+                    try:
+                        opik_trace.end(error_info={"exception_type": f"HTTP{status}", "exception_message": f"upstream returned {status}"})
+                    except Exception as exc2:
+                        debug(f"opik_trace.end failed: {exc2!r}", component="proxy")
+                return
+
             if usage:
-                prompt_tokens = int(usage.get("prompt_tokens", 0))
-                comp_tokens = int(usage.get("completion_tokens", 0))
+                prompt_tokens = int(usage.get("prompt_tokens") or 0)
+                comp_tokens = int(usage.get("completion_tokens") or 0)
             else:
                 prompt_tokens = sum(
                     len(str(m.get("content", "")).split()) for m in messages
                 )
-                comp_tokens = len(content.split())
+                combined_comp = " ".join(p for p in (content, reasoning) if p)
+                comp_tokens = len(combined_comp.split())
             TOKENS_PROMPT.labels(model, kind).inc(prompt_tokens)
             TOKENS_COMPLETION.labels(model, kind).inc(comp_tokens)
             if usage:
-                cached = int((usage.get("prompt_tokens_details") or {}).get("cached_tokens", 0))
+                cached = int((usage.get("prompt_tokens_details") or {}).get("cached_tokens") or 0)
                 PROMPT_CACHED.labels(model, kind).inc(cached)
                 if prompt_tokens > 0:
                     PROMPT_CACHE_RATIO.labels(model=model).set(
@@ -1217,6 +1447,7 @@ class Proxy(BaseHTTPRequestHandler):
                     )
                 span.set_status("OK")
                 span.end()
+                span = None
 
             if opik_span is not None:
                 try:
@@ -1313,6 +1544,7 @@ class Proxy(BaseHTTPRequestHandler):
                 span.set_attribute("http.response.status_code", 503)
                 span.set_status("ERROR", str(exc))
                 span.end()
+                span = None
             if opik_span is not None:
                 try:
                     opik_span.end(
@@ -1350,11 +1582,6 @@ class Proxy(BaseHTTPRequestHandler):
                     span.end()
                 except Exception as exc2:
                     debug(f"span.end failed: {exc2!r}", component="proxy")
-            if _OPIK is not None and (opik_trace is not None or opik_span is not None):
-                try:
-                    _OPIK.flush()
-                except Exception as exc2:
-                    debug(f"opik flush failed: {exc2!r}", component="proxy")
             conn.close()
 
     def do_GET(self):
@@ -1367,20 +1594,76 @@ class Proxy(BaseHTTPRequestHandler):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Mlx-Trace")
         self.send_header("Connection", "close")
         self.end_headers()
         self.close_connection = True
 
 
-def _health_watch(upstream):
+def _set_model_info_gauges(info_obj, model_name: str) -> None:
+    global _CTX_MAX_TOKENS
+    _CTX_MAX_TOKENS = info_obj.max_context_tokens
+    CONTEXT_MAX.labels(model=model_name).set(info_obj.max_context_tokens)
+    KV_BYTES_PER_TOKEN.labels(model=model_name).set(info_obj.kv_bytes_per_token)
+    for attr, val in (
+        ("max_context_tokens", info_obj.max_context_tokens),
+        ("kv_bytes_per_token", info_obj.kv_bytes_per_token),
+        ("layer_count", info_obj.num_layers),
+        ("attention_layers", info_obj.attention_layers),
+        ("linear_layers", info_obj.linear_layers),
+        ("kv_heads", info_obj.num_key_value_heads),
+        ("head_dim", info_obj.head_dim),
+        ("hidden_size", info_obj.hidden_size),
+        ("attention_heads", info_obj.num_attention_heads),
+        ("vocab_size", info_obj.vocab_size),
+        ("intermediate_size", info_obj.intermediate_size),
+        ("quant_bits", info_obj.quant_bits),
+        ("quant_group_size", info_obj.quant_group_size),
+        ("linear_key_heads", info_obj.linear_key_heads),
+        ("linear_value_heads", info_obj.linear_value_heads),
+        ("linear_key_head_dim", info_obj.linear_key_head_dim),
+        ("linear_value_head_dim", info_obj.linear_value_head_dim),
+        ("linear_conv_kernel_dim", info_obj.linear_conv_kernel_dim),
+        ("mtp_layers", info_obj.mtp_layers),
+        ("tie_word_embeddings", int(info_obj.tie_word_embeddings)),
+    ):
+        MODEL_INFO.labels(model=model_name, attr=attr).set(val)
+    if info_obj.arch or info_obj.dtype:
+        MODEL_ARCH.labels(
+            model=model_name,
+            arch=info_obj.arch or "unknown",
+            dtype=info_obj.dtype or "unknown",
+        ).set(1)
+
+
+def _health_watch(upstream, args_model: str | None = None, model_path: str | None = None):
+    global _MODEL_NAME
     while True:
         try:
-            c = http.client.HTTPConnection(upstream[0], upstream[1], timeout=3)
-            c.request("GET", "/v1/models")
-            r = c.getresponse()
-            UPSTREAM_UP.set(1 if r.status == 200 else 0)
-            c.close()
+            c = _make_upstream_conn(upstream, timeout=3)
+            try:
+                c.request("GET", "/v1/models")
+                r = c.getresponse()
+                r.read()
+                is_ok = r.status == 200
+            finally:
+                c.close()
+            UPSTREAM_UP.set(1 if is_ok else 0)
+            if is_ok and _MODEL_NAME is None:
+                upstream_url = _upstream_base_url(upstream)
+                discovered = _resolve_model(args_model, upstream_url, model_path)
+                if discovered:
+                    _MODEL_NAME = discovered
+                    info(f"model discovered on health retry: {_MODEL_NAME}", component="proxy")
+                    if _model_info is not None:
+                        try:
+                            info_obj = _model_info(
+                                _MODEL_NAME, model_path=model_path, upstream_url=upstream_url
+                            )
+                            if info_obj is not None:
+                                _set_model_info_gauges(info_obj, _MODEL_NAME)
+                        except Exception as exc:
+                            debug(f"retry model_info lookup failed: {exc!r}", component="proxy")
         except Exception as exc:
             debug(f"health watch failed: {exc!r}", component="proxy")
             UPSTREAM_UP.set(0)
@@ -1388,7 +1671,7 @@ def _health_watch(upstream):
 
 
 def main():
-    global _OTEL, _OPIK, _OPIK_OTLP, _NODE_NAME, _MODEL_NAME, _CTX_MAX_TOKENS
+    global _OTEL, _OPIK, _OPIK_OTLP, _NODE_NAME, _MODEL_NAME
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--listen", default=os.environ.get("MLX_PROXY_LISTEN", "127.0.0.1:8080"))
     ap.add_argument("--upstream", default=os.environ.get("MLX_UPSTREAM", "127.0.0.1:11234"))
@@ -1476,12 +1759,19 @@ def main():
     )
     args = ap.parse_args()
 
-    setup_logging(service="mlx-proxy",
-                  macbook=os.environ.get("MLX_MACBOOK_ID", "unknown"))
+    macbook_id = os.environ.get("MLX_DEVICE_ID") or os.environ.get("MLX_MACBOOK_ID") or "unknown"
+    setup_logging(service="mlx-proxy", macbook=macbook_id)
 
-    host, _, port = args.listen.rpartition(":")
-    up_host, _, up_port = args.upstream.rpartition(":")
-    Proxy.upstream = (up_host or "127.0.0.1", int(up_port or 8081))
+    try:
+        host, port = parse_listen_addr(args.listen, default_host="0.0.0.0", default_port=8080)
+    except ValueError as exc:
+        error(f"invalid listen address {args.listen!r}: {exc}", component="proxy")
+        sys.exit(1)
+    try:
+        Proxy.upstream = parse_upstream_url(args.upstream, default_port=8000)
+    except ValueError as exc:
+        error(f"invalid upstream address {args.upstream!r}: {exc}", component="proxy")
+        sys.exit(1)
     Proxy.metrics_path = args.metrics_path
     Proxy.logprobs_top = max(0, min(10, args.logprobs))
     Proxy.stream_sample = max(0.0, min(1.0, args.logprobs_stream_sample))
@@ -1495,16 +1785,20 @@ def main():
     aliases_raw = os.environ.get("MLX_MODEL_ALIASES", "")
     Proxy.model_aliases = [a.strip() for a in aliases_raw.split(",") if a.strip()]
 
-    upstream_url = f"http://{Proxy.upstream[0]}:{Proxy.upstream[1]}"
+    upstream_url = Proxy.upstream[3]
     _MODEL_NAME = _resolve_model(args.model, upstream_url, args.model_path)
 
     TOOL_CALLS.labels(model=_MODEL_NAME or "unknown", kind="", tool="", type="").inc(0)
     FLAGS.labels(model=_MODEL_NAME or "unknown").inc(0)
-    ERRORS.labels(model=_MODEL_NAME or "unknown", status="500", kind="chat").inc(0)
+    ERRORS.labels(model=_MODEL_NAME or "unknown", status="4xx", kind="chat").inc(0)
+    ERRORS.labels(model=_MODEL_NAME or "unknown", status="5xx", kind="chat").inc(0)
     PROMPT_CACHED.labels(model=_MODEL_NAME or "unknown", kind="chat").inc(0)
     _NODE_NAME = args.node_name
     _OTEL = _setup_otel(
-        args.otlp_endpoint, args.node_name, opik_otlp_endpoint=args.opik_otlp_endpoint
+        args.otlp_endpoint,
+        args.node_name,
+        opik_otlp_endpoint=args.opik_otlp_endpoint,
+        verify_tls=args.otlp_verify_tls,
     )
     if args.opik_endpoint:
         try:
@@ -1533,37 +1827,7 @@ def main():
             if not _MODEL_NAME or _MODEL_NAME.startswith(("/", "~", "./", "../")):
                 _MODEL_NAME = info_obj.model_id
 
-            _CTX_MAX_TOKENS = info_obj.max_context_tokens
-            CONTEXT_MAX.labels(model=_MODEL_NAME).set(info_obj.max_context_tokens)
-            KV_BYTES_PER_TOKEN.labels(model=_MODEL_NAME).set(info_obj.kv_bytes_per_token)
-            for attr, val in (
-                ("max_context_tokens", info_obj.max_context_tokens),
-                ("kv_bytes_per_token", info_obj.kv_bytes_per_token),
-                ("layer_count", info_obj.num_layers),
-                ("attention_layers", info_obj.attention_layers),
-                ("linear_layers", info_obj.linear_layers),
-                ("kv_heads", info_obj.num_key_value_heads),
-                ("head_dim", info_obj.head_dim),
-                ("hidden_size", info_obj.hidden_size),
-                ("attention_heads", info_obj.num_attention_heads),
-                ("vocab_size", info_obj.vocab_size),
-                ("intermediate_size", info_obj.intermediate_size),
-                ("quant_bits", info_obj.quant_bits),
-                ("quant_group_size", info_obj.quant_group_size),
-                ("linear_key_heads", info_obj.linear_key_heads),
-                ("linear_value_heads", info_obj.linear_value_heads),
-                ("linear_key_head_dim", info_obj.linear_key_head_dim),
-                ("linear_value_head_dim", info_obj.linear_value_head_dim),
-                ("linear_conv_kernel_dim", info_obj.linear_conv_kernel_dim),
-                ("mtp_layers", info_obj.mtp_layers),
-                ("tie_word_embeddings", int(info_obj.tie_word_embeddings)),
-            ):
-                MODEL_INFO.labels(model=_MODEL_NAME, attr=attr).set(val)
-            if info_obj.arch or info_obj.dtype:
-                MODEL_ARCH.labels(
-                    model=_MODEL_NAME, arch=info_obj.arch or "unknown",
-                    dtype=info_obj.dtype or "unknown",
-                ).set(1)
+            _set_model_info_gauges(info_obj, _MODEL_NAME)
             info(
                 f"model ctx={info_obj.max_context_tokens} kv={info_obj.kv_bytes_per_token} B/tok "
                 f"layers={info_obj.num_layers} attention_layers={info_obj.attention_layers} "
@@ -1579,13 +1843,17 @@ def main():
         error(f"model info failed ({exc!r})", component="proxy")
 
     threading.Thread(
-        target=_health_watch, args=(Proxy.upstream,), daemon=True
+        target=_health_watch,
+        args=(Proxy.upstream, args.model, args.model_path),
+        daemon=True,
     ).start()
 
-    server = ThreadingHTTPServer((host or "0.0.0.0", int(port or 8080)), Proxy)
+    ThreadingHTTPServer.allow_reuse_address = True
+    ThreadingHTTPServer.address_family = socket.AF_INET6 if ":" in host else socket.AF_INET
+    server = ThreadingHTTPServer((host, port), Proxy)
     info(
-        f"listening on {host or '0.0.0.0'}:{port or 8080} "
-        f"-> upstream {Proxy.upstream[0]}:{Proxy.upstream[1]} "
+        f"listening on {host}:{port} "
+        f"-> upstream {_upstream_base_url(Proxy.upstream)} "
         f"(metrics at {args.metrics_path})",
         component="proxy",
     )
@@ -1598,10 +1866,33 @@ def main():
         )
     else:
         info("confidence scoring: disabled (--logprobs 0)", component="proxy")
+
+    def _shutdown(signum, frame):
+        threading.Thread(target=server.shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        server.shutdown()
+        pass
+    finally:
+        if _OPIK is not None:
+            try:
+                _OPIK.flush()
+            except Exception as exc:
+                debug(f"opik shutdown flush failed: {exc!r}", component="proxy")
+        if _OTEL is not None:
+            for prov in (getattr(_OTEL, "tracer_provider", None),
+                         getattr(_OTEL, "logger_provider", None)):
+                if prov is not None:
+                    try:
+                        prov.force_flush(timeout_millis=3000)
+                        prov.shutdown()
+                    except Exception as exc:
+                        debug(f"otel provider shutdown failed: {exc!r}", component="proxy")
+        server.server_close()
 
 
 if __name__ == "__main__":

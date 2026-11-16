@@ -101,7 +101,7 @@
       "targets": [
         {
           "expr": "mlx_model_loaded{device=~\"$device\"}",
-          "legendFormat": "{{device}}",
+          "legendFormat": "{{device}} ({{model}})",
           "refId": "A"
         }
       ],
@@ -132,7 +132,7 @@
     },
     {
       "type": "graph",
-      "title": "Server State (0=idle 1=running 2=starting 3=backoff)",
+      "title": "Server State (0=down 1=running_ready 2=up_not_ready 3=backoff)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
@@ -225,7 +225,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_server_health_checks_total{device=~\"$device\"}",
+          "expr": "rate(mlx_server_health_checks_total{device=~\"$device\"}[5m])",
           "legendFormat": "{{device}} {{result}}",
           "refId": "A"
         }

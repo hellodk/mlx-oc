@@ -14,6 +14,8 @@ edge/vmagent-remotewrite-data/
 central/.env
 edge/config/edge.env
 edge/config/nodes.yml
+edge/com.mlx.monitoring.bundle.plist
+edge/com.mlx.monitoring-bundle.service
 
 # OS
 .DS_Store

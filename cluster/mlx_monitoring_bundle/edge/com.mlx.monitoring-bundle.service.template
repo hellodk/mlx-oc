@@ -1,0 +1,23 @@
+[Unit]
+Description=mlx monitoring bundle edge node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory={{EDGE_DIR}}
+ExecStart={{VENV_PYTHON}} {{EDGE_DIR}}/mlx_monitoring_bundle.py start
+ExecStop={{VENV_PYTHON}} {{EDGE_DIR}}/mlx_monitoring_bundle.py stop
+Restart=always
+RestartSec=5
+StartLimitBurst=10
+StartLimitIntervalSec=60
+User={{SERVICE_USER}}
+Group={{SERVICE_GROUP}}
+Environment=MLX_DEVICE_ID={{DEVICE_ID}}
+EnvironmentFile=-{{EDGE_DIR}}/config/edge.env
+StandardOutput=append:{{EDGE_DIR}}/logs/systemd.out.log
+StandardError=append:{{EDGE_DIR}}/logs/systemd.err.log
+
+[Install]
+WantedBy=multi-user.target

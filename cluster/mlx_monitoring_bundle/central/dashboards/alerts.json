@@ -16,21 +16,25 @@
         "name": "device",
         "type": "query",
         "datasource": "VictoriaMetrics",
-        "query": "label_values(ALERTS, device)",
+        "query": "label_values(mlx_hw_up, device)",
         "includeAll": true,
-        "allValue": ".+",
+        "allValue": ".*",
         "multi": false,
         "refresh": 1
       },
       {
         "name": "severity",
-        "type": "query",
-        "datasource": "VictoriaMetrics",
-        "query": "label_values(ALERTS, severity)",
+        "type": "custom",
+        "query": "critical,warning,info",
+        "options": [
+          {"text": "All", "value": "$__all", "selected": true},
+          {"text": "critical", "value": "critical", "selected": false},
+          {"text": "warning", "value": "warning", "selected": false},
+          {"text": "info", "value": "info", "selected": false}
+        ],
         "includeAll": true,
-        "allValue": ".+",
-        "multi": false,
-        "refresh": 1
+        "allValue": ".*",
+        "multi": false
       },
       {
         "name": "alertname",
@@ -38,7 +42,7 @@
         "datasource": "VictoriaMetrics",
         "query": "label_values(ALERTS, alertname)",
         "includeAll": true,
-        "allValue": ".+",
+        "allValue": "MLX.*",
         "multi": false,
         "refresh": 1
       }
@@ -57,7 +61,7 @@
       },
       "targets": [
         {
-          "expr": "ALERTS{alertname=~\"MLX.*\", device=~\"$device\", severity=~\"$severity\"}",
+          "expr": "ALERTS{alertname=~\"$alertname\", device=~\"$device\", severity=~\"$severity\"}",
           "legendFormat": "{{alertname}} {{severity}} {{device}}",
           "refId": "A"
         }
@@ -93,7 +97,7 @@
       },
       "targets": [
         {
-          "expr": "count(ALERTS{alertname=~\"MLX.*\", device=~\"$device\", severity=\"critical\", alertstate=\"firing\"}) or vector(0)",
+          "expr": "count(ALERTS{alertname=~\"$alertname\", device=~\"$device\", severity=\"critical\", alertstate=\"firing\"}) or vector(0)",
           "legendFormat": "critical",
           "refId": "A"
         }
@@ -102,13 +106,13 @@
         "defaults": {
           "links": [
             {
-              "title": "\ud83d\udcca Drilldown: Per-Device Detail for ${__field.labels.device}",
-              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail",
+              "url": "/d/mlx-detail?var-device=${device}",
               "targetBlank": false
             },
             {
               "title": "\u26a1 Drilldown: Device Health Matrix",
-              "url": "/d/mlx-device-health?var-device=${__field.labels.device}",
+              "url": "/d/mlx-device-health?var-device=${device}",
               "targetBlank": false
             }
           ]
@@ -127,7 +131,7 @@
       },
       "targets": [
         {
-          "expr": "count(ALERTS{alertname=~\"MLX.*\", device=~\"$device\", severity=\"warning\", alertstate=\"firing\"}) or vector(0)",
+          "expr": "count(ALERTS{alertname=~\"$alertname\", device=~\"$device\", severity=\"warning\", alertstate=\"firing\"}) or vector(0)",
           "legendFormat": "warning",
           "refId": "A"
         }
@@ -136,13 +140,13 @@
         "defaults": {
           "links": [
             {
-              "title": "\ud83d\udcca Drilldown: Per-Device Detail for ${__field.labels.device}",
-              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail",
+              "url": "/d/mlx-detail?var-device=${device}",
               "targetBlank": false
             },
             {
               "title": "\u26a1 Drilldown: Device Health Matrix",
-              "url": "/d/mlx-device-health?var-device=${__field.labels.device}",
+              "url": "/d/mlx-device-health?var-device=${device}",
               "targetBlank": false
             }
           ]
@@ -161,7 +165,7 @@
       },
       "targets": [
         {
-          "expr": "ALERTS{alertname=~\"MLX.*\", device=~\"$device\"}",
+          "expr": "ALERTS{alertname=~\"$alertname\", device=~\"$device\"}",
           "legendFormat": "{{alertname}} {{device}} {{alertstate}}",
           "refId": "A"
         }
@@ -197,7 +201,7 @@
       },
       "targets": [
         {
-          "expr": "ALERTS{alertname=~\"MLX.*\", device=~\"$device\", severity=~\"$severity\", alertstate=\"firing\"}",
+          "expr": "ALERTS{alertname=~\"$alertname\", device=~\"$device\", severity=~\"$severity\", alertstate=\"firing\"}",
           "legendFormat": "{{alertname}}",
           "refId": "A"
         }

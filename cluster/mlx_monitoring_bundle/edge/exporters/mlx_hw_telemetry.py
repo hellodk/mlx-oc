@@ -25,9 +25,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
-from mlx_logging import degraded, debug, error, info, setup_logging
+from mlx_logging import degraded, debug, error, info, parse_listen_addr, setup_logging
 
 NODE_DEFAULT = "unknown"
+NODE: str = NODE_DEFAULT
 LISTEN_DEFAULT = "127.0.0.1:9102"
 SAMPLE_INTERVAL_DEFAULT = 5.0
 GPU_SAMPLE_INTERVAL_DEFAULT = 15.0
@@ -119,6 +120,9 @@ _NET_IFACE = ""
 _CONTAINER_STATS = False
 
 _GPU_LOCK = threading.Lock()
+_POWERMETRICS_LOCK = threading.Lock()
+_SAMPLE_LOCK = threading.Lock()
+_NET_IFACE_CACHE: tuple[str | None, float] = (None, 0.0)
 _GPU_STATS = {"util": float("nan"), "freq": float("nan"),
               "gpu_power": float("nan"), "pkg_power": float("nan"),
               "cpu_power": float("nan"), "ane_power": float("nan"),
@@ -148,13 +152,34 @@ def _parse_page_size():
 
 
 def _mem_info():
-    """Return memory accounting in bytes from vm_stat.
-
-    ``available`` mirrors what macOS considers reclaimable for new processes:
-    free + inactive + speculative + purgeable pages. ``free`` is strictly the
-    Pages free counter, which is why the old exporter reported 0 B available
-    on an otherwise healthy machine.
-    """
+    """Return memory accounting in bytes from vm_stat (macOS) or /proc/meminfo (Linux)."""
+    global _MEM_TOTAL
+    if os.path.exists("/proc/meminfo"):
+        try:
+            kv: dict[str, int] = {}
+            with open("/proc/meminfo", "r", encoding="utf8") as fh:
+                for line in fh:
+                    if ":" in line:
+                        k, rest = line.split(":", 1)
+                        val_parts = rest.strip().split()
+                        if val_parts and val_parts[0].isdigit():
+                            kv[k.strip()] = int(val_parts[0]) * 1024
+            total = kv.get("MemTotal", _MEM_TOTAL)
+            if total and not _MEM_TOTAL:
+                _MEM_TOTAL = total
+            free = kv.get("MemFree", 0)
+            available = kv.get("MemAvailable", free)
+            used = max(0, (total or 0) - available)
+            page_size = _PAGE_SIZE or 4096
+            return {
+                "used": used,
+                "free": free,
+                "available": available,
+                "free_pages": free // page_size,
+                "page_size": page_size,
+            }
+        except Exception as exc:
+            debug(f"/proc/meminfo failed: {exc!r}", component="hw")
     try:
         out = subprocess.run(
             ["vm_stat"], capture_output=True, text=True, timeout=5
@@ -191,11 +216,30 @@ def _mem_info():
 
 
 def _cpu_temp():
+    if sys.platform != "darwin":
+        try:
+            import glob
+
+            temps = []
+            for path in sorted(glob.glob("/sys/class/thermal/thermal_zone*/temp")):
+                try:
+                    with open(path, "r", encoding="utf8") as fh:
+                        raw = fh.read().strip()
+                    if raw.lstrip("-").isdigit():
+                        c = int(raw) / 1000.0
+                        if 0.0 < c < 150.0:
+                            temps.append(c)
+                except OSError:
+                    continue
+            return max(temps) if temps else 0.0
+        except Exception:
+            return 0.0
     try:
-        out = subprocess.run(
-            ["sudo", "-n", "powermetrics", "-n", "1", "--samplers", "thermal", "-f", "text"],
-            capture_output=True, text=True, timeout=6,
-        ).stdout
+        with _POWERMETRICS_LOCK:
+            out = subprocess.run(
+                ["sudo", "-n", "powermetrics", "-n", "1", "--samplers", "thermal", "-f", "text"],
+                capture_output=True, text=True, timeout=6,
+            ).stdout
         for line in out.splitlines():
             m = re.search(r"(?:CPU die temperature|package.*temperature|temperature)\s*:\s*([\d.]+)",
                           line, re.I)
@@ -209,6 +253,8 @@ def _cpu_temp():
 
 def _gpu_iokit_stats():
     used = alloc = total = util = float("nan")
+    if sys.platform != "darwin":
+        return used, alloc, total, util
     try:
         out = subprocess.run(
             ["ioreg", "-c", "IOAccelerator", "-r", "-d", "2"],
@@ -238,12 +284,23 @@ def _gpu_iokit_stats():
 def _gpu_power_stats():
     global _GPU_STATS
     util = freq = gpu_power = pkg_power = cpu_power = ane_power = float("nan")
+    if sys.platform != "darwin":
+        with _GPU_LOCK:
+            _GPU_STATS = {
+                "util": util, "freq": freq,
+                "gpu_power": gpu_power, "pkg_power": pkg_power,
+                "cpu_power": cpu_power, "ane_power": ane_power,
+                "gpu_mem_used": util, "gpu_mem_alloc": util,
+                "gpu_mem_total": util, "gpu_util_iokit": util,
+            }
+        return
     try:
-        out = subprocess.run(
-            ["sudo", "-n", "powermetrics", "-n", "1",
-             "--samplers", "cpu_power,gpu_power", "-i", "1000", "-f", "text"],
-            capture_output=True, text=True, timeout=8,
-        ).stdout
+        with _POWERMETRICS_LOCK:
+            out = subprocess.run(
+                ["sudo", "-n", "powermetrics", "-n", "1",
+                 "--samplers", "cpu_power,gpu_power", "-i", "1000", "-f", "text"],
+                capture_output=True, text=True, timeout=8,
+            ).stdout
         for line in out.splitlines():
             m = re.search(r"GPU HW active residency:\s*([\d.]+)%", line)
             if m:
@@ -278,6 +335,8 @@ def _gpu_power_stats():
 
 
 def _thermal_pressure():
+    if sys.platform != "darwin":
+        return 0.0
     try:
         out = subprocess.run(
             ["pmset", "-g", "therm"], capture_output=True, text=True, timeout=3
@@ -293,42 +352,24 @@ def _thermal_pressure():
         return float("nan")
 
 
-def _gpu_sampler_loop(interval: float):
-    while True:
+def _gpu_sampler_loop(interval: float, stop_event: threading.Event | None = None):
+    if sys.platform != "darwin":
+        return
+    while stop_event is None or not stop_event.is_set():
         try:
             _gpu_power_stats()
         except Exception as exc:
             error(f"gpu sampler error: {exc!r}", component="hw")
-        time.sleep(interval)
+        if stop_event is not None:
+            stop_event.wait(interval)
+        else:
+            time.sleep(interval)
 
 
-def _worker_stats():
-    cpu = 0.0
-    rss = 0
-    try:
-        out = subprocess.run(
-            ["ps", "-axo", "pid=,pcpu=,rss=,command="],
-            capture_output=True, text=True, timeout=5,
-        ).stdout
-        for line in out.splitlines():
-            if _PROC_MATCH and _PROC_MATCH not in line:
-                continue
-            if "mlx_metrics_proxy" in line or "mlx_hw_telemetry" in line:
-                continue
-            parts = line.split(None, 3)
-            if len(parts) < 4:
-                continue
-            try:
-                rss += int(parts[2]) * 1024
-                cpu += float(parts[1])
-            except ValueError:
-                continue
-    except Exception as exc:
-        degraded(f"worker stats collection failed: {exc!r}", component="hw")
-    return cpu, rss
-
-
-def _proc_stats():
+def _collect_ps_stats():
+    """Single `ps` pass returning ((worker_cpu, worker_rss), proc_component_dict)."""
+    wcpu = 0.0
+    wrss = 0
     stats = {name: (0.0, 0) for name in _PROC_COMPONENTS}
     try:
         out = subprocess.run(
@@ -347,13 +388,29 @@ def _proc_stats():
                 rss = int(parts[2]) * 1024
             except ValueError:
                 continue
+            if (
+                _PROC_MATCH
+                and _PROC_MATCH in line
+                and "mlx_metrics_proxy" not in line
+                and "mlx_server_supervisor" not in line
+            ):
+                wcpu += cpu
+                wrss += rss
             for name, needle in _PROC_COMPONENTS.items():
                 if needle in cmd:
                     c, r = stats[name]
                     stats[name] = (c + cpu, r + rss)
     except Exception as exc:
-        debug(f"proc stats collection failed: {exc!r}", component="hw")
-    return stats
+        degraded(f"process stats collection failed: {exc!r}", component="hw")
+    return (wcpu, wrss), stats
+
+
+def _worker_stats():
+    return _collect_ps_stats()[0]
+
+
+def _proc_stats():
+    return _collect_ps_stats()[1]
 
 
 def _container_stats():
@@ -393,14 +450,15 @@ def _mem_usage_bytes(usage: str) -> int:
 
 
 def _net_iface():
-    """Return the interface to monitor.
-
-    An explicit MLX_NET_IFACE / --net-iface always wins. Otherwise use the
-    default-route interface (en1 on Wi-Fi, en0 on Ethernet), which works on
-    any subnet instead of the old hardcoded 192.168.2.x ring range.
-    """
+    """Return the interface to monitor (cached for 60s unless overridden)."""
+    global _NET_IFACE_CACHE
     if _NET_IFACE:
         return _NET_IFACE
+    cached_iface, cached_at = _NET_IFACE_CACHE
+    now = time.monotonic()
+    if cached_iface and (now - cached_at) < 60.0:
+        return cached_iface
+    detected = None
     try:
         out = subprocess.run(
             ["route", "-n", "get", "default"],
@@ -408,38 +466,62 @@ def _net_iface():
         ).stdout
         m = re.search(r"interface:\s*(\S+)", out)
         if m:
-            return m.group(1)
+            detected = m.group(1)
     except Exception as exc:
         debug(f"default route detection failed: {exc!r}", component="hw")
-    try:
-        out = subprocess.run(
-            ["ip", "route", "show", "default"],
-            capture_output=True, text=True, timeout=3,
-        ).stdout
-        m = re.search(r"dev\s+(\S+)", out)
-        if m:
-            return m.group(1)
-    except Exception:
-        pass
-    try:
-        out = subprocess.run(
-            ["ifconfig"], capture_output=True, text=True, timeout=3
-        ).stdout
-        cur = None
-        for line in out.splitlines():
-            m = re.match(r"^(\S+):", line)
+    if not detected:
+        try:
+            out = subprocess.run(
+                ["ip", "route", "show", "default"],
+                capture_output=True, text=True, timeout=3,
+            ).stdout
+            m = re.search(r"dev\s+(\S+)", out)
             if m:
-                cur = m.group(1)
-                continue
-            if cur and not cur.startswith("lo") and re.search(r"inet\s+\d+\.\d+\.\d+\.\d+\s", line):
-                return cur
-    except Exception as exc:
-        debug(f"iface fallback detection failed: {exc!r}", component="hw")
-    return None
+                detected = m.group(1)
+        except Exception:
+            pass
+    if not detected:
+        try:
+            out = subprocess.run(
+                ["ifconfig"], capture_output=True, text=True, timeout=3
+            ).stdout
+            cur = None
+            for line in out.splitlines():
+                m = re.match(r"^(\S+):", line)
+                if m:
+                    cur = m.group(1)
+                    continue
+                if cur and not cur.startswith("lo") and re.search(r"inet\s+\d+\.\d+\.\d+\.\d+\s", line):
+                    detected = cur
+                    break
+        except Exception as exc:
+            debug(f"iface fallback detection failed: {exc!r}", component="hw")
+    if detected:
+        _NET_IFACE_CACHE = (detected, now)
+    return detected
 
 
 def _net_stats(iface: str | None):
     if not iface:
+        return None
+    if os.path.exists("/proc/net/dev"):
+        try:
+            with open("/proc/net/dev", "r", encoding="utf8") as fh:
+                for line in fh:
+                    if ":" not in line:
+                        continue
+                    dev, rest = line.split(":", 1)
+                    if dev.strip() != iface:
+                        continue
+                    fields = rest.split()
+                    if len(fields) >= 11:
+                        return (
+                            int(fields[0]), int(fields[8]),
+                            int(fields[2]), int(fields[10]),
+                        )
+        except Exception as exc:
+            debug(f"/proc/net/dev stats failed: {exc!r}", component="hw")
+    if sys.platform != "darwin":
         return None
     try:
         out = subprocess.run(
@@ -485,69 +567,86 @@ def _ring_net_since(iface, counters):
     _NET_LAST[node][iface] = (rx, tx, rx_err, tx_err)
 
 
+def _host_uptime_seconds() -> float:
+    if os.path.exists("/proc/uptime"):
+        try:
+            with open("/proc/uptime", "r", encoding="utf8") as fh:
+                return max(0.0, float(fh.read().split()[0]))
+        except (OSError, ValueError, IndexError):
+            pass
+    boot = _sysctl("kern.boottime", "") or ""
+    m = re.search(r"sec\s*=\s*(\d+)", boot)
+    if m:
+        return max(0.0, time.time() - float(m.group(1)))
+    return 0.0
+
+
 def _sample():
     load1, load5, load15 = os.getloadavg()
     mem = _mem_info()
     disk = shutil.disk_usage("/")
+    uptime = _host_uptime_seconds()
+    cpu_temp = _cpu_temp()
+    thermal = _thermal_pressure()
+    (wcpu, wrss), proc_stats = _collect_ps_stats()
+    cont_stats = _container_stats() if _CONTAINER_STATS else {}
+    iface = _net_iface()
+    net = _net_stats(iface)
 
-    G_UP.labels(NODE).set(1)
     ssh_up = 0.0
     try:
         with socket.create_connection(("127.0.0.1", 22), timeout=0.3):
             ssh_up = 1.0
-    except Exception:
+    except OSError:
         ssh_up = 0.0
-    G_SSH_UP.labels(NODE).set(ssh_up)
-    boot = _sysctl("kern.boottime", "")
-    m = re.search(r"sec\s*=\s*(\d+)", boot)
-    if m:
-        G_UPTIME.labels(NODE).set(max(0.0, time.time() - float(m.group(1))))
-    else:
-        G_UPTIME.labels(NODE).set(0)
-    G_LOAD1.labels(NODE).set(load1)
-    G_LOAD5.labels(NODE).set(load5)
-    G_LOAD15.labels(NODE).set(load15)
-    G_CPU_COUNT.labels(NODE).set(os.cpu_count() or 0)
-    G_CPU_TEMP.labels(NODE).set(_cpu_temp())
+
     with _GPU_LOCK:
         stats = dict(_GPU_STATS)
-    G_GPU_UTIL.labels(NODE).set(stats["util"])
-    G_GPU_FREQ.labels(NODE).set(stats["freq"])
-    G_GPU_POWER.labels(NODE).set(stats["gpu_power"])
-    G_PKG_POWER.labels(NODE).set(stats["pkg_power"])
-    G_CPU_POWER.labels(NODE).set(stats["cpu_power"])
-    G_ANE_POWER.labels(NODE).set(stats["ane_power"])
-    G_THERMAL.labels(NODE).set(_thermal_pressure())
-    G_GPU_MEM_USED.labels(NODE).set(stats["gpu_mem_used"])
-    G_GPU_MEM_ALLOC.labels(NODE).set(stats["gpu_mem_alloc"])
-    G_GPU_MEM_TOTAL.labels(NODE).set(stats["gpu_mem_total"])
-    G_GPU_UTIL_IOKIT.labels(NODE).set(stats["gpu_util_iokit"])
-    G_MEM_TOTAL.labels(NODE).set(_MEM_TOTAL)
-    G_MEM_USED.labels(NODE).set(mem["used"])
-    G_MEM_FREE.labels(NODE).set(mem["free"])
-    G_MEM_AVAILABLE.labels(NODE).set(mem["available"])
-    G_MEM_PRESSURE.labels(NODE).set(mem["free_pages"])
-    G_PAGE_SIZE.labels(NODE).set(mem["page_size"])
-    G_DISK_TOTAL.labels(NODE).set(disk.total)
-    G_DISK_USED.labels(NODE).set(disk.used)
 
-    wcpu, wrss = _worker_stats()
-    G_WORKER_CPU.labels(NODE).set(wcpu)
-    G_WORKER_RSS.labels(NODE).set(wrss)
+    with _SAMPLE_LOCK:
+        G_UP.labels(NODE).set(1)
+        G_SSH_UP.labels(NODE).set(ssh_up)
+        G_UPTIME.labels(NODE).set(uptime)
+        G_LOAD1.labels(NODE).set(load1)
+        G_LOAD5.labels(NODE).set(load5)
+        G_LOAD15.labels(NODE).set(load15)
+        G_CPU_COUNT.labels(NODE).set(os.cpu_count() or 0)
+        G_CPU_TEMP.labels(NODE).set(cpu_temp)
+        G_GPU_UTIL.labels(NODE).set(stats["util"])
+        G_GPU_FREQ.labels(NODE).set(stats["freq"])
+        G_GPU_POWER.labels(NODE).set(stats["gpu_power"])
+        G_PKG_POWER.labels(NODE).set(stats["pkg_power"])
+        G_CPU_POWER.labels(NODE).set(stats["cpu_power"])
+        G_ANE_POWER.labels(NODE).set(stats["ane_power"])
+        G_THERMAL.labels(NODE).set(thermal)
+        G_GPU_MEM_USED.labels(NODE).set(stats["gpu_mem_used"])
+        G_GPU_MEM_ALLOC.labels(NODE).set(stats["gpu_mem_alloc"])
+        G_GPU_MEM_TOTAL.labels(NODE).set(stats["gpu_mem_total"])
+        G_GPU_UTIL_IOKIT.labels(NODE).set(stats["gpu_util_iokit"])
+        G_MEM_TOTAL.labels(NODE).set(_MEM_TOTAL)
+        G_MEM_USED.labels(NODE).set(mem["used"])
+        G_MEM_FREE.labels(NODE).set(mem["free"])
+        G_MEM_AVAILABLE.labels(NODE).set(mem["available"])
+        G_MEM_PRESSURE.labels(NODE).set(mem["free_pages"])
+        G_PAGE_SIZE.labels(NODE).set(mem["page_size"])
+        G_DISK_TOTAL.labels(NODE).set(disk.total)
+        G_DISK_USED.labels(NODE).set(disk.used)
 
-    for name, (cpu, rss) in _proc_stats().items():
-        G_PROC_CPU.labels(NODE, name).set(cpu)
-        G_PROC_RSS.labels(NODE, name).set(rss)
+        G_WORKER_CPU.labels(NODE).set(wcpu)
+        G_WORKER_RSS.labels(NODE).set(wrss)
 
-    if _CONTAINER_STATS:
-        for name, (cpu, rss) in _container_stats().items():
+        G_PROC_CPU.clear()
+        G_PROC_RSS.clear()
+        for name, (cpu, rss) in proc_stats.items():
             G_PROC_CPU.labels(NODE, name).set(cpu)
             G_PROC_RSS.labels(NODE, name).set(rss)
 
-    iface = _net_iface()
-    net = _net_stats(iface)
-    if net:
-        _ring_net_since(iface, net)
+        for name, (cpu, rss) in cont_stats.items():
+            G_PROC_CPU.labels(NODE, name).set(cpu)
+            G_PROC_RSS.labels(NODE, name).set(rss)
+
+        if net:
+            _ring_net_since(iface, net)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -562,7 +661,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
-        payload = generate_latest()
+        with _SAMPLE_LOCK:
+            payload = generate_latest()
         self.send_response(200)
         self.send_header("Content-Type", CONTENT_TYPE_LATEST)
         self.send_header("Content-Length", str(len(payload)))
@@ -575,56 +675,91 @@ def main():
     global _NET_IFACE, _CONTAINER_STATS
 
     ap = argparse.ArgumentParser(description="MLX hardware telemetry agent")
-    ap.add_argument("--node-name", default=os.environ.get("MLX_MACBOOK_ID",
-             socket.gethostname()))
+    device_id = (
+        os.environ.get("MLX_DEVICE_ID")
+        or os.environ.get("MLX_MACBOOK_ID")
+        or socket.gethostname()
+    )
+    ap.add_argument(
+        "--node-name",
+        default=device_id,
+    )
     ap.add_argument("--listen", default=os.environ.get("MLX_HW_LISTEN", LISTEN_DEFAULT))
-    ap.add_argument("--interval", type=float,
-             default=float(os.environ.get("MLX_HW_INTERVAL", SAMPLE_INTERVAL_DEFAULT)))
+    ap.add_argument(
+        "--interval",
+        type=float,
+        default=float(os.environ.get("MLX_HW_INTERVAL", SAMPLE_INTERVAL_DEFAULT)),
+    )
     ap.add_argument("--worker-match", default="mlx_lm.server")
-    ap.add_argument("--net-iface", default=os.environ.get("MLX_NET_IFACE", ""),
-             help="interface to monitor (default: default-route interface)")
-    ap.add_argument("--container-stats", action="store_true",
-             default=os.environ.get("ENABLE_CONTAINER_STATS", "false").lower() == "true",
-             help="include podman container CPU/RSS (default: off)")
-    ap.add_argument("--gpu-interval", type=float,
-             default=float(os.environ.get("MLX_HW_GPU_INTERVAL",
-                                          str(GPU_SAMPLE_INTERVAL_DEFAULT))))
+    ap.add_argument(
+        "--net-iface",
+        default=os.environ.get("MLX_NET_IFACE", ""),
+        help="interface to monitor (default: default-route interface)",
+    )
+    ap.add_argument(
+        "--container-stats",
+        action="store_true",
+        default=os.environ.get("ENABLE_CONTAINER_STATS", "false").lower() == "true",
+        help="include podman container CPU/RSS (default: off)",
+    )
+    ap.add_argument(
+        "--gpu-interval",
+        type=float,
+        default=float(
+            os.environ.get("MLX_HW_GPU_INTERVAL", str(GPU_SAMPLE_INTERVAL_DEFAULT))
+        ),
+    )
     args = ap.parse_args()
 
     NODE = args.node_name
-    LISTEN = (args.listen.rsplit(":", 1)[0],
-              int(args.listen.rsplit(":", 1)[1]))
+    setup_logging(service="mlx-hw-telemetry", macbook=NODE)
+
+    LISTEN = parse_listen_addr(args.listen, default_host="127.0.0.1", default_port=9102)
     SAMPLE_INTERVAL = max(1.0, args.interval)
     _PROC_MATCH = args.worker_match
     _NET_IFACE = args.net_iface or ""
     _CONTAINER_STATS = bool(args.container_stats)
-    _MEM_TOTAL = int(_sysctl("hw.memsize", "0") or 0)
     _parse_page_size()
+    if sys.platform == "darwin":
+        _MEM_TOTAL = int(_sysctl("hw.memsize", "0") or 0)
+    else:
+        _MEM_TOTAL = 0
+        _mem_info()
 
-    setup_logging(service="mlx-hw-telemetry",
-                  macbook=os.environ.get("MLX_MACBOOK_ID", "unknown"))
-
-    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    stop_event = threading.Event()
 
     def _loop():
-        while True:
+        while not stop_event.is_set():
             try:
                 _sample()
             except Exception as exc:
                 error(f"sample error: {exc!r}", component="hw")
-            time.sleep(SAMPLE_INTERVAL)
+            stop_event.wait(SAMPLE_INTERVAL)
 
     threading.Thread(target=_loop, daemon=True).start()
-    threading.Thread(target=_gpu_sampler_loop, args=(args.gpu_interval,),
+    threading.Thread(target=_gpu_sampler_loop, args=(args.gpu_interval, stop_event),
                      daemon=True).start()
 
+    ThreadingHTTPServer.allow_reuse_address = True
+    ThreadingHTTPServer.address_family = socket.AF_INET6 if ":" in LISTEN[0] else socket.AF_INET
     server = ThreadingHTTPServer(LISTEN, Handler)
     info(f"node={NODE} listening on {LISTEN[0]}:{LISTEN[1]}",
          component="hw")
+
+    def _shutdown(signum, frame):
+        stop_event.set()
+        threading.Thread(target=server.shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        server.shutdown()
+        pass
+    finally:
+        stop_event.set()
+        server.server_close()
 
 
 if __name__ == "__main__":

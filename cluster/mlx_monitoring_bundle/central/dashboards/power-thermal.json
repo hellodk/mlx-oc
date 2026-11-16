@@ -173,7 +173,7 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
+          "unit": "percent",
           "min": 0,
           "max": 100
         }
@@ -181,7 +181,7 @@
     },
     {
       "type": "graph",
-      "title": "GPU Frequency (MHz)",
+      "title": "GPU Frequency",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
@@ -191,7 +191,7 @@
       },
       "targets": [
         {
-          "expr": "mlx_hw_gpu_frequency_mhz{device=~\"$device\", node=~\"$node\"}",
+          "expr": "mlx_hw_gpu_frequency_mhz{device=~\"$device\", node=~\"$node\"} * 1000000",
           "legendFormat": "{{device}} {{node}}",
           "refId": "A"
         }
@@ -222,7 +222,7 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
+          "unit": "percent",
           "min": 0,
           "max": 100
         }

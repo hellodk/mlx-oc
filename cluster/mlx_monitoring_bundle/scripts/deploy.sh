@@ -63,6 +63,16 @@ warn()  { printf '\033[1;33m[deploy]\033[0m %s\n' "$*" >&2; }
 err()   { printf '\033[1;31m[deploy][ERR]\033[0m %s\n' "$*" >&2; }
 die()   { printf '\033[1;31m[deploy][ERR]\033[0m %s\n' "$*" >&2; exit 1; }
 
+_require_cmds() {
+  local missing=() cmd
+  for cmd in "$@"; do
+    command -v "${cmd}" >/dev/null 2>&1 || missing+=("${cmd}")
+  done
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    die "missing required command(s): ${missing[*]}"
+  fi
+}
+
 _prompt_input() {
   local prompt="$1" default="${2:-}" val=""
   if [[ -n "${default}" ]]; then
@@ -103,8 +113,10 @@ _prompt_select() {
   local choice; read -r choice || true
   [ -z "$choice" ] && return 1
   case "$choice" in ''|*[!0-9]*) return 1;; esac
-  [ "$choice" -lt 1 ] || [ "$choice" -gt "$#" ] && return 1
-  eval "echo \${$choice}"
+  if [[ "$choice" -lt 1 || "$choice" -gt "$#" ]]; then
+    return 1
+  fi
+  printf '%s\n' "${!choice}"
 }
 
 prompt_confirm_word() {
@@ -131,6 +143,12 @@ bundle_python() {
   fi
   if [[ -n "${candidate}" && -x "${candidate}" ]]; then
     printf '%s' "${candidate}"
+    return
+  fi
+  local detected
+  detected="$(_detect_venv || true)"
+  if [[ -n "${detected}" && -x "${detected}" ]]; then
+    printf '%s' "${detected}"
     return
   fi
   printf '%s' "python3"
@@ -206,6 +224,7 @@ ensure_vmagent() {
   fi
 
   local download_url
+  _require_cmds curl tar
   download_url="$(_detect_vmagent_url)"
   info "vmagent not found. Downloading official release from ${download_url}..."
   mkdir -p "${bin_dir}"
@@ -254,7 +273,7 @@ _detect_venv() {
   )
   for c in "${candidates[@]}"; do
     if [[ -n "${c}" && -x "${c}" ]]; then
-      if "${c}" -c 'import yaml, prometheus_client' >/dev/null 2>&1; then
+      if "${c}" -c 'import yaml, prometheus_client, psutil' >/dev/null 2>&1; then
         printf '%s' "${c}"
         return 0
       fi
@@ -263,37 +282,51 @@ _detect_venv() {
   return 1
 }
 
-_detect_mlx_venv() {
-  local candidates=(
-    "${MLX_VENV_PYTHON:-}"
-    "${HOME}/venvs/mlx/bin/python"
-    "${HOME}/mlx-venv/bin/python"
-    "${HOME}/.venv-mlx/bin/python"
-  )
-  for c in "${candidates[@]}"; do
-    if [[ -n "${c}" && -x "${c}" ]]; then
-      printf '%s' "${c}"
-      return 0
-    fi
+render_edge_service_units() {
+  local mon_python="${1:-$(bundle_python)}"
+  local device_id="${2:-unknown}"
+  local svc_user
+  local svc_group
+  svc_user="$(id -un 2>/dev/null || echo "${USER:-root}")"
+  svc_group="$(id -gn 2>/dev/null || echo "${svc_user}")"
+
+  local tpl dst
+  for tpl in \
+    "${EDGE_DIR}/com.mlx.monitoring.bundle.plist.template" \
+    "${EDGE_DIR}/com.mlx.monitoring-bundle.service.template"; do
+    [[ -f "${tpl}" ]] || continue
+    dst="${tpl%.template}"
+    "${mon_python}" -c "
+import sys
+tpl_path, dst_path, venv_py, edge_dir, dev_id, s_user, s_grp = sys.argv[1:8]
+text = open(tpl_path, 'r', encoding='utf-8').read()
+for k, v in (
+    ('{{VENV_PYTHON}}', venv_py),
+    ('{{EDGE_DIR}}', edge_dir),
+    ('{{DEVICE_ID}}', dev_id),
+    ('{{SERVICE_USER}}', s_user),
+    ('{{SERVICE_GROUP}}', s_grp),
+):
+    text = text.replace(k, v)
+open(dst_path, 'w', encoding='utf-8').write(text)
+" "${tpl}" "${dst}" "${mon_python}" "${EDGE_DIR}" "${device_id}" "${svc_user}" "${svc_group}"
   done
-  if command -v python3 >/dev/null 2>&1; then
-    if python3 -c 'import mlx_lm' >/dev/null 2>&1; then
-      command -v python3
-      return 0
-    fi
-  fi
-  return 1
 }
 
 cmd_setup_edge() {
-  local central_ip="${1:-}"
+  _require_cmds python3
+  local central_ip="${1:-${CENTRAL_IP:-${CENTRAL_VICTORIA_METRICS:-}}}"
   local model_id="${2:-}"
   local model_path="${3:-}"
+  local mlx_upstream="${4:-${MLX_UPSTREAM:-}}"
   local vmagent_bin="${MLX_MONITORING_DIR}/bin/vmagent"
 
   info "setting up edge monitoring bundle on local machine"
   mkdir -p "${MLX_MONITORING_DIR}"
   ensure_vmagent "${vmagent_bin}"
+  if command -v vmagent >/dev/null 2>&1; then
+    vmagent_bin="$(command -v vmagent)"
+  fi
 
   mkdir -p "${EDGE_DIR}/config"
   mkdir -p "${EDGE_DIR}/logs"
@@ -301,15 +334,39 @@ cmd_setup_edge() {
 
   # Interactive prompt if parameters are omitted and not provided in environment
   if [[ -z "${central_ip}" ]]; then
-    central_ip="$(_prompt_input "Central VictoriaMetrics IP / Host (e.g. 192.168.1.10)")"
-    [[ -n "${central_ip}" ]] || die "central_ip is required"
+    if [[ -t 0 ]]; then
+      central_ip="$(_prompt_input "Central VictoriaMetrics IP / Host (e.g. 192.168.1.10)")"
+    fi
+    [[ -n "${central_ip}" ]] || die "central_ip is required (pass as 1st arg, set CENTRAL_IP / CENTRAL_VICTORIA_METRICS, or enter interactively)"
+  fi
+  central_ip="${central_ip#http://}"
+  central_ip="${central_ip#https://}"
+  central_ip="${central_ip%%/*}"
+  if [[ "${central_ip}" =~ ^(\[.*\])(:[0-9]+)$ ]]; then
+    central_ip="${BASH_REMATCH[1]}"
+  elif [[ "${central_ip}" =~ ^([^:]+)(:[0-9]+)$ ]]; then
+    central_ip="${BASH_REMATCH[1]}"
+  elif [[ "${central_ip}" =~ :.*: && "${central_ip}" != \[*\] ]]; then
+    central_ip="[${central_ip}]"
   fi
 
-  if [[ -z "${model_id}" ]]; then
+  if [[ -z "${mlx_upstream}" ]]; then
+    if [[ -t 0 ]]; then
+      mlx_upstream="$(_prompt_input "External LLM Upstream URL (e.g. http://127.0.0.1:8000)")"
+    fi
+    [[ -n "${mlx_upstream}" ]] || die "MLX_UPSTREAM is required (e.g. http://127.0.0.1:8000). Pass as 4th arg, set MLX_UPSTREAM in env, or enter when prompted."
+  fi
+  mlx_upstream="${mlx_upstream#"${mlx_upstream%%[![:space:]]*}"}"
+  mlx_upstream="${mlx_upstream%"${mlx_upstream##*[![:space:]]}"}"
+  [[ "${mlx_upstream}" != *[[:space:]]* ]] || die "Invalid MLX_UPSTREAM '${mlx_upstream}': URL must not contain whitespace"
+  [[ "${mlx_upstream}" == *"://"* ]] || mlx_upstream="http://${mlx_upstream}"
+  mlx_upstream="${mlx_upstream%/}"
+
+  if [[ -z "${model_id}" && -t 0 ]]; then
     model_id="$(_prompt_input "Model ID (press Enter to skip or specify served model)")"
   fi
 
-  if [[ -n "${model_id}" && -z "${model_path}" ]]; then
+  if [[ -n "${model_id}" && -z "${model_path}" && -t 0 ]]; then
     local default_mpath=""
     if [[ -d "${HOME}/mlx-models/${model_id}" ]]; then
       default_mpath="${HOME}/mlx-models/${model_id}"
@@ -320,14 +377,8 @@ cmd_setup_edge() {
   fi
 
   # Ensure virtualenv (creates ~/mlx-monitoring/venv if none exists)
-  local mon_python mlx_python
+  local mon_python
   mon_python="$(ensure_monitoring_venv)"
-
-  mlx_python="$(_detect_mlx_venv || true)"
-  if [[ -z "${mlx_python}" ]]; then
-    warn "Could not auto-detect a virtualenv with mlx_lm installed."
-    mlx_python="$(_prompt_input "Path to MLX Python binary (press Enter to use monitoring python)" "${mon_python}")"
-  fi
 
   # Generate nodes.yml using the monitoring python (which has pyyaml)
   local disc_cmd=(
@@ -346,13 +397,23 @@ cmd_setup_edge() {
   info "generating ${EDGE_DIR}/config/nodes.yml via discover_nodes.py"
   "${disc_cmd[@]}" > "${EDGE_DIR}/config/nodes.yml"
 
+  local device_id
+  device_id="$("${mon_python}" -c '
+import sys, yaml
+data = yaml.safe_load(open(sys.argv[1], encoding="utf8")) or {}
+devs = data.get("devices") or data.get("macbooks") or []
+print(devs[0].get("id", "unknown") if devs else "unknown")
+' "${EDGE_DIR}/config/nodes.yml" 2>/dev/null || hostname -s)"
+
   info "generating ${ENV_FILE}"
   cat <<EOF > "${ENV_FILE}"
 ENABLE_PROXY=true
 ENABLE_HW_TELEMETRY=true
 ENABLE_KV_AGENT=true
-ENABLE_SUPERVISOR=true
+ENABLE_SERVER_MONITOR=true
 ENABLE_LOGTAILER=true
+ENABLE_PROCESS_PROFILER=true
+ENABLE_SBOM_COLLECTOR=true
 ENABLE_VMAGENT=true
 
 LOG_LEVEL=INFO
@@ -364,18 +425,39 @@ PID_DIR=./bin
 CONFIG_DIR=./config
 
 VENV_PYTHON=${mon_python}
-MLX_VENV_PYTHON=${mlx_python}
 
-MLX_UPSTREAM=http://127.0.0.1:11234
-MLX_SERVER_PORT=11234
-
-SUPERVISOR_ATTACH_HEALTHY=true
+# External LLM server endpoint. The proxy listens on :8080 and forwards here.
+MLX_UPSTREAM=${mlx_upstream}
 MLX_PROXY_STRICT_MODEL=false
+MLX_LOGPROBS=3
+MLX_LOGPROBS_STREAM_SAMPLE=0.0
+MLX_LOW_CONFIDENCE=0.5
+MAX_PROMPT_TOKENS=12000
+MAX_TOKENS_CAP=4096
+RATE_LIMIT=0
+RATE_WINDOW=10.0
 
 MLX_NET_IFACE=
 
 ENABLE_CONTAINER_STATS=false
 MLX_SERVER_LOG=${EDGE_DIR}/logs/server.log
+
+# Passive process/external-supervisor monitoring overrides
+MLX_PROCESS_PATTERN=mlx_lm.server
+MLX_LAUNCHD_LABEL=
+MLX_SYSTEMD_UNIT=
+
+# Process Profiler & SBOM Collector
+PROXY_LISTEN=127.0.0.1:8080
+HW_LISTEN=127.0.0.1:9102
+KV_LISTEN=127.0.0.1:9104
+SUPERVISOR_LISTEN=127.0.0.1:9105
+LOGTAILER_LISTEN=127.0.0.1:9106
+PROCESS_SAMPLE_INTERVAL=5.0
+PROCESS_LISTEN=127.0.0.1:9107
+SBOM_SCAN_INTERVAL=3600.0
+SBOM_LISTEN=127.0.0.1:9108
+SBOM_BASE_DEVICE=${SBOM_BASE_DEVICE:-}
 
 VMAGENT_SCRAPE_INTERVAL=10s
 VMAGENT_QUEUE_CAPACITY=5000
@@ -383,8 +465,11 @@ VMAGENT_MAX_SHARDS=200
 VMAGENT_BINARY=${vmagent_bin}
 VMAGENT_PERSISTENT_QUEUE=
 
+OTLP_SCHEME=http
 OTLP_VERIFY_TLS=false
 EOF
+
+  render_edge_service_units "${mon_python}" "${device_id}"
 
   info "edge setup complete; validating configuration"
   cmd_validate
@@ -456,7 +541,7 @@ cmd_review_vmagent() {
 
   cd "${EDGE_DIR}"
   "${py_bin}" -c "
-import os, sys, yaml, socket, subprocess, shutil
+import os, sys, urllib.parse, yaml, socket, subprocess, shutil
 from pathlib import Path
 
 edge_dir = Path('${EDGE_DIR}').resolve()
@@ -534,21 +619,43 @@ targets = [
     ('mlx-kv', env.get('KV_LISTEN', '127.0.0.1:9104'), '/metrics'),
     ('mlx-supervisor', env.get('SUPERVISOR_LISTEN', '127.0.0.1:9105'), '/metrics'),
     ('mlx-logtailer', env.get('LOGTAILER_LISTEN', '127.0.0.1:9106'), '/metrics'),
+    ('mlx-process', env.get('PROCESS_LISTEN', '127.0.0.1:9107'), '/metrics'),
+    ('mlx-sbom', env.get('SBOM_LISTEN', '127.0.0.1:9108'), '/metrics'),
 ]
+def _split_host_port(raw_addr, default_host, default_port):
+    val = (raw_addr or '').strip()
+    if '://' in val:
+        parsed = urllib.parse.urlsplit(val)
+        try:
+            port = parsed.port or default_port
+        except ValueError:
+            port = default_port
+        return (parsed.hostname or default_host, port)
+    if ':' in val:
+        h, _, pt = val.rpartition(':')
+        if pt.isdigit():
+            return (h.strip('[]') or default_host, int(pt))
+    return (val.strip('[]') or default_host, default_port)
+
 target_rows = []
 up_count = 0
 for job, listen, path in targets:
-    thost, tport = listen.split(':') if ':' in listen else ('127.0.0.1', listen)
+    thost, tport = _split_host_port(listen, '127.0.0.1', 8080)
     is_up = probe_target(thost, tport, timeout=0.3)
     if is_up:
         up_count += 1
     target_rows.append((job, listen, path, is_up))
 
 # 4. Central VM probe
-cvm_host, cvm_port = central_vm.split(':') if ':' in central_vm else (central_vm, 8428)
+cvm_scheme = otlp_scheme
+if '://' in str(central_vm):
+    cvm_scheme = urllib.parse.urlsplit(str(central_vm)).scheme or otlp_scheme
+cvm_host, cvm_port = _split_host_port(central_vm, '127.0.0.1', 8428)
 cvm_reachable = probe_target(cvm_host, cvm_port, timeout=1.0)
+cvm_host_fmt = f'[{cvm_host}]' if ':' in cvm_host else cvm_host
+cvm_display = f'{cvm_host_fmt}:{cvm_port}'
 
-remote_url = f'{otlp_scheme}://{central_vm}/api/v1/write'
+remote_url = f'{cvm_scheme}://{cvm_display}/api/v1/write'
 
 print('=' * 74)
 print('                  vmagent Edge Configuration Review')
@@ -579,7 +686,7 @@ for job, listen, path, is_up in target_rows:
     print(f'  • {job:<15} -> http://{listen}{path:<10} {stat}')
 print('-' * 74)
 print('CLI Launch Command:')
-pq_flags = f' -remoteWrite.persistentQueue=true -remoteWrite.persistentQueueDir={pq}' if pq else ''
+pq_flags = f' -remoteWrite.tmpDataPath {pq}' if pq else ''
 print('  ' + vmagent_bin + ' \\\\')
 print('    -promscrape.config logs/vmagent.yml \\\\')
 print('    -promscrape.configCheckInterval 30s \\\\')
@@ -824,8 +931,9 @@ pw_note = ''
 if not password:
     pw_note = ' [FAIL: Password is empty]'
 elif password == 'changeme':
-    pw_note = ' [WARN: Using default password changeme]'
-print(f'  • Admin Password  : {password}{pw_note}')
+    pw_note = ' [WARN: Using default password]'
+masked_pw = '<empty>' if not password else f'<configured: {len(password)} chars>'
+print(f'  • Admin Password  : {masked_pw}{pw_note}')
 print(f'  • Anonymous Auth  : {\"ENABLED\" if anon.lower() == \"true\" else \"DISABLED\"} (GF_AUTH_ANONYMOUS_ENABLED={anon})')
 print('Access Endpoints:')
 print(f'  • Localhost       : http://127.0.0.1:3000')
@@ -1048,15 +1156,18 @@ render_alertmanager_config() {
 
   local oncall_url="${ONCALL_WEBHOOK_URL:-${ALERT_WEBHOOK_URL:-}}"
   local default_url="${ALERT_WEBHOOK_URL:-}"
+  if [[ -f "${dst}" && -z "${oncall_url}" && -z "${default_url}" ]] && ! grep -q '{{' "${dst}" 2>/dev/null; then
+    return 0
+  fi
 
   local oncall_cfg="webhook_configs: []"
   if [[ -n "${oncall_url}" ]]; then
-    oncall_cfg="webhook_configs:\n      - url: \"${oncall_url}\"\n        send_resolved: true"
+    oncall_cfg=$'webhook_configs:\n      - url: "'"${oncall_url}"$'"\n        send_resolved: true'
   fi
 
   local default_cfg="webhook_configs: []"
   if [[ -n "${default_url}" ]]; then
-    default_cfg="webhook_configs:\n      - url: \"${default_url}\"\n        send_resolved: true"
+    default_cfg=$'webhook_configs:\n      - url: "'"${default_url}"$'"\n        send_resolved: true'
   fi
 
   python3 -c "
@@ -1282,6 +1393,7 @@ cmd_central() {
   if ! engine="$(_detect_container_engine)"; then
     die "docker or podman is required for the central stack"
   fi
+  _require_cmds "${engine}"
   if [[ "${engine}" == "podman" ]]; then
     if ! _check_podman_machine_size "${with_opik}" "${FORCE_DEPLOY:-0}"; then
       die "Podman machine size check failed. Increase VM memory or pass --force."
@@ -1328,7 +1440,7 @@ cmd_central() {
   if [[ ${#raw_images[@]} -eq 0 ]]; then
     while IFS= read -r img; do
       [[ -n "${img}" ]] && raw_images+=("${img}")
-    done < <(python3 -c "
+    done < <("$(bundle_python)" -c "
 import sys, yaml
 with_opik = sys.argv[1] == '1'
 opik_ver = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else '2.2.13'
@@ -1395,8 +1507,7 @@ except Exception:
       ;;
     y|Y|yes|YES) ;;
     *)
-      info "Deployment aborted by user."
-      return 0
+      die "Deployment aborted by user."
       ;;
   esac
 
@@ -1482,8 +1593,13 @@ except Exception:
       retries=$((retries - 1))
     done
     if command -v curl >/dev/null 2>&1; then
-      curl -sS --max-time 2 -X POST -u "${GRAFANA_ADMIN_USER}:${GRAFANA_ADMIN_PASSWORD}" \
-        "http://127.0.0.1:3000/api/admin/provisioning/datasources/reload" >/dev/null 2>&1 || true
+      local safe_user="${GRAFANA_ADMIN_USER//\\/\\\\}"
+      safe_user="${safe_user//\"/\\\"}"
+      local safe_pass="${GRAFANA_ADMIN_PASSWORD//\\/\\\\}"
+      safe_pass="${safe_pass//\"/\\\"}"
+      printf 'user = "%s:%s"\n' "${safe_user}" "${safe_pass}" | \
+        curl -sS --max-time 2 -X POST --config - \
+          "http://127.0.0.1:3000/api/admin/provisioning/datasources/reload" >/dev/null 2>&1 || true
     fi
   fi
 
@@ -1557,6 +1673,7 @@ clean_central() {
     local central_volumes=(
       "mlx-central_vm-data" "central_vm-data" "vm-data"
       "mlx-central_grafana-data" "central_grafana-data" "grafana-data"
+      "mlx-central_alertmanager-data" "central_alertmanager-data" "alertmanager-data"
       "mlx-central_central-otel-logs" "central_central-otel-logs" "central-otel-logs"
       "mlx-central_opik-mysql" "central_opik-mysql" "opik-mysql"
       "mlx-central_opik-clickhouse" "central_opik-clickhouse" "opik-clickhouse"
@@ -1640,12 +1757,24 @@ clean_edge() {
     done
   fi
 
-  # 3. Terminate any orphaned listeners on standard edge exporter ports
-  local edge_ports=(8080 9102 9104 9105 9106 8429)
+  # 3. Terminate any orphaned listeners on standard and configured edge exporter ports
+  local edge_ports=(8080 9102 9104 9105 9106 9107 9108 8429)
+  if [[ -f "${ENV_FILE}" ]]; then
+    local cfg_key cfg_val cfg_port
+    while IFS='=' read -r cfg_key cfg_val; do
+      cfg_key="$(printf '%s' "${cfg_key}" | tr -d '[:space:]')"
+      [[ "${cfg_key}" =~ ^[A-Z0-9_]+_LISTEN$ ]] || continue
+      cfg_val="$(printf '%s' "${cfg_val}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//')"
+      cfg_port="${cfg_val##*:}"
+      if [[ "${cfg_port}" =~ ^[0-9]+$ && " ${edge_ports[*]} " != *" ${cfg_port} "* ]]; then
+        edge_ports+=("${cfg_port}")
+      fi
+    done < "${ENV_FILE}"
+  fi
   if command -v lsof >/dev/null 2>&1; then
     for port in "${edge_ports[@]}"; do
       local pids
-      pids="$(lsof -ti :${port} 2>/dev/null || true)"
+      pids="$(lsof -ti -sTCP:LISTEN :${port} 2>/dev/null || true)"
       if [[ -n "${pids}" ]]; then
         for p in ${pids}; do
           info "terminating residual process on port ${port} (PID ${p})"
@@ -1993,7 +2122,7 @@ Clean & Reinstall options:
   -y, --yes, -f, --force   skip confirmation prompt
 
 Setup-edge arguments:
-  ./scripts/deploy.sh setup-edge <central_ip> [model_id] [model_path]
+  ./scripts/deploy.sh setup-edge <central_ip> [model_id] [model_path] [mlx_upstream]
   If arguments are omitted, the script asks interactively.
 
 Edge arguments:

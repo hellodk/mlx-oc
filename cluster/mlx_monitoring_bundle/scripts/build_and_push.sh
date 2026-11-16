@@ -27,42 +27,68 @@ if [[ "${1:-}" == "--dry-run" ]]; then
   DRY_RUN=1
 fi
 
-ENGINE="docker"
-if command -v podman >/dev/null 2>&1 && ! command -v docker >/dev/null 2>&1; then
-  ENGINE="podman"
+ENGINE="podman"
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  ENGINE="docker"
+elif ! command -v podman >/dev/null 2>&1; then
+  ENGINE="docker"
 fi
+
+REGISTRY_HOST="${REGISTRY%%/*}"
 
 info() { printf '[build] %s\n' "$*" >&2; }
 err()  { printf '[build][ERR] %s\n' "$*" >&2; }
 
 login() {
   if [[ "${DRY_RUN}" == "1" ]]; then
-    info "dry-run: skipping quay login"
+    info "dry-run: skipping registry login"
     return 0
   fi
   if [[ -n "${QUAY_USERNAME:-}" && -n "${QUAY_PASSWORD:-}" ]]; then
-    printf '%s' "${QUAY_PASSWORD}" | "${ENGINE}" login quay.io -u "${QUAY_USERNAME}" --password-stdin
+    printf '%s' "${QUAY_PASSWORD}" | "${ENGINE}" login "${REGISTRY_HOST}" -u "${QUAY_USERNAME}" --password-stdin
     return
   fi
   if [[ -n "${QUAY_TOKEN:-}" ]]; then
-    printf '%s' "${QUAY_TOKEN}" | "${ENGINE}" login quay.io -u "${QUAY_USERNAME:-hellodk}" --password-stdin
+    printf '%s' "${QUAY_TOKEN}" | "${ENGINE}" login "${REGISTRY_HOST}" -u "${QUAY_USERNAME:-hellodk}" --password-stdin
     return
   fi
-  info "no QUAY credentials found; attempting existing quay login"
-  "${ENGINE}" login quay.io || true
+  info "no QUAY credentials found; attempting existing ${REGISTRY_HOST} login"
+  "${ENGINE}" login "${REGISTRY_HOST}" || true
 }
 
+STAGE_DIR="$(mktemp -d)"
+trap 'rm -rf "${STAGE_DIR}"' EXIT
+
+cp -R "${CENTRAL_DIR}/." "${STAGE_DIR}/"
+rm -f "${STAGE_DIR}/.env" "${STAGE_DIR}/.env."* "${STAGE_DIR}/"*.bak*
+find "${STAGE_DIR}" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find "${STAGE_DIR}" -type f -name "*.bak*" -delete 2>/dev/null || true
+
+# Render clean non-secret defaults from templates for image reproducibility
+if [[ -f "${STAGE_DIR}/config/alertmanager.yml.template" ]]; then
+  sed \
+    -e 's|{{ONCALL_WEBHOOK_CONFIG}}|webhook_configs: []|g' \
+    -e 's|{{DEFAULT_WEBHOOK_CONFIG}}|webhook_configs: []|g' \
+    "${STAGE_DIR}/config/alertmanager.yml.template" > "${STAGE_DIR}/config/alertmanager.yml"
+fi
+if [[ -f "${STAGE_DIR}/config/grafana/datasources.yaml.template" ]]; then
+  sed \
+    -e 's|{{VICTORIAMETRICS_URL}}|http://victoria-metrics:8428|g' \
+    "${STAGE_DIR}/config/grafana/datasources.yaml.template" > "${STAGE_DIR}/config/grafana/datasources.yaml"
+fi
+
 full="${REGISTRY}/${REPO}:${TAG}"
-info "building ${full} from ${CENTRAL_DIR}/Dockerfile.central"
+info "building ${full} from staged context (${STAGE_DIR}/Dockerfile.central)"
 "${ENGINE}" build --tag "${full}" \
-  --file "${CENTRAL_DIR}/Dockerfile.central" \
-  "${CENTRAL_DIR}"
+  --file "${STAGE_DIR}/Dockerfile.central" \
+  "${STAGE_DIR}"
 
 if [[ "${DRY_RUN}" == "1" ]]; then
   info "dry-run: built ${full} (not pushed)"
   exit 0
 fi
 
+login
 info "pushing ${full}"
 "${ENGINE}" push "${full}"
 info "pushed ${full}"

@@ -22,7 +22,7 @@ Exposes Prometheus metrics on HTTP (default 127.0.0.1:9108) for:
   - mac_sbom_drift_status
   - mac_sbom_drift_mismatch_count
   - mac_sbom_missing_package_count
-  - mac_sbom_drift_diff
+  - mac_sbom_drift_details
   - mac_sbom_collector_up
 
 Stores historical JSON snapshots in logs/sbom_snapshot.json.
@@ -47,16 +47,16 @@ import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-from prometheus_client import CollectorRegistry, Counter, Gauge, generate_latest
+from prometheus_client import CollectorRegistry, Gauge, generate_latest
 
-from mlx_logging import debug, degraded, error, info, setup_logging
+from mlx_logging import debug, error, info, parse_listen_addr, setup_logging
 
 # ---------------------------------------------------------------------------
 # Default Constants
 # ---------------------------------------------------------------------------
 DEFAULT_LISTEN = "127.0.0.1:9108"
 DEFAULT_INTERVAL = 3600.0  # Hourly scan
-DEFAULT_BASE_DEVICE = "mm"
+DEFAULT_BASE_DEVICE = ""
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 EDGE_DIR = SCRIPT_DIR.parent
@@ -64,6 +64,7 @@ LOG_DIR = EDGE_DIR / "logs"
 CONFIG_DIR = EDGE_DIR / "config"
 
 LOG_DIR.mkdir(parents=True, exist_ok=True)
+CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
 # ---------------------------------------------------------------------------
 # Metric Registry & Isolated Gauges
@@ -112,12 +113,6 @@ G_SBOM_MISSING_PACKAGE_COUNT = Gauge(
     ["device", "base"],
     registry=REGISTRY,
 )
-G_SBOM_DRIFT_DIFF = Gauge(
-    "mac_sbom_drift_diff",
-    "Granular package delta against baseline device",
-    ["base", "target", "package", "base_version", "target_version", "ecosystem", "path"],
-    registry=REGISTRY,
-)
 G_SBOM_DEVICE_DRIFT_SUMMARY = Gauge(
     "mac_sbom_device_drift_summary",
     "Summary table of fleet device drift state against baseline",
@@ -131,7 +126,7 @@ G_SBOM_DRIFT_DETAILS = Gauge(
     registry=REGISTRY,
 )
 
-_SCAN_LOCK = threading.Lock()
+_SCAN_LOCK = threading.RLock()
 _CURRENT_INVENTORY: List[Dict[str, Any]] = []
 
 
@@ -216,10 +211,9 @@ def _scan_pip_venvs() -> List[Dict[str, Any]]:
     seen: set[Tuple[str, str, str]] = set()
 
     pythons = [sys.executable]
-    for env_var in ("VENV_PYTHON", "MLX_VENV_PYTHON"):
-        val = os.environ.get(env_var)
-        if val and os.path.isfile(val) and val not in pythons:
-            pythons.append(val)
+    venv_py = os.environ.get("VENV_PYTHON")
+    if venv_py and os.path.isfile(venv_py) and venv_py not in pythons:
+        pythons.append(venv_py)
 
     # Common search paths
     for cand in (
@@ -331,7 +325,6 @@ def _scan_mlx_models() -> List[Dict[str, Any]]:
     items: List[Dict[str, Any]] = []
     candidates = [
         Path.home() / "mlx-models",
-        Path("/Users/dk/mlx-models"),
         Path.home() / ".cache" / "huggingface" / "hub",
     ]
     model_path_env = os.environ.get("MLX_MODEL_PATH")
@@ -390,34 +383,44 @@ def _scan_mlx_models() -> List[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Drift & Delta Engine
 # ---------------------------------------------------------------------------
+def _pkg_key(item: Dict[str, Any]) -> str:
+    return f"{item.get('ecosystem', 'unknown')}::{item['package']}"
+
+
 def _load_or_save_baseline_reference(
     node_name: str,
     base_device: str,
     current_items: List[Dict[str, Any]],
-) -> Dict[str, Dict[str, Any]]:
+) -> Optional[Dict[str, Dict[str, Any]]]:
     """Load baseline reference inventory; if current node is base, update reference file."""
     ref_file = CONFIG_DIR / "sbom_base_reference.json"
-    ref_map: Dict[str, Dict[str, Any]] = {}
 
     if node_name == base_device:
-        # We are the baseline authority; write reference
+        # We are the baseline authority; write reference keyed by ecosystem::package
+        ref_data = {_pkg_key(item): item for item in current_items}
         try:
-            ref_data = {item["package"]: item for item in current_items}
             ref_file.write_text(json.dumps(ref_data, indent=2), encoding="utf8")
-            return ref_data
         except Exception as exc:
             debug(f"failed to write base reference: {exc!r}", component="sbom")
+        return ref_data
 
     if ref_file.is_file():
         try:
             ref_data = json.loads(ref_file.read_text(encoding="utf8"))
             if isinstance(ref_data, dict):
-                return ref_data
+                normalized: Dict[str, Dict[str, Any]] = {}
+                for k, val in ref_data.items():
+                    if isinstance(val, dict):
+                        norm_k = k if "::" in k else _pkg_key(
+                            {"ecosystem": val.get("ecosystem", "unknown"), "package": val.get("package", k)}
+                        )
+                        normalized[norm_k] = val
+                return normalized
         except Exception as exc:
             debug(f"failed to read base reference: {exc!r}", component="sbom")
 
-    # If no reference exists, build default baseline mapping from current items
-    return {item["package"]: item for item in current_items}
+    # Non-base node without a synced reference must not claim IN_SYNC against itself.
+    return None
 
 
 def _evaluate_drift(
@@ -427,14 +430,17 @@ def _evaluate_drift(
 ) -> Tuple[str, int, int, List[Dict[str, Any]]]:
     """Compare local items against base device reference to compute delta."""
     baseline = _load_or_save_baseline_reference(node_name, base_device, current_items)
-    curr_map = {item["package"]: item for item in current_items}
+    if baseline is None:
+        return "NO_REFERENCE", 0, 0, []
+    curr_map = {_pkg_key(item): item for item in current_items}
 
     diffs: List[Dict[str, Any]] = []
     missing_count = 0
     mismatch_count = 0
 
-    for pkg_name, base_item in baseline.items():
-        if pkg_name not in curr_map:
+    for pkg_key, base_item in baseline.items():
+        pkg_name = base_item.get("package") or pkg_key.split("::", 1)[-1]
+        if pkg_key not in curr_map:
             missing_count += 1
             diffs.append({
                 "package": pkg_name,
@@ -444,7 +450,7 @@ def _evaluate_drift(
                 "path": base_item.get("path", "none"),
             })
         else:
-            curr_item = curr_map[pkg_name]
+            curr_item = curr_map[pkg_key]
             if curr_item.get("version") != base_item.get("version"):
                 mismatch_count += 1
                 diffs.append({
@@ -455,6 +461,18 @@ def _evaluate_drift(
                     "path": curr_item.get("path", "none"),
                 })
 
+    for pkg_key, curr_item in curr_map.items():
+        if pkg_key not in baseline:
+            pkg_name = curr_item.get("package") or pkg_key.split("::", 1)[-1]
+            mismatch_count += 1
+            diffs.append({
+                "package": pkg_name,
+                "base_version": "MISSING",
+                "target_version": curr_item.get("version", "unknown"),
+                "ecosystem": curr_item.get("ecosystem", "unknown"),
+                "path": curr_item.get("path", "none"),
+            })
+
     status = "DEVIATED" if (missing_count > 0 or mismatch_count > 0) else "IN_SYNC"
     return status, mismatch_count, missing_count, diffs
 
@@ -462,14 +480,18 @@ def _evaluate_drift(
 # ---------------------------------------------------------------------------
 # Core Collection & Metrics Update
 # ---------------------------------------------------------------------------
-def collect_and_update_metrics(node_name: str, base_device: str) -> None:
+def collect_and_update_metrics(
+    node_name: str,
+    base_device: str,
+    skip_package_metrics: bool = False,
+) -> None:
     """Run full SBOM scan, update Prometheus gauges, and dump JSON snapshot."""
     global _CURRENT_INVENTORY
 
     start_time = time.time()
     all_items: List[Dict[str, Any]] = []
 
-    # 1. Collect all ecosystems
+    # 1. Collect all ecosystems outside _SCAN_LOCK so scrapes never stall
     all_items.extend(_scan_pip_venvs())
     all_items.extend(_scan_homebrew())
     all_items.extend(_scan_system_binaries())
@@ -485,65 +507,61 @@ def collect_and_update_metrics(node_name: str, base_device: str) -> None:
             "hash": "ci-base",
         })
 
-    _CURRENT_INVENTORY = all_items
-
-    # 2. Reset gauges to prevent stale packages
-    G_SBOM_PACKAGE_INFO.clear()
-    G_SBOM_TOTAL_PACKAGES.clear()
-    G_SBOM_DRIFT_STATUS.clear()
-    G_SBOM_DRIFT_MISMATCH_COUNT.clear()
-    G_SBOM_MISSING_PACKAGE_COUNT.clear()
-    G_SBOM_DRIFT_DIFF.clear()
-
-    # 3. Populate package inventory gauges
     counts_by_eco: Dict[str, int] = {}
     for item in all_items:
         eco = item["ecosystem"]
         counts_by_eco[eco] = counts_by_eco.get(eco, 0) + 1
 
-        G_SBOM_PACKAGE_INFO.labels(
-            device=node_name,
-            package=item["package"],
-            version=item["version"],
-            ecosystem=eco,
-            path=item["path"],
-            hash=item["hash"],
-        ).set(1.0)
-
-    for eco, count in counts_by_eco.items():
-        G_SBOM_TOTAL_PACKAGES.labels(device=node_name, ecosystem=eco).set(count)
-
-    # 4. Evaluate Drift against Base Device
+    # Evaluate drift against baseline device
     status, mismatch_cnt, missing_cnt, diffs = _evaluate_drift(node_name, base_device, all_items)
-
-    G_SBOM_DRIFT_STATUS.labels(device=node_name, base=base_device, status=status).set(1.0)
-    G_SBOM_DEVICE_DRIFT_SUMMARY.labels(device=node_name, base=base_device, status=status).set(1.0)
-    G_SBOM_DRIFT_MISMATCH_COUNT.labels(device=node_name, base=base_device).set(mismatch_cnt)
-    G_SBOM_MISSING_PACKAGE_COUNT.labels(device=node_name, base=base_device).set(missing_cnt)
-
-    for d in diffs:
-        G_SBOM_DRIFT_DIFF.labels(
-            base=base_device,
-            target=node_name,
-            package=d["package"],
-            base_version=d["base_version"],
-            target_version=d["target_version"],
-            ecosystem=d["ecosystem"],
-            path=d["path"],
-        ).set(1.0)
-        G_SBOM_DRIFT_DETAILS.labels(
-            device=node_name,
-            base=base_device,
-            package=d["package"],
-            base_version=d["base_version"],
-            target_version=d["target_version"],
-            ecosystem=d["ecosystem"],
-            path=d["path"],
-        ).set(1.0)
-
     now = time.time()
-    G_SBOM_UP.labels(device=node_name).set(1.0)
-    G_SBOM_LAST_SCAN.labels(device=node_name).set(now)
+
+    with _SCAN_LOCK:
+        _CURRENT_INVENTORY = all_items
+
+        # 2. Reset gauges cleanly under lock so resolved drifts / uninstalled packages vanish
+        G_SBOM_PACKAGE_INFO.clear()
+        G_SBOM_TOTAL_PACKAGES.clear()
+        G_SBOM_DRIFT_STATUS.clear()
+        G_SBOM_DEVICE_DRIFT_SUMMARY.clear()
+        G_SBOM_DRIFT_MISMATCH_COUNT.clear()
+        G_SBOM_MISSING_PACKAGE_COUNT.clear()
+        G_SBOM_DRIFT_DETAILS.clear()
+
+        # 3. Populate package inventory gauges
+        if not skip_package_metrics:
+            for item in all_items:
+                G_SBOM_PACKAGE_INFO.labels(
+                    device=node_name,
+                    package=item["package"],
+                    version=item["version"],
+                    ecosystem=item["ecosystem"],
+                    path=item["path"],
+                    hash=item["hash"],
+                ).set(1.0)
+
+        for eco, count in counts_by_eco.items():
+            G_SBOM_TOTAL_PACKAGES.labels(device=node_name, ecosystem=eco).set(count)
+
+        # 4. Populate drift metrics
+        G_SBOM_DRIFT_STATUS.labels(device=node_name, base=base_device, status=status).set(1.0)
+        G_SBOM_DEVICE_DRIFT_SUMMARY.labels(device=node_name, base=base_device, status=status).set(1.0)
+        G_SBOM_DRIFT_MISMATCH_COUNT.labels(device=node_name, base=base_device).set(mismatch_cnt)
+        G_SBOM_MISSING_PACKAGE_COUNT.labels(device=node_name, base=base_device).set(missing_cnt)
+
+        for d in diffs:
+            G_SBOM_DRIFT_DETAILS.labels(
+                device=node_name,
+                base=base_device,
+                package=d["package"],
+                base_version=d["base_version"],
+                target_version=d["target_version"],
+                ecosystem=d["ecosystem"],
+                path=d["path"],
+            ).set(1.0)
+
+        G_SBOM_UP.labels(device=node_name).set(1.0)
+        G_SBOM_LAST_SCAN.labels(device=node_name).set(now)
 
     # 5. Persist JSON snapshot to disk for historical audit & ClickHouse ingestion
     ist_tz = timezone(timedelta(hours=5, minutes=30))
@@ -581,7 +599,8 @@ def collect_and_update_metrics(node_name: str, base_device: str) -> None:
 class SbomHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path in ("/metrics", "/metrics/"):
-            data = generate_latest(REGISTRY)
+            with _SCAN_LOCK:
+                data = generate_latest(REGISTRY)
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
@@ -598,6 +617,7 @@ class SbomHandler(BaseHTTPRequestHandler):
                 self.wfile.write(content)
             else:
                 self.send_response(404)
+                self.send_header("Content-Length", "0")
                 self.end_headers()
         elif self.path in ("/health", "/healthz", "/"):
             resp = b'{"status":"healthy","service":"mlx-sbom-collector"}\n'
@@ -608,6 +628,7 @@ class SbomHandler(BaseHTTPRequestHandler):
             self.wfile.write(resp)
         else:
             self.send_response(404)
+            self.send_header("Content-Length", "0")
             self.end_headers()
 
     def log_message(self, format: str, *args: Any) -> None:
@@ -617,14 +638,21 @@ class SbomHandler(BaseHTTPRequestHandler):
 # ---------------------------------------------------------------------------
 # Daemon Scan Loop
 # ---------------------------------------------------------------------------
-def _scan_loop(node_name: str, base_device: str, interval: float, stop_event: threading.Event) -> None:
+def _scan_loop(
+    node_name: str,
+    base_device: str,
+    interval: float,
+    stop_event: threading.Event,
+    skip_package_metrics: bool = False,
+) -> None:
     while not stop_event.is_set():
         stop_event.wait(interval)
         if stop_event.is_set():
             break
         try:
-            with _SCAN_LOCK:
-                collect_and_update_metrics(node_name, base_device)
+            collect_and_update_metrics(
+                node_name, base_device, skip_package_metrics=skip_package_metrics
+            )
         except Exception as exc:
             error(f"scheduled sbom scan error: {exc!r}", component="sbom")
 
@@ -655,7 +683,13 @@ def main() -> int:
     parser.add_argument(
         "--base-device",
         default=os.environ.get("SBOM_BASE_DEVICE", DEFAULT_BASE_DEVICE),
-        help=f"baseline reference device for drift comparison (default: {DEFAULT_BASE_DEVICE})",
+        help="baseline reference device for drift comparison (default: self / node-name)",
+    )
+    parser.add_argument(
+        "--skip-package-metrics",
+        action="store_true",
+        default=os.environ.get("SBOM_SKIP_PACKAGE_METRICS", "false").lower() == "true",
+        help="omit high-cardinality mac_sbom_package_info Prometheus gauge series",
     )
     parser.add_argument(
         "--scan-once",
@@ -664,12 +698,14 @@ def main() -> int:
     )
 
     args = parser.parse_args()
+    base_device = args.base_device or args.node_name
 
     setup_logging(service="mlx-sbom-collector", macbook=args.node_name)
 
     # Initial synchronous scan
-    with _SCAN_LOCK:
-        collect_and_update_metrics(args.node_name, args.base_device)
+    collect_and_update_metrics(
+        args.node_name, base_device, skip_package_metrics=args.skip_package_metrics
+    )
 
     if args.scan_once:
         print(f"SBOM scan complete. Snapshot written to {LOG_DIR / 'sbom_snapshot.json'}")
@@ -678,23 +714,28 @@ def main() -> int:
     stop_event = threading.Event()
     loop_thread = threading.Thread(
         target=_scan_loop,
-        args=(args.node_name, args.base_device, max(10.0, args.interval), stop_event),
+        args=(
+            args.node_name,
+            base_device,
+            max(10.0, args.interval),
+            stop_event,
+            args.skip_package_metrics,
+        ),
         daemon=True,
     )
     loop_thread.start()
 
-    host, port_str = args.listen.rsplit(":", 1) if ":" in args.listen else ("127.0.0.1", args.listen)
-    port = int(port_str)
+    host, port = parse_listen_addr(args.listen, default_host="127.0.0.1", default_port=9108)
 
     ThreadingHTTPServer.allow_reuse_address = True
+    ThreadingHTTPServer.address_family = socket.AF_INET6 if ":" in host else socket.AF_INET
     server = ThreadingHTTPServer((host, port), SbomHandler)
     info(f"sbom collector listening on {host}:{port}", component="sbom")
 
     def _shutdown_handler(signum: int, frame: Any) -> None:
         info("received termination signal, stopping sbom collector...", component="sbom")
         stop_event.set()
-        server.shutdown()
-        sys.exit(0)
+        threading.Thread(target=server.shutdown, daemon=True).start()
 
     signal.signal(signal.SIGTERM, _shutdown_handler)
     signal.signal(signal.SIGINT, _shutdown_handler)

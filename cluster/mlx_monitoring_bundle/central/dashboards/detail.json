@@ -37,381 +37,431 @@
   },
   "panels": [
     {
+      "id": 1,
       "type": "row",
       "title": "Hardware",
-      "panels": [
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "graph",
+      "title": "CPU Load15 vs CPU Count",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
         {
-          "type": "graph",
-          "title": "CPU Load15 vs CPU Count",
-          "datasource": "VictoriaMetrics",
-          "gridPos": {
-            "x": 0,
-            "y": 0,
-            "w": 8,
-            "h": 6
-          },
-          "targets": [
-            {
-              "expr": "mlx_hw_load15{device=~\"$device\", node=~\"$node\"}",
-              "legendFormat": "{{device}} load15",
-              "refId": "A"
-            },
-            {
-              "expr": "mlx_hw_cpu_count{device=~\"$device\", node=~\"$node\"}",
-              "legendFormat": "{{device}} cpu_count",
-              "refId": "B"
-            }
-          ]
+          "expr": "mlx_hw_load15{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}} load15",
+          "refId": "A"
         },
         {
-          "type": "graph",
-          "title": "Memory Used",
-          "datasource": "VictoriaMetrics",
-          "gridPos": {
-            "x": 8,
-            "y": 0,
-            "w": 8,
-            "h": 6
-          },
-          "targets": [
-            {
-              "expr": "mlx_hw_mem_used_bytes{device=~\"$device\", node=~\"$node\"}",
-              "legendFormat": "{{device}}",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "bytes"
-            }
-          }
-        },
-        {
-          "type": "graph",
-          "title": "Disk Used",
-          "datasource": "VictoriaMetrics",
-          "gridPos": {
-            "x": 16,
-            "y": 0,
-            "w": 8,
-            "h": 6
-          },
-          "targets": [
-            {
-              "expr": "mlx_hw_disk_used_bytes{device=~\"$device\", node=~\"$node\"}",
-              "legendFormat": "{{device}}",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "bytes"
-            }
-          }
+          "expr": "mlx_hw_cpu_count{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}} cpu_count",
+          "refId": "B"
         }
       ]
     },
     {
+      "id": 3,
+      "type": "graph",
+      "title": "Memory Used",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_mem_used_bytes{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "graph",
+      "title": "Disk Used",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 16,
+        "y": 1,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_disk_used_bytes{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "id": 5,
       "type": "row",
       "title": "Serving",
-      "panels": [
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 6,
+      "type": "graph",
+      "title": "Server State",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
         {
-          "type": "graph",
-          "title": "Server State",
-          "datasource": "VictoriaMetrics",
-          "gridPos": {
-            "x": 0,
-            "y": 6,
-            "w": 8,
-            "h": 6
-          },
-          "targets": [
-            {
-              "expr": "mlx_server_state{device=~\"$device\"}",
-              "legendFormat": "{{device}}",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "min": 0,
-              "max": 3
-            }
-          }
+          "expr": "mlx_server_state{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 3
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "graph",
+      "title": "Server Ready / Up",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 8,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_server_up{device=~\"$device\"}",
+          "legendFormat": "{{device}} up",
+          "refId": "A"
         },
         {
-          "type": "graph",
-          "title": "Server Ready / Up",
-          "datasource": "VictoriaMetrics",
-          "gridPos": {
-            "x": 8,
-            "y": 6,
-            "w": 8,
-            "h": 6
-          },
-          "targets": [
-            {
-              "expr": "mlx_server_up{device=~\"$device\"}",
-              "legendFormat": "{{device}} up",
-              "refId": "A"
-            },
-            {
-              "expr": "mlx_server_ready{device=~\"$device\"}",
-              "legendFormat": "{{device}} ready",
-              "refId": "B"
-            }
-          ]
-        },
-        {
-          "type": "graph",
-          "title": "Model Loaded",
-          "datasource": "VictoriaMetrics",
-          "gridPos": {
-            "x": 16,
-            "y": 6,
-            "w": 8,
-            "h": 6
-          },
-          "targets": [
-            {
-              "expr": "mlx_model_loaded{device=~\"$device\"}",
-              "legendFormat": "{{device}} {{model}}",
-              "refId": "A"
-            }
-          ]
+          "expr": "mlx_server_ready{device=~\"$device\"}",
+          "legendFormat": "{{device}} ready",
+          "refId": "B"
         }
       ]
     },
     {
+      "id": 8,
+      "type": "graph",
+      "title": "Model Loaded",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 16,
+        "y": 8,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_model_loaded{device=~\"$device\"}",
+          "legendFormat": "{{device}} {{model}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
       "type": "row",
       "title": "Inference",
-      "panels": [
-        {
-          "type": "graph",
-          "title": "Requests / sec",
-          "datasource": "VictoriaMetrics",
-          "gridPos": {
-            "x": 0,
-            "y": 12,
-            "w": 8,
-            "h": 6
-          },
-          "targets": [
-            {
-              "expr": "rate(mlx_requests_total{device=~\"$device\"}[1m])",
-              "legendFormat": "{{device}}",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "reqps"
-            }
-          }
-        },
-        {
-          "type": "graph",
-          "title": "TTFT p95",
-          "datasource": "VictoriaMetrics",
-          "gridPos": {
-            "x": 8,
-            "y": 12,
-            "w": 8,
-            "h": 6
-          },
-          "targets": [
-            {
-              "expr": "histogram_quantile(0.95, rate(mlx_ttft_seconds_bucket{device=~\"$device\"}[5m]))",
-              "legendFormat": "{{device}}",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "s"
-            }
-          }
-        },
-        {
-          "type": "graph",
-          "title": "Token Rate",
-          "datasource": "VictoriaMetrics",
-          "gridPos": {
-            "x": 16,
-            "y": 12,
-            "w": 8,
-            "h": 6
-          },
-          "targets": [
-            {
-              "expr": "rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\"}[1m]) / rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\"}[1m])",
-              "legendFormat": "{{device}}",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "reqps"
-            }
-          }
-        }
-      ]
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
     },
     {
+      "id": 10,
+      "type": "graph",
+      "title": "Requests / sec",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "rate(mlx_requests_total{device=~\"$device\"}[1m])",
+          "legendFormat": "{{device}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "graph",
+      "title": "TTFT p95",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 15,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(mlx_ttft_seconds_bucket{device=~\"$device\"}[5m]))",
+          "legendFormat": "{{device}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "graph",
+      "title": "Token Rate",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 16,
+        "y": 15,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\"}[1m]) / (rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\"}[1m]) > 0)",
+          "legendFormat": "{{device}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 13,
       "type": "row",
       "title": "Quality",
-      "panels": [
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 14,
+      "type": "graph",
+      "title": "Hallucination Risk",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
         {
-          "type": "graph",
-          "title": "Hallucination Risk",
-          "datasource": "VictoriaMetrics",
-          "gridPos": {
-            "x": 0,
-            "y": 18,
-            "w": 8,
-            "h": 6
-          },
-          "targets": [
-            {
-              "expr": "mlx_hallucination_risk{device=~\"$device\"}",
-              "legendFormat": "{{device}}",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "percentunit",
-              "min": 0,
-              "max": 1,
-              "decimals": 2
-            }
-          }
-        },
+          "expr": "mlx_hallucination_risk{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "graph",
+      "title": "Mean Confidence",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 22,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
         {
-          "type": "graph",
-          "title": "Mean Confidence",
-          "datasource": "VictoriaMetrics",
-          "gridPos": {
-            "x": 8,
-            "y": 18,
-            "w": 8,
-            "h": 6
-          },
-          "targets": [
-            {
-              "expr": "mlx_token_confidence_mean{device=~\"$device\"}",
-              "legendFormat": "{{device}}",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "percentunit",
-              "min": 0,
-              "max": 1,
-              "decimals": 2
-            }
-          }
-        },
+          "expr": "mlx_token_confidence_mean{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "graph",
+      "title": "Perplexity",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 16,
+        "y": 22,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
         {
-          "type": "graph",
-          "title": "Perplexity",
-          "datasource": "VictoriaMetrics",
-          "gridPos": {
-            "x": 16,
-            "y": 18,
-            "w": 8,
-            "h": 6
-          },
-          "targets": [
-            {
-              "expr": "mlx_output_perplexity{device=~\"$device\"}",
-              "legendFormat": "{{device}}",
-              "refId": "A"
-            }
-          ]
+          "expr": "mlx_output_perplexity{device=~\"$device\"}",
+          "legendFormat": "{{device}}",
+          "refId": "A"
         }
       ]
     },
     {
+      "id": 17,
       "type": "row",
       "title": "Power & Thermal",
-      "panels": [
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 18,
+      "type": "graph",
+      "title": "GPU Power (mW)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
         {
-          "type": "graph",
-          "title": "GPU Power (mW)",
-          "datasource": "VictoriaMetrics",
-          "gridPos": {
-            "x": 0,
-            "y": 24,
-            "w": 8,
-            "h": 6
-          },
-          "targets": [
-            {
-              "expr": "mlx_hw_gpu_power_milliwatts{device=~\"$device\", node=~\"$node\"}",
-              "legendFormat": "{{device}} {{node}}",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "mW"
-            }
-          }
-        },
-        {
-          "type": "graph",
-          "title": "Thermal Pressure",
-          "datasource": "VictoriaMetrics",
-          "gridPos": {
-            "x": 8,
-            "y": 24,
-            "w": 8,
-            "h": 6
-          },
-          "targets": [
-            {
-              "expr": "mlx_hw_thermal_pressure{device=~\"$device\", node=~\"$node\"}",
-              "legendFormat": "{{device}} {{node}}",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "percentunit",
-              "min": 0,
-              "max": 1,
-              "decimals": 2
-            }
-          }
-        },
-        {
-          "type": "graph",
-          "title": "GPU Utilization",
-          "datasource": "VictoriaMetrics",
-          "gridPos": {
-            "x": 16,
-            "y": 24,
-            "w": 8,
-            "h": 6
-          },
-          "targets": [
-            {
-              "expr": "mlx_hw_gpu_utilization_percent{device=~\"$device\", node=~\"$node\"}",
-              "legendFormat": "{{device}} {{node}}",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "percentunit",
-              "min": 0,
-              "max": 100
-            }
-          }
+          "expr": "mlx_hw_gpu_power_milliwatts{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}} {{node}}",
+          "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "mW"
+        }
+      }
+    },
+    {
+      "id": 19,
+      "type": "graph",
+      "title": "Thermal Pressure",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 8,
+        "y": 29,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_thermal_pressure{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}} {{node}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "graph",
+      "title": "GPU Utilization",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 16,
+        "y": 29,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_hw_gpu_utilization_percent{device=~\"$device\", node=~\"$node\"}",
+          "legendFormat": "{{device}} {{node}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      }
     }
   ],
   "uid": "mlx-detail",

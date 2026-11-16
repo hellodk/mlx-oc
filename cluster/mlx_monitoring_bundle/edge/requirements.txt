@@ -5,3 +5,4 @@ opentelemetry-exporter-otlp-proto-http==1.45.1
 pyyaml==6.0.3
 requests==2.34.2
 opik==2.2.103
+psutil==7.0.0

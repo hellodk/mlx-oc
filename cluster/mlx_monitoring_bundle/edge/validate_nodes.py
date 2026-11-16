@@ -11,7 +11,7 @@ connectivity check is needed. This tool verifies:
   - at least one enabled macbook entry exists
   - a node can be selected (MLX_MACBOOK_ID or exactly one enabled entry)
   - model_path (when set) contains a readable config.json
-  - VENV_PYTHON and MLX_VENV_PYTHON point at executables
+  - VENV_PYTHON points at a Python executable
   - required Python packages import in the monitoring venv
   - optionally, that the exporter ports are free
 
@@ -22,9 +22,12 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import socket
+import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 
@@ -32,7 +35,7 @@ BUNDLE_DIR = Path(__file__).resolve().parent
 DEFAULT_NODES_FILE = BUNDLE_DIR / "config" / "nodes.yml"
 DEFAULT_ENV_FILE = BUNDLE_DIR / "config" / "edge.env"
 
-REQUIRED_MODULES = ("yaml", "prometheus_client", "requests")
+REQUIRED_MODULES = ("yaml", "prometheus_client", "requests", "psutil", "opentelemetry")
 
 
 def load_yaml(path: Path) -> dict:
@@ -76,8 +79,6 @@ def select_node(data: dict, explicit: str | None) -> dict:
 
 def module_available(python: str, module: str) -> bool:
     try:
-        import subprocess
-
         proc = subprocess.run(
             [python, "-c", f"import {module}"],
             capture_output=True, text=True, timeout=15,
@@ -105,7 +106,7 @@ def main() -> int:
                     help="path to nodes.yml (default: config/nodes.yml)")
     ap.add_argument("--env-file", default=str(DEFAULT_ENV_FILE),
                     help="path to edge.env (default: config/edge.env)")
-    ap.add_argument("--node", default=os.environ.get("MLX_MACBOOK_ID"),
+    ap.add_argument("--node", default=os.environ.get("MLX_DEVICE_ID") or os.environ.get("MLX_MACBOOK_ID"),
                     help="node id to validate (default: auto-select single enabled node)")
     ap.add_argument("--check-ports", action="store_true",
                     help="warn when exporter ports are already in use")
@@ -115,7 +116,10 @@ def main() -> int:
     if not nodes_path.is_absolute():
         nodes_path = BUNDLE_DIR / nodes_path
     data = load_yaml(nodes_path)
-    env = load_env_file(Path(args.env_file))
+    env_path = Path(args.env_file)
+    if not env_path.is_absolute():
+        env_path = BUNDLE_DIR / env_path
+    env = load_env_file(env_path)
 
     errors: list[str] = []
     warnings: list[str] = []
@@ -125,9 +129,9 @@ def main() -> int:
         ("victoria_metrics", "CENTRAL_VICTORIA_METRICS"),
         ("otel", "CENTRAL_OTEL"),
     ):
-        if not (central.get(key) or env.get(env_key)):
+        if not (central.get(key) or os.environ.get(env_key) or env.get(env_key)):
             errors.append(f"central.{key} is not configured (or set {env_key})")
-    if not (central.get("opik") or env.get("CENTRAL_OPIK")):
+    if not (central.get("opik") or os.environ.get("CENTRAL_OPIK") or env.get("CENTRAL_OPIK")):
         warnings.append("central.opik is not configured; Opik tracing will be skipped")
 
     macbooks = [
@@ -150,8 +154,12 @@ def main() -> int:
     elif node:
         print(f"node     : {node.get('id', 'unknown')} "
               f"({node.get('ip', 'no ip')})")
-        model = env.get("MLX_MODEL") or node.get("model")
-        model_path = env.get("MLX_MODEL_PATH") or node.get("model_path")
+        model = os.environ.get("MLX_MODEL") or env.get("MLX_MODEL") or node.get("model")
+        model_path = (
+            os.environ.get("MLX_MODEL_PATH")
+            or env.get("MLX_MODEL_PATH")
+            or node.get("model_path")
+        )
         if model:
             print(f"model    : {model}")
         elif node.get("model_path"):
@@ -171,25 +179,54 @@ def main() -> int:
             else:
                 errors.append(f"model path does not contain config.json: {cfg}")
 
-    venv_python = env.get("VENV_PYTHON", "python3")
-    mlx_python = env.get("MLX_VENV_PYTHON", venv_python)
-    for label, executable in (
-        ("VENV_PYTHON", venv_python),
-        ("MLX_VENV_PYTHON", mlx_python),
-    ):
-        path = Path(executable).expanduser()
-        if not (path.is_file() and os.access(path, os.X_OK)):
-            errors.append(f"{label} is not executable: {path}")
-        else:
-            print(f"{label:16}: {path}")
+    venv_python = os.environ.get("VENV_PYTHON") or env.get("VENV_PYTHON", "python3")
+    venv_candidate = Path(venv_python).expanduser()
+    resolved_venv = (
+        str(venv_candidate)
+        if venv_candidate.is_file() and os.access(venv_candidate, os.X_OK)
+        else (shutil.which(venv_python) or "")
+    )
+    if not resolved_venv:
+        errors.append(f"VENV_PYTHON is not executable: {venv_python}")
+    else:
+        print(f"{'VENV_PYTHON':16}: {resolved_venv}")
 
-    if Path(venv_python).is_file():
+    raw_upstream = (os.environ.get("MLX_UPSTREAM") or env.get("MLX_UPSTREAM", "")).strip()
+    if raw_upstream:
+        with_scheme = (
+            raw_upstream if "://" in raw_upstream else f"http://{raw_upstream}"
+        )
+        parsed_up = urlparse(with_scheme)
+        try:
+            _ = parsed_up.port
+            port_ok = True
+        except ValueError:
+            port_ok = False
+        if not parsed_up.hostname or not port_ok or any(ch.isspace() for ch in raw_upstream):
+            errors.append(f"MLX_UPSTREAM is invalid: {raw_upstream!r}")
+
+    if resolved_venv:
         for module in REQUIRED_MODULES:
-            if not module_available(venv_python, module):
-                errors.append(f"{module} is not importable in {venv_python}")
+            if not module_available(resolved_venv, module):
+                errors.append(f"{module} is not importable in {resolved_venv}")
 
     if args.check_ports:
-        for port in (8080, 9102, 9104, 9105, 9106):
+        default_ports = (
+            ("PROXY_LISTEN", 8080),
+            ("HW_LISTEN", 9102),
+            ("KV_LISTEN", 9104),
+            ("SUPERVISOR_LISTEN", 9105),
+            ("LOGTAILER_LISTEN", 9106),
+            ("PROCESS_LISTEN", 9107),
+            ("SBOM_LISTEN", 9108),
+        )
+        for env_key, default_port in default_ports:
+            listen_val = os.environ.get(env_key) or env.get(env_key, "")
+            port = default_port
+            if listen_val and ":" in listen_val:
+                _, _, port_str = listen_val.rpartition(":")
+                if port_str.isdigit():
+                    port = int(port_str)
             if not port_free(port):
                 warnings.append(f"port {port} is already in use")
 
