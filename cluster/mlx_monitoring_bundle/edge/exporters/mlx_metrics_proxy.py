@@ -191,6 +191,15 @@ def _setup_otel(endpoint: str, node_name: str, service_name: str = "mlx-metrics-
             logger_provider = lp if endpoint else None
 
             @staticmethod
+            def extract_context(headers):
+                try:
+                    from opentelemetry.propagate import extract
+                    carrier = {str(k).lower(): str(v) for k, v in headers.items()}
+                    return extract(carrier)
+                except Exception:
+                    return None
+
+            @staticmethod
             def span(name, **attrs):
                 return Otel.tracer.start_as_current_span(name, attributes=attrs)
 
@@ -353,6 +362,16 @@ ENTROPY = Gauge(
     "Mean per-token Shannon entropy (nats)",
     ["model"],
 )
+ENTROPY_TAIL = Gauge(
+    "mlx_token_entropy_tail_nats",
+    "Tail-corrected per-token Shannon entropy lower bound (nats)",
+    ["model"],
+)
+TOPK_MASS = Gauge(
+    "mlx_token_topk_mass_mean",
+    "Mean probability mass captured by returned top_logprobs candidates (0..1)",
+    ["model"],
+)
 ENTROPY_HIST = Histogram(
     "mlx_token_entropy_histogram",
     "Distribution of mean per-token entropy (nats)",
@@ -374,10 +393,22 @@ CONF_STD = Gauge(
     "Standard deviation of per-token confidence",
     ["model"],
 )
+CONF_HIST = Histogram(
+    "mlx_token_confidence_histogram",
+    "Distribution of per-token confidence probabilities (0..1)",
+    ["model"],
+    buckets=(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99),
+)
 MARGIN_MEAN = Gauge(
     "mlx_token_margin_mean",
     "Mean gap between top-1 and top-2 token probabilities (0..1)",
     ["model"],
+)
+MARGIN_HIST = Histogram(
+    "mlx_token_margin_histogram",
+    "Distribution of top-1 minus top-2 token probability margin (0..1)",
+    ["model"],
+    buckets=(0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 0.85, 0.95),
 )
 LOW_CONF_RATIO = Gauge(
     "mlx_low_confidence_token_ratio",
@@ -392,6 +423,11 @@ SCORED = Counter(
 LOW_CONF_RESPONSES = Counter(
     "mlx_low_confidence_response_total",
     "Scored completions whose mean token confidence was below threshold",
+    ["model"],
+)
+HIGH_PPL_RESPONSES = Counter(
+    "mlx_high_perplexity_responses_total",
+    "Scored completions whose perplexity exceeded threshold",
     ["model"],
 )
 
@@ -501,8 +537,11 @@ def confidence_stats(confidences) -> tuple:
     return mean, math.sqrt(var), min(confidences)
 
 
-def mean_token_entropy(entries) -> float:
-    totals = []
+def mean_token_entropy_stats(entries) -> tuple[float, float, float]:
+    """Return (raw_topk_entropy_nats, tail_corrected_entropy_nats, topk_mass_mean)."""
+    raw_totals = []
+    tail_totals = []
+    masses = []
     for e in entries:
         top = e.get("top_logprobs")
         if not isinstance(top, list) or not top:
@@ -516,18 +555,31 @@ def mean_token_entropy(entries) -> float:
         mass = sum(probs)
         if mass <= 0:
             continue
-        h = 0.0
+        clamped_mass = min(1.0, mass)
+        masses.append(clamped_mass)
+        h_raw = 0.0
         for p in probs:
             q = p / mass
             if q > _EPS:
-                h -= q * math.log(q)
-        totals.append(h)
-    if not totals:
-        return 0.0
-    return sum(totals) / len(totals)
+                h_raw -= q * math.log(q)
+        raw_totals.append(h_raw)
+        residual = max(0.0, 1.0 - clamped_mass)
+        h_tail = sum(-p * math.log(max(p, _EPS)) for p in probs if p > _EPS)
+        if residual > _EPS:
+            p_floor = max(min(probs), _EPS)
+            h_tail += -residual * math.log(p_floor)
+        tail_totals.append(h_tail)
+    if not raw_totals:
+        return 0.0, 0.0, 0.0
+    n = len(raw_totals)
+    return sum(raw_totals) / n, sum(tail_totals) / n, sum(masses) / n
 
 
-def mean_top2_margin(entries) -> float:
+def mean_token_entropy(entries) -> float:
+    return mean_token_entropy_stats(entries)[0]
+
+
+def token_top2_margins(entries) -> list[float]:
     margins = []
     for e in entries:
         top = e.get("top_logprobs")
@@ -543,6 +595,11 @@ def mean_top2_margin(entries) -> float:
         if len(probs) < 2:
             continue
         margins.append(max(0.0, probs[0] - probs[1]))
+    return margins
+
+
+def mean_top2_margin(entries) -> float:
+    margins = token_top2_margins(entries)
     if not margins:
         return 0.0
     return sum(margins) / len(margins)
@@ -556,15 +613,22 @@ def score_confidence(logprobs_obj, threshold: float) -> dict:
             return {}
         mean, std, lowest = confidence_stats(confidences)
         low = sum(1 for p in confidences if p < threshold) / len(confidences)
+        ent_raw, ent_tail, topk_mass = mean_token_entropy_stats(entries)
+        margins = token_top2_margins(entries)
+        margin_mean = (sum(margins) / len(margins)) if margins else 0.0
         return {
             "tokens": len(confidences),
             "perplexity": perplexity(confidences),
-            "entropy": mean_token_entropy(entries),
+            "entropy": ent_raw,
+            "entropy_tail": ent_tail,
+            "topk_mass": topk_mass,
             "confidence_mean": mean,
             "confidence_std": std,
             "confidence_min": lowest,
-            "margin_mean": mean_top2_margin(entries),
+            "margin_mean": margin_mean,
             "low_confidence_ratio": low,
+            "token_confidences": confidences,
+            "token_margins": margins,
         }
     except Exception as exc:
         debug(f"score_confidence failed: {exc!r}", component="proxy")
@@ -655,6 +719,7 @@ class _StreamParser:
         self._tool_calls = {}
         self.usage = None
         self.finish_reason = None
+        self.stream_logprobs = []
 
     def feed(self, chunk: str):
         self._buf += chunk
@@ -678,6 +743,9 @@ class _StreamParser:
             if not choices or not isinstance(choices[0], dict):
                 continue
             self.finish_reason = choices[0].get("finish_reason")
+            lp_chunk = choices[0].get("logprobs")
+            if isinstance(lp_chunk, dict) and isinstance(lp_chunk.get("content"), list):
+                self.stream_logprobs.extend(lp_chunk["content"])
             delta = choices[0].get("delta") or {}
             if not isinstance(delta, dict):
                 continue
@@ -807,6 +875,7 @@ class Proxy(BaseHTTPRequestHandler):
     logprobs_top = 0
     stream_sample = 0.0
     low_conf_threshold = 0.5
+    high_perplexity_threshold = 3.0
     max_prompt_tokens = 12000
     max_tokens_cap = 4096
     max_body_bytes = 4 * 1024 * 1024
@@ -1033,6 +1102,8 @@ class Proxy(BaseHTTPRequestHandler):
                 )
                 if bool(req.get("enable_thinking", False)):
                     kind = "reasoning"
+                if self.headers.get("X-Mlx-Eval", "0") == "1":
+                    kind = "eval"
 
                 if req_model != _MODEL_NAME and _MODEL_NAME is not None and req_model not in self.model_aliases:
                     if self.strict_model:
@@ -1083,7 +1154,7 @@ class Proxy(BaseHTTPRequestHandler):
                     body_dirty = True
 
                 if req.get("logprobs"):
-                    lp_source = "client" if not streaming else ""
+                    lp_source = "client"
                 elif self.logprobs_top > 0:
                     if not streaming:
                         lp_source = "injected"
@@ -1146,8 +1217,10 @@ class Proxy(BaseHTTPRequestHandler):
         t_first_token = None
         span = None
         if _OTEL is not None:
+            parent_ctx = _OTEL.extract_context(self.headers)
             span = _OTEL.tracer.start_span(
                 "mlx.chat.completions",
+                context=parent_ctx,
                 attributes={
                     "http.request.method": self.command,
                     "url.path": req_path,
@@ -1288,7 +1361,10 @@ class Proxy(BaseHTTPRequestHandler):
                 except json.JSONDecodeError:
                     pass
 
-            lp_obj = choice_logprobs(resp_obj) if lp_source else None
+            if is_sse and lp_source == "client" and parser.stream_logprobs:
+                lp_obj = {"content": parser.stream_logprobs}
+            else:
+                lp_obj = choice_logprobs(resp_obj) if lp_source else None
 
             if rewrite and not client_disconnected:
                 try:
@@ -1365,24 +1441,33 @@ class Proxy(BaseHTTPRequestHandler):
 
             risk, flagged = composite_risk(model, content, tools_provided, tool_calls)
             RISK.labels(model, kind).set(risk)
-            RISK_HIST.labels(model).observe(risk)
-            if flagged:
-                FLAGS.labels(model).inc()
+            if kind != "eval":
+                RISK_HIST.labels(model).observe(risk)
+                if flagged:
+                    FLAGS.labels(model).inc()
 
             conf = score_confidence(lp_obj, self.low_conf_threshold) if lp_obj else {}
-            if conf:
+            if conf and kind != "eval":
                 PERPLEXITY.labels(model).set(conf["perplexity"])
                 PERPLEXITY_HIST.labels(model).observe(conf["perplexity"])
                 ENTROPY.labels(model).set(conf["entropy"])
+                ENTROPY_TAIL.labels(model).set(conf["entropy_tail"])
+                TOPK_MASS.labels(model).set(conf["topk_mass"])
                 ENTROPY_HIST.labels(model).observe(conf["entropy"])
                 CONF_MEAN.labels(model).set(conf["confidence_mean"])
                 CONF_MIN.labels(model).set(conf["confidence_min"])
                 CONF_STD.labels(model).set(conf["confidence_std"])
+                for p_tok in conf.get("token_confidences", ()):
+                    CONF_HIST.labels(model).observe(p_tok)
+                for m_tok in conf.get("token_margins", ()):
+                    MARGIN_HIST.labels(model).observe(m_tok)
                 MARGIN_MEAN.labels(model).set(conf["margin_mean"])
                 LOW_CONF_RATIO.labels(model).set(conf["low_confidence_ratio"])
                 SCORED.labels(model, lp_source).inc()
                 if conf["confidence_mean"] < self.low_conf_threshold:
                     LOW_CONF_RESPONSES.labels(model).inc()
+                if conf["perplexity"] > self.high_perplexity_threshold:
+                    HIGH_PPL_RESPONSES.labels(model).inc()
 
             if span is not None:
                 span.set_attribute(
@@ -1405,6 +1490,12 @@ class Proxy(BaseHTTPRequestHandler):
                     span.set_attribute("mlx.logprobs_source", lp_source)
                     span.set_attribute("mlx.perplexity", round(conf["perplexity"], 4))
                     span.set_attribute("mlx.token_entropy", round(conf["entropy"], 4))
+                    span.set_attribute(
+                        "mlx.token_entropy_tail", round(conf["entropy_tail"], 4)
+                    )
+                    span.set_attribute(
+                        "mlx.topk_mass", round(conf["topk_mass"], 4)
+                    )
                     span.set_attribute(
                         "mlx.confidence_mean", round(conf["confidence_mean"], 4)
                     )
@@ -1594,7 +1685,10 @@ class Proxy(BaseHTTPRequestHandler):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Mlx-Trace")
+        self.send_header(
+            "Access-Control-Allow-Headers",
+            "Content-Type, Authorization, X-Mlx-Trace, X-Mlx-Eval, traceparent",
+        )
         self.send_header("Connection", "close")
         self.end_headers()
         self.close_connection = True
@@ -1626,6 +1720,14 @@ def _set_model_info_gauges(info_obj, model_name: str) -> None:
         ("linear_conv_kernel_dim", info_obj.linear_conv_kernel_dim),
         ("mtp_layers", info_obj.mtp_layers),
         ("tie_word_embeddings", int(info_obj.tie_word_embeddings)),
+        ("moe_experts", info_obj.num_local_experts),
+        ("moe_experts_active", info_obj.num_experts_per_tok),
+        ("moe_intermediate_size", info_obj.moe_intermediate_size),
+        ("shared_expert_intermediate_size", info_obj.shared_expert_intermediate_size),
+        ("sliding_window", info_obj.sliding_window),
+        ("gqa_ratio", info_obj.gqa_ratio),
+        ("total_weight_bytes", info_obj.total_weight_bytes),
+        ("shard_file_count", info_obj.shard_file_count),
     ):
         MODEL_INFO.labels(model=model_name, attr=attr).set(val)
     if info_obj.arch or info_obj.dtype:
@@ -1691,12 +1793,17 @@ def main():
     ap.add_argument(
         "--logprobs-stream-sample",
         type=float,
-        default=float(os.environ.get("MLX_LOGPROBS_STREAM_SAMPLE", "0.0")),
+        default=float(os.environ.get("MLX_LOGPROBS_STREAM_SAMPLE", "0.25")),
     )
     ap.add_argument(
         "--low-confidence-threshold",
         type=float,
         default=float(os.environ.get("MLX_LOW_CONFIDENCE", "0.5")),
+    )
+    ap.add_argument(
+        "--high-perplexity-threshold",
+        type=float,
+        default=float(os.environ.get("MLX_HIGH_PERPLEXITY_THRESHOLD", "3.0")),
     )
     ap.add_argument(
         "--model",
@@ -1776,6 +1883,7 @@ def main():
     Proxy.logprobs_top = max(0, min(10, args.logprobs))
     Proxy.stream_sample = max(0.0, min(1.0, args.logprobs_stream_sample))
     Proxy.low_conf_threshold = args.low_confidence_threshold
+    Proxy.high_perplexity_threshold = args.high_perplexity_threshold
     Proxy.strict_model = args.strict_model
     Proxy.api_key = os.environ.get("MLX_API_KEY", "")
     Proxy.max_prompt_tokens = args.max_prompt_tokens

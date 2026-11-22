@@ -1,0 +1,8 @@
+{"id": "qa_math_add", "suite": "exact_qa", "prompt": "What is 17 * 23? Reply with only the integer.", "check": "contains", "expected": "391"}
+{"id": "qa_capital", "suite": "exact_qa", "prompt": "What is the capital of Japan? Reply with only the city name.", "check": "contains_ci", "expected": "tokyo"}
+{"id": "qa_http_status", "suite": "exact_qa", "prompt": "Which HTTP status code means Not Found? Reply with only the 3-digit number.", "check": "contains", "expected": "404"}
+{"id": "json_user", "suite": "json_schema", "prompt": "Return ONLY a compact JSON object with integer key \"status\" equal to 200 and boolean key \"ok\" equal to true.", "check": "json_keys", "required_keys": ["status", "ok"], "expected_values": {"status": 200, "ok": true}}
+{"id": "json_list", "suite": "json_schema", "prompt": "Return ONLY a JSON object with key \"items\" containing a list of 3 integers.", "check": "json_keys", "required_keys": ["items"]}
+{"id": "code_py_func", "suite": "coding", "prompt": "Write a valid single Python function `def square(x):` that returns x * x. Output code only.", "check": "python_ast", "expected": "square"}
+{"id": "code_regex", "suite": "coding", "prompt": "In Python, which standard library module provides regular expression matching? Reply with the module name only.", "check": "contains_ci", "expected": "re"}
+{"id": "tool_read", "suite": "tool_call", "prompt": "Read the file /etc/hosts using the read_file tool.", "check": "tool_call", "expected_tool": "read_file", "tools": [{"type": "function", "function": {"name": "read_file", "description": "Read file contents by path", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}}]}

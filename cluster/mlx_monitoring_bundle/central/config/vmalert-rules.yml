@@ -388,18 +388,49 @@ groups:
         runbook: "https://docs.example.com/mlx-monitoring/runbook#low-confidence"
 
     - alert: MLXHighPerplexity
-      expr: mlx_output_perplexity > 3
+      expr: |
+        histogram_quantile(0.95, sum(rate(mlx_output_perplexity_histogram_bucket[5m])) by (le, device, model)) > 3
+        and on(device, model) rate(mlx_confidence_scored_total[5m]) > 0
       for: 10m
       labels:
         severity: warning
         category: quality
       annotations:
-        summary: "High perplexity on {{ $labels.device }}: {{ $value }}"
+        summary: "High p95 perplexity on {{ $labels.device }} ({{ $labels.model }}): {{ $value }}"
         description: |
-          Output perplexity exceeds 3 on Device {{ $labels.device }}
-          ({{ $labels.macbook }}). The model distribution is flat - it is sampling
-          from uncertain tokens more often than not.
+          95th-percentile output perplexity exceeds 3 over active scored traffic
+          on Device {{ $labels.device }}. Check sampling temperature and weights.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#high-perplexity"
+
+    - alert: MLXHighTokenEntropy
+      expr: |
+        histogram_quantile(0.95, sum(rate(mlx_token_entropy_histogram_bucket[5m])) by (le, device, model)) > 1.5
+        and on(device, model) rate(mlx_confidence_scored_total[5m]) > 0
+      for: 10m
+      labels:
+        severity: warning
+        category: quality
+      annotations:
+        summary: "High p95 token entropy on {{ $labels.device }} ({{ $labels.model }}): {{ $value }} nats"
+        description: |
+          Token entropy p95 exceeds 1.5 nats on Device {{ $labels.device }}.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#high-entropy"
+
+    - alert: MLXConfidenceCoverageZero
+      expr: |
+        sum by (device, model) (rate(mlx_requests_total{kind!="eval"}[5m])) > 0.05
+        unless on(device, model)
+        (sum by (device, model) (rate(mlx_confidence_scored_total[5m])) > 0)
+      for: 10m
+      labels:
+        severity: warning
+        category: quality
+      annotations:
+        summary: "Zero logprobs quality scoring coverage on {{ $labels.device }} ({{ $labels.model }})"
+        description: |
+          Requests are arriving on {{ $labels.device }} without logprobs scoring.
+          Verify MLX_LOGPROBS > 0 and MLX_LOGPROBS_STREAM_SAMPLE > 0.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#confidence-coverage"
 
     - alert: MLXLowConfidenceRatioHigh
       expr: mlx_low_confidence_token_ratio > 0.3
@@ -446,3 +477,101 @@ groups:
           {{ $labels.device }} ({{ $labels.macbook }}). Investigate upstream
           failures, proxy rejections, and OOMs.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#error-budget"
+
+  - name: mlx.sharding
+    rules:
+    - alert: MLXShardRankMissing
+      expr: |
+        count by (model) (mlx_shard_rank >= 0) < max by (model) (mlx_shard_world_size)
+      for: 2m
+      labels:
+        severity: critical
+        category: sharding
+      annotations:
+        summary: "Missing shard rank for {{ $labels.model }}: {{ $value }} active"
+        description: |
+          Fewer active shard ranks are reporting than expected world_size for
+          {{ $labels.model }}. One or more cluster nodes lost its shard worker.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#shard-rank-missing"
+
+    - alert: MLXShardPeerUnreachable
+      expr: mlx_shard_peer_up == 0
+      for: 2m
+      labels:
+        severity: critical
+        category: sharding
+      annotations:
+        summary: "Shard peer {{ $labels.peer_ip }} (rank {{ $labels.peer_rank }}) unreachable from rank {{ $labels.rank }}"
+        description: |
+          Interconnect peer check failed on Device {{ $labels.device }}. Distributed
+          ring/pipeline forward passes will stall.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#shard-peer-down"
+
+    - alert: MLXShardMemoryOverbudget
+      expr: |
+        (mlx_shard_weight_bytes / on(device) group_left() (mlx_hw_gpu_mem_total_bytes > 0)) > 0.85
+      for: 5m
+      labels:
+        severity: warning
+        category: sharding
+      annotations:
+        summary: "Shard weight footprint >85% of GPU memory on {{ $labels.device }} (rank {{ $labels.rank }})"
+        description: |
+          Assigned model shard on rank {{ $labels.rank }} leaves minimal headroom
+          for KV cache and activations on {{ $labels.device }}.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#shard-memory"
+
+    - alert: MLXShardFilesIncomplete
+      expr: |
+        mlx_shard_files_expected > 0
+        and on(device, model) (mlx_shard_files_present < on(device, model) mlx_shard_files_expected)
+      for: 5m
+      labels:
+        severity: warning
+        category: sharding
+      annotations:
+        summary: "Incomplete safetensors shards on {{ $labels.device }} ({{ $labels.model }})"
+        description: |
+          Fewer safetensors files are present on disk than referenced in
+          model.safetensors.index.json.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#shard-files"
+
+  - name: mlx.accuracy
+    rules:
+    - alert: MLXEvalAccuracyDrop
+      expr: mlx_eval_overall_accuracy_ratio < 0.75
+      for: 15m
+      labels:
+        severity: warning
+        category: accuracy
+      annotations:
+        summary: "Canary accuracy dropped on {{ $labels.device }} ({{ $labels.model }}): {{ $value }}"
+        description: |
+          Deterministic canary benchmark pass rate fell below 75% on
+          {{ $labels.device }}.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#eval-accuracy"
+
+    - alert: MLXJudgeCorrectnessLow
+      expr: mlx_judge_score{criterion="correctness"} < 0.65
+      for: 15m
+      labels:
+        severity: warning
+        category: accuracy
+      annotations:
+        summary: "Low online judge correctness on {{ $labels.device }} ({{ $labels.model }}): {{ $value }}"
+        description: |
+          Mean Opik judge correctness score dropped below 0.65.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#judge-correctness"
+
+    - alert: MLXOverconfidentErrors
+      expr: mlx_eval_calibration_ece > 0.25
+      for: 15m
+      labels:
+        severity: warning
+        category: accuracy
+      annotations:
+        summary: "High calibration error (overconfident wrong answers) on {{ $labels.device }}: ECE={{ $value }}"
+        description: |
+          Expected Calibration Error exceeds 0.25 on {{ $labels.device }}
+          ({{ $labels.model }}): model confidence diverges from actual accuracy.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#calibration-ece"

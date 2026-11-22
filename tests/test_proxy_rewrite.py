@@ -566,3 +566,48 @@ def test_post_metrics_405_transfer_encoding_400_and_cors_headers(stack):
         assert r.status == 204
         allow_hdrs = r.headers.get("Access-Control-Allow-Headers", "")
         assert "X-Mlx-Trace" in allow_hdrs
+        assert "X-Mlx-Eval" in allow_hdrs
+
+
+def test_entropy_tail_confidence_hist_eval_isolation_and_high_ppl(stack):
+    """Verify histograms, tail-aware entropy, high-PPL counter, and X-Mlx-Eval gauge isolation."""
+    # Trigger a baseline chat completion to establish live quality gauges.
+    status, _, _ = post(stack, {
+        "model": MODEL,
+        "messages": [{"role": "user", "content": "baseline"}],
+    })
+    assert status == 200
+    snap_before = metrics(stack)
+    assert "mlx_token_confidence_histogram_count" in snap_before
+    assert "mlx_token_margin_histogram_count" in snap_before
+    assert series(snap_before, "mlx_token_topk_mass_mean") > 0.0
+    assert series(snap_before, "mlx_token_entropy_tail_nats") >= series(
+        snap_before, "mlx_token_entropy_nats"
+    )
+    scored_before = series(snap_before, "mlx_confidence_scored_total")
+    ppl_before = series(snap_before, "mlx_output_perplexity")
+
+    # Send an eval-tagged request; kind="eval" must increment mlx_requests_total{kind="eval"}
+    # without overwriting live production quality gauges or firing high-PPL counters.
+    req = urllib.request.Request(
+        stack + "/v1/chat/completions",
+        data=json.dumps({
+            "model": MODEL,
+            "messages": [{"role": "user", "content": "eval check"}],
+        }).encode(),
+        headers={
+            "Content-Type": "application/json",
+            "X-Mlx-Trace": "0",
+            "X-Mlx-Eval": "1",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=10) as r:
+        assert r.status == 200
+        resp_obj = json.loads(r.read())
+        assert "logprobs" not in resp_obj["choices"][0]
+
+    snap_after = metrics(stack)
+    assert 'kind="eval"' in snap_after
+    assert series(snap_after, "mlx_confidence_scored_total") == scored_before
+    assert series(snap_after, "mlx_output_perplexity") == ppl_before
+    assert "mlx_high_perplexity_responses_total" in snap_after

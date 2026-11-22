@@ -79,10 +79,27 @@ class ModelInfo:
     tie_word_embeddings: bool
     arch: str
     source: str
+    num_local_experts: int = 0
+    num_experts_per_tok: int = 0
+    moe_intermediate_size: int = 0
+    shared_expert_intermediate_size: int = 0
+    sliding_window: int = 0
+    total_weight_bytes: int = 0
+    shard_file_count: int = 0
 
     @property
     def bytes_per_element(self) -> int:
         return 4 if self.dtype == "float32" else 2
+
+    @property
+    def gqa_ratio(self) -> int:
+        if self.num_attention_heads > 0 and self.num_key_value_heads > 0:
+            return max(1, self.num_attention_heads // self.num_key_value_heads)
+        return 0
+
+    @property
+    def is_moe(self) -> bool:
+        return self.num_local_experts > 0
 
     @property
     def kv_bytes_per_token(self) -> int:
@@ -283,6 +300,8 @@ def _parse_config(path: Path, model_id: str, data: dict[str, Any]) -> ModelInfo:
     else:
         arch = str(data.get("model_type") or text.get("model_type") or "")
 
+    total_weight_bytes, shard_file_count = _safetensors_stats(path.parent)
+
     return ModelInfo(
         model_id=model_id,
         model_path=str(path.parent),
@@ -320,7 +339,57 @@ def _parse_config(path: Path, model_id: str, data: dict[str, Any]) -> ModelInfo:
         ),
         arch=arch,
         source=str(path),
+        num_local_experts=_first_int(
+            text, "num_local_experts", "n_routed_experts", "num_experts"
+        ),
+        num_experts_per_tok=_first_int(
+            text, "num_experts_per_tok", "experts_per_token"
+        ),
+        moe_intermediate_size=_first_int(text, "moe_intermediate_size"),
+        shared_expert_intermediate_size=_first_int(
+            text, "shared_expert_intermediate_size"
+        ),
+        sliding_window=_first_int(text, "sliding_window"),
+        total_weight_bytes=total_weight_bytes,
+        shard_file_count=shard_file_count,
     )
+
+
+def _safetensors_stats(model_dir: Path) -> tuple[int, int]:
+    """Return (total_weight_bytes, shard_file_count) from index or safetensors."""
+    idx_path = model_dir / "model.safetensors.index.json"
+    if idx_path.is_file():
+        idx_data = _load_json(idx_path)
+        if isinstance(idx_data, dict):
+            weight_map = idx_data.get("weight_map")
+            files = (
+                sorted({str(v) for v in weight_map.values() if isinstance(v, str)})
+                if isinstance(weight_map, dict)
+                else []
+            )
+            meta = idx_data.get("metadata")
+            total_size = 0
+            if isinstance(meta, dict):
+                raw_size = meta.get("total_size")
+                if isinstance(raw_size, (int, float)) and raw_size > 0:
+                    total_size = int(raw_size)
+            if not total_size and files:
+                for fname in files:
+                    fp = model_dir / fname
+                    try:
+                        if fp.is_file():
+                            total_size += fp.stat().st_size
+                    except OSError:
+                        pass
+            if files or total_size:
+                return total_size, len(files)
+
+    try:
+        st_files = sorted(model_dir.glob("*.safetensors"))
+        total_size = sum(fp.stat().st_size for fp in st_files if fp.is_file())
+        return total_size, len(st_files)
+    except OSError:
+        return 0, 0
 
 
 def _pick_served_model_id(models: list[Any]) -> str | None:
@@ -475,6 +544,14 @@ def main() -> int:
         "mtp_layers",
         "tie_word_embeddings",
         "arch",
+        "num_local_experts",
+        "num_experts_per_tok",
+        "moe_intermediate_size",
+        "shared_expert_intermediate_size",
+        "sliding_window",
+        "gqa_ratio",
+        "total_weight_bytes",
+        "shard_file_count",
         "kv_bytes_per_token",
         "kv_bytes_for_max_context",
         "source",
