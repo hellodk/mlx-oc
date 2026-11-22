@@ -35,6 +35,8 @@ from typing import Any
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, generate_latest
 
 from mlx_logging import debug, error, info, parse_upstream_url, setup_logging
+from mlx_model_info import model_info as _discover_model_info
+from mlx_shard_topology import discover_shard_placement, probe_peer_reachability
 
 LISTEN_DEFAULT = "127.0.0.1:9105"
 
@@ -136,6 +138,87 @@ G_CHECKS = Counter(
     "mlx_server_health_checks_total", "health probe outcomes", ["result"]
 )
 G_BACKOFF = Gauge("mlx_server_backoff_seconds", "backoff delay (0 in passive mode)")
+
+G_SHARD_INFO = Gauge(
+    "mlx_model_shard_info",
+    "Static & runtime model shard placement info on this node",
+    [
+        "model",
+        "rank",
+        "world_size",
+        "mode",
+        "backend",
+        "layer_range",
+        "shard_files",
+        "transport_ip",
+        "iface",
+    ],
+)
+G_SHARD_WORLD_SIZE = Gauge(
+    "mlx_shard_world_size",
+    "Total distributed ranks serving the model",
+    ["model", "mode", "backend"],
+)
+G_SHARD_RANK = Gauge(
+    "mlx_shard_rank",
+    "Rank index assigned to this node",
+    ["model"],
+)
+G_SHARD_LAYER_START = Gauge(
+    "mlx_shard_layer_start",
+    "First transformer layer index hosted on this rank",
+    ["model", "rank"],
+)
+G_SHARD_LAYER_END = Gauge(
+    "mlx_shard_layer_end",
+    "Last transformer layer index hosted on this rank",
+    ["model", "rank"],
+)
+G_SHARD_LAYERS_ASSIGNED = Gauge(
+    "mlx_shard_layers_assigned",
+    "Number of transformer layers hosted on this rank",
+    ["model", "rank"],
+)
+G_SHARD_DIM_HIDDEN = Gauge(
+    "mlx_shard_dim_hidden",
+    "Hidden dimension visible on this shard",
+    ["model", "rank"],
+)
+G_SHARD_DIM_KV_HEADS = Gauge(
+    "mlx_shard_dim_kv_heads",
+    "KV attention heads assigned to this rank",
+    ["model", "rank"],
+)
+G_SHARD_DIM_INTERMEDIATE = Gauge(
+    "mlx_shard_dim_intermediate",
+    "FFN intermediate dimension assigned to this rank",
+    ["model", "rank"],
+)
+G_SHARD_WEIGHT_BYTES = Gauge(
+    "mlx_shard_weight_bytes",
+    "Expected model weight bytes hosted by this rank",
+    ["model", "rank"],
+)
+G_SHARD_FILES_PRESENT = Gauge(
+    "mlx_shard_files_present",
+    "Number of safetensors shard files present locally",
+    ["model", "rank"],
+)
+G_SHARD_FILES_EXPECTED = Gauge(
+    "mlx_shard_files_expected",
+    "Total safetensors shard files expected by index",
+    ["model"],
+)
+G_SHARD_PEER_UP = Gauge(
+    "mlx_shard_peer_up",
+    "1 if peer shard node is reachable over transport IP",
+    ["rank", "peer_rank", "peer_ip"],
+)
+G_CLUSTER_SHARD_PLACEMENT = Gauge(
+    "mlx_cluster_shard_placement_info",
+    "Cluster-wide node-to-shard mapping discovered from hostfile/nodes config",
+    ["target_device", "model", "rank", "world_size", "mode", "layer_range", "node_ip"],
+)
 
 
 class CrashLogSniffer:
@@ -355,11 +438,208 @@ class PassiveServerObserver:
         self.last_served_models: list[str] = []
         self.known_models: set[str] = set()
         self.sniffer = CrashLogSniffer(args.server_log)
+        self._shard_labels: dict[Any, set[tuple[str, ...]]] = {}
+        self._last_shard_poll_at = 0.0
+        self._cached_shard_snapshot: tuple[Any, dict[tuple[int, str], bool]] | None = None
         if args.model:
             self.known_models.add(args.model)
         for reason in KNOWN_REASONS:
             G_CRASHES.labels(reason=reason).inc(0)
             G_REASON.labels(reason=reason).set(0)
+
+    def _collect_shard_snapshot(
+        self, served_models: list[str]
+    ) -> tuple[Any, dict[tuple[int, str], bool]]:
+        """Gather shard placement & peer status outside metrics_lock."""
+        now = time.monotonic()
+        refresh_interval = max(
+            15.0, float(getattr(self.args, "shard_refresh_interval", 30.0))
+        )
+        if (
+            self._cached_shard_snapshot is not None
+            and (now - self._last_shard_poll_at) < refresh_interval
+        ):
+            return self._cached_shard_snapshot
+
+        eff_model = (served_models[-1] if served_models else "") or getattr(
+            self.args, "model", ""
+        )
+        m_path = getattr(self.args, "model_path", "") or os.environ.get(
+            "MLX_MODEL_PATH", ""
+        )
+        m_info = None
+        if eff_model or m_path:
+            try:
+                m_info = _discover_model_info(
+                    eff_model or None,
+                    model_path=m_path or None,
+                    upstream_url=getattr(self.args, "health", "").rsplit("/v1/", 1)[0]
+                    or None,
+                )
+            except Exception as exc:
+                debug(f"shard model_info failed: {exc!r}", component="supervisor")
+
+        if m_info and not eff_model:
+            eff_model = m_info.model_id
+
+        nodes_devices: list[dict[str, Any]] | None = None
+        device_ip = ""
+        device_id = os.environ.get("MLX_DEVICE_ID") or os.environ.get(
+            "MLX_MACBOOK_ID", ""
+        )
+        nodes_cfg = getattr(self.args, "nodes_config", "") or os.environ.get(
+            "MLX_NODES_CONFIG", ""
+        )
+        hostfile = getattr(self.args, "hostfile", "") or os.environ.get(
+            "MLX_HOSTFILE", ""
+        )
+        backend_ovr = getattr(self.args, "backend", "") or os.environ.get(
+            "MLX_DISTRIBUTED_BACKEND", ""
+        )
+        if nodes_cfg and Path(nodes_cfg).is_file():
+            try:
+                import yaml
+
+                cfg_data = yaml.safe_load(
+                    Path(nodes_cfg).read_text(encoding="utf8")
+                ) or {}
+                devs = cfg_data.get("devices") or cfg_data.get("macbooks") or []
+                if isinstance(devs, list):
+                    nodes_devices = [d for d in devs if isinstance(d, dict)]
+                    for d in nodes_devices:
+                        if d.get("id") == device_id:
+                            device_ip = str(d.get("ip") or "")
+                            if not hostfile and d.get("hostfile"):
+                                hostfile = str(d.get("hostfile"))
+                            break
+                cluster_sec = cfg_data.get("cluster") or {}
+                if isinstance(cluster_sec, dict):
+                    if not hostfile and cluster_sec.get("hostfile"):
+                        hostfile = str(cluster_sec["hostfile"])
+                    if not backend_ovr and cluster_sec.get("backend"):
+                        backend_ovr = str(cluster_sec["backend"])
+            except Exception as exc:
+                debug(f"nodes_config parse skipped: {exc!r}", component="supervisor")
+
+        raw_rank = getattr(self.args, "shard_rank", None)
+        if raw_rank is None and os.environ.get("MLX_RANK", "").isdigit():
+            raw_rank = int(os.environ["MLX_RANK"])
+        raw_ws = getattr(self.args, "shard_world_size", None)
+        if raw_ws is None and os.environ.get("MLX_WORLD_SIZE", "").isdigit():
+            raw_ws = int(os.environ["MLX_WORLD_SIZE"])
+
+        placement = discover_shard_placement(
+            model_info_obj=m_info,
+            model_id=eff_model or "unknown",
+            model_path=m_path,
+            process_pattern=getattr(self.args, "process_pattern", "mlx_lm.server"),
+            hostfile=hostfile,
+            mode_override=getattr(self.args, "parallel_mode", ""),
+            backend_override=backend_ovr,
+            rank_override=raw_rank,
+            world_override=raw_ws,
+            device_ip=device_ip,
+            device_id=device_id,
+            shard_layers_override=getattr(self.args, "shard_layers", ""),
+            nodes_devices=nodes_devices,
+        )
+        probe_port = int(getattr(self.args, "peer_probe_port", 22))
+        peers_up = probe_peer_reachability(placement.peers, port=probe_port)
+        self._cached_shard_snapshot = (placement, peers_up)
+        self._last_shard_poll_at = now
+        return placement, peers_up
+
+    def _set_gauge_series(
+        self, gauge: Gauge, desired: dict[tuple[str, ...], float]
+    ) -> None:
+        """Update a labeled Gauge and prune labels no longer active."""
+        prev = self._shard_labels.get(gauge, set())
+        for stale in prev - set(desired.keys()):
+            try:
+                gauge.remove(*stale)
+            except KeyError:
+                pass
+        for labels, val in desired.items():
+            gauge.labels(*labels).set(val)
+        self._shard_labels[gauge] = set(desired.keys())
+
+    def _publish_shard_metrics(
+        self, placement: Any, peers_up: dict[tuple[int, str], bool]
+    ) -> None:
+        """Apply shard placement snapshot to Prometheus gauges under metrics_lock."""
+        rk = str(placement.rank)
+        ws = str(placement.world_size)
+        mid = placement.model_id
+        self._set_gauge_series(
+            G_SHARD_INFO,
+            {
+                (
+                    mid,
+                    rk,
+                    ws,
+                    placement.mode,
+                    placement.backend,
+                    placement.layer_range,
+                    placement.shard_files,
+                    placement.transport_ip,
+                    placement.iface,
+                ): 1.0
+            },
+        )
+        self._set_gauge_series(
+            G_SHARD_WORLD_SIZE,
+            {(mid, placement.mode, placement.backend): float(placement.world_size)},
+        )
+        self._set_gauge_series(G_SHARD_RANK, {(mid,): float(placement.rank)})
+        self._set_gauge_series(
+            G_SHARD_LAYER_START, {(mid, rk): float(placement.layer_start)}
+        )
+        self._set_gauge_series(
+            G_SHARD_LAYER_END, {(mid, rk): float(placement.layer_end)}
+        )
+        self._set_gauge_series(
+            G_SHARD_LAYERS_ASSIGNED, {(mid, rk): float(placement.layers_assigned)}
+        )
+        self._set_gauge_series(
+            G_SHARD_DIM_HIDDEN, {(mid, rk): float(placement.dim_hidden)}
+        )
+        self._set_gauge_series(
+            G_SHARD_DIM_KV_HEADS, {(mid, rk): float(placement.dim_kv_heads)}
+        )
+        self._set_gauge_series(
+            G_SHARD_DIM_INTERMEDIATE, {(mid, rk): float(placement.dim_intermediate)}
+        )
+        self._set_gauge_series(
+            G_SHARD_WEIGHT_BYTES, {(mid, rk): float(placement.expected_weight_bytes)}
+        )
+        self._set_gauge_series(
+            G_SHARD_FILES_PRESENT, {(mid, rk): float(placement.shard_files_present)}
+        )
+        self._set_gauge_series(
+            G_SHARD_FILES_EXPECTED, {(mid,): float(placement.shard_files_expected)}
+        )
+        self._set_gauge_series(
+            G_SHARD_PEER_UP,
+            {
+                (rk, str(pr), pip): 1.0 if up else 0.0
+                for (pr, pip), up in peers_up.items()
+            },
+        )
+        self._set_gauge_series(
+            G_CLUSTER_SHARD_PLACEMENT,
+            {
+                (
+                    str(n["device"]),
+                    mid,
+                    str(n["rank"]),
+                    str(n["world_size"]),
+                    str(n["mode"]),
+                    str(n["layer_range"]),
+                    str(n["node_ip"]),
+                ): 1.0
+                for n in placement.cluster_nodes
+            },
+        )
 
     def _probe_health(self) -> tuple[bool, list[str]]:
         """Probe upstream health endpoint; treat any HTTP 200 as ready."""
@@ -444,8 +724,9 @@ class PassiveServerObserver:
         transitioned_down = (pid_changed and self.was_up) or (
             self.was_up and not is_up
         )
-        # Perform log disk I/O before acquiring metrics_lock
+        # Perform log disk & shard index I/O before acquiring metrics_lock
         sniffed = self.sniffer.sniff_new() if transitioned_down else "unknown"
+        placement, peers_up = self._collect_shard_snapshot(served_models)
 
         with self.metrics_lock:
             if pid_changed:
@@ -501,6 +782,8 @@ class PassiveServerObserver:
             for m in list(self.known_models):
                 loaded = 1 if (ok and _model_in_served(m, served_models)) else 0
                 G_MODEL.labels(model=m).set(loaded)
+
+            self._publish_shard_metrics(placement, peers_up)
 
     def run(self) -> None:
         """Continuously poll until stop_event is set."""
@@ -619,6 +902,62 @@ def main() -> None:
         type=int,
         default=_parse_int_env("SUPERVISOR_FAIL_THRESHOLD", 3),
         help="Consecutive probe failures before marking not-ready (default 3)",
+    )
+    p.add_argument(
+        "--model-path",
+        default=os.environ.get("MLX_MODEL_PATH", ""),
+        help="Local model directory for safetensors shard & dim inspection",
+    )
+    p.add_argument(
+        "--hostfile",
+        default=os.environ.get("MLX_HOSTFILE", ""),
+        help="Optional distributed hostfile (JSON or text) for rank/peer mapping",
+    )
+    p.add_argument(
+        "--parallel-mode",
+        default=os.environ.get("MLX_PARALLEL_MODE", ""),
+        help="Optional parallelism mode override (standalone|pipeline|tensor)",
+    )
+    p.add_argument(
+        "--backend",
+        default=os.environ.get("MLX_DISTRIBUTED_BACKEND", ""),
+        help="Optional distributed backend override (ring|jaccl|mpi|nccl)",
+    )
+    p.add_argument(
+        "--shard-rank",
+        type=int,
+        default=(
+            int(os.environ["MLX_RANK"])
+            if os.environ.get("MLX_RANK", "").isdigit()
+            else None
+        ),
+        help="Optional explicit rank index override",
+    )
+    p.add_argument(
+        "--shard-world-size",
+        type=int,
+        default=(
+            int(os.environ["MLX_WORLD_SIZE"])
+            if os.environ.get("MLX_WORLD_SIZE", "").isdigit()
+            else None
+        ),
+        help="Optional explicit world size override",
+    )
+    p.add_argument(
+        "--shard-layers",
+        default=os.environ.get("MLX_SHARD_LAYERS", ""),
+        help="Optional explicit layer range override (e.g. 0..15)",
+    )
+    p.add_argument(
+        "--nodes-config",
+        default=os.environ.get("MLX_NODES_CONFIG", ""),
+        help="Optional path to nodes.yml for device-to-rank mapping",
+    )
+    p.add_argument(
+        "--peer-probe-port",
+        type=int,
+        default=_parse_int_env("MLX_PEER_PROBE_PORT", 22),
+        help="TCP port to probe distributed peer reachability (0 disables)",
     )
     args = p.parse_args()
 

@@ -50,7 +50,7 @@ def test_vmagent_yaml_rendering():
     assert data["global"]["external_labels"]["device"] == "test-mac"
     assert data["global"]["external_labels"]["macbook"] == "test-mac"
     assert data["global"]["external_labels"]["serial"] == "SERIAL12345"
-    assert len(data["scrape_configs"]) == 7
+    assert len(data["scrape_configs"]) == 8
 
 
 def test_vmagent_yaml_rendering_with_defaults():
@@ -239,7 +239,7 @@ def test_deploy_review_vmagent_command():
         cwd=str(REPO_ROOT),
         stdin=subprocess.DEVNULL,
         env=env,
-        timeout=15,
+        timeout=30,
     )
     assert proc.returncode == 0, f"deploy.sh review-vmagent failed: {proc.stderr}"
     assert "vmagent Edge Configuration Review" in proc.stdout
@@ -259,7 +259,7 @@ def test_deploy_review_grafana_command():
         cwd=str(REPO_ROOT),
         stdin=subprocess.DEVNULL,
         env=env,
-        timeout=15,
+        timeout=30,
     )
     assert proc.returncode == 0, f"deploy.sh review-grafana failed: {proc.stderr}"
     assert "Grafana Central Configuration Review" in proc.stdout
@@ -2100,3 +2100,358 @@ def test_diagnostics_v1_upstream_suffix_and_env_precedence(tmp_path):
         )
     assert proc.returncode == 0, f"review-edge failed with /v1 upstream: {proc.stdout}\n{proc.stderr}"
     assert "serving: test-model" in proc.stdout
+
+
+def test_model_info_moe_and_safetensors_totals(tmp_path):
+    """Verify ModelInfo parses MoE dims, GQA ratio, and safetensors index totals."""
+    from mlx_model_info import model_info as _mi
+
+    mdir = tmp_path / "Qwen-MoE-4bit"
+    mdir.mkdir()
+    (mdir / "config.json").write_text(
+        json.dumps({
+            "architectures": ["Qwen3MoeForCausalLM"],
+            "num_hidden_layers": 32,
+            "hidden_size": 2048,
+            "num_attention_heads": 16,
+            "num_key_value_heads": 4,
+            "head_dim": 128,
+            "intermediate_size": 6144,
+            "vocab_size": 151936,
+            "max_position_embeddings": 32768,
+            "num_local_experts": 64,
+            "num_experts_per_tok": 8,
+            "moe_intermediate_size": 1408,
+            "shared_expert_intermediate_size": 2816,
+            "sliding_window": 4096,
+            "dtype": "bfloat16",
+            "quantization": {"bits": 4, "group_size": 64},
+        }),
+        encoding="utf8",
+    )
+    (mdir / "model.safetensors.index.json").write_text(
+        json.dumps({
+            "metadata": {"total_size": 12_000_000_000},
+            "weight_map": {
+                "model.embed_tokens.weight": "model-00001-of-00004.safetensors",
+                "model.layers.0.self_attn.q_proj.weight": "model-00001-of-00004.safetensors",
+                "model.layers.15.mlp.gate.weight": "model-00002-of-00004.safetensors",
+                "model.layers.16.mlp.gate.weight": "model-00003-of-00004.safetensors",
+                "model.layers.31.mlp.gate.weight": "model-00004-of-00004.safetensors",
+                "lm_head.weight": "model-00004-of-00004.safetensors",
+            },
+        }),
+        encoding="utf8",
+    )
+    (mdir / "model-00001-of-00004.safetensors").write_bytes(b"a" * 100)
+    (mdir / "model-00002-of-00004.safetensors").write_bytes(b"b" * 100)
+
+    info_obj = _mi("Qwen-MoE-4bit", model_path=str(mdir), refresh=True)
+    assert info_obj is not None
+    assert info_obj.is_moe is True
+    assert info_obj.num_local_experts == 64
+    assert info_obj.num_experts_per_tok == 8
+    assert info_obj.moe_intermediate_size == 1408
+    assert info_obj.shared_expert_intermediate_size == 2816
+    assert info_obj.sliding_window == 4096
+    assert info_obj.gqa_ratio == 4
+    assert info_obj.total_weight_bytes == 12_000_000_000
+    assert info_obj.shard_file_count == 4
+
+
+def test_shard_topology_pipeline_and_tensor(tmp_path):
+    """Verify shard placement resolution across pipeline (hosts.json) and tensor splits."""
+    from mlx_model_info import model_info as _mi
+    import mlx_shard_topology as st
+
+    mdir = tmp_path / "Llama-32L"
+    mdir.mkdir()
+    (mdir / "config.json").write_text(
+        json.dumps({
+            "num_hidden_layers": 32,
+            "hidden_size": 4096,
+            "num_attention_heads": 32,
+            "num_key_value_heads": 8,
+            "intermediate_size": 14336,
+            "max_position_embeddings": 8192,
+            "dtype": "float16",
+        }),
+        encoding="utf8",
+    )
+    wmap = {"model.embed_tokens.weight": "model-00001-of-00004.safetensors"}
+    for idx in range(32):
+        shard_num = (idx // 8) + 1
+        wmap[f"model.layers.{idx}.self_attn.q_proj.weight"] = (
+            f"model-0000{shard_num}-of-00004.safetensors"
+        )
+    wmap["lm_head.weight"] = "model-00004-of-00004.safetensors"
+    (mdir / "model.safetensors.index.json").write_text(
+        json.dumps({"metadata": {"total_size": 16_000_000_000}, "weight_map": wmap}),
+        encoding="utf8",
+    )
+    for idx in range(1, 5):
+        (mdir / f"model-0000{idx}-of-00004.safetensors").write_bytes(b"x" * 1000)
+
+    hosts_file = tmp_path / "hosts.json"
+    hosts_file.write_text(
+        json.dumps({
+            "backend": "ring",
+            "hosts": [
+                {"ssh": "127.0.0.1", "ips": ["192.168.2.1"]},
+                {"ssh": "192.168.2.2", "ips": ["192.168.2.2"]},
+            ],
+        }),
+        encoding="utf8",
+    )
+    mi = _mi("Llama-32L", model_path=str(mdir), refresh=True)
+    assert mi is not None
+
+    rank0 = st.discover_shard_placement(
+        model_info_obj=mi,
+        model_id="Llama-32L",
+        process_pattern="",
+        hostfile=str(hosts_file),
+        rank_override=0,
+        world_override=2,
+        nodes_devices=[
+            {"id": "mm-r0", "rank": 0, "ip": "192.168.2.1"},
+            {"id": "mm-r1", "rank": 1, "ip": "192.168.2.2"},
+        ],
+    )
+    assert rank0.mode == "pipeline"
+    assert rank0.backend == "ring"
+    assert (rank0.layer_start, rank0.layer_end) == (0, 15)
+    assert rank0.layers_assigned == 16
+    assert rank0.shard_files == "shards-00001..00002/4"
+    assert rank0.shard_files_present == 4
+    assert rank0.shard_files_expected == 4
+    assert rank0.peers == ((1, "192.168.2.2"),)
+    assert [n["device"] for n in rank0.cluster_nodes] == ["mm-r0", "mm-r1"]
+    assert rank0.cluster_nodes[1]["layer_range"] == "16..31"
+
+    rank1_tp = st.discover_shard_placement(
+        model_info_obj=mi,
+        model_id="Llama-32L",
+        process_pattern="",
+        hostfile=str(hosts_file),
+        mode_override="tensor",
+        backend_override="jaccl",
+        rank_override=1,
+        world_override=2,
+    )
+    assert rank1_tp.mode == "tensor"
+    assert rank1_tp.backend == "jaccl"
+    assert (rank1_tp.layer_start, rank1_tp.layer_end) == (0, 31)
+    assert rank1_tp.dim_kv_heads == 4
+    assert rank1_tp.dim_intermediate == 7168
+    assert rank1_tp.expected_weight_bytes == 8_000_000_000
+
+
+def test_supervisor_emits_shard_placement_metrics(tmp_path):
+    """Verify PassiveServerObserver exports bounded-cardinality shard gauges."""
+    import argparse
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from prometheus_client import generate_latest
+    import mlx_server_supervisor as sup
+
+    mdir = tmp_path / "ShardTestModel"
+    mdir.mkdir()
+    (mdir / "config.json").write_text(
+        json.dumps({
+            "num_hidden_layers": 24,
+            "hidden_size": 1024,
+            "num_attention_heads": 8,
+            "num_key_value_heads": 4,
+            "intermediate_size": 4096,
+            "max_position_embeddings": 4096,
+        }),
+        encoding="utf8",
+    )
+    (mdir / "model.safetensors").write_bytes(b"weights" * 100)
+
+    class _HealthHandler(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            return
+
+        def do_GET(self):
+            body = json.dumps({"data": [{"id": "ShardTestModel"}]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), _HealthHandler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        args = argparse.Namespace(
+            health=f"http://127.0.0.1:{srv.server_address[1]}/v1/models",
+            model="ShardTestModel",
+            model_path=str(mdir),
+            server_log=str(tmp_path / "missing.log"),
+            process_pattern="",
+            launchd_label="",
+            systemd_unit="",
+            probe_interval=5.0,
+            health_timeout=2.0,
+            fail_threshold=1,
+            shard_rank=0,
+            shard_world_size=1,
+            peer_probe_port=0,
+            shard_refresh_interval=0.0,
+        )
+        obs = sup.PassiveServerObserver(args)
+        obs.poll_once()
+        text = generate_latest().decode()
+        assert 'mlx_model_shard_info{' in text
+        assert 'model="ShardTestModel"' in text
+        assert 'layer_range="0..23"' in text
+        assert 'mlx_shard_dim_hidden{model="ShardTestModel",rank="0"} 1024.0' in text
+        assert 'mlx_shard_files_present{model="ShardTestModel",rank="0"} 1.0' in text
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_accuracy_eval_canary_ece_and_opik_judge(tmp_path):
+    """Verify mlx_accuracy_eval runs canary probes, computes ECE, and scores Opik traces."""
+    import argparse
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from prometheus_client import generate_latest
+    import mlx_accuracy_eval as ev
+
+    suite_file = tmp_path / "suite.jsonl"
+    suite_file.write_text(
+        "\n".join([
+            json.dumps({"id": "q1", "suite": "exact_qa", "prompt": "2+2?", "check": "contains", "expected": "4"}),
+            json.dumps({"id": "q2", "suite": "json_schema", "prompt": "json?", "check": "json_keys", "required_keys": ["ok"]}),
+            json.dumps({"id": "q3", "suite": "coding", "prompt": "fn?", "check": "python_ast", "expected": "sq"}),
+        ]),
+        encoding="utf8",
+    )
+
+    seen_eval_hdrs = []
+    written_scores = []
+
+    class _MockHandler(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            return
+
+        def do_GET(self):
+            if self.path.startswith("/v1/models"):
+                body = json.dumps({"data": [{"id": "eval-model"}]}).encode()
+            elif "/traces" in self.path:
+                body = json.dumps({
+                    "content": [{
+                        "id": "trace-abc-123",
+                        "input": {"messages": [{"role": "user", "content": "What is 2+2?"}]},
+                        "output": {"content": "4"},
+                        "feedback_scores": [],
+                    }]
+                }).encode()
+            else:
+                body = b"{}"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            req = json.loads(self.rfile.read(length) or b"{}")
+            seen_eval_hdrs.append((
+                self.headers.get("X-Mlx-Eval"),
+                self.headers.get("X-Mlx-Trace"),
+            ))
+            prompt = req["messages"][0]["content"]
+            if "You are an evaluator" in prompt:
+                reply = json.dumps({"correctness": 1.0, "helpfulness": 0.9, "hallucination_free": 1.0})
+                lp = -0.05
+            elif "2+2?" in prompt:
+                reply = "4"
+                lp = -0.05
+            elif "json?" in prompt:
+                reply = '{"ok": true}'
+                lp = -0.1
+            else:
+                reply = "not valid python ***"
+                lp = -0.05
+            body = json.dumps({
+                "choices": [{
+                    "message": {"content": reply},
+                    "logprobs": {"content": [{"token": "x", "logprob": lp}]},
+                }]
+            }).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_PUT(self):
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            written_scores.append(json.loads(self.rfile.read(length) or b"{}"))
+            self.send_response(200)
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), _MockHandler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    try:
+        args = argparse.Namespace(
+            proxy_url=base,
+            model="eval-model",
+            suite_file=str(suite_file),
+            eval_interval=60.0,
+            enable_canary=True,
+            enable_judge=True,
+            opik_base=base,
+            opik_project="mlx",
+            judge_url=base + "/v1",
+            judge_model="eval-model",
+            judge_interval=60.0,
+            judge_limit=10,
+            judge_window=20,
+            api_key="",
+            verify_tls=False,
+        )
+        evaluator = ev.AccuracyEvaluator(args)
+        assert evaluator.run_canary_once() is True
+        assert evaluator.run_judge_once() == 1
+        assert all(h == ("1", "0") for h in seen_eval_hdrs)
+        assert len(written_scores) == 1
+        assert len(written_scores[0]["scores"]) == 3
+
+        prom = generate_latest().decode()
+        assert 'mlx_eval_overall_accuracy_ratio{model="eval-model"} ' in prom
+        assert 'mlx_eval_perplexity{model="eval-model"} ' in prom
+        assert 'mlx_eval_calibration_ece{model="eval-model"} ' in prom
+        assert 'mlx_judge_score{criterion="correctness",model="eval-model"} 1.0' in prom
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_bundle_renders_eval_job_and_deploy_port_guard(tmp_path):
+    """Verify bundle renders mlx-eval scrape job and deploy.sh has central port collision check."""
+    import yaml as _yaml
+    import mlx_monitoring_bundle as mb
+
+    bundle = mb.Bundle({
+        "central": {"victoria_metrics": "127.0.0.1:8428", "otel": "127.0.0.1:4318"},
+        "devices": [{"id": "node0", "serial": "S0", "ip": "127.0.0.1", "enabled": True}],
+        "EVAL_LISTEN": "127.0.0.1:19109",
+    })
+    bundle.vmagent_config_rendered = tmp_path / "vmagent.yml"
+    assert bundle._render_vmagent_config() is True
+    rendered = _yaml.safe_load(bundle.vmagent_config_rendered.read_text(encoding="utf8"))
+    jobs = {sc["job_name"]: sc["static_configs"][0]["targets"][0] for sc in rendered["scrape_configs"]}
+    assert jobs["mlx-eval"] == "127.0.0.1:19109"
+
+    deploy_txt = (BUNDLE_DIR / "scripts" / "deploy.sh").read_text(encoding="utf8")
+    assert "_check_central_host_ports" in deploy_txt

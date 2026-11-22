@@ -1,0 +1,303 @@
+{
+  "id": null,
+  "uid": "mlx-model-sharding",
+  "title": "MLX Model Architecture & Sharding",
+  "tags": [
+    "cluster",
+    "mlx",
+    "sharding",
+    "architecture"
+  ],
+  "timezone": "Asia/Kolkata",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_model_shard_info, device)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      },
+      {
+        "name": "model",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_model_shard_info, model)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Which Shard Is Where (Live Node & Rank Placement)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 7 },
+      "targets": [
+        {
+          "expr": "mlx_model_shard_info{device=~\"$device\", model=~\"$model\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "expr": "mlx_shard_weight_bytes{device=~\"$device\", model=~\"$model\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true, "service": true, "macbook": true, "serial": true, "Value #A": true },
+            "renameByName": {
+              "device": "Device",
+              "model": "Model",
+              "rank": "Rank",
+              "world_size": "World Size",
+              "mode": "Mode",
+              "backend": "Backend",
+              "layer_range": "Layers (start..end)",
+              "shard_files": "Safetensors Shards",
+              "transport_ip": "Transport IP",
+              "iface": "NIC",
+              "Value #B": "Shard Weights"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Shard Weights" },
+            "properties": [{ "id": "unit", "value": "bytes" }]
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Cluster Hostfile Shard Map (All Configured Ranks)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 0, "y": 7, "w": 14, "h": 6 },
+      "targets": [
+        {
+          "expr": "mlx_cluster_shard_placement_info{model=~\"$model\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true, "service": true, "macbook": true, "serial": true, "device": true, "Value": true },
+            "renameByName": {
+              "target_device": "Node",
+              "model": "Model",
+              "rank": "Rank",
+              "world_size": "World",
+              "mode": "Mode",
+              "layer_range": "Layers",
+              "node_ip": "Node IP"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Peer Interconnect Reachability",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 14, "y": 7, "w": 10, "h": 6 },
+      "targets": [
+        {
+          "expr": "mlx_shard_peer_up{device=~\"$device\"}",
+          "legendFormat": "r{{rank}} -> r{{peer_rank}} ({{peer_ip}})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ]
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Model Dimensions (dim, layers, heads, MoE, quantization)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 0, "y": 13, "w": 14, "h": 8 },
+      "targets": [
+        {
+          "expr": "mlx_model_info{device=~\"$device\", model=~\"$model\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true, "service": true, "macbook": true, "serial": true },
+            "renameByName": {
+              "device": "Device",
+              "model": "Model",
+              "attr": "Dimension Attribute",
+              "Value": "Value"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Per-Rank Sliced Dimensions & Layer Span",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 14, "y": 13, "w": 10, "h": 8 },
+      "targets": [
+        {
+          "expr": "mlx_shard_layers_assigned{device=~\"$device\", model=~\"$model\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "expr": "mlx_shard_dim_hidden{device=~\"$device\", model=~\"$model\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        },
+        {
+          "expr": "mlx_shard_dim_kv_heads{device=~\"$device\", model=~\"$model\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "C"
+        },
+        {
+          "expr": "mlx_shard_dim_intermediate{device=~\"$device\", model=~\"$model\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "D"
+        }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true, "service": true, "macbook": true, "serial": true },
+            "renameByName": {
+              "device": "Device",
+              "rank": "Rank",
+              "Value #A": "Layers",
+              "Value #B": "Hidden Dim",
+              "Value #C": "KV Heads",
+              "Value #D": "FFN Intermediate"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "graph",
+      "title": "Shard Weight Footprint vs GPU Memory Allocated",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 0, "y": 21, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "mlx_shard_weight_bytes{device=~\"$device\", model=~\"$model\"}",
+          "legendFormat": "{{device}} r{{rank}} expected shard weights",
+          "refId": "A"
+        },
+        {
+          "expr": "mlx_hw_gpu_mem_alloc_bytes{device=~\"$device\"}",
+          "legendFormat": "{{device}} GPU mem allocated",
+          "refId": "B"
+        },
+        {
+          "expr": "mlx_hw_gpu_mem_total_bytes{device=~\"$device\"}",
+          "legendFormat": "{{device}} GPU mem total",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "id": 7,
+      "type": "graph",
+      "title": "Safetensors Shard Files Integrity (Present vs Expected)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "x": 12, "y": 21, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "mlx_shard_files_present{device=~\"$device\", model=~\"$model\"}",
+          "legendFormat": "{{device}} r{{rank}} present",
+          "refId": "A"
+        },
+        {
+          "expr": "mlx_shard_files_expected{device=~\"$device\", model=~\"$model\"}",
+          "legendFormat": "{{device}} expected",
+          "refId": "B"
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": ["mlx"],
+      "title": "MLX Dashboards",
+      "type": "dashboards"
+    },
+    {
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Cluster Overview",
+      "type": "link",
+      "url": "/d/mlx-overview"
+    },
+    {
+      "icon": "sitemap",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Network & TB4",
+      "type": "link",
+      "url": "/d/mlx-network"
+    },
+    {
+      "icon": "bolt",
+      "includeVars": true,
+      "keepTime": true,
+      "title": "Quality & Confidence",
+      "type": "link",
+      "url": "/d/mlx-quality"
+    }
+  ]
+}

@@ -414,6 +414,7 @@ ENABLE_SERVER_MONITOR=true
 ENABLE_LOGTAILER=true
 ENABLE_PROCESS_PROFILER=true
 ENABLE_SBOM_COLLECTOR=true
+ENABLE_ACCURACY_EVAL=true
 ENABLE_VMAGENT=true
 
 LOG_LEVEL=INFO
@@ -429,9 +430,10 @@ VENV_PYTHON=${mon_python}
 # External LLM server endpoint. The proxy listens on :8080 and forwards here.
 MLX_UPSTREAM=${mlx_upstream}
 MLX_PROXY_STRICT_MODEL=false
-MLX_LOGPROBS=3
-MLX_LOGPROBS_STREAM_SAMPLE=0.0
+MLX_LOGPROBS=5
+MLX_LOGPROBS_STREAM_SAMPLE=0.25
 MLX_LOW_CONFIDENCE=0.5
+MLX_HIGH_PERPLEXITY_THRESHOLD=3.0
 MAX_PROMPT_TOKENS=12000
 MAX_TOKENS_CAP=4096
 RATE_LIMIT=0
@@ -458,6 +460,13 @@ PROCESS_LISTEN=127.0.0.1:9107
 SBOM_SCAN_INTERVAL=3600.0
 SBOM_LISTEN=127.0.0.1:9108
 SBOM_BASE_DEVICE=${SBOM_BASE_DEVICE:-}
+EVAL_LISTEN=127.0.0.1:9109
+EVAL_INTERVAL=1800
+ENABLE_CANARY_EVAL=true
+ENABLE_OPIK_JUDGE=true
+JUDGE_INTERVAL=60
+MLX_HOSTFILE=${MLX_HOSTFILE:-}
+MLX_PEER_PROBE_PORT=22
 
 VMAGENT_SCRAPE_INTERVAL=10s
 VMAGENT_QUEUE_CAPACITY=5000
@@ -1381,6 +1390,46 @@ _remove_orphan_central_pods() {
   done
 }
 
+_check_central_host_ports() {
+  local engine="$1"
+  local with_opik="$2"
+  local force="${3:-0}"
+  command -v lsof >/dev/null 2>&1 || return 0
+
+  local ports=(8428 3000 4317 4318 8880 9093)
+  if [[ "${with_opik}" == "1" ]]; then
+    ports+=(32173)
+  fi
+
+  local conflicts=0
+  local port lines line proc pid addr
+  for port in "${ports[@]}"; do
+    lines="$(lsof -nP -iTCP:"${port}" -sTCP:LISTEN 2>/dev/null || true)"
+    [[ -z "${lines}" ]] && continue
+    while IFS= read -r line; do
+      [[ -z "${line}" || "${line}" == COMMAND* ]] && continue
+      proc="$(printf '%s' "${line}" | awk '{print $1}')"
+      pid="$(printf '%s' "${line}" | awk '{print $2}')"
+      addr="$(printf '%s' "${line}" | awk '{print $(NF-1)}')"
+      # Ignore Podman/Docker port-forwarders belonging to the container stack itself.
+      if [[ "${proc}" =~ ^(gvproxy|vpnkit|com\.docke|docker-pr|lima-host|podman) ]]; then
+        continue
+      fi
+      # Flag native listeners bound specifically to 127.0.0.1 / ::1 or wildcard, which hijack container traffic.
+      err "Host port collision on :${port}: process '${proc}' (PID ${pid}) listening on ${addr}"
+      conflicts=$((conflicts + 1))
+    done <<< "${lines}"
+  done
+
+  if [[ "${conflicts}" -gt 0 ]]; then
+    if [[ "${force}" == "1" ]]; then
+      warn "Proceeding despite ${conflicts} host port conflict(s) (--force set); loopback traffic to containers may be hijacked."
+    else
+      die "Detected ${conflicts} host port conflict(s) on 127.0.0.1 / wildcard ports (engine=${engine}). Stop conflicting native processes or pass --force."
+    fi
+  fi
+}
+
 cmd_central() {
   local with_opik=0
   for arg in "$@"; do
@@ -1394,6 +1443,7 @@ cmd_central() {
     die "docker or podman is required for the central stack"
   fi
   _require_cmds "${engine}"
+  _check_central_host_ports "${engine}" "${with_opik}" "${FORCE_DEPLOY:-0}"
   if [[ "${engine}" == "podman" ]]; then
     if ! _check_podman_machine_size "${with_opik}" "${FORCE_DEPLOY:-0}"; then
       die "Podman machine size check failed. Increase VM memory or pass --force."
@@ -1758,7 +1808,7 @@ clean_edge() {
   fi
 
   # 3. Terminate any orphaned listeners on standard and configured edge exporter ports
-  local edge_ports=(8080 9102 9104 9105 9106 9107 9108 8429)
+  local edge_ports=(8080 9102 9104 9105 9106 9107 9108 9109 8429)
   if [[ -f "${ENV_FILE}" ]]; then
     local cfg_key cfg_val cfg_port
     while IFS='=' read -r cfg_key cfg_val; do

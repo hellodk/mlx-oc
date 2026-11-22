@@ -165,6 +165,7 @@ _SERVICE_MATCH_TOKENS: dict[str, tuple[str, ...]] = {
     "proxy": ("mlx_metrics_proxy.py",),
     "process": ("mlx_process_telemetry.py",),
     "sbom": ("mlx_sbom_collector.py",),
+    "eval": ("mlx_accuracy_eval.py",),
     "vmagent": ("vmagent",),
 }
 MAX_BUNDLE_LOG_BYTES = 10 * 1024 * 1024
@@ -319,6 +320,7 @@ class Bundle:
         self.enable_logtailer = config.get("ENABLE_LOGTAILER", "true").lower() == "true"
         self.enable_process = config.get("ENABLE_PROCESS_PROFILER", "true").lower() == "true"
         self.enable_sbom = config.get("ENABLE_SBOM_COLLECTOR", "true").lower() == "true"
+        self.enable_eval = config.get("ENABLE_ACCURACY_EVAL", "true").lower() == "true"
         self.enable_vmagent = config.get("ENABLE_VMAGENT", "true").lower() == "true"
         self.vmagent_binary = config.get("VMAGENT_BINARY", "vmagent")
         self.vmagent_config_template = BUNDLE_DIR / "vmagent-edge" / "vmagent.yml"
@@ -350,6 +352,14 @@ class Bundle:
         env["OPIK_ENDPOINT"] = self.opik_endpoint
         env["OPIK_OTLP_ENDPOINT"] = self.opik_otlp_endpoint
         env["OTLP_VERIFY_TLS"] = "true" if self.otlp_verify_tls else "false"
+        if NODES_FILE.is_file():
+            env.setdefault("MLX_NODES_CONFIG", str(NODES_FILE))
+        if self.node_config.get("rank") is not None:
+            env.setdefault("MLX_RANK", str(self.node_config["rank"]))
+        if self.node_config.get("shard_layers"):
+            env.setdefault("MLX_SHARD_LAYERS", str(self.node_config["shard_layers"]))
+        if self.node_config.get("hostfile"):
+            env.setdefault("MLX_HOSTFILE", str(self.node_config["hostfile"]))
         aliases = self.node_config.get("model_aliases") or self.config.get("MLX_MODEL_ALIASES")
         if aliases:
             if isinstance(aliases, (list, tuple)):
@@ -409,8 +419,8 @@ class Bundle:
             "--opik-otlp-endpoint", self.opik_otlp_endpoint,
             "--model", self.model or "",
             "--model-path", self.model_path,
-            "--logprobs", config_val(self.config, "MLX_LOGPROBS", "3"),
-            "--logprobs-stream-sample", config_val(self.config, "MLX_LOGPROBS_STREAM_SAMPLE", "0.0"),
+            "--logprobs", config_val(self.config, "MLX_LOGPROBS", "5"),
+            "--logprobs-stream-sample", config_val(self.config, "MLX_LOGPROBS_STREAM_SAMPLE", "0.25"),
             "--low-confidence-threshold", config_val(self.config, "MLX_LOW_CONFIDENCE", "0.5"),
             "--max-prompt-tokens", config_val(self.config, "MAX_PROMPT_TOKENS", "12000"),
             "--max-tokens-cap", config_val(self.config, "MAX_TOKENS_CAP", "4096"),
@@ -496,6 +506,32 @@ class Bundle:
             cmd.append("--skip-package-metrics")
         self._spawn("sbom", cmd)
 
+    def start_eval(self):
+        if not self.enable_eval:
+            return
+        cmd = [
+            self.venv_python, "mlx_accuracy_eval.py",
+            "--listen", config_val(self.config, "EVAL_LISTEN", "127.0.0.1:9109"),
+            "--model", self.model or "",
+            "--eval-interval", config_val(self.config, "EVAL_INTERVAL", "1800"),
+            "--judge-interval", config_val(self.config, "JUDGE_INTERVAL", "60"),
+        ]
+        if self.opik_endpoint:
+            cmd += ["--opik-base", self.opik_endpoint]
+        judge_url = config_val(self.config, "JUDGE_URL", "")
+        if judge_url:
+            cmd += ["--judge-url", judge_url]
+        judge_model = config_val(self.config, "JUDGE_MODEL", "")
+        if judge_model:
+            cmd += ["--judge-model", judge_model]
+        if config_val(self.config, "ENABLE_CANARY_EVAL", "true").lower() != "true":
+            cmd.append("--no-canary")
+        if config_val(self.config, "ENABLE_OPIK_JUDGE", "true").lower() != "true":
+            cmd.append("--no-judge")
+        if self.otlp_verify_tls:
+            cmd.append("--verify-tls")
+        self._spawn("eval", cmd)
+
     def _render_vmagent_config(self) -> bool:
         """Render vmagent.yml template with environment variables."""
         if not self.vmagent_config_template.exists():
@@ -522,6 +558,7 @@ class Bundle:
                 "LOGTAILER_LISTEN": config_val(self.config, "LOGTAILER_LISTEN", "127.0.0.1:9106"),
                 "PROCESS_LISTEN": config_val(self.config, "PROCESS_LISTEN", "127.0.0.1:9107"),
                 "SBOM_LISTEN": config_val(self.config, "SBOM_LISTEN", "127.0.0.1:9108"),
+                "EVAL_LISTEN": config_val(self.config, "EVAL_LISTEN", "127.0.0.1:9109"),
             }
             # Single-pass substitution: replace ${VAR} and ${VAR:-default}.
 
@@ -600,11 +637,20 @@ class Bundle:
         systemd_unit = config_val(self.config, "MLX_SYSTEMD_UNIT", "")
         if systemd_unit:
             cmd += ["--systemd-unit", systemd_unit]
+        if self.model_path:
+            cmd += ["--model-path", self.model_path]
+        hostfile = config_val(self.config, "MLX_HOSTFILE", self.node_config.get("hostfile", ""))
+        if hostfile:
+            cmd += ["--hostfile", str(hostfile)]
+        if NODES_FILE.is_file():
+            cmd += ["--nodes-config", str(NODES_FILE)]
         self._spawn("supervisor", cmd)
 
     def status(self) -> dict:
         pids = {}
-        for name in ["supervisor", "logtailer", "kv", "hw", "proxy", "process", "sbom", "vmagent"]:
+        for name in [
+            "supervisor", "logtailer", "kv", "hw", "proxy", "process", "sbom", "eval", "vmagent"
+        ]:
             pfile = self.pid_dir / f"{name}.pid"
             pids[name] = read_pid(pfile)
         return {
@@ -635,7 +681,9 @@ class Bundle:
         # Stop verified child exporters before signalling any external bundle PID so an
         # in-process signal handler never kills itself mid-cleanup, and reused PIDs are safe.
         pending: list[tuple[str, int, tuple[str, ...]]] = []
-        for name in ["supervisor", "logtailer", "kv", "hw", "proxy", "process", "sbom", "vmagent"]:
+        for name in [
+            "supervisor", "logtailer", "kv", "hw", "proxy", "process", "sbom", "eval", "vmagent"
+        ]:
             pfile = self.pid_dir / f"{name}.pid"
             pid = read_pid(pfile)
             tokens = _SERVICE_MATCH_TOKENS.get(name, (name,))
@@ -717,6 +765,9 @@ class Bundle:
         if self.enable_sbom:
             self.start_sbom()
             started.append("sbom:9108")
+        if self.enable_eval:
+            self.start_eval()
+            started.append("eval:9109")
         if self.enable_vmagent:
             self.start_vmagent()
             started.append("vmagent")

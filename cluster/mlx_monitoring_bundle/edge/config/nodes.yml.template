@@ -23,3 +23,7 @@ macbooks:
     model_path: "<MODEL_DIRECTORY>"
     # Optional list of model aliases accepted by strict model checking
     # model_aliases: ["alias-1", "alias-2"]
+    # Optional distributed sharding metadata (auto-detected from process/hostfile if omitted)
+    # hostfile: "/path/to/hosts.json"
+    # rank: 0
+    # shard_layers: "0..15"

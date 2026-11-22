@@ -130,9 +130,14 @@
       },
       "targets": [
         {
-          "expr": "mlx_output_perplexity{device=~\"$device\"}",
-          "legendFormat": "{{device}}",
+          "expr": "histogram_quantile(0.95, sum(rate(mlx_output_perplexity_histogram_bucket{device=~\"$device\"}[5m])) by (le, device))",
+          "legendFormat": "{{device}} p95",
           "refId": "A"
+        },
+        {
+          "expr": "mlx_output_perplexity{device=~\"$device\"}",
+          "legendFormat": "{{device}} latest",
+          "refId": "B"
         }
       ],
       "fieldConfig": {

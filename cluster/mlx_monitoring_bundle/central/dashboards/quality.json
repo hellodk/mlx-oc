@@ -22,6 +22,16 @@
         "allValue": ".+",
         "multi": false,
         "refresh": 1
+      },
+      {
+        "name": "model",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(mlx_requests_total, model)",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": false,
+        "refresh": 1
       }
     ]
   },
@@ -106,7 +116,7 @@
     },
     {
       "type": "graph",
-      "title": "Output Perplexity",
+      "title": "Output Perplexity (p50 / p95 / Latest / Eval Ref)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 8,
@@ -116,15 +126,30 @@
       },
       "targets": [
         {
-          "expr": "mlx_output_perplexity{device=~\"$device\"}",
-          "legendFormat": "{{device}}",
+          "expr": "histogram_quantile(0.95, sum(rate(mlx_output_perplexity_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))",
+          "legendFormat": "{{device}} {{model}} p95",
           "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(mlx_output_perplexity_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))",
+          "legendFormat": "{{device}} {{model}} p50",
+          "refId": "B"
+        },
+        {
+          "expr": "mlx_output_perplexity{device=~\"$device\", model=~\"$model\"}",
+          "legendFormat": "{{device}} {{model}} latest",
+          "refId": "C"
+        },
+        {
+          "expr": "mlx_eval_perplexity{device=~\"$device\", model=~\"$model\"}",
+          "legendFormat": "{{device}} {{model}} eval_ref",
+          "refId": "D"
         }
       ]
     },
     {
       "type": "graph",
-      "title": "Token Entropy (nats)",
+      "title": "Token Entropy (nats, p95 / tail-corrected / mean)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
@@ -134,9 +159,19 @@
       },
       "targets": [
         {
-          "expr": "mlx_token_entropy_nats{device=~\"$device\"}",
-          "legendFormat": "{{device}}",
+          "expr": "histogram_quantile(0.95, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))",
+          "legendFormat": "{{device}} {{model}} p95",
           "refId": "A"
+        },
+        {
+          "expr": "mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"}",
+          "legendFormat": "{{device}} {{model}} latest",
+          "refId": "B"
+        },
+        {
+          "expr": "mlx_token_entropy_tail_nats{device=~\"$device\", model=~\"$model\"}",
+          "legendFormat": "{{device}} {{model}} tail-corrected",
+          "refId": "C"
         }
       ]
     },
@@ -274,6 +309,132 @@
           "expr": "rate(mlx_hallucination_flag_total{device=~\"$device\"}[5m])",
           "legendFormat": "{{device}}",
           "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Token Confidence Distribution (p50 / p95 / Logprobs Coverage)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(mlx_token_confidence_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))",
+          "legendFormat": "{{device}} conf p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.05, sum(rate(mlx_token_confidence_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))",
+          "legendFormat": "{{device}} conf p05 (low tail)",
+          "refId": "B"
+        },
+        {
+          "expr": "mlx_token_topk_mass_mean{device=~\"$device\", model=~\"$model\"}",
+          "legendFormat": "{{device}} top-k mass",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Canary Eval Accuracy & Expected Calibration Error (ECE)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 16,
+        "y": 6,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_eval_overall_accuracy_ratio{device=~\"$device\", model=~\"$model\"}",
+          "legendFormat": "{{device}} {{model}} overall_acc",
+          "refId": "A"
+        },
+        {
+          "expr": "mlx_eval_accuracy_ratio{device=~\"$device\", model=~\"$model\"}",
+          "legendFormat": "{{device}} {{suite}}",
+          "refId": "B"
+        },
+        {
+          "expr": "mlx_eval_calibration_ece{device=~\"$device\", model=~\"$model\"}",
+          "legendFormat": "{{device}} calibration_ece",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Online Judge Accuracy (Opik Feedback Scores)",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 16,
+        "y": 12,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "mlx_judge_score{device=~\"$device\", model=~\"$model\"}",
+          "legendFormat": "{{device}} {{criterion}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Logprobs Scoring Coverage & High-Perplexity Rate",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 16,
+        "y": 18,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "sum by (device, source) (rate(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[5m]))",
+          "legendFormat": "{{device}} scored ({{source}})",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (device) (rate(mlx_high_perplexity_responses_total{device=~\"$device\", model=~\"$model\"}[5m]))",
+          "legendFormat": "{{device}} high_ppl",
+          "refId": "B"
         }
       ],
       "fieldConfig": {
