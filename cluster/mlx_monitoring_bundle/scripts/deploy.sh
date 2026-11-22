@@ -1824,7 +1824,7 @@ clean_edge() {
   if command -v lsof >/dev/null 2>&1; then
     for port in "${edge_ports[@]}"; do
       local pids
-      pids="$(lsof -ti -iTCP:"${port}" -sTCP:LISTEN 2>/dev/null || true)"
+      pids="$(lsof -nP -t -iTCP:"${port}" -sTCP:LISTEN 2>/dev/null || true)"
       if [[ -n "${pids}" ]]; then
         for p in ${pids}; do
           info "terminating residual process on port ${port} (PID ${p})"
