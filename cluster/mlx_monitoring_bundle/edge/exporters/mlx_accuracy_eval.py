@@ -324,9 +324,24 @@ class AccuracyEvaluator:
         ) as r:
             return json.loads(r.read().decode("utf8", "replace"))
 
+    def _upstream_ready(self) -> bool:
+        """Check whether proxy /v1/models responds HTTP 200 before firing eval calls."""
+        url = self.args.proxy_url.rstrip("/") + "/v1/models"
+        req = urllib.request.Request(url, headers=self._headers())
+        try:
+            with urllib.request.urlopen(
+                req, timeout=3, context=_ssl_ctx(self.args.verify_tls)
+            ) as r:
+                return r.status == 200
+        except Exception as exc:
+            debug(f"canary/judge skipped (upstream not ready): {exc!r}", component="eval")
+            return False
+
     def run_canary_once(self) -> bool:
         """Execute one deterministic canary evaluation sweep."""
         if not self.args.enable_canary or not self.suite_items:
+            return False
+        if not self._upstream_ready():
             return False
         model = self._discover_model()
         endpoint = self.args.proxy_url.rstrip("/") + "/v1/chat/completions"
@@ -449,6 +464,8 @@ class AccuracyEvaluator:
                 pending.append((t["id"], question, answer))
 
         if not pending:
+            return 0
+        if not self._upstream_ready():
             return 0
 
         judge_url = self.args.judge_url.rstrip("/") + "/chat/completions"

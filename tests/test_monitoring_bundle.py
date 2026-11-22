@@ -2455,3 +2455,4 @@ def test_bundle_renders_eval_job_and_deploy_port_guard(tmp_path):
 
     deploy_txt = (BUNDLE_DIR / "scripts" / "deploy.sh").read_text(encoding="utf8")
     assert "_check_central_host_ports" in deploy_txt
+    assert 'lsof -ti -iTCP:"${port}" -sTCP:LISTEN' in deploy_txt
