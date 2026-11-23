@@ -2999,6 +2999,11 @@ def test_peer_reachability_with_app_rtt_probe():
     import mlx_shard_topology as top
 
     class SimpleHeadHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
         def do_HEAD(self):
             self.send_response(200)
             self.send_header("Content-Length", "0")
@@ -3058,4 +3063,120 @@ def test_peer_reachability_with_app_rtt_probe():
     assert res_closed.connect_seconds == 0.0
     assert res_closed.app_rtt_seconds == 0.0
     assert res_closed.reason in ("refused", "timeout", "unreachable")
+
+
+def test_kv_cache_agent_unbound_local_error_when_model_info_none(tmp_path):
+    """Verify mlx_kv_cache_agent._update_gauges does not fail with UnboundLocalError when model info is unavailable."""
+    import mlx_kv_cache_agent as kv
+    from prometheus_client import generate_latest
+
+    dummy_log = tmp_path / "server.log"
+    dummy_log.write_text("prompt cache total=0 (0.000 GiB)\n", encoding="utf8")
+
+    # Calling with model_name=None and model_path=None causes info_obj to be None.
+    # Previously, getattr(placement, "kv_heads_exact", True) raised UnboundLocalError.
+    kv._update_gauges(
+        log_path=str(dummy_log),
+        model_name=None,
+        model_path=None,
+        upstream_url="http://127.0.0.1:9999",
+        prompt_cache_size=10,
+    )
+    text = generate_latest().decode()
+    assert "mlx_kv_cache_shard_exact" in text
+
+
+def test_peer_app_probe_isolates_app_rtt_and_rejects_non_http():
+    """Verify probe_peer_app isolates request/response RTT from connect and flags non-HTTP sockets."""
+    import socket
+    import threading
+    import http.server
+    import mlx_shard_topology as top
+
+    # 1. Raw non-HTTP TCP server (simulating raw binary MLX transport)
+    raw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    raw_sock.bind(("127.0.0.1", 0))
+    raw_port = raw_sock.getsockname()[1]
+    raw_sock.listen(1)
+
+    def serve_raw():
+        try:
+            conn, _ = raw_sock.accept()
+            conn.recv(1024)
+            # Send raw binary garbage, not HTTP
+            conn.sendall(b"\x00\x01\x02\x03BINARY_PAYLOAD")
+            conn.close()
+        except Exception:
+            pass
+
+    t_raw = threading.Thread(target=serve_raw, daemon=True)
+    t_raw.start()
+
+    try:
+        raw_res = top.probe_peer_app(((1, "127.0.0.1"),), port=raw_port, timeout=0.5)
+        r = raw_res[(1, "127.0.0.1")]
+        assert r.up is False
+        assert r.reason == "not_http"
+        assert r.status_code == 0
+        assert r.app_rtt_seconds == 0.0
+    finally:
+        raw_sock.close()
+
+
+def test_proxy_prompt_token_uses_request_tools_and_tracks_exactness(tmp_path):
+    """Verify chat template prompt token counting uses request tools and marks missing tool template support as estimated."""
+    import mlx_metrics_proxy as p
+
+    model_dir = tmp_path / "templated_tool_model"
+    model_dir.mkdir()
+
+    # Template that explicitly formats tools
+    tool_template = (
+        "{% for message in messages %}"
+        "<|im_start|>{{ message['role'] }}\n{{ message['content'] }}<|im_end|>\n"
+        "{% endfor %}"
+        "{% if tools %}"
+        "<|tools|>"
+        "{% for t in tools %}{{ t['function']['name'] }}{% endfor %}"
+        "<|endoftext|>"
+        "{% endif %}"
+        "{% if add_generation_prompt %}<|im_start|>assistant\n{% endif %}"
+    )
+
+    # Template with NO tool support
+    no_tool_template = (
+        "{% for message in messages %}"
+        "<|im_start|>{{ message['role'] }}\n{{ message['content'] }}<|im_end|>\n"
+        "{% endfor %}"
+        "{% if add_generation_prompt %}<|im_start|>assistant\n{% endif %}"
+    )
+
+    (model_dir / "tokenizer_config.json").write_text(
+        json.dumps({"chat_template": tool_template}),
+        encoding="utf8",
+    )
+
+    tpl_with_tools = p._get_chat_template_for_model("tool_model", str(model_dir))
+    assert tpl_with_tools is not None
+    assert "tools" in getattr(tpl_with_tools, "_raw_template", "")
+
+    req_tools = [
+        {"type": "function", "function": {"name": "get_weather", "description": "Fetch weather"}}
+    ]
+    messages = [{"role": "user", "content": "What's the weather?"}]
+
+    rendered = tpl_with_tools.render(messages=messages, tools=req_tools, add_generation_prompt=True)
+    assert "get_weather" in rendered
+
+    # Now verify template without tool support flags prompt_tokens_exact as False
+    no_tool_dir = tmp_path / "no_tool_model"
+    no_tool_dir.mkdir()
+    (no_tool_dir / "tokenizer_config.json").write_text(
+        json.dumps({"chat_template": no_tool_template}),
+        encoding="utf8",
+    )
+    tpl_no_tools = p._get_chat_template_for_model("no_tool_model", str(no_tool_dir))
+    assert tpl_no_tools is not None
+    assert "tools" not in getattr(tpl_no_tools, "_raw_template", "")
+
 

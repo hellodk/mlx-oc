@@ -592,6 +592,7 @@ class PassiveServerObserver:
         self, placement: Any, peers_up: dict[tuple[int, str], bool]
     ) -> None:
         """Apply shard placement snapshot to Prometheus gauges under metrics_lock."""
+        app_port = int(getattr(self.args, "peer_app_port", 8081))
         rk = str(placement.rank)
         ws = str(placement.world_size)
         mid = placement.model_id
@@ -654,13 +655,16 @@ class PassiveServerObserver:
                 for (pr, pip), res in peers_up.items()
             },
         )
-        self._set_gauge_series(
-            G_SHARD_PEER_APP_UP,
-            {
-                (rk, str(pr), pip): 1.0 if getattr(res, "app_up", False) else 0.0
-                for (pr, pip), res in peers_up.items()
-            },
-        )
+        if app_port > 0:
+            self._set_gauge_series(
+                G_SHARD_PEER_APP_UP,
+                {
+                    (rk, str(pr), pip): 1.0 if getattr(res, "app_up", False) else 0.0
+                    for (pr, pip), res in peers_up.items()
+                },
+            )
+        else:
+            self._set_gauge_series(G_SHARD_PEER_APP_UP, {})
         for (pr, pip), res in peers_up.items():
             conn_sec = getattr(res, "connect_seconds", 0.0)
             app_rtt = getattr(res, "app_rtt_seconds", 0.0)

@@ -245,6 +245,7 @@ def _update_gauges(log_path: str, model_name: str | None,
     kv_max_ctx_bytes = 0
     kv_max_ctx_bytes_shard = 0
     shard_resolved = False
+    placement = None
 
     if info_obj is not None:
         kv_max_ctx_bytes = info_obj.kv_bytes_for_max_context

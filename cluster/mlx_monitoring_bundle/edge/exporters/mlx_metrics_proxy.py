@@ -183,6 +183,7 @@ def _get_chat_template_for_model(model_name: str, model_path: str | None = None)
                         )
                         env.filters["raise_exception"] = lambda msg: msg
                         tpl = env.from_string(raw_template)
+                        setattr(tpl, "_raw_template", raw_template)
                         break
                 except Exception:
                     pass
@@ -1168,6 +1169,7 @@ class Proxy(BaseHTTPRequestHandler):
         streaming = False
         temperature = 0.0
         tools_provided = False
+        request_tools = None
         messages = []
         opik_trace = None
         opik_span = None
@@ -1205,7 +1207,13 @@ class Proxy(BaseHTTPRequestHandler):
                     temperature = float(raw_temp) if raw_temp is not None else 0.0
                 except (ValueError, TypeError):
                     temperature = 0.0
-                tools_provided = bool(req.get("tools"))
+                raw_tools = req.get("tools")
+                request_tools = (
+                    [t for t in raw_tools if isinstance(t, dict)]
+                    if isinstance(raw_tools, list)
+                    else None
+                )
+                tools_provided = bool(request_tools)
                 raw_messages = req.get("messages")
                 messages = (
                     [m for m in raw_messages if isinstance(m, dict)]
@@ -1439,13 +1447,13 @@ class Proxy(BaseHTTPRequestHandler):
                 content = parser.content
                 reasoning = parser.reasoning
                 tool_calls = parser.tool_calls
-                tools = parser.tools
+                response_tools = parser.tools
                 usage = parser.usage
                 finish_reason = parser.finish_reason
             else:
                 content = ""
                 tool_calls = 0
-                tools = []
+                response_tools = []
                 usage = None
                 finish_reason = None
                 try:
@@ -1460,7 +1468,7 @@ class Proxy(BaseHTTPRequestHandler):
                             reasoning = msg.get("reasoning_content") or msg.get("reasoning") or ""
                             calls = msg.get("tool_calls") or []
                             tool_calls = len(calls)
-                            tools = [
+                            response_tools = [
                                 {
                                     "type": tc.get("type") or "unknown",
                                     "name": (tc.get("function") or {}).get("name")
@@ -1521,13 +1529,23 @@ class Proxy(BaseHTTPRequestHandler):
                 tpl = _get_chat_template_for_model(model, _MODEL_PATH)
                 if tok is not None and tpl is not None:
                     try:
-                        templated_prompt = tpl.render(
-                            messages=messages,
-                            tools=tools if tools_provided else None,
-                            add_generation_prompt=True,
-                        )
-                        prompt_tokens = len(tok.encode(templated_prompt).ids)
-                        prompt_tokens_exact = True
+                        raw_tpl_str = getattr(tpl, "_raw_template", "")
+                        # If tools were provided in request, the chat template MUST support tools
+                        if tools_provided and ("tools" not in raw_tpl_str and "tool" not in raw_tpl_str):
+                            prompt_tokens_exact = False
+                            templated_prompt = tpl.render(
+                                messages=messages,
+                                add_generation_prompt=True,
+                            )
+                            prompt_tokens = len(tok.encode(templated_prompt).ids)
+                        else:
+                            templated_prompt = tpl.render(
+                                messages=messages,
+                                tools=request_tools if tools_provided else None,
+                                add_generation_prompt=True,
+                            )
+                            prompt_tokens = len(tok.encode(templated_prompt).ids)
+                            prompt_tokens_exact = True
                     except Exception:
                         prompt_tokens_exact = False
                 if not prompt_tokens_exact:
@@ -1600,7 +1618,7 @@ class Proxy(BaseHTTPRequestHandler):
 
             REQUESTS.labels(model, "true" if streaming else "false", kind).inc()
             FINISH_REASON.labels(model, finish_reason or "unknown", kind).inc()
-            for t in tools:
+            for t in response_tools:
                 TOOL_CALLS.labels(model, kind, t["name"], t["type"]).inc()
             TEMPERATURE.labels(model, kind).set(temperature)
 
@@ -1643,10 +1661,10 @@ class Proxy(BaseHTTPRequestHandler):
                 span.set_attribute("mlx.tokens_prompt", prompt_tokens)
                 span.set_attribute("mlx.tokens_completion", comp_tokens)
                 span.set_attribute("mlx.tool_calls", tool_calls)
-                if tools:
+                if response_tools:
                     span.set_attribute(
                         "mlx.tool_names",
-                        ", ".join(t["name"] for t in tools),
+                        ", ".join(t["name"] for t in response_tools),
                     )
                 span.set_attribute("mlx.hallucination_risk", risk)
                 span.set_attribute("mlx.hallucination_flagged", flagged)

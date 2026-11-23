@@ -772,7 +772,11 @@ def probe_peer_app(
     path: str = "/",
     timeout: float = 0.5,
 ) -> dict[tuple[int, str], PeerAppResult]:
-    """Measure application request/response round-trip time (RTT) to peer service endpoint."""
+    """Measure application request/response round-trip time (RTT) to peer service endpoint.
+
+    Isolates application-level RTT from TCP connection establishment by starting the
+    request timer strictly after the socket connection is established.
+    """
     status: dict[tuple[int, str], PeerAppResult] = {}
     if port <= 0:
         for pr, pip in peers:
@@ -784,32 +788,34 @@ def probe_peer_app(
             )
         return status
     for pr, pip in peers:
-        t0 = time.monotonic()
         try:
             with socket.create_connection((pip, port), timeout=timeout) as sock:
                 sock.settimeout(timeout)
                 host_hdr = pip if ":" not in pip else f"[{pip}]"
                 req = (
-                    f"HEAD {path} HTTP/1.1\r\n"
+                    f"GET {path} HTTP/1.1\r\n"
                     f"Host: {host_hdr}:{port}\r\n"
                     f"User-Agent: mlx-probe\r\n"
                     f"Connection: close\r\n\r\n"
                 ).encode("ascii")
+                t_req = time.monotonic()
                 sock.sendall(req)
                 resp_bytes = sock.recv(512)
-                elapsed = max(0.0, time.monotonic() - t0)
+                elapsed = max(0.0, time.monotonic() - t_req)
                 status_code = 0
+                is_http = False
                 if resp_bytes:
-                    first_line = resp_bytes.split(b"\r\n", 1)[0].decode("ascii", "replace")
+                    first_line = resp_bytes.split(b"\r\n", 1)[0].decode("latin1", "replace")
                     parts = first_line.split()
-                    if len(parts) >= 2 and parts[1].isdigit():
+                    if len(parts) >= 2 and parts[0].startswith("HTTP/") and parts[1].isdigit():
                         status_code = int(parts[1])
-                is_up = 0 < status_code < 500 or (bool(resp_bytes) and status_code == 0)
+                        is_http = True
+                is_up = is_http and (100 <= status_code < 600)
                 status[(pr, pip)] = PeerAppResult(
                     up=is_up,
                     app_rtt_seconds=elapsed if is_up else 0.0,
                     status_code=status_code,
-                    reason="ok" if is_up else f"status_{status_code}",
+                    reason="ok" if is_up else (f"status_{status_code}" if is_http else "not_http"),
                 )
         except ConnectionRefusedError:
             status[(pr, pip)] = PeerAppResult(
@@ -843,7 +849,7 @@ def probe_peer_reachability(
     app_port: int | None = None,
 ) -> dict[tuple[int, str], PeerProbeResult]:
     """Passively check peer reachability, measuring both TCP connect and application RTT independently."""
-    eff_app_port = app_port if app_port is not None else port
+    eff_app_port = app_port if app_port is not None else 0
     conn_results = probe_peer_transport(peers, port=port, timeout=timeout)
     app_results = (
         probe_peer_app(peers, port=eff_app_port, timeout=timeout)
