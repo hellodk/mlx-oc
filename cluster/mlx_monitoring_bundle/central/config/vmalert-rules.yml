@@ -538,6 +538,33 @@ groups:
           indicating network transport congestion or degraded reachability to the peer rank.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#shard-peer-latency-high"
 
+    - alert: MLXShardPeerAppRTTHigh
+      expr: |
+        histogram_quantile(0.95, sum by (le, device, rank, peer_rank, peer_ip) (rate(mlx_shard_peer_app_rtt_seconds_bucket[5m]))) > 0.10
+      for: 5m
+      labels:
+        severity: warning
+        category: sharding
+      annotations:
+        summary: "High peer application RTT from {{ $labels.device }} (rank {{ $labels.rank }}) to peer {{ $labels.peer_ip }} (rank {{ $labels.peer_rank }})"
+        description: |
+          Application-level request/response RTT to peer service exceeds 100ms.
+          Distributed synchronization and collective communication will bottleneck token generation.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#shard-peer-app-rtt-high"
+
+    - alert: MLXShardPeerAppDown
+      expr: |
+        (mlx_shard_peer_up == 1) and (mlx_shard_peer_app_up == 0)
+      for: 2m
+      labels:
+        severity: critical
+        category: sharding
+      annotations:
+        summary: "Peer application service unreachable on {{ $labels.peer_ip }} (rank {{ $labels.peer_rank }})"
+        description: |
+          Peer host is network-reachable via TCP handshake, but application service endpoint is not responding.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#shard-peer-app-down"
+
     - alert: MLXShardMemoryOverbudget
       expr: |
         (mlx_hw_gpu_mem_alloc_bytes / on(device) group_left() (mlx_hw_gpu_mem_total_bytes > 0)) > 0.85

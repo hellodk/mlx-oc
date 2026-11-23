@@ -31,6 +31,31 @@ _SHARD_NUM_RE = re.compile(r"-(\d+)-of-\d+\.safetensors$")
 
 
 @dataclass(frozen=True)
+class PeerConnectResult:
+    """TCP connection establishment probe result (transport layer reachability)."""
+
+    up: bool
+    connect_seconds: float
+    reason: str  # "connected", "refused", "timeout", "unreachable", "disabled"
+
+    def __bool__(self) -> bool:
+        return self.up
+
+
+@dataclass(frozen=True)
+class PeerAppResult:
+    """Application-level request/response RTT probe result (service layer reachability)."""
+
+    up: bool
+    app_rtt_seconds: float
+    status_code: int
+    reason: str  # "ok", "refused", "timeout", "error", "disabled"
+
+    def __bool__(self) -> bool:
+        return self.up
+
+
+@dataclass(frozen=True)
 class PeerProbeResult:
     """Reachability status, TCP connect duration, and application RTT for a single peer rank."""
 
@@ -38,6 +63,7 @@ class PeerProbeResult:
     connect_seconds: float
     reason: str  # "connected", "refused", "timeout", "unreachable", "disabled"
     app_rtt_seconds: float = 0.0
+    app_up: bool = False
 
     def __bool__(self) -> bool:
         return self.up
@@ -71,6 +97,8 @@ class ShardPlacement:
     pp_rank: int = 0
     tp_size: int = 1
     pp_size: int = 1
+    kv_heads_exact: bool = True
+    kv_source: str = "exact"
 
 
 def inspect_safetensors_index(model_dir: Path | None) -> dict[str, Any]:
@@ -335,6 +363,9 @@ def infer_runtime_sharding(
         pp_val = _extract_flag_value(toks, ("--pipeline-parallel-size", "-pp"))
         if pp_val.isdigit() and int(pp_val) > 0:
             info["pp_size"] = int(pp_val)
+        kv_val = _extract_flag_value(toks, ("--shard-kv-heads", "--kv-heads", "--num-kv-heads"))
+        if kv_val.isdigit() and int(kv_val) > 0:
+            info["shard_kv_heads"] = int(kv_val)
         if not info["mode"] and ("--pipeline" in toks or info["pp_size"] > 1):
             info["mode"] = "pipeline"
 
@@ -558,20 +589,52 @@ def discover_shard_placement(
 
     tp_div = max(1, tp_size)
     dim_hidden = model_info_obj.hidden_size if model_info_obj else 0
+
+    local_dev = None
+    if nodes_devices:
+        for dev in nodes_devices:
+            if device_id and dev.get("id") == device_id:
+                local_dev = dev
+                break
+            if dev.get("rank") == rank:
+                local_dev = dev
+                break
+            if device_ip and dev.get("ip") == device_ip:
+                local_dev = dev
+                break
+
     raw_shard_kv = os.environ.get("MLX_SHARD_KV_HEADS", "")
-    if raw_shard_kv and raw_shard_kv.isdigit():
+    node_kv = local_dev.get("shard_kv_heads") if local_dev else None
+
+    kv_heads_exact = True
+    kv_source = "exact"
+
+    if raw_shard_kv and raw_shard_kv.isdigit() and int(raw_shard_kv) > 0:
         dim_kv = int(raw_shard_kv)
+        kv_source = "env_override"
+    elif node_kv is not None and str(node_kv).isdigit() and int(node_kv) > 0:
+        dim_kv = int(node_kv)
+        kv_source = "nodes_config"
+    elif runtime.get("shard_kv_heads"):
+        dim_kv = int(runtime["shard_kv_heads"])
+        kv_source = "process_arg"
     elif model_info_obj and model_info_obj.num_key_value_heads:
         if tp_div <= 1:
             dim_kv = model_info_obj.num_key_value_heads
+            kv_source = "full_model"
         elif model_info_obj.num_key_value_heads % tp_div == 0:
             dim_kv = model_info_obj.num_key_value_heads // tp_div
+            kv_source = "uniform_division"
         else:
             base = model_info_obj.num_key_value_heads // tp_div
             rem = model_info_obj.num_key_value_heads % tp_div
             dim_kv = max(1, base + (1 if tp_rank < rem else 0))
+            kv_heads_exact = False
+            kv_source = "estimated_fallback"
     else:
         dim_kv = 0
+        kv_heads_exact = False
+        kv_source = "unknown"
     dim_inter = (
         max(1, model_info_obj.intermediate_size // tp_div)
         if model_info_obj and model_info_obj.intermediate_size
@@ -649,7 +712,127 @@ def discover_shard_placement(
         pp_rank=pp_rank,
         tp_size=tp_size,
         pp_size=pp_size,
+        kv_heads_exact=kv_heads_exact,
+        kv_source=kv_source,
     )
+
+
+def probe_peer_transport(
+    peers: tuple[tuple[int, str], ...],
+    port: int = 8081,
+    timeout: float = 0.5,
+) -> dict[tuple[int, str], PeerConnectResult]:
+    """Passively check TCP reachability & connect latency (SYN-ACK) of peer ranks.
+
+    Measures pure TCP connection establishment duration only. Does not transmit application data.
+    """
+    status: dict[tuple[int, str], PeerConnectResult] = {}
+    if port <= 0:
+        for pr, pip in peers:
+            status[(pr, pip)] = PeerConnectResult(
+                up=False,
+                connect_seconds=0.0,
+                reason="disabled",
+            )
+        return status
+    for pr, pip in peers:
+        t0 = time.monotonic()
+        try:
+            with socket.create_connection((pip, port), timeout=timeout):
+                connect_elapsed = max(0.0, time.monotonic() - t0)
+                status[(pr, pip)] = PeerConnectResult(
+                    up=True,
+                    connect_seconds=connect_elapsed,
+                    reason="connected",
+                )
+        except ConnectionRefusedError:
+            status[(pr, pip)] = PeerConnectResult(
+                up=False,
+                connect_seconds=0.0,
+                reason="refused",
+            )
+        except socket.timeout:
+            status[(pr, pip)] = PeerConnectResult(
+                up=False,
+                connect_seconds=0.0,
+                reason="timeout",
+            )
+        except OSError:
+            status[(pr, pip)] = PeerConnectResult(
+                up=False,
+                connect_seconds=0.0,
+                reason="unreachable",
+            )
+    return status
+
+
+def probe_peer_app(
+    peers: tuple[tuple[int, str], ...],
+    port: int = 8081,
+    path: str = "/",
+    timeout: float = 0.5,
+) -> dict[tuple[int, str], PeerAppResult]:
+    """Measure application request/response round-trip time (RTT) to peer service endpoint."""
+    status: dict[tuple[int, str], PeerAppResult] = {}
+    if port <= 0:
+        for pr, pip in peers:
+            status[(pr, pip)] = PeerAppResult(
+                up=False,
+                app_rtt_seconds=0.0,
+                status_code=0,
+                reason="disabled",
+            )
+        return status
+    for pr, pip in peers:
+        t0 = time.monotonic()
+        try:
+            with socket.create_connection((pip, port), timeout=timeout) as sock:
+                sock.settimeout(timeout)
+                host_hdr = pip if ":" not in pip else f"[{pip}]"
+                req = (
+                    f"HEAD {path} HTTP/1.1\r\n"
+                    f"Host: {host_hdr}:{port}\r\n"
+                    f"User-Agent: mlx-probe\r\n"
+                    f"Connection: close\r\n\r\n"
+                ).encode("ascii")
+                sock.sendall(req)
+                resp_bytes = sock.recv(512)
+                elapsed = max(0.0, time.monotonic() - t0)
+                status_code = 0
+                if resp_bytes:
+                    first_line = resp_bytes.split(b"\r\n", 1)[0].decode("ascii", "replace")
+                    parts = first_line.split()
+                    if len(parts) >= 2 and parts[1].isdigit():
+                        status_code = int(parts[1])
+                is_up = 0 < status_code < 500 or (bool(resp_bytes) and status_code == 0)
+                status[(pr, pip)] = PeerAppResult(
+                    up=is_up,
+                    app_rtt_seconds=elapsed if is_up else 0.0,
+                    status_code=status_code,
+                    reason="ok" if is_up else f"status_{status_code}",
+                )
+        except ConnectionRefusedError:
+            status[(pr, pip)] = PeerAppResult(
+                up=False,
+                app_rtt_seconds=0.0,
+                status_code=0,
+                reason="refused",
+            )
+        except socket.timeout:
+            status[(pr, pip)] = PeerAppResult(
+                up=False,
+                app_rtt_seconds=0.0,
+                status_code=0,
+                reason="timeout",
+            )
+        except Exception as exc:
+            status[(pr, pip)] = PeerAppResult(
+                up=False,
+                app_rtt_seconds=0.0,
+                status_code=0,
+                reason=f"error_{type(exc).__name__}",
+            )
+    return status
 
 
 def probe_peer_reachability(
@@ -657,60 +840,25 @@ def probe_peer_reachability(
     port: int = 8081,
     timeout: float = 0.5,
     probe_app_rtt: bool = True,
+    app_port: int | None = None,
 ) -> dict[tuple[int, str], PeerProbeResult]:
-    """Passively check TCP reachability & connect latency of peer ranks.
+    """Passively check peer reachability, measuring both TCP connect and application RTT independently."""
+    eff_app_port = app_port if app_port is not None else port
+    conn_results = probe_peer_transport(peers, port=port, timeout=timeout)
+    app_results = (
+        probe_peer_app(peers, port=eff_app_port, timeout=timeout)
+        if probe_app_rtt and eff_app_port > 0
+        else {}
+    )
 
-    Measures TCP connection establishment duration (SYN-ACK).
-    If probe_app_rtt is True and TCP connects, sends a lightweight HTTP HEAD /
-    request to measure actual application-level request/response RTT.
-    """
     status: dict[tuple[int, str], PeerProbeResult] = {}
-    if port <= 0:
-        return status
-    for pr, pip in peers:
-        t0 = time.monotonic()
-        try:
-            with socket.create_connection((pip, port), timeout=timeout) as sock:
-                t_connect = time.monotonic()
-                connect_elapsed = max(0.0, t_connect - t0)
-                app_rtt = 0.0
-                if probe_app_rtt:
-                    try:
-                        sock.settimeout(timeout)
-                        sock.sendall(
-                            b"HEAD / HTTP/1.1\r\nHost: "
-                            + pip.encode("ascii", "replace")
-                            + b"\r\nUser-Agent: mlx-probe\r\nConnection: close\r\n\r\n"
-                        )
-                        _ = sock.recv(512)
-                        app_rtt = max(0.0, time.monotonic() - t_connect)
-                    except Exception:
-                        app_rtt = 0.0
-                status[(pr, pip)] = PeerProbeResult(
-                    up=True,
-                    connect_seconds=connect_elapsed,
-                    reason="connected",
-                    app_rtt_seconds=app_rtt,
-                )
-        except ConnectionRefusedError:
-            status[(pr, pip)] = PeerProbeResult(
-                up=False,
-                connect_seconds=0.0,
-                reason="refused",
-                app_rtt_seconds=0.0,
-            )
-        except socket.timeout:
-            status[(pr, pip)] = PeerProbeResult(
-                up=False,
-                connect_seconds=0.0,
-                reason="timeout",
-                app_rtt_seconds=0.0,
-            )
-        except OSError:
-            status[(pr, pip)] = PeerProbeResult(
-                up=False,
-                connect_seconds=0.0,
-                reason="unreachable",
-                app_rtt_seconds=0.0,
-            )
+    for pair, c_res in conn_results.items():
+        a_res = app_results.get(pair)
+        status[pair] = PeerProbeResult(
+            up=c_res.up,
+            connect_seconds=c_res.connect_seconds,
+            reason=c_res.reason,
+            app_rtt_seconds=a_res.app_rtt_seconds if a_res and a_res.up else 0.0,
+            app_up=a_res.up if a_res else False,
+        )
     return status

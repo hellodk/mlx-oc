@@ -186,7 +186,12 @@ G_SHARD_DIM_HIDDEN = Gauge(
 )
 G_SHARD_DIM_KV_HEADS = Gauge(
     "mlx_shard_dim_kv_heads",
-    "KV attention heads assigned to this rank",
+    "KV attention heads assigned to this rank (override, runtime inspection, or estimated fallback)",
+    ["model", "rank"],
+)
+G_SHARD_DIM_KV_HEADS_EXACT = Gauge(
+    "mlx_shard_dim_kv_heads_exact",
+    "1 if shard KV heads allocation is explicitly configured/discovered or uniformly divisible, 0 if estimated fallback",
     ["model", "rank"],
 )
 G_SHARD_DIM_INTERMEDIATE = Gauge(
@@ -211,12 +216,17 @@ G_SHARD_FILES_EXPECTED = Gauge(
 )
 G_SHARD_PEER_UP = Gauge(
     "mlx_shard_peer_up",
-    "1 if peer shard node is reachable over transport IP",
+    "1 if peer shard node is reachable over TCP transport IP",
+    ["rank", "peer_rank", "peer_ip"],
+)
+G_SHARD_PEER_APP_UP = Gauge(
+    "mlx_shard_peer_app_up",
+    "1 if peer application service endpoint is healthy and responding to HTTP probes",
     ["rank", "peer_rank", "peer_ip"],
 )
 G_SHARD_PEER_CONNECT_SECONDS = Histogram(
     "mlx_shard_peer_connect_seconds",
-    "TCP connection establishment latency (SYN-ACK) to peer port - transport reachability probe only, not application RTT or MLX distributed communication latency",
+    "TCP connection establishment latency (SYN-ACK) to peer transport port - reachability probe only, not application RTT or MLX distributed communication latency",
     ["rank", "peer_rank", "peer_ip"],
     buckets=(0.0005, 0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0),
 )
@@ -556,7 +566,10 @@ class PassiveServerObserver:
             nodes_devices=nodes_devices,
         )
         probe_port = int(getattr(self.args, "peer_probe_port", 8081))
-        peers_up = probe_peer_reachability(placement.peers, port=probe_port)
+        app_port = int(getattr(self.args, "peer_app_port", 8081))
+        peers_up = probe_peer_reachability(
+            placement.peers, port=probe_port, app_port=app_port, probe_app_rtt=(app_port > 0)
+        )
         self._cached_shard_snapshot = (placement, peers_up)
         self._last_shard_poll_at = now
         return placement, peers_up
@@ -619,6 +632,10 @@ class PassiveServerObserver:
             G_SHARD_DIM_KV_HEADS, {(mid, rk): float(placement.dim_kv_heads)}
         )
         self._set_gauge_series(
+            G_SHARD_DIM_KV_HEADS_EXACT,
+            {(mid, rk): 1.0 if getattr(placement, "kv_heads_exact", True) else 0.0},
+        )
+        self._set_gauge_series(
             G_SHARD_DIM_INTERMEDIATE, {(mid, rk): float(placement.dim_intermediate)}
         )
         self._set_gauge_series(
@@ -637,13 +654,21 @@ class PassiveServerObserver:
                 for (pr, pip), res in peers_up.items()
             },
         )
+        self._set_gauge_series(
+            G_SHARD_PEER_APP_UP,
+            {
+                (rk, str(pr), pip): 1.0 if getattr(res, "app_up", False) else 0.0
+                for (pr, pip), res in peers_up.items()
+            },
+        )
         for (pr, pip), res in peers_up.items():
             conn_sec = getattr(res, "connect_seconds", 0.0)
             app_rtt = getattr(res, "app_rtt_seconds", 0.0)
             is_up = getattr(res, "up", bool(res))
+            app_up = getattr(res, "app_up", False)
             if is_up and conn_sec > 0.0:
                 G_SHARD_PEER_CONNECT_SECONDS.labels(rk, str(pr), pip).observe(conn_sec)
-            if is_up and app_rtt > 0.0:
+            if app_up and app_rtt > 0.0:
                 G_SHARD_PEER_APP_RTT_SECONDS.labels(rk, str(pr), pip).observe(app_rtt)
         self._set_gauge_series(
             G_CLUSTER_SHARD_PLACEMENT,
@@ -977,7 +1002,13 @@ def main() -> None:
         "--peer-probe-port",
         type=int,
         default=_parse_int_env("MLX_PEER_PROBE_PORT", 8081),
-        help="TCP port to probe distributed peer reachability (0 disables)",
+        help="TCP port to probe distributed peer transport reachability (0 disables)",
+    )
+    p.add_argument(
+        "--peer-app-port",
+        type=int,
+        default=_parse_int_env("MLX_PEER_APP_PORT", 8081),
+        help="TCP port to probe distributed peer application HTTP endpoint (0 disables)",
     )
     args = p.parse_args()
 

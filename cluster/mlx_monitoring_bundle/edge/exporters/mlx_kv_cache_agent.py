@@ -77,6 +77,10 @@ G_KV_CAPACITY_SHARD = Gauge(
     "mlx_kv_cache_capacity_bytes_shard",
     "Configured or effective KV cache capacity bytes on this shard",
 )
+G_KV_EXACT = Gauge(
+    "mlx_kv_cache_shard_exact",
+    "1 if shard KV capacity calculation is exact (explicitly configured or uniformly divisible), 0 if estimated fallback",
+)
 G_UTIL = Gauge(
     "mlx_kv_cache_utilization",
     "KV cache bytes / (max_sequences x KV bytes for a full context)",
@@ -318,6 +322,9 @@ def _update_gauges(log_path: str, model_name: str | None,
     capacity = cfg_limit if cfg_limit > 0 else (max_seq * effective_ctx_bytes)
     G_KV_CAPACITY_SHARD.set(capacity)
     G_UTIL.set(total_bytes / capacity if capacity else 0.0)
+
+    is_exact = getattr(placement, "kv_heads_exact", True) if placement is not None else True
+    G_KV_EXACT.set(1.0 if is_exact else 0.0)
 
 
 class Handler(BaseHTTPRequestHandler):

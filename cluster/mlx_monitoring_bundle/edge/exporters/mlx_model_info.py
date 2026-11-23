@@ -151,13 +151,17 @@ class ModelInfo:
         indices = self.attention_layer_indices or tuple(range(self.attention_layers))
         local_attn_layers = sum(1 for i in indices if layer_start <= i <= layer_end)
 
+        raw_env_kv = os.environ.get("MLX_SHARD_KV_HEADS", "")
         if dim_kv_heads is not None and dim_kv_heads > 0:
             local_kv_heads = dim_kv_heads
+        elif raw_env_kv and raw_env_kv.isdigit() and int(raw_env_kv) > 0:
+            local_kv_heads = int(raw_env_kv)
         elif tp_size > 1:
             effective_tp_rank = (rank % tp_size) if tp_size > 0 else 0
             if self.num_key_value_heads % tp_size == 0:
                 local_kv_heads = max(1, self.num_key_value_heads // tp_size)
             else:
+                # Fallback estimate when uneven KV heads are not explicitly configured or discovered
                 base = self.num_key_value_heads // tp_size
                 rem = self.num_key_value_heads % tp_size
                 local_kv_heads = max(1, base + (1 if effective_tp_rank < rem else 0))
@@ -194,13 +198,17 @@ class ModelInfo:
         local_full = sum(1 for i in full_set if layer_start <= i <= layer_end)
         local_sliding = sum(1 for i in sliding_set if layer_start <= i <= layer_end)
 
+        raw_env_kv = os.environ.get("MLX_SHARD_KV_HEADS", "")
         if dim_kv_heads is not None and dim_kv_heads > 0:
             local_kv_heads = dim_kv_heads
+        elif raw_env_kv and raw_env_kv.isdigit() and int(raw_env_kv) > 0:
+            local_kv_heads = int(raw_env_kv)
         elif tp_size > 1:
             effective_tp_rank = (rank % tp_size) if tp_size > 0 else 0
             if self.num_key_value_heads % tp_size == 0:
                 local_kv_heads = max(1, self.num_key_value_heads // tp_size)
             else:
+                # Fallback estimate when uneven KV heads are not explicitly configured or discovered
                 base = self.num_key_value_heads // tp_size
                 rem = self.num_key_value_heads % tp_size
                 local_kv_heads = max(1, base + (1 if effective_tp_rank < rem else 0))

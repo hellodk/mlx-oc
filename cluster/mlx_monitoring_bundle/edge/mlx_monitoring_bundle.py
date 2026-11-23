@@ -373,6 +373,9 @@ class Bundle:
         peer_port = self.node_config.get("peer_probe_port") or self.config.get("MLX_PEER_PROBE_PORT")
         if peer_port:
             env.setdefault("MLX_PEER_PROBE_PORT", str(peer_port))
+        peer_app = self.node_config.get("peer_app_port") or self.config.get("MLX_PEER_APP_PORT")
+        if peer_app:
+            env.setdefault("MLX_PEER_APP_PORT", str(peer_app))
         aliases = self.node_config.get("model_aliases") or self.config.get("MLX_MODEL_ALIASES")
         if aliases:
             if isinstance(aliases, (list, tuple)):

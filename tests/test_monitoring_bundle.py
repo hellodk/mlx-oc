@@ -2299,6 +2299,7 @@ def test_supervisor_emits_shard_placement_metrics(tmp_path):
             shard_rank=0,
             shard_world_size=1,
             peer_probe_port=0,
+            peer_app_port=0,
             shard_refresh_interval=0.0,
         )
         obs = sup.PassiveServerObserver(args)
@@ -2308,6 +2309,7 @@ def test_supervisor_emits_shard_placement_metrics(tmp_path):
         assert 'model="ShardTestModel"' in text
         assert 'layer_range="0..23"' in text
         assert 'mlx_shard_dim_hidden{model="ShardTestModel",rank="0"} 1024.0' in text
+        assert 'mlx_shard_dim_kv_heads_exact{model="ShardTestModel",rank="0"} 1.0' in text
         assert 'mlx_shard_files_present{model="ShardTestModel",rank="0"} 1.0' in text
     finally:
         srv.shutdown()
@@ -2726,6 +2728,20 @@ def test_kv_cache_agent_topology_and_capacity_integration(tmp_path, monkeypatch)
     # Must be 0 bytes, NOT fall back to full model allocation
     assert kva.G_KV_MAX_CTX_SHARD._value.get() == 0
     assert kva.G_KV_CAPACITY_SHARD._value.get() == 0
+    assert kva.G_KV_EXACT._value.get() == 1.0
+
+    # 3. Uneven TP (8 heads / 3 ranks) without override -> G_KV_EXACT is 0.0 (marked estimate)
+    monkeypatch.setenv("MLX_WORLD_SIZE", "3")
+    monkeypatch.setenv("MLX_TP_SIZE", "3")
+    monkeypatch.setenv("MLX_DISTRIBUTED_MODE", "tensor")
+    monkeypatch.delenv("MLX_SHARD_LAYERS", raising=False)
+    kva._update_gauges(str(server_log), "KVModel", model_path=str(mdir))
+    assert kva.G_KV_EXACT._value.get() == 0.0
+
+    # 4. Explicit MLX_SHARD_KV_HEADS override -> G_KV_EXACT is 1.0 (exact)
+    monkeypatch.setenv("MLX_SHARD_KV_HEADS", "3")
+    kva._update_gauges(str(server_log), "KVModel", model_path=str(mdir))
+    assert kva.G_KV_EXACT._value.get() == 1.0
 
 
 def test_proxy_request_path_prefill_and_decode_telemetry(monkeypatch):
@@ -2800,19 +2816,28 @@ def test_proxy_request_path_prefill_and_decode_telemetry(monkeypatch):
 
 def test_peer_probe_port_and_alert_dashboard_consistency():
     """Verify peer probe defaults to 8081, MLXPrefillSlow is removed, and alert labels match."""
-    # 1. Template default port check
+    # 1. Template and deploy script default port check
     template_text = (BUNDLE_DIR / "edge" / "config" / "edge.env.template").read_text(encoding="utf8")
     assert "MLX_PEER_PROBE_PORT=8081" in template_text
     assert "MLX_PEER_PROBE_PORT=22" not in template_text
+    assert "MLX_PEER_APP_PORT=8081" in template_text
+
+    deploy_text = (BUNDLE_DIR / "scripts" / "deploy.sh").read_text(encoding="utf8")
+    assert "MLX_PEER_PROBE_PORT=8081" in deploy_text
+    assert "MLX_PEER_PROBE_PORT=22" not in deploy_text
+    assert "MLX_PEER_APP_PORT=8081" in deploy_text
 
     # 2. Supervisor argument default check
     import mlx_server_supervisor as sup
     assert sup._parse_int_env("MLX_PEER_PROBE_PORT", 8081) == 8081
+    assert sup._parse_int_env("MLX_PEER_APP_PORT", 8081) == 8081
 
-    # 3. vmalert-rules check: no MLXPrefillSlow duplicate, and correct labels
+    # 3. vmalert-rules check: no MLXPrefillSlow duplicate, and correct labels & separate alerts
     alert_text = (BUNDLE_DIR / "central" / "config" / "vmalert-rules.yml").read_text(encoding="utf8")
     assert "alert: MLXPrefillSlow" not in alert_text, "Duplicate MLXPrefillSlow alert must be removed"
     assert "alert: MLXShardPeerLatencyHigh" in alert_text
+    assert "alert: MLXShardPeerAppRTTHigh" in alert_text
+    assert "alert: MLXShardPeerAppDown" in alert_text
     assert "sum by (le, device, rank, peer_rank, peer_ip)" in alert_text
     # MLXShardMemoryOverbudget must not have dangling rank label
     assert "GPU memory allocated >85% on {{ $labels.device }}" in alert_text
@@ -2825,6 +2850,9 @@ def test_peer_probe_port_and_alert_dashboard_consistency():
     assert "Prompt-to-First-Token & Streaming Decode Duration (p95)" in titles
 
     sharding_dash = json.loads((BUNDLE_DIR / "central" / "dashboards" / "model-sharding.json").read_text(encoding="utf8"))
+    dash_titles = [p.get("title") for p in sharding_dash.get("panels", [])]
+    assert "Peer Interconnect TCP Connect Latency" in dash_titles
+    assert "Peer Interconnect Application Round-Trip Time (RTT)" in dash_titles
     dash_targets = []
     for p in sharding_dash.get("panels", []):
         dash_targets.extend(p.get("targets", []))
@@ -2877,7 +2905,7 @@ def test_hybrid_tp_pp_rank_mapping_and_shard_placement(tmp_path, monkeypatch):
     monkeypatch.setenv("MLX_TP_SIZE", "2")
     monkeypatch.setenv("MLX_DISTRIBUTED_MODE", "hybrid")
 
-    # Test Rank 0 (Stage 0, TP 0)
+    # Test Rank 0 (Stage 0, TP 0) - Uneven TP without explicit override -> estimated_fallback
     monkeypatch.setenv("MLX_RANK", "0")
     p0 = top.discover_shard_placement(model_info_obj=model_info, model_id="hybrid_model", model_path=str(model_dir))
     assert p0.mode == "hybrid"
@@ -2887,7 +2915,17 @@ def test_hybrid_tp_pp_rank_mapping_and_shard_placement(tmp_path, monkeypatch):
     assert p0.pp_rank == 0
     assert p0.layer_start == 0 and p0.layer_end == 15
     assert p0.dim_kv_heads == 4  # 7 // 2 + 1
+    assert p0.kv_heads_exact is False  # Explicitly labeled as estimate
+    assert p0.kv_source == "estimated_fallback"
     assert "00001" in p0.shard_files  # Stage 0 has embed
+
+    # Explicit override via MLX_SHARD_KV_HEADS -> exact
+    monkeypatch.setenv("MLX_SHARD_KV_HEADS", "4")
+    p0_exact = top.discover_shard_placement(model_info_obj=model_info, model_id="hybrid_model", model_path=str(model_dir))
+    assert p0_exact.dim_kv_heads == 4
+    assert p0_exact.kv_heads_exact is True
+    assert p0_exact.kv_source == "env_override"
+    monkeypatch.delenv("MLX_SHARD_KV_HEADS")
 
     # Test Rank 1 (Stage 0, TP 1)
     monkeypatch.setenv("MLX_RANK", "1")
@@ -2898,6 +2936,7 @@ def test_hybrid_tp_pp_rank_mapping_and_shard_placement(tmp_path, monkeypatch):
     assert p1.pp_rank == 0
     assert p1.layer_start == 0 and p1.layer_end == 15
     assert p1.dim_kv_heads == 3  # 7 // 2 + 0
+    assert p1.kv_heads_exact is False
 
     # Test Rank 2 (Stage 1, TP 0)
     monkeypatch.setenv("MLX_RANK", "2")
@@ -2908,6 +2947,7 @@ def test_hybrid_tp_pp_rank_mapping_and_shard_placement(tmp_path, monkeypatch):
     assert p2.pp_rank == 1
     assert p2.layer_start == 16 and p2.layer_end == 31
     assert p2.dim_kv_heads == 4  # tp_rank 0 gets remainder head
+    assert p2.kv_heads_exact is False
     assert "00004" in p2.shard_files  # Stage 1 (last) has head
 
     # Test Rank 3 (Stage 1, TP 1)
@@ -2919,6 +2959,7 @@ def test_hybrid_tp_pp_rank_mapping_and_shard_placement(tmp_path, monkeypatch):
     assert p3.pp_rank == 1
     assert p3.layer_start == 16 and p3.layer_end == 31
     assert p3.dim_kv_heads == 3  # tp_rank 1 gets base head
+    assert p3.kv_heads_exact is False
 
 
 def test_proxy_chat_template_rendering_and_exact_tokens(tmp_path, monkeypatch):
@@ -2952,7 +2993,7 @@ def test_proxy_chat_template_rendering_and_exact_tokens(tmp_path, monkeypatch):
 
 
 def test_peer_reachability_with_app_rtt_probe():
-    """Verify probe_peer_reachability measures both TCP connect and application-level HTTP RTT."""
+    """Verify probe_peer_transport and probe_peer_app are decoupled and separate transport connect from application RTT."""
     import http.server
     import threading
     import mlx_shard_topology as top
@@ -2971,25 +3012,49 @@ def test_peer_reachability_with_app_rtt_probe():
     t = threading.Thread(target=server.serve_forever, daemon=True)
     t.start()
     try:
-        results = top.probe_peer_reachability(
-            ((1, "127.0.0.1"),), port=port, timeout=1.0, probe_app_rtt=True
+        # 1. Independent transport probe (TCP SYN-ACK only)
+        c_res = top.probe_peer_transport(((1, "127.0.0.1"),), port=port, timeout=1.0)
+        assert c_res[(1, "127.0.0.1")].up is True
+        assert c_res[(1, "127.0.0.1")].connect_seconds > 0.0
+        assert c_res[(1, "127.0.0.1")].reason == "connected"
+
+        # 2. Independent app RTT probe (HTTP HEAD request/response only)
+        a_res = top.probe_peer_app(((1, "127.0.0.1"),), port=port, timeout=1.0)
+        assert a_res[(1, "127.0.0.1")].up is True
+        assert a_res[(1, "127.0.0.1")].app_rtt_seconds > 0.0
+        assert a_res[(1, "127.0.0.1")].status_code == 200
+        assert a_res[(1, "127.0.0.1")].reason == "ok"
+
+        # 3. Decoupled probe with separate transport vs app ports
+        closed_port = port + 1 if port < 65000 else port - 1
+        # Transport port open, app port closed: transport is UP, app is DOWN
+        mixed = top.probe_peer_reachability(
+            ((1, "127.0.0.1"),), port=port, app_port=closed_port, timeout=0.2, probe_app_rtt=True
         )
-        res = results[(1, "127.0.0.1")]
-        assert res.up is True
-        assert res.connect_seconds > 0.0
-        assert res.app_rtt_seconds > 0.0
-        assert res.reason == "connected"
+        assert mixed[(1, "127.0.0.1")].up is True
+        assert mixed[(1, "127.0.0.1")].connect_seconds > 0.0
+        assert mixed[(1, "127.0.0.1")].app_up is False
+        assert mixed[(1, "127.0.0.1")].app_rtt_seconds == 0.0
+
+        # Transport port closed, app port open: transport is DOWN, app is UP
+        mixed2 = top.probe_peer_reachability(
+            ((1, "127.0.0.1"),), port=closed_port, app_port=port, timeout=0.2, probe_app_rtt=True
+        )
+        assert mixed2[(1, "127.0.0.1")].up is False
+        assert mixed2[(1, "127.0.0.1")].connect_seconds == 0.0
+        assert mixed2[(1, "127.0.0.1")].app_up is True
+        assert mixed2[(1, "127.0.0.1")].app_rtt_seconds > 0.0
     finally:
         server.shutdown()
         server.server_close()
 
-    # Closed port should report refused with 0.0 latencies
-    closed_port = port + 1 if port < 65000 else port - 1
+    # Closed port for both
     results_closed = top.probe_peer_reachability(
-        ((2, "127.0.0.1"),), port=closed_port, timeout=0.2, probe_app_rtt=True
+        ((2, "127.0.0.1"),), port=closed_port, app_port=closed_port, timeout=0.2, probe_app_rtt=True
     )
     res_closed = results_closed[(2, "127.0.0.1")]
     assert res_closed.up is False
+    assert res_closed.app_up is False
     assert res_closed.connect_seconds == 0.0
     assert res_closed.app_rtt_seconds == 0.0
     assert res_closed.reason in ("refused", "timeout", "unreachable")
