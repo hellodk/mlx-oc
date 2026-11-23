@@ -231,20 +231,37 @@ def test_deploy_review_vmagent_command():
     """Verify deploy.sh review-vmagent runs cleanly and displays status/health checks."""
     import subprocess
     deploy_sh = BUNDLE_DIR / "scripts" / "deploy.sh"
-    env = dict(os.environ, SKIP_GIT_PULL="1")
-    proc = subprocess.run(
-        [str(deploy_sh), "review-vmagent"],
-        capture_output=True,
-        text=True,
-        cwd=str(REPO_ROOT),
-        stdin=subprocess.DEVNULL,
-        env=env,
-        timeout=30,
-    )
-    assert proc.returncode == 0, f"deploy.sh review-vmagent failed: {proc.stderr}"
-    assert "vmagent Edge Configuration Review" in proc.stdout
-    assert "Fail Checks & Health:" in proc.stdout
-    assert "Scrape Targets (Local Exporters):" in proc.stdout
+    edge_cfg = BUNDLE_DIR / "edge" / "config"
+    edge_env = edge_cfg / "edge.env"
+    nodes_yml = edge_cfg / "nodes.yml"
+    created_env = False
+    created_nodes = False
+    if not edge_env.exists() and (edge_cfg / "edge.env.template").exists():
+        edge_env.write_text((edge_cfg / "edge.env.template").read_text(encoding="utf8"), encoding="utf8")
+        created_env = True
+    if not nodes_yml.exists() and (edge_cfg / "nodes.yml.template").exists():
+        nodes_yml.write_text((edge_cfg / "nodes.yml.template").read_text(encoding="utf8"), encoding="utf8")
+        created_nodes = True
+    try:
+        env = dict(os.environ, SKIP_GIT_PULL="1")
+        proc = subprocess.run(
+            [str(deploy_sh), "review-vmagent"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            stdin=subprocess.DEVNULL,
+            env=env,
+            timeout=30,
+        )
+        assert proc.returncode == 0, f"deploy.sh review-vmagent failed: {proc.stderr}"
+        assert "vmagent Edge Configuration Review" in proc.stdout
+        assert "Fail Checks & Health:" in proc.stdout
+        assert "Scrape Targets (Local Exporters):" in proc.stdout
+    finally:
+        if created_env and edge_env.exists():
+            edge_env.unlink()
+        if created_nodes and nodes_yml.exists():
+            nodes_yml.unlink()
 
 
 def test_deploy_review_grafana_command():
