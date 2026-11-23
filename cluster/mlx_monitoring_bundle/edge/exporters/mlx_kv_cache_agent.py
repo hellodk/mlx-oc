@@ -19,8 +19,10 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import shlex
 import signal
 import socket
+import subprocess
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -39,6 +41,10 @@ from mlx_logging import (
     setup_logging,
 )
 from mlx_model_info import model_info as _model_info
+try:
+    from mlx_shard_topology import discover_shard_placement
+except ImportError:
+    discover_shard_placement = None
 
 LISTEN_DEFAULT = "127.0.0.1:9104"
 POLL_INTERVAL_DEFAULT = 5.0
@@ -176,9 +182,37 @@ def _resolve_model(args_model: str | None, upstream_url: str,
     return None
 
 
+def _discover_prompt_cache_size(args_prompt_cache_size: int | None = None) -> int:
+    """Discover prompt cache sequence depth from argument, env, or running server process."""
+    if args_prompt_cache_size and args_prompt_cache_size > 0:
+        return args_prompt_cache_size
+    env_val = os.environ.get("MLX_PROMPT_CACHE_SIZE", "") or os.environ.get("MLX_MAX_SEQUENCES", "")
+    if env_val.isdigit() and int(env_val) > 0:
+        return int(env_val)
+    try:
+        out = subprocess.check_output(
+            ["ps", "-eo", "args="], text=True, stderr=subprocess.DEVNULL, timeout=2
+        )
+        for line in out.splitlines():
+            if "mlx_lm.server" in line:
+                tokens = shlex.split(line)
+                for i, tok in enumerate(tokens):
+                    if tok in ("--prompt-cache-size", "--max-sequences") and i + 1 < len(tokens):
+                        if tokens[i + 1].isdigit():
+                            return int(tokens[i + 1])
+                    if tok.startswith("--prompt-cache-size="):
+                        v = tok.split("=", 1)[1]
+                        if v.isdigit():
+                            return int(v)
+    except Exception:
+        pass
+    return MAX_SEQ_DEFAULT
+
+
 def _update_gauges(log_path: str, model_name: str | None,
                    model_path: str | None = None,
-                   upstream_url: str | None = None) -> None:
+                   upstream_url: str | None = None,
+                   prompt_cache_size: int | None = None) -> None:
     stats = _read_cache_stats(log_path)
 
     for label in ("total", "assistant", "user", "system"):
@@ -190,7 +224,8 @@ def _update_gauges(log_path: str, model_name: str | None,
             G_SEQ.labels(type=label).set(0)
             G_BYTES.labels(type=label).set(0)
 
-    G_MAX_SEQ.set(MAX_SEQ_DEFAULT)
+    max_seq = _discover_prompt_cache_size(prompt_cache_size)
+    G_MAX_SEQ.set(max_seq)
 
     info_obj = None
     if model_name or model_path:
@@ -205,60 +240,81 @@ def _update_gauges(log_path: str, model_name: str | None,
                      component="kv-agent")
     kv_max_ctx_bytes = 0
     kv_max_ctx_bytes_shard = 0
+    shard_resolved = False
+
     if info_obj is not None:
         kv_max_ctx_bytes = info_obj.kv_bytes_for_max_context
 
-        # Discover shard parameters if configured
-        shard_layers = os.environ.get("MLX_SHARD_LAYERS", "").strip()
-        l_start = -1
-        l_end = -1
-        if shard_layers and ".." in shard_layers:
+        # Discover shard parameters using shared topology discovery
+        raw_rank_str = os.environ.get("MLX_RANK") or os.environ.get("MLX_SHARD_RANK", "")
+        raw_ws_str = os.environ.get("MLX_WORLD_SIZE") or os.environ.get("MLX_SHARD_WORLD_SIZE", "")
+        raw_rank = int(raw_rank_str) if raw_rank_str.isdigit() else None
+        raw_ws = int(raw_ws_str) if raw_ws_str.isdigit() else None
+
+        device_id = os.environ.get("MLX_DEVICE_ID") or os.environ.get("MLX_MACBOOK_ID") or ""
+        device_ip = os.environ.get("MLX_DEVICE_IP") or os.environ.get("NODE_IP") or ""
+        nodes_cfg = os.environ.get("MLX_NODES_CONFIG", "")
+        nodes_devices = None
+        if nodes_cfg and Path(nodes_cfg).is_file():
             try:
-                parts = shard_layers.split("..", 1)
-                l_start, l_end = int(parts[0]), int(parts[1])
-            except (ValueError, TypeError):
-                pass
-        elif shard_layers and "-" in shard_layers:
-            try:
-                parts = shard_layers.split("-", 1)
-                l_start, l_end = int(parts[0]), int(parts[1])
-            except (ValueError, TypeError):
+                import yaml
+                data = yaml.safe_load(Path(nodes_cfg).read_text(encoding="utf8"))
+                if isinstance(data, dict):
+                    nodes_devices = data.get("macbooks") or []
+            except Exception:
                 pass
 
-        shard_rank = int(os.environ.get("MLX_SHARD_RANK", "0")) if os.environ.get("MLX_SHARD_RANK", "").isdigit() else 0
-        shard_world = int(os.environ.get("MLX_SHARD_WORLD_SIZE", "1")) if os.environ.get("MLX_SHARD_WORLD_SIZE", "").isdigit() else 1
-        shard_kv_heads = int(os.environ.get("MLX_SHARD_KV_HEADS", "0")) if os.environ.get("MLX_SHARD_KV_HEADS", "").isdigit() else 0
-        tp_size = int(os.environ.get("MLX_TP_SIZE", "1")) if os.environ.get("MLX_TP_SIZE", "").isdigit() else 1
+        if discover_shard_placement is not None:
+            placement = discover_shard_placement(
+                model_info_obj=info_obj,
+                model_id=model_name or "",
+                model_path=model_path or "",
+                process_pattern=os.environ.get("MLX_PROCESS_PATTERN", "mlx_lm.server"),
+                hostfile=os.environ.get("MLX_HOSTFILE", ""),
+                mode_override=os.environ.get("MLX_PARALLEL_MODE", ""),
+                backend_override=os.environ.get("MLX_DISTRIBUTED_BACKEND", ""),
+                rank_override=raw_rank,
+                world_override=raw_ws,
+                device_ip=device_ip,
+                device_id=device_id,
+                shard_layers_override=os.environ.get("MLX_SHARD_LAYERS", ""),
+                nodes_devices=nodes_devices,
+            )
 
-        if l_start < 0 and info_obj.num_layers > 0:
-            if shard_world > 1:
-                per_rank = info_obj.num_layers // shard_world
-                rem = info_obj.num_layers % shard_world
-                l_start = shard_rank * per_rank + min(shard_rank, rem)
-                layers_here = per_rank + (1 if shard_rank < rem else 0)
-                l_end = max(l_start, l_start + layers_here - 1)
-            else:
-                l_start, l_end = 0, info_obj.num_layers - 1
+            shard_resolved = (
+                placement.world_size > 1
+                or bool(os.environ.get("MLX_SHARD_LAYERS"))
+                or placement.mode in ("pipeline", "tensor", "hybrid")
+                or raw_rank is not None
+            )
 
-        kv_max_ctx_bytes_shard = info_obj.kv_bytes_for_max_context_shard(
-            layer_start=max(0, l_start),
-            layer_end=l_end if l_end >= 0 else (info_obj.num_layers - 1),
-            dim_kv_heads=shard_kv_heads if shard_kv_heads > 0 else None,
-            tp_size=tp_size,
-        )
+            tp_size = placement.world_size if placement.mode == "tensor" else int(os.environ.get("MLX_TP_SIZE", "1") or "1")
+            kv_max_ctx_bytes_shard = info_obj.kv_bytes_for_max_context_shard(
+                layer_start=placement.layer_start,
+                layer_end=placement.layer_end,
+                dim_kv_heads=placement.dim_kv_heads if placement.dim_kv_heads > 0 else None,
+                tp_size=tp_size,
+                rank=placement.rank,
+            )
+        else:
+            shard_resolved = bool(raw_rank is not None or raw_ws and raw_ws > 1)
+            kv_max_ctx_bytes_shard = kv_max_ctx_bytes
 
     G_KV_MAX_CTX.set(kv_max_ctx_bytes)
-    G_KV_MAX_CTX_SHARD.set(kv_max_ctx_bytes_shard or kv_max_ctx_bytes)
+    if shard_resolved:
+        G_KV_MAX_CTX_SHARD.set(kv_max_ctx_bytes_shard)
+        effective_ctx_bytes = kv_max_ctx_bytes_shard
+    else:
+        G_KV_MAX_CTX_SHARD.set(kv_max_ctx_bytes)
+        effective_ctx_bytes = kv_max_ctx_bytes
 
     total_bytes = stats.get("total", (0, 0))[1]
     if not total_bytes:
         total_bytes = max((b for n, b in stats.values()), default=0)
 
-    # Configured server byte limit (e.g. from MLX_MAX_KV_SIZE) or theoretical capacity
     raw_max_bytes = os.environ.get("MLX_MAX_KV_SIZE", "")
     cfg_limit = int(raw_max_bytes) if raw_max_bytes.isdigit() and int(raw_max_bytes) > 0 else 0
-    effective_ctx_bytes = kv_max_ctx_bytes_shard if kv_max_ctx_bytes_shard > 0 else kv_max_ctx_bytes
-    capacity = cfg_limit if cfg_limit > 0 else (MAX_SEQ_DEFAULT * effective_ctx_bytes)
+    capacity = cfg_limit if cfg_limit > 0 else (max_seq * effective_ctx_bytes)
     G_KV_CAPACITY_SHARD.set(capacity)
     G_UTIL.set(total_bytes / capacity if capacity else 0.0)
 
@@ -296,6 +352,12 @@ def main():
         "--interval",
         type=float,
         default=float(os.environ.get("MLX_KV_INTERVAL", POLL_INTERVAL_DEFAULT)),
+    )
+    ap.add_argument(
+        "--prompt-cache-size",
+        type=int,
+        default=int(os.environ.get("MLX_PROMPT_CACHE_SIZE", "0")) or None,
+        help="Configured server prompt-cache depth (default: auto-discover)",
     )
     args = ap.parse_args()
 
@@ -335,6 +397,7 @@ def main():
                     model_name,
                     model_path=args.model_path,
                     upstream_url=upstream_base,
+                    prompt_cache_size=args.prompt_cache_size,
                 )
             except Exception as exc:
                 error(f"poll error: {exc!r}", component="kv-agent")

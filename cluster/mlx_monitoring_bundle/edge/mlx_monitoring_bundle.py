@@ -356,10 +356,23 @@ class Bundle:
             env.setdefault("MLX_NODES_CONFIG", str(NODES_FILE))
         if self.node_config.get("rank") is not None:
             env.setdefault("MLX_RANK", str(self.node_config["rank"]))
+            env.setdefault("MLX_SHARD_RANK", str(self.node_config["rank"]))
+        if self.node_config.get("world_size") is not None:
+            env.setdefault("MLX_WORLD_SIZE", str(self.node_config["world_size"]))
+            env.setdefault("MLX_SHARD_WORLD_SIZE", str(self.node_config["world_size"]))
         if self.node_config.get("shard_layers"):
             env.setdefault("MLX_SHARD_LAYERS", str(self.node_config["shard_layers"]))
+        if self.node_config.get("shard_kv_heads"):
+            env.setdefault("MLX_SHARD_KV_HEADS", str(self.node_config["shard_kv_heads"]))
+        if self.node_config.get("tp_size"):
+            env.setdefault("MLX_TP_SIZE", str(self.node_config["tp_size"]))
+        if self.node_config.get("prompt_cache_size"):
+            env.setdefault("MLX_PROMPT_CACHE_SIZE", str(self.node_config["prompt_cache_size"]))
         if self.node_config.get("hostfile"):
             env.setdefault("MLX_HOSTFILE", str(self.node_config["hostfile"]))
+        peer_port = self.node_config.get("peer_probe_port") or self.config.get("MLX_PEER_PROBE_PORT")
+        if peer_port:
+            env.setdefault("MLX_PEER_PROBE_PORT", str(peer_port))
         aliases = self.node_config.get("model_aliases") or self.config.get("MLX_MODEL_ALIASES")
         if aliases:
             if isinstance(aliases, (list, tuple)):

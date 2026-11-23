@@ -105,6 +105,40 @@ _OPIK = None
 _OPIK_OTLP = False
 _NODE_NAME = ""
 _MODEL_NAME = None  # resolved at startup: config > upstream discovery > None
+_MODEL_PATH = None
+
+_tokenizers: dict[str, Any] = {}
+_tokenizer_lock = threading.Lock()
+
+
+def _get_tokenizer_for_model(model_name: str, model_path: str | None = None) -> Any:
+    """Retrieve or load a Tokenizer for model_name / model_path if available."""
+    with _tokenizer_lock:
+        if model_name in _tokenizers:
+            return _tokenizers[model_name]
+        tok = None
+        paths_to_try: list[Path] = []
+        target_path = model_path or _MODEL_PATH
+        if target_path:
+            paths_to_try.append(Path(target_path))
+        if _model_info:
+            try:
+                info = _model_info(model_name, model_path=target_path)
+                if info and info.model_path:
+                    paths_to_try.append(Path(info.model_path))
+            except Exception:
+                pass
+        for p in paths_to_try:
+            tok_json = p / "tokenizer.json"
+            if tok_json.is_file():
+                try:
+                    from tokenizers import Tokenizer
+                    tok = Tokenizer.from_file(str(tok_json))
+                    break
+                except Exception:
+                    pass
+        _tokenizers[model_name] = tok
+        return tok
 
 _CTX_MAX_TOKENS = 0
 
@@ -248,27 +282,32 @@ TOKEN_RATE = Histogram(
 )
 PREFILL_TIME = Histogram(
     "mlx_prefill_seconds",
-    "Prompt evaluation / prefill duration per request",
+    "TTFT-derived prompt evaluation duration per request (client-to-first-token)",
     ["model"],
     buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0),
 )
 PREFILL_RATE = Histogram(
     "mlx_prefill_token_rate_tokens_per_second",
-    "Prompt tokens processed per second of prefill duration",
+    "Prompt tokens processed per second of TTFT-derived prompt duration",
     ["model"],
     buckets=(10, 25, 50, 100, 250, 500, 1000, 2000, 4000),
 )
 DECODE_TIME = Histogram(
     "mlx_decode_seconds",
-    "Autoregressive decode interval from first token to last token",
+    "Post-first-token streaming response duration",
     ["model"],
     buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0),
 )
 DECODE_RATE = Histogram(
     "mlx_decode_token_rate_tokens_per_second",
-    "Inter-token generation rate across decode interval",
+    "Completion tokens per second across post-first-token streaming decode interval",
     ["model"],
     buckets=(1, 2, 5, 10, 20, 40, 80, 160, 320, 640),
+)
+TOKENS_ESTIMATED = Counter(
+    "mlx_tokens_estimated_total",
+    "Prompt or completion tokens estimated via whitespace splitting when exact usage is unavailable",
+    ["model", "kind", "type"],
 )
 TOOL_CALLS = Counter(
     "mlx_tool_calls_total",
@@ -1421,15 +1460,32 @@ class Proxy(BaseHTTPRequestHandler):
                         debug(f"opik_trace.end failed: {exc2!r}", component="proxy")
                 return
 
+            tokens_exact = False
             if usage:
                 prompt_tokens = int(usage.get("prompt_tokens") or 0)
                 comp_tokens = int(usage.get("completion_tokens") or 0)
+                tokens_exact = True
             else:
-                prompt_tokens = sum(
-                    len(str(m.get("content", "")).split()) for m in messages
-                )
-                combined_comp = " ".join(p for p in (content, reasoning) if p)
-                comp_tokens = len(combined_comp.split())
+                tok = _get_tokenizer_for_model(model, _MODEL_PATH)
+                if tok is not None:
+                    try:
+                        prompt_tokens = sum(
+                            len(tok.encode(str(m.get("content", ""))).ids)
+                            for m in messages
+                        )
+                        combined_comp = " ".join(p for p in (content, reasoning) if p)
+                        comp_tokens = len(tok.encode(combined_comp).ids)
+                        tokens_exact = True
+                    except Exception:
+                        tokens_exact = False
+                if not tokens_exact:
+                    prompt_tokens = sum(
+                        len(str(m.get("content", "")).split()) for m in messages
+                    )
+                    combined_comp = " ".join(p for p in (content, reasoning) if p)
+                    comp_tokens = len(combined_comp.split())
+                    TOKENS_ESTIMATED.labels(model, kind, "prompt").inc(prompt_tokens)
+                    TOKENS_ESTIMATED.labels(model, kind, "completion").inc(comp_tokens)
             TOKENS_PROMPT.labels(model, kind).inc(prompt_tokens)
             TOKENS_COMPLETION.labels(model, kind).inc(comp_tokens)
             if usage:
@@ -1456,17 +1512,17 @@ class Proxy(BaseHTTPRequestHandler):
                 # Prefill telemetry
                 prefill_dur = ttft
                 PREFILL_TIME.labels(model).observe(prefill_dur)
-                if prompt_tokens > 0 and prefill_dur > 0:
+                if prompt_tokens > 0 and prefill_dur > 0 and tokens_exact:
                     PREFILL_RATE.labels(model).observe(prompt_tokens / prefill_dur)
 
                 # Decode telemetry
                 decode_dur = max(0.0, t_done - t_first_token)
                 DECODE_TIME.labels(model).observe(decode_dur)
-                if comp_tokens > 1 and decode_dur > 0:
+                if comp_tokens > 1 and decode_dur > 0 and tokens_exact:
                     # Number of inter-token intervals is (completion_tokens - 1)
                     DECODE_RATE.labels(model).observe((comp_tokens - 1) / decode_dur)
 
-            if comp_tokens > 0 and gen_time > 0:
+            if comp_tokens > 0 and gen_time > 0 and tokens_exact:
                 TOKEN_RATE.labels(model).observe(comp_tokens / gen_time)
 
             REQUESTS.labels(model, "true" if streaming else "false", kind).inc()
@@ -1930,6 +1986,7 @@ def main():
     Proxy.model_aliases = [a.strip() for a in aliases_raw.split(",") if a.strip()]
 
     upstream_url = Proxy.upstream[3]
+    _MODEL_PATH = args.model_path
     _MODEL_NAME = _resolve_model(args.model, upstream_url, args.model_path)
 
     TOOL_CALLS.labels(model=_MODEL_NAME or "unknown", kind="", tool="", type="").inc(0)

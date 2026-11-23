@@ -528,9 +528,9 @@ def discover_shard_placement(
         elif model_info_obj.num_key_value_heads % tp_div == 0:
             dim_kv = model_info_obj.num_key_value_heads // tp_div
         else:
-            # GQA replication: when KV heads cannot be evenly partitioned across TP ranks,
-            # each rank retains ceil allocation
-            dim_kv = max(1, math.ceil(model_info_obj.num_key_value_heads / tp_div))
+            base = model_info_obj.num_key_value_heads // tp_div
+            rem = model_info_obj.num_key_value_heads % tp_div
+            dim_kv = max(1, base + (1 if rank < rem else 0))
     else:
         dim_kv = 0
     dim_inter = (

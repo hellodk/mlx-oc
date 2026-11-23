@@ -2598,9 +2598,8 @@ def test_peer_reachability_distinguishes_success_refusal_and_measures_latency():
 
 
 def test_shard_aware_kv_cache_calculations(tmp_path):
-    """Verify ModelInfo and kv-cache agent calculate shard-aware KV dimensions and capacity."""
+    """Verify ModelInfo calculates shard-aware KV dimensions across PP, TP, hybrid, and sliding window."""
     from mlx_model_info import model_info as _mi
-    import mlx_kv_cache_agent as kva
 
     # Create hybrid attention model (32 layers total, 8 full-attention layers at interval=4)
     mdir = tmp_path / "HybridModel"
@@ -2632,33 +2631,203 @@ def test_shard_aware_kv_cache_calculations(tmp_path):
     assert pp_kv_rank0 == 16384
     assert mi.kv_bytes_for_max_context_shard(layer_start=0, layer_end=15) == 16384 * 8192
 
-    # Tensor Parallelism with uneven GQA split: 8 KV heads with TP=3 -> ceil(8/3) = 3 heads per rank
-    # Local KV: 2 * 8 * 3 * 128 * 2 = 12,288 bytes/tok
-    tp_kv = mi.kv_bytes_per_token_for_shard(layer_start=0, layer_end=31, tp_size=3)
-    assert tp_kv == 12288
+    # Zero attention layer shard (layers 0..2 contain 0 attention layers): KV should be 0
+    zero_kv = mi.kv_bytes_per_token_for_shard(layer_start=0, layer_end=2)
+    assert zero_kv == 0
+    assert mi.kv_bytes_for_max_context_shard(layer_start=0, layer_end=2) == 0
+
+    # Tensor Parallelism with uneven GQA split: 8 KV heads with TP=3
+    # Rank 0 and 1 receive 3 heads (8//3 + 1), Rank 2 receives 2 heads (8//3)
+    tp_kv_r0 = mi.kv_bytes_per_token_for_shard(layer_start=0, layer_end=31, tp_size=3, rank=0)
+    assert tp_kv_r0 == 2 * 8 * 3 * 128 * 2  # 12,288 bytes/tok
+    tp_kv_r1 = mi.kv_bytes_per_token_for_shard(layer_start=0, layer_end=31, tp_size=3, rank=1)
+    assert tp_kv_r1 == 12288
+    tp_kv_r2 = mi.kv_bytes_per_token_for_shard(layer_start=0, layer_end=31, tp_size=3, rank=2)
+    assert tp_kv_r2 == 2 * 8 * 2 * 128 * 2  # 8,192 bytes/tok
+    # Total KV head slots across 3 ranks: 3 + 3 + 2 = 8 heads exactly!
+
+    # Explicit per-node override via dim_kv_heads
+    tp_kv_override = mi.kv_bytes_per_token_for_shard(layer_start=0, layer_end=31, dim_kv_heads=4)
+    assert tp_kv_override == 2 * 8 * 4 * 128 * 2  # 16,384 bytes/tok
 
     # Hybrid TP + PP: layers 0..15 (4 attn layers) and TP=2 (8//2 = 4 KV heads)
     # Local KV: 2 * 4 * 4 * 128 * 2 = 8,192 bytes/tok
     hybrid_kv = mi.kv_bytes_per_token_for_shard(layer_start=0, layer_end=15, tp_size=2)
     assert hybrid_kv == 8192
 
+    # Sliding window model test: 4 layers (2 full_attention, 2 sliding_attention with sliding_window=2048)
+    sw_dir = tmp_path / "SlidingModel"
+    sw_dir.mkdir()
+    (sw_dir / "config.json").write_text(
+        json.dumps({
+            "num_hidden_layers": 4,
+            "hidden_size": 2048,
+            "num_attention_heads": 16,
+            "num_key_value_heads": 4,
+            "head_dim": 128,
+            "layer_types": ["full_attention", "sliding_attention", "full_attention", "sliding_attention"],
+            "sliding_window": 2048,
+            "max_position_embeddings": 8192,
+            "dtype": "float16",
+        }),
+        encoding="utf8",
+    )
+    sw_mi = _mi("SlidingModel", model_path=str(sw_dir), refresh=True)
+    assert sw_mi is not None
+    assert len(sw_mi.attention_layer_indices) == 4
+    assert len(sw_mi.sliding_layer_indices) == 2
+    # Bytes per token per layer = 2 * 4 * 128 * 2 = 2048 bytes
+    # For max context: 2 full layers * 8192 * 2048 + 2 sliding layers * 2048 * 2048
+    expected_sw_ctx_bytes = (2 * 8192 * 2048) + (2 * 2048 * 2048)
+    assert sw_mi.kv_bytes_for_max_context == expected_sw_ctx_bytes
 
-def test_proxy_prefill_and_decode_phase_telemetry(monkeypatch):
-    """Verify proxy disaggregates prefill and decode metrics for streaming and avoids fake TTFT for non-streaming."""
+
+def test_kv_cache_agent_topology_and_capacity_integration(tmp_path, monkeypatch):
+    """Verify kv-cache agent consumes discover_shard_placement, honors MLX_RANK, and does not fallback to full model on 0 KV allocation."""
+    from mlx_model_info import model_info as _mi
+    import mlx_kv_cache_agent as kva
+
+    mdir = tmp_path / "KVModel"
+    mdir.mkdir()
+    (mdir / "config.json").write_text(
+        json.dumps({
+            "num_hidden_layers": 32,
+            "hidden_size": 4096,
+            "num_attention_heads": 32,
+            "num_key_value_heads": 8,
+            "head_dim": 128,
+            "full_attention_interval": 4,
+            "max_position_embeddings": 8192,
+            "dtype": "float16",
+        }),
+        encoding="utf8",
+    )
+    server_log = tmp_path / "server.log"
+    server_log.write_text("Prompt Cache: 2 sequences, 0.50 GB\n- total: 2 sequences, 0.50 GB\n")
+
+    # 1. Pipeline Rank 0: layers 0..15 (4 attention layers)
+    monkeypatch.setenv("MLX_RANK", "0")
+    monkeypatch.setenv("MLX_WORLD_SIZE", "2")
+    monkeypatch.setenv("MLX_SHARD_LAYERS", "0..15")
+    monkeypatch.setenv("MLX_PROMPT_CACHE_SIZE", "15")
+
+    kva._update_gauges(str(server_log), "KVModel", model_path=str(mdir))
+
+    # G_MAX_SEQ should reflect MLX_PROMPT_CACHE_SIZE=15
+    assert kva.G_MAX_SEQ._value.get() == 15
+    # Rank 0 has 4 attention layers: 4 * 2 * 8 * 128 * 2 * 8192 = 134,217,728 bytes
+    expected_shard_bytes = 4 * 2 * 8 * 128 * 2 * 8192
+    assert kva.G_KV_MAX_CTX_SHARD._value.get() == expected_shard_bytes
+    assert kva.G_KV_CAPACITY_SHARD._value.get() == 15 * expected_shard_bytes
+
+    # 2. Shard with 0 attention layers (layers 0..2)
+    monkeypatch.setenv("MLX_SHARD_LAYERS", "0..2")
+    kva._update_gauges(str(server_log), "KVModel", model_path=str(mdir))
+    # Must be 0 bytes, NOT fall back to full model allocation
+    assert kva.G_KV_MAX_CTX_SHARD._value.get() == 0
+    assert kva.G_KV_CAPACITY_SHARD._value.get() == 0
+
+
+def test_proxy_request_path_prefill_and_decode_telemetry(monkeypatch):
+    """Verify proxy executes request path, observes prefill/decode for SSE, avoids fake TTFT for non-streaming, and separates estimates."""
+    import sys
+    import threading
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    sys.path.insert(0, str(BUNDLE_DIR / "edge" / "exporters"))
     import mlx_metrics_proxy as p
+    import test_proxy_rewrite as tpr
 
-    # Ensure clean histogram observation
-    model = "test-phase-model"
+    server = tpr.ThreadingHTTPServer(("127.0.0.1", 0), tpr.StubUpstream)
+    u_port = server.server_address[1]
+    threading.Thread(target=server.serve_forever, daemon=True).start()
 
-    # 1. Streaming response simulation: t_send=10.0, t_first_token=10.5, t_done=12.0, comp_tokens=16, prompt_tokens=100
-    p.PREFILL_TIME.labels(model).observe(0.5)
-    p.PREFILL_RATE.labels(model).observe(100.0 / 0.5)
-    p.DECODE_TIME.labels(model).observe(1.5)
-    # (16 - 1) / 1.5 = 10.0 tok/s
-    p.DECODE_RATE.labels(model).observe((16 - 1) / 1.5)
+    monkeypatch.setattr(p.Proxy, "upstream", ("127.0.0.1", u_port))
+    monkeypatch.setattr(p.Proxy, "metrics_path", "/metrics")
+    monkeypatch.setattr(p, "_MODEL_NAME", tpr.MODEL)
+    monkeypatch.setattr(p.Proxy, "stream_sample", 0.0)
+    monkeypatch.setattr(p.Proxy, "logprobs_top", 0)
+    monkeypatch.setattr(p.Proxy, "strict_model", False)
 
-    prom = p.generate_latest().decode()
-    assert 'mlx_prefill_seconds_count{model="test-phase-model"}' in prom
-    assert 'mlx_prefill_token_rate_tokens_per_second_count{model="test-phase-model"}' in prom
-    assert 'mlx_decode_seconds_count{model="test-phase-model"}' in prom
-    assert 'mlx_decode_token_rate_tokens_per_second_count{model="test-phase-model"}' in prom
+    proxy_srv = tpr.ThreadingHTTPServer(("127.0.0.1", 0), p.Proxy)
+    p_port = proxy_srv.server_address[1]
+    threading.Thread(target=proxy_srv.serve_forever, daemon=True).start()
+
+    base = f"http://127.0.0.1:{p_port}"
+    try:
+        # Initial metric counts
+        m_init = tpr.metrics(base)
+        ttft_init = tpr.series(m_init, "mlx_ttft_seconds_count")
+        prefill_init = tpr.series(m_init, "mlx_prefill_seconds_count")
+        decode_init = tpr.series(m_init, "mlx_decode_seconds_count")
+
+        # 1. Non-streaming request -> Must NOT observe TTFT, prefill, or decode
+        tpr.post(
+            base,
+            {
+                "model": tpr.MODEL,
+                "stream": False,
+                "messages": [{"role": "user", "content": "non-streaming prompt"}],
+            },
+        )
+        m_ns = tpr.metrics(base)
+        assert tpr.series(m_ns, "mlx_ttft_seconds_count") == ttft_init
+        assert tpr.series(m_ns, "mlx_prefill_seconds_count") == prefill_init
+        assert tpr.series(m_ns, "mlx_decode_seconds_count") == decode_init
+
+        # 2. Streaming request with SSE chunks -> Must observe TTFT, prefill, decode
+        tpr.post(
+            base,
+            {
+                "model": tpr.MODEL,
+                "stream": True,
+                "messages": [{"role": "user", "content": "streaming prompt"}],
+            },
+        )
+        m_stream = tpr.metrics(base)
+        assert tpr.series(m_stream, "mlx_ttft_seconds_count") == ttft_init + 1
+        assert tpr.series(m_stream, "mlx_prefill_seconds_count") == prefill_init + 1
+        assert tpr.series(m_stream, "mlx_decode_seconds_count") == decode_init + 1
+
+        # Check estimated token metrics: stub upstream didn't send usage and no tokenizer file was loaded
+        est_tokens = tpr.series(m_stream, "mlx_tokens_estimated_total")
+        assert est_tokens > 0, "Whitespace fallback must record into mlx_tokens_estimated_total"
+    finally:
+        proxy_srv.shutdown()
+        proxy_srv.server_close()
+        server.shutdown()
+        server.server_close()
+
+
+def test_peer_probe_port_and_alert_dashboard_consistency():
+    """Verify peer probe defaults to 8081, MLXPrefillSlow is removed, and alert labels match."""
+    # 1. Template default port check
+    template_text = (BUNDLE_DIR / "edge" / "config" / "edge.env.template").read_text(encoding="utf8")
+    assert "MLX_PEER_PROBE_PORT=8081" in template_text
+    assert "MLX_PEER_PROBE_PORT=22" not in template_text
+
+    # 2. Supervisor argument default check
+    import mlx_server_supervisor as sup
+    assert sup._parse_int_env("MLX_PEER_PROBE_PORT", 8081) == 8081
+
+    # 3. vmalert-rules check: no MLXPrefillSlow duplicate, and correct labels
+    alert_text = (BUNDLE_DIR / "central" / "config" / "vmalert-rules.yml").read_text(encoding="utf8")
+    assert "alert: MLXPrefillSlow" not in alert_text, "Duplicate MLXPrefillSlow alert must be removed"
+    assert "alert: MLXShardPeerLatencyHigh" in alert_text
+    assert "sum by (le, device, rank, peer_rank, peer_ip)" in alert_text
+    # MLXShardMemoryOverbudget must not have dangling rank label
+    assert "GPU memory allocated >85% on {{ $labels.device }}" in alert_text
+    assert "leaving minimal headroom for KV cache and activations on this shard node." in alert_text
+
+    # 4. Dashboard queries check
+    inf_dash = json.loads((BUNDLE_DIR / "central" / "dashboards" / "inference.json").read_text(encoding="utf8"))
+    titles = [p.get("title") for p in inf_dash.get("panels", [])]
+    assert "Mean Per-Request Prefill & Decode Rate (tok/s)" in titles
+    assert "Prompt-to-First-Token & Streaming Decode Duration (p95)" in titles
+
+    sharding_dash = json.loads((BUNDLE_DIR / "central" / "dashboards" / "model-sharding.json").read_text(encoding="utf8"))
+    dash_targets = []
+    for p in sharding_dash.get("panels", []):
+        dash_targets.extend(p.get("targets", []))
+    peer_exprs = [t.get("expr", "") for t in dash_targets if "mlx_shard_peer_connect_seconds" in t.get("expr", "")]
+    for expr in peer_exprs:
+        assert "sum by (le, device, rank, peer_rank, peer_ip)" in expr

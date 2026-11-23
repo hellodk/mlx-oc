@@ -26,4 +26,8 @@ macbooks:
     # Optional distributed sharding metadata (auto-detected from process/hostfile if omitted)
     # hostfile: "/path/to/hosts.json"
     # rank: 0
+    # world_size: 2
     # shard_layers: "0..15"
+    # shard_kv_heads: 4
+    # tp_size: 1
+    # prompt_cache_size: 10

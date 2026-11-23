@@ -87,6 +87,7 @@ class ModelInfo:
     total_weight_bytes: int = 0
     shard_file_count: int = 0
     attention_layer_indices: tuple[int, ...] = ()
+    sliding_layer_indices: tuple[int, ...] = ()
 
     @property
     def bytes_per_element(self) -> int:
@@ -122,7 +123,12 @@ class ModelInfo:
 
     @property
     def kv_bytes_for_max_context(self) -> int:
-        return self.kv_bytes_per_token * self.max_context_tokens
+        return self.kv_bytes_for_max_context_shard(
+            layer_start=0,
+            layer_end=self.num_layers - 1,
+            tp_size=1,
+            rank=0,
+        )
 
     def kv_bytes_per_token_for_shard(
         self,
@@ -130,6 +136,7 @@ class ModelInfo:
         layer_end: int = -1,
         dim_kv_heads: int | None = None,
         tp_size: int = 1,
+        rank: int = 0,
     ) -> int:
         """KV cache bytes per token on this shard (supporting PP, TP, and hybrid).
 
@@ -150,7 +157,9 @@ class ModelInfo:
             if self.num_key_value_heads % tp_size == 0:
                 local_kv_heads = max(1, self.num_key_value_heads // tp_size)
             else:
-                local_kv_heads = max(1, math.ceil(self.num_key_value_heads / tp_size))
+                base = self.num_key_value_heads // tp_size
+                rem = self.num_key_value_heads % tp_size
+                local_kv_heads = max(1, base + (1 if rank < rem else 0))
         else:
             local_kv_heads = self.num_key_value_heads
 
@@ -168,14 +177,45 @@ class ModelInfo:
         layer_end: int = -1,
         dim_kv_heads: int | None = None,
         tp_size: int = 1,
+        rank: int = 0,
     ) -> int:
-        """Approx KV bytes for one full-length context sequence on this shard."""
-        return self.kv_bytes_per_token_for_shard(
-            layer_start=layer_start,
-            layer_end=layer_end,
-            dim_kv_heads=dim_kv_heads,
-            tp_size=tp_size,
-        ) * self.max_context_tokens
+        """Approx KV bytes for one full-length context sequence on this shard,
+        properly applying sliding window bounds to sliding-attention layers."""
+        if not (self.num_layers and self.head_dim and self.num_key_value_heads):
+            return 0
+        if layer_end < 0:
+            layer_end = self.num_layers - 1
+
+        all_indices = self.attention_layer_indices or tuple(range(self.attention_layers))
+        sliding_set = set(self.sliding_layer_indices)
+        full_set = set(all_indices) - sliding_set
+
+        local_full = sum(1 for i in full_set if layer_start <= i <= layer_end)
+        local_sliding = sum(1 for i in sliding_set if layer_start <= i <= layer_end)
+
+        if dim_kv_heads is not None and dim_kv_heads > 0:
+            local_kv_heads = dim_kv_heads
+        elif tp_size > 1:
+            if self.num_key_value_heads % tp_size == 0:
+                local_kv_heads = max(1, self.num_key_value_heads // tp_size)
+            else:
+                base = self.num_key_value_heads // tp_size
+                rem = self.num_key_value_heads % tp_size
+                local_kv_heads = max(1, base + (1 if rank < rem else 0))
+        else:
+            local_kv_heads = self.num_key_value_heads
+
+        bytes_per_tok_one_layer = (
+            2 * local_kv_heads * self.head_dim * self.bytes_per_element
+        )
+        sliding_ctx = (
+            min(self.max_context_tokens, self.sliding_window)
+            if self.sliding_window > 0
+            else self.max_context_tokens
+        )
+        return bytes_per_tok_one_layer * (
+            local_full * self.max_context_tokens + local_sliding * sliding_ctx
+        )
 
 
 def _expand(path: str) -> Path:
@@ -333,6 +373,23 @@ def _attention_layer_indices(text: dict[str, Any], num_layers: int) -> tuple[int
     return tuple(range(num_layers)) if num_layers > 0 else ()
 
 
+def _sliding_attention_layer_indices(text: dict[str, Any], num_layers: int) -> tuple[int, ...]:
+    layer_types = text.get("layer_types")
+    if isinstance(layer_types, list) and layer_types:
+        return tuple(
+            i
+            for i, item in enumerate(layer_types[:num_layers])
+            if str(item) == "sliding_attention"
+        )
+    sliding_win = _first_int(text, "sliding_window")
+    interval = _first_int(text, "full_attention_interval")
+    if interval > 0 and sliding_win > 0 and num_layers > 0:
+        return tuple(i for i in range(num_layers) if (i + 1) % interval != 0)
+    if sliding_win > 0 and num_layers > 0:
+        return tuple(range(num_layers))
+    return ()
+
+
 def _parse_config(path: Path, model_id: str, data: dict[str, Any]) -> ModelInfo:
     text = data.get("text_config")
     if not isinstance(text, dict):
@@ -351,6 +408,7 @@ def _parse_config(path: Path, model_id: str, data: dict[str, Any]) -> ModelInfo:
         head_dim = hidden_size // num_attention_heads
 
     attn_indices = _attention_layer_indices(text, num_layers)
+    sliding_indices = _sliding_attention_layer_indices(text, num_layers)
     attention_layers = len(attn_indices) if attn_indices else _attention_layer_count(text, num_layers)
     linear_layers = max(0, num_layers - attention_layers)
 
@@ -425,6 +483,7 @@ def _parse_config(path: Path, model_id: str, data: dict[str, Any]) -> ModelInfo:
         total_weight_bytes=total_weight_bytes,
         shard_file_count=shard_file_count,
         attention_layer_indices=attn_indices,
+        sliding_layer_indices=sliding_indices,
     )
 
 

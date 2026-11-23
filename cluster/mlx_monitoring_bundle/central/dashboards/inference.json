@@ -240,7 +240,7 @@
     },
     {
       "type": "timeseries",
-      "title": "Prefill & Decode Throughput (tok/s)",
+      "title": "Mean Per-Request Prefill & Decode Rate (tok/s)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
@@ -268,7 +268,7 @@
     },
     {
       "type": "timeseries",
-      "title": "Prefill & Decode Duration (p95)",
+      "title": "Prompt-to-First-Token & Streaming Decode Duration (p95)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 12,
