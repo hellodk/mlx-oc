@@ -324,7 +324,7 @@ def _update_gauges(log_path: str, model_name: str | None,
     G_KV_CAPACITY_SHARD.set(capacity)
     G_UTIL.set(total_bytes / capacity if capacity else 0.0)
 
-    is_exact = getattr(placement, "kv_heads_exact", True) if placement is not None else True
+    is_exact = getattr(placement, "kv_heads_exact", False) if placement is not None else False
     G_KV_EXACT.set(1.0 if is_exact else 0.0)
 
 

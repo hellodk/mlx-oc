@@ -774,8 +774,8 @@ def probe_peer_app(
 ) -> dict[tuple[int, str], PeerAppResult]:
     """Measure application request/response round-trip time (RTT) to peer service endpoint.
 
-    Isolates application-level RTT from TCP connection establishment by starting the
-    request timer strictly after the socket connection is established.
+    Measures complete application round-trip time (request write through complete response body receipt),
+    strictly isolated from TCP connection establishment.
     """
     status: dict[tuple[int, str], PeerAppResult] = {}
     if port <= 0:
@@ -800,8 +800,45 @@ def probe_peer_app(
                 ).encode("ascii")
                 t_req = time.monotonic()
                 sock.sendall(req)
-                resp_bytes = sock.recv(512)
+
+                chunks: list[bytes] = []
+                header_end = -1
+                content_length: int | None = None
+                is_chunked = False
+
+                while True:
+                    chunk = sock.recv(4096)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    if header_end == -1:
+                        buf = b"".join(chunks)
+                        pos = buf.find(b"\r\n\r\n")
+                        if pos != -1:
+                            header_end = pos + 4
+                            hdr_text = buf[:pos].decode("latin1", "replace")
+                            for line in hdr_text.split("\r\n")[1:]:
+                                if ":" in line:
+                                    k, v = line.split(":", 1)
+                                    k_lower = k.strip().lower()
+                                    if k_lower == "content-length":
+                                        try:
+                                            content_length = int(v.strip())
+                                        except ValueError:
+                                            pass
+                                    elif k_lower == "transfer-encoding" and "chunked" in v.lower():
+                                        is_chunked = True
+                    if header_end != -1 and content_length is not None and not is_chunked:
+                        current_body_len = sum(len(c) for c in chunks) - header_end
+                        if current_body_len >= content_length:
+                            break
+                    if is_chunked:
+                        buf = b"".join(chunks)
+                        if buf.endswith(b"0\r\n\r\n"):
+                            break
+
                 elapsed = max(0.0, time.monotonic() - t_req)
+                resp_bytes = b"".join(chunks)
                 status_code = 0
                 is_http = False
                 if resp_bytes:

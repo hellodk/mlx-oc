@@ -3100,7 +3100,7 @@ def test_kv_cache_agent_unbound_local_error_when_model_info_none(tmp_path):
         prompt_cache_size=10,
     )
     text = generate_latest().decode()
-    assert "mlx_kv_cache_shard_exact" in text
+    assert "mlx_kv_cache_shard_exact 0.0" in text
 
 
 def test_peer_app_probe_isolates_app_rtt_and_rejects_non_http():
