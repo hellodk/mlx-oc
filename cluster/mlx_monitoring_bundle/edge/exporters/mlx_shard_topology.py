@@ -11,12 +11,14 @@ safetensors index files. Never starts, stops, or alters any server process.
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import shlex
 import socket
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -26,6 +28,18 @@ from mlx_model_info import ModelInfo
 
 _LAYER_KEY_RE = re.compile(r"(?:^|\.)(?:layers|h|blocks)\.(\d+)\.")
 _SHARD_NUM_RE = re.compile(r"-(\d+)-of-\d+\.safetensors$")
+
+
+@dataclass(frozen=True)
+class PeerProbeResult:
+    """Reachability status and connect duration for a single peer rank."""
+
+    up: bool
+    connect_seconds: float
+    reason: str  # "connected", "refused", "timeout", "unreachable", "disabled"
+
+    def __bool__(self) -> bool:
+        return self.up
 
 
 @dataclass(frozen=True)
@@ -505,11 +519,20 @@ def discover_shard_placement(
 
     tp_div = max(1, runtime["tp_size"] or (world_size if mode == "tensor" else 1))
     dim_hidden = model_info_obj.hidden_size if model_info_obj else 0
-    dim_kv = (
-        max(1, model_info_obj.num_key_value_heads // tp_div)
-        if model_info_obj and model_info_obj.num_key_value_heads
-        else 0
-    )
+    raw_shard_kv = os.environ.get("MLX_SHARD_KV_HEADS", "")
+    if raw_shard_kv and raw_shard_kv.isdigit():
+        dim_kv = int(raw_shard_kv)
+    elif model_info_obj and model_info_obj.num_key_value_heads:
+        if tp_div <= 1:
+            dim_kv = model_info_obj.num_key_value_heads
+        elif model_info_obj.num_key_value_heads % tp_div == 0:
+            dim_kv = model_info_obj.num_key_value_heads // tp_div
+        else:
+            # GQA replication: when KV heads cannot be evenly partitioned across TP ranks,
+            # each rank retains ceil allocation
+            dim_kv = max(1, math.ceil(model_info_obj.num_key_value_heads / tp_div))
+    else:
+        dim_kv = 0
     dim_inter = (
         max(1, model_info_obj.intermediate_size // tp_div)
         if model_info_obj and model_info_obj.intermediate_size
@@ -553,8 +576,14 @@ def discover_shard_placement(
             "node_ip": transport_ip,
         })
 
-    expected_cnt = len(index_info["expected_files"])
-    present_cnt = len(index_info["present_files"])
+    total_model_files = len(index_info["expected_files"])
+    if rank_files:
+        expected_cnt = len(rank_files)
+        present_cnt = sum(1 for f in rank_files if f in index_info.get("present_files", []))
+    else:
+        expected_cnt = total_model_files
+        present_cnt = len(index_info["present_files"])
+
     return ShardPlacement(
         model_id=model_id or "unknown",
         rank=rank,
@@ -565,7 +594,7 @@ def discover_shard_placement(
         layer_end=l_end,
         layers_assigned=layers_assigned,
         layer_range=layer_range,
-        shard_files=_summarize_shard_files(rank_files, expected_cnt),
+        shard_files=_summarize_shard_files(rank_files, total_model_files),
         shard_files_present=present_cnt,
         shard_files_expected=expected_cnt,
         expected_weight_bytes=exp_bytes,
@@ -581,22 +610,45 @@ def discover_shard_placement(
 
 def probe_peer_reachability(
     peers: tuple[tuple[int, str], ...],
-    port: int = 22,
+    port: int = 8081,
     timeout: float = 0.5,
-) -> dict[tuple[int, str], bool]:
-    """Passively check TCP reachability of peer ranks (e.g. ring SSH/transport)."""
-    status: dict[tuple[int, str], bool] = {}
+) -> dict[tuple[int, str], PeerProbeResult]:
+    """Passively check TCP reachability & connect latency of peer ranks.
+
+    Defaults to MLX distributed transport / upstream service port (default 8081).
+    Distinguishes successful connection from ConnectionRefusedError, timeout,
+    and host unreachable. ConnectionRefusedError marks the transport as DOWN
+    because the target service is not listening.
+    """
+    status: dict[tuple[int, str], PeerProbeResult] = {}
     if port <= 0:
         return status
     for pr, pip in peers:
-        reachable = False
+        t0 = time.monotonic()
         try:
             with socket.create_connection((pip, port), timeout=timeout):
-                reachable = True
+                elapsed = max(0.0, time.monotonic() - t0)
+                status[(pr, pip)] = PeerProbeResult(
+                    up=True,
+                    connect_seconds=elapsed,
+                    reason="connected",
+                )
         except ConnectionRefusedError:
-            # Host responded with RST over L3 interconnect; peer network path is alive.
-            reachable = True
+            status[(pr, pip)] = PeerProbeResult(
+                up=False,
+                connect_seconds=0.0,
+                reason="refused",
+            )
+        except socket.timeout:
+            status[(pr, pip)] = PeerProbeResult(
+                up=False,
+                connect_seconds=0.0,
+                reason="timeout",
+            )
         except OSError:
-            reachable = False
-        status[(pr, pip)] = reachable
+            status[(pr, pip)] = PeerProbeResult(
+                up=False,
+                connect_seconds=0.0,
+                reason="unreachable",
+            )
     return status

@@ -86,6 +86,7 @@ class ModelInfo:
     sliding_window: int = 0
     total_weight_bytes: int = 0
     shard_file_count: int = 0
+    attention_layer_indices: tuple[int, ...] = ()
 
     @property
     def bytes_per_element(self) -> int:
@@ -122,6 +123,59 @@ class ModelInfo:
     @property
     def kv_bytes_for_max_context(self) -> int:
         return self.kv_bytes_per_token * self.max_context_tokens
+
+    def kv_bytes_per_token_for_shard(
+        self,
+        layer_start: int = 0,
+        layer_end: int = -1,
+        dim_kv_heads: int | None = None,
+        tp_size: int = 1,
+    ) -> int:
+        """KV cache bytes per token on this shard (supporting PP, TP, and hybrid).
+
+        Formula:
+          KV_local = 2 * L_attention,local * H_KV,local * D_head * B_element
+        """
+        if not (self.num_layers and self.head_dim and self.num_key_value_heads):
+            return 0
+        if layer_end < 0:
+            layer_end = self.num_layers - 1
+
+        indices = self.attention_layer_indices or tuple(range(self.attention_layers))
+        local_attn_layers = sum(1 for i in indices if layer_start <= i <= layer_end)
+
+        if dim_kv_heads is not None and dim_kv_heads > 0:
+            local_kv_heads = dim_kv_heads
+        elif tp_size > 1:
+            if self.num_key_value_heads % tp_size == 0:
+                local_kv_heads = max(1, self.num_key_value_heads // tp_size)
+            else:
+                local_kv_heads = max(1, math.ceil(self.num_key_value_heads / tp_size))
+        else:
+            local_kv_heads = self.num_key_value_heads
+
+        return (
+            2
+            * local_attn_layers
+            * local_kv_heads
+            * self.head_dim
+            * self.bytes_per_element
+        )
+
+    def kv_bytes_for_max_context_shard(
+        self,
+        layer_start: int = 0,
+        layer_end: int = -1,
+        dim_kv_heads: int | None = None,
+        tp_size: int = 1,
+    ) -> int:
+        """Approx KV bytes for one full-length context sequence on this shard."""
+        return self.kv_bytes_per_token_for_shard(
+            layer_start=layer_start,
+            layer_end=layer_end,
+            dim_kv_heads=dim_kv_heads,
+            tp_size=tp_size,
+        ) * self.max_context_tokens
 
 
 def _expand(path: str) -> Path:
@@ -262,6 +316,23 @@ def _attention_layer_count(text: dict[str, Any], num_layers: int) -> int:
     return num_layers
 
 
+def _attention_layer_indices(text: dict[str, Any], num_layers: int) -> tuple[int, ...]:
+    layer_types = text.get("layer_types")
+    if isinstance(layer_types, list) and layer_types:
+        indices = tuple(
+            i
+            for i, item in enumerate(layer_types[:num_layers])
+            if str(item) in ("full_attention", "sliding_attention", "attention")
+        )
+        if indices:
+            return indices
+
+    interval = _first_int(text, "full_attention_interval")
+    if interval > 0 and num_layers > 0:
+        return tuple(i for i in range(num_layers) if (i + 1) % interval == 0)
+    return tuple(range(num_layers)) if num_layers > 0 else ()
+
+
 def _parse_config(path: Path, model_id: str, data: dict[str, Any]) -> ModelInfo:
     text = data.get("text_config")
     if not isinstance(text, dict):
@@ -279,7 +350,8 @@ def _parse_config(path: Path, model_id: str, data: dict[str, Any]) -> ModelInfo:
     if not head_dim and num_attention_heads and hidden_size:
         head_dim = hidden_size // num_attention_heads
 
-    attention_layers = _attention_layer_count(text, num_layers)
+    attn_indices = _attention_layer_indices(text, num_layers)
+    attention_layers = len(attn_indices) if attn_indices else _attention_layer_count(text, num_layers)
     linear_layers = max(0, num_layers - attention_layers)
 
     quantization = {}
@@ -352,6 +424,7 @@ def _parse_config(path: Path, model_id: str, data: dict[str, Any]) -> ModelInfo:
         sliding_window=_first_int(text, "sliding_window"),
         total_weight_bytes=total_weight_bytes,
         shard_file_count=shard_file_count,
+        attention_layer_indices=attn_indices,
     )
 
 

@@ -42,7 +42,12 @@
       "type": "table",
       "title": "Which Shard Is Where (Live Node & Rank Placement)",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 7 },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 7
+      },
       "targets": [
         {
           "expr": "mlx_model_shard_info{device=~\"$device\", model=~\"$model\"}",
@@ -58,11 +63,23 @@
         }
       ],
       "transformations": [
-        { "id": "merge", "options": {} },
+        {
+          "id": "merge",
+          "options": {}
+        },
         {
           "id": "organize",
           "options": {
-            "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true, "service": true, "macbook": true, "serial": true, "Value #A": true },
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "job": true,
+              "instance": true,
+              "service": true,
+              "macbook": true,
+              "serial": true,
+              "Value #A": true
+            },
             "renameByName": {
               "device": "Device",
               "model": "Model",
@@ -82,8 +99,16 @@
       "fieldConfig": {
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Shard Weights" },
-            "properties": [{ "id": "unit", "value": "bytes" }]
+            "matcher": {
+              "id": "byName",
+              "options": "Shard Weights"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
           }
         ]
       }
@@ -93,7 +118,12 @@
       "type": "table",
       "title": "Cluster Hostfile Shard Map (All Configured Ranks)",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 0, "y": 7, "w": 14, "h": 6 },
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 14,
+        "h": 6
+      },
       "targets": [
         {
           "expr": "mlx_cluster_shard_placement_info{model=~\"$model\"}",
@@ -106,7 +136,17 @@
         {
           "id": "organize",
           "options": {
-            "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true, "service": true, "macbook": true, "serial": true, "device": true, "Value": true },
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "job": true,
+              "instance": true,
+              "service": true,
+              "macbook": true,
+              "serial": true,
+              "device": true,
+              "Value": true
+            },
             "renameByName": {
               "target_device": "Node",
               "model": "Model",
@@ -125,7 +165,12 @@
       "type": "stat",
       "title": "Peer Interconnect Reachability",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 14, "y": 7, "w": 10, "h": 6 },
+      "gridPos": {
+        "x": 14,
+        "y": 7,
+        "w": 10,
+        "h": 6
+      },
       "targets": [
         {
           "expr": "mlx_shard_peer_up{device=~\"$device\"}",
@@ -136,7 +181,19 @@
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                }
+              }
+            }
           ]
         }
       }
@@ -146,7 +203,12 @@
       "type": "table",
       "title": "Model Dimensions (dim, layers, heads, MoE, quantization)",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 0, "y": 13, "w": 14, "h": 8 },
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 14,
+        "h": 8
+      },
       "targets": [
         {
           "expr": "mlx_model_info{device=~\"$device\", model=~\"$model\"}",
@@ -159,7 +221,15 @@
         {
           "id": "organize",
           "options": {
-            "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true, "service": true, "macbook": true, "serial": true },
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "job": true,
+              "instance": true,
+              "service": true,
+              "macbook": true,
+              "serial": true
+            },
             "renameByName": {
               "device": "Device",
               "model": "Model",
@@ -175,7 +245,12 @@
       "type": "table",
       "title": "Per-Rank Sliced Dimensions & Layer Span",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 14, "y": 13, "w": 10, "h": 8 },
+      "gridPos": {
+        "x": 14,
+        "y": 13,
+        "w": 10,
+        "h": 8
+      },
       "targets": [
         {
           "expr": "mlx_shard_layers_assigned{device=~\"$device\", model=~\"$model\"}",
@@ -203,11 +278,22 @@
         }
       ],
       "transformations": [
-        { "id": "merge", "options": {} },
+        {
+          "id": "merge",
+          "options": {}
+        },
         {
           "id": "organize",
           "options": {
-            "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true, "service": true, "macbook": true, "serial": true },
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "job": true,
+              "instance": true,
+              "service": true,
+              "macbook": true,
+              "serial": true
+            },
             "renameByName": {
               "device": "Device",
               "rank": "Rank",
@@ -225,7 +311,12 @@
       "type": "graph",
       "title": "Shard Weight Footprint vs GPU Memory Allocated",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 0, "y": 21, "w": 12, "h": 6 },
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 12,
+        "h": 6
+      },
       "targets": [
         {
           "expr": "mlx_shard_weight_bytes{device=~\"$device\", model=~\"$model\"}",
@@ -243,14 +334,23 @@
           "refId": "C"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "bytes" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
     },
     {
       "id": 7,
       "type": "graph",
       "title": "Safetensors Shard Files Integrity (Present vs Expected)",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "x": 12, "y": 21, "w": 12, "h": 6 },
+      "gridPos": {
+        "x": 12,
+        "y": 21,
+        "w": 12,
+        "h": 6
+      },
       "targets": [
         {
           "expr": "mlx_shard_files_present{device=~\"$device\", model=~\"$model\"}",
@@ -263,6 +363,38 @@
           "refId": "B"
         }
       ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Peer Interconnect Connect Latency",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, rank, peer_rank, peer_ip) (rate(mlx_shard_peer_connect_seconds_bucket{device=~\"$device\"}[5m])))",
+          "legendFormat": "p95 r{{rank}} -> r{{peer_rank}} ({{peer_ip}})",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, rank, peer_rank, peer_ip) (rate(mlx_shard_peer_connect_seconds_bucket{device=~\"$device\"}[5m])))",
+          "legendFormat": "p50 r{{rank}} -> r{{peer_rank}} ({{peer_ip}})",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineInterpolation": "smooth"
+          }
+        }
+      }
     }
   ],
   "links": [
@@ -271,7 +403,9 @@
       "icon": "external link",
       "includeVars": true,
       "keepTime": true,
-      "tags": ["mlx"],
+      "tags": [
+        "mlx"
+      ],
       "title": "MLX Dashboards",
       "type": "dashboards"
     },

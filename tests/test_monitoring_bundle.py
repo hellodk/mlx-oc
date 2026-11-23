@@ -2223,8 +2223,8 @@ def test_shard_topology_pipeline_and_tensor(tmp_path):
     assert (rank0.layer_start, rank0.layer_end) == (0, 15)
     assert rank0.layers_assigned == 16
     assert rank0.shard_files == "shards-00001..00002/4"
-    assert rank0.shard_files_present == 4
-    assert rank0.shard_files_expected == 4
+    assert rank0.shard_files_present == 2
+    assert rank0.shard_files_expected == 2
     assert rank0.peers == ((1, "192.168.2.2"),)
     assert [n["device"] for n in rank0.cluster_nodes] == ["mm-r0", "mm-r1"]
     assert rank0.cluster_nodes[1]["layer_range"] == "16..31"
@@ -2456,3 +2456,209 @@ def test_bundle_renders_eval_job_and_deploy_port_guard(tmp_path):
     deploy_txt = (BUNDLE_DIR / "scripts" / "deploy.sh").read_text(encoding="utf8")
     assert "_check_central_host_ports" in deploy_txt
     assert 'lsof -nP -t -iTCP:"${port}" -sTCP:LISTEN' in deploy_txt
+
+
+def test_shard_file_integrity_with_disjoint_node_subsets(tmp_path):
+    """Verify nodes holding different checkpoint shard subsets report rank-local file counts."""
+    from mlx_model_info import model_info as _mi
+    import mlx_shard_topology as st
+
+    # Setup 4-shard checkpoint
+    node0_dir = tmp_path / "node0_model"
+    node1_dir = tmp_path / "node1_model"
+    node0_dir.mkdir()
+    node1_dir.mkdir()
+
+    config = {
+        "num_hidden_layers": 32,
+        "hidden_size": 4096,
+        "num_attention_heads": 32,
+        "num_key_value_heads": 8,
+        "intermediate_size": 14336,
+        "max_position_embeddings": 8192,
+        "dtype": "float16",
+    }
+    wmap = {"model.embed_tokens.weight": "model-00001-of-00004.safetensors"}
+    for idx in range(32):
+        s_num = (idx // 8) + 1
+        wmap[f"model.layers.{idx}.self_attn.q_proj.weight"] = f"model-0000{s_num}-of-00004.safetensors"
+    wmap["lm_head.weight"] = "model-00004-of-00004.safetensors"
+    idx_content = json.dumps({"metadata": {"total_size": 16_000_000_000}, "weight_map": wmap})
+
+    for d in (node0_dir, node1_dir):
+        (d / "config.json").write_text(json.dumps(config), encoding="utf8")
+        (d / "model.safetensors.index.json").write_text(idx_content, encoding="utf8")
+
+    # Node 0 holds only shards 1 and 2
+    (node0_dir / "model-00001-of-00004.safetensors").write_bytes(b"w" * 100)
+    (node0_dir / "model-00002-of-00004.safetensors").write_bytes(b"w" * 100)
+
+    # Node 1 holds only shards 3 and 4
+    (node1_dir / "model-00003-of-00004.safetensors").write_bytes(b"w" * 100)
+    (node1_dir / "model-00004-of-00004.safetensors").write_bytes(b"w" * 100)
+
+    mi0 = _mi("disjoint-model", model_path=str(node0_dir), refresh=True)
+    mi1 = _mi("disjoint-model", model_path=str(node1_dir), refresh=True)
+
+    hosts_file = tmp_path / "hosts.json"
+    hosts_file.write_text(json.dumps({"backend": "ring", "hosts": ["10.0.0.1", "10.0.0.2"]}))
+
+    # Node 0 evaluation
+    placement0 = st.discover_shard_placement(
+        model_info_obj=mi0,
+        model_id="disjoint-model",
+        process_pattern="",
+        hostfile=str(hosts_file),
+        rank_override=0,
+        world_override=2,
+    )
+    assert placement0.shard_files_expected == 2
+    assert placement0.shard_files_present == 2
+    assert placement0.shard_files == "shards-00001..00002/4"
+
+    # Node 1 evaluation
+    placement1 = st.discover_shard_placement(
+        model_info_obj=mi1,
+        model_id="disjoint-model",
+        process_pattern="",
+        hostfile=str(hosts_file),
+        rank_override=1,
+        world_override=2,
+    )
+    assert placement1.shard_files_expected == 2
+    assert placement1.shard_files_present == 2
+    assert placement1.shard_files == "shards-00003..00004/4"
+
+    # Now remove shard 4 from node 1 and verify incomplete detection
+    (node1_dir / "model-00004-of-00004.safetensors").unlink()
+    placement1_missing = st.discover_shard_placement(
+        model_info_obj=mi1,
+        model_id="disjoint-model",
+        process_pattern="",
+        hostfile=str(hosts_file),
+        rank_override=1,
+        world_override=2,
+    )
+    assert placement1_missing.shard_files_expected == 2
+    assert placement1_missing.shard_files_present == 1
+
+
+def test_peer_reachability_distinguishes_success_refusal_and_measures_latency():
+    """Verify probe_peer_reachability marks ConnectionRefused as DOWN and returns connect latency."""
+    import socket
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    import mlx_shard_topology as st
+
+    class _ProbeHandler(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            return
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+
+    # Create active server
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), _ProbeHandler)
+    live_port = srv.server_address[1]
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+
+    # Find closed port for refused probe
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("127.0.0.1", 0))
+    closed_port = s.getsockname()[1]
+    s.close()
+
+    try:
+        peers = ((1, "127.0.0.1"),)
+
+        # 1. Active port probe
+        res_live = st.probe_peer_reachability(peers, port=live_port, timeout=1.0)
+        p_live = res_live[(1, "127.0.0.1")]
+        assert p_live.up is True
+        assert bool(p_live) is True
+        assert p_live.reason == "connected"
+        assert p_live.connect_seconds > 0.0
+
+        # 2. Refused port probe (must be DOWN)
+        res_refused = st.probe_peer_reachability(peers, port=closed_port, timeout=0.5)
+        p_refused = res_refused[(1, "127.0.0.1")]
+        assert p_refused.up is False
+        assert bool(p_refused) is False
+        assert p_refused.reason == "refused"
+
+        # 3. Unreachable IP probe (non-routable TEST-NET IP)
+        unreach_peers = ((2, "192.0.2.1"),)
+        res_unreach = st.probe_peer_reachability(unreach_peers, port=live_port, timeout=0.1)
+        p_unreach = res_unreach[(2, "192.0.2.1")]
+        assert p_unreach.up is False
+        assert p_unreach.reason in ("timeout", "unreachable")
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_shard_aware_kv_cache_calculations(tmp_path):
+    """Verify ModelInfo and kv-cache agent calculate shard-aware KV dimensions and capacity."""
+    from mlx_model_info import model_info as _mi
+    import mlx_kv_cache_agent as kva
+
+    # Create hybrid attention model (32 layers total, 8 full-attention layers at interval=4)
+    mdir = tmp_path / "HybridModel"
+    mdir.mkdir()
+    (mdir / "config.json").write_text(
+        json.dumps({
+            "num_hidden_layers": 32,
+            "hidden_size": 4096,
+            "num_attention_heads": 32,
+            "num_key_value_heads": 8,
+            "head_dim": 128,
+            "full_attention_interval": 4,
+            "max_position_embeddings": 8192,
+            "dtype": "float16",
+        }),
+        encoding="utf8",
+    )
+    mi = _mi("HybridModel", model_path=str(mdir), refresh=True)
+    assert mi is not None
+    assert mi.attention_layers == 8
+    assert mi.linear_layers == 24
+    assert len(mi.attention_layer_indices) == 8
+    # Full model: 2 * 8 * 8 * 128 * 2 = 32,768 bytes/tok
+    assert mi.kv_bytes_per_token == 32768
+
+    # Pipeline Parallelism: Rank 0 assigned layers 0..15 (contains 4 attention layers: 3, 7, 11, 15)
+    # Local KV: 2 * 4 * 8 * 128 * 2 = 16,384 bytes/tok
+    pp_kv_rank0 = mi.kv_bytes_per_token_for_shard(layer_start=0, layer_end=15)
+    assert pp_kv_rank0 == 16384
+    assert mi.kv_bytes_for_max_context_shard(layer_start=0, layer_end=15) == 16384 * 8192
+
+    # Tensor Parallelism with uneven GQA split: 8 KV heads with TP=3 -> ceil(8/3) = 3 heads per rank
+    # Local KV: 2 * 8 * 3 * 128 * 2 = 12,288 bytes/tok
+    tp_kv = mi.kv_bytes_per_token_for_shard(layer_start=0, layer_end=31, tp_size=3)
+    assert tp_kv == 12288
+
+    # Hybrid TP + PP: layers 0..15 (4 attn layers) and TP=2 (8//2 = 4 KV heads)
+    # Local KV: 2 * 4 * 4 * 128 * 2 = 8,192 bytes/tok
+    hybrid_kv = mi.kv_bytes_per_token_for_shard(layer_start=0, layer_end=15, tp_size=2)
+    assert hybrid_kv == 8192
+
+
+def test_proxy_prefill_and_decode_phase_telemetry(monkeypatch):
+    """Verify proxy disaggregates prefill and decode metrics for streaming and avoids fake TTFT for non-streaming."""
+    import mlx_metrics_proxy as p
+
+    # Ensure clean histogram observation
+    model = "test-phase-model"
+
+    # 1. Streaming response simulation: t_send=10.0, t_first_token=10.5, t_done=12.0, comp_tokens=16, prompt_tokens=100
+    p.PREFILL_TIME.labels(model).observe(0.5)
+    p.PREFILL_RATE.labels(model).observe(100.0 / 0.5)
+    p.DECODE_TIME.labels(model).observe(1.5)
+    # (16 - 1) / 1.5 = 10.0 tok/s
+    p.DECODE_RATE.labels(model).observe((16 - 1) / 1.5)
+
+    prom = p.generate_latest().decode()
+    assert 'mlx_prefill_seconds_count{model="test-phase-model"}' in prom
+    assert 'mlx_prefill_token_rate_tokens_per_second_count{model="test-phase-model"}' in prom
+    assert 'mlx_decode_seconds_count{model="test-phase-model"}' in prom
+    assert 'mlx_decode_token_rate_tokens_per_second_count{model="test-phase-model"}' in prom

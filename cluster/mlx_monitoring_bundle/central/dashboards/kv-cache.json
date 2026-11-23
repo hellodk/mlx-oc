@@ -225,6 +225,34 @@
           "unit": "reqps"
         }
       }
+    },
+    {
+      "type": "timeseries",
+      "title": "Shard Context & Capacity Allocation",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "mlx_kv_est_bytes_max_context_shard{device=~\"$device\"}",
+          "legendFormat": "Shard Est Max Ctx Bytes ({{device}})",
+          "refId": "A"
+        },
+        {
+          "expr": "mlx_kv_cache_capacity_bytes_shard{device=~\"$device\"}",
+          "legendFormat": "Shard Cache Capacity Bytes ({{device}})",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
     }
   ],
   "uid": "mlx-kv-cache",

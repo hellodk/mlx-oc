@@ -246,6 +246,30 @@ TOKEN_RATE = Histogram(
     ["model"],
     buckets=(1, 2, 5, 10, 20, 40, 80, 160, 320, 640),
 )
+PREFILL_TIME = Histogram(
+    "mlx_prefill_seconds",
+    "Prompt evaluation / prefill duration per request",
+    ["model"],
+    buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0),
+)
+PREFILL_RATE = Histogram(
+    "mlx_prefill_token_rate_tokens_per_second",
+    "Prompt tokens processed per second of prefill duration",
+    ["model"],
+    buckets=(10, 25, 50, 100, 250, 500, 1000, 2000, 4000),
+)
+DECODE_TIME = Histogram(
+    "mlx_decode_seconds",
+    "Autoregressive decode interval from first token to last token",
+    ["model"],
+    buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0),
+)
+DECODE_RATE = Histogram(
+    "mlx_decode_token_rate_tokens_per_second",
+    "Inter-token generation rate across decode interval",
+    ["model"],
+    buckets=(1, 2, 5, 10, 20, 40, 80, 160, 320, 640),
+)
 TOOL_CALLS = Counter(
     "mlx_tool_calls_total",
     "Tool calls requested by the model",
@@ -1426,9 +1450,21 @@ class Proxy(BaseHTTPRequestHandler):
             gen_time = t_done - t_send
             GEN_TIME.labels(model).observe(gen_time)
             if t_first_token is not None:
-                TTFT.labels(model).observe(t_first_token - t_send)
-            elif not synth_sse:
-                TTFT.labels(model).observe(gen_time)
+                ttft = max(0.0, t_first_token - t_send)
+                TTFT.labels(model).observe(ttft)
+
+                # Prefill telemetry
+                prefill_dur = ttft
+                PREFILL_TIME.labels(model).observe(prefill_dur)
+                if prompt_tokens > 0 and prefill_dur > 0:
+                    PREFILL_RATE.labels(model).observe(prompt_tokens / prefill_dur)
+
+                # Decode telemetry
+                decode_dur = max(0.0, t_done - t_first_token)
+                DECODE_TIME.labels(model).observe(decode_dur)
+                if comp_tokens > 1 and decode_dur > 0:
+                    # Number of inter-token intervals is (completion_tokens - 1)
+                    DECODE_RATE.labels(model).observe((comp_tokens - 1) / decode_dur)
 
             if comp_tokens > 0 and gen_time > 0:
                 TOKEN_RATE.labels(model).observe(comp_tokens / gen_time)

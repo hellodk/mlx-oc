@@ -32,7 +32,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 
 from mlx_logging import debug, error, info, parse_upstream_url, setup_logging
 from mlx_model_info import model_info as _discover_model_info
@@ -206,13 +206,19 @@ G_SHARD_FILES_PRESENT = Gauge(
 )
 G_SHARD_FILES_EXPECTED = Gauge(
     "mlx_shard_files_expected",
-    "Total safetensors shard files expected by index",
-    ["model"],
+    "Total safetensors shard files expected for this rank",
+    ["model", "rank"],
 )
 G_SHARD_PEER_UP = Gauge(
     "mlx_shard_peer_up",
     "1 if peer shard node is reachable over transport IP",
     ["rank", "peer_rank", "peer_ip"],
+)
+G_SHARD_PEER_CONNECT_SECONDS = Histogram(
+    "mlx_shard_peer_connect_seconds",
+    "TCP connection establishment latency to peer shard node",
+    ["rank", "peer_rank", "peer_ip"],
+    buckets=(0.0005, 0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0),
 )
 G_CLUSTER_SHARD_PLACEMENT = Gauge(
     "mlx_cluster_shard_placement_info",
@@ -543,7 +549,7 @@ class PassiveServerObserver:
             shard_layers_override=getattr(self.args, "shard_layers", ""),
             nodes_devices=nodes_devices,
         )
-        probe_port = int(getattr(self.args, "peer_probe_port", 22))
+        probe_port = int(getattr(self.args, "peer_probe_port", 8081))
         peers_up = probe_peer_reachability(placement.peers, port=probe_port)
         self._cached_shard_snapshot = (placement, peers_up)
         self._last_shard_poll_at = now
@@ -616,15 +622,20 @@ class PassiveServerObserver:
             G_SHARD_FILES_PRESENT, {(mid, rk): float(placement.shard_files_present)}
         )
         self._set_gauge_series(
-            G_SHARD_FILES_EXPECTED, {(mid,): float(placement.shard_files_expected)}
+            G_SHARD_FILES_EXPECTED, {(mid, rk): float(placement.shard_files_expected)}
         )
         self._set_gauge_series(
             G_SHARD_PEER_UP,
             {
-                (rk, str(pr), pip): 1.0 if up else 0.0
-                for (pr, pip), up in peers_up.items()
+                (rk, str(pr), pip): 1.0 if (res.up if hasattr(res, "up") else bool(res)) else 0.0
+                for (pr, pip), res in peers_up.items()
             },
         )
+        for (pr, pip), res in peers_up.items():
+            conn_sec = getattr(res, "connect_seconds", 0.0)
+            is_up = getattr(res, "up", bool(res))
+            if is_up and conn_sec > 0.0:
+                G_SHARD_PEER_CONNECT_SECONDS.labels(rk, str(pr), pip).observe(conn_sec)
         self._set_gauge_series(
             G_CLUSTER_SHARD_PLACEMENT,
             {
@@ -956,7 +967,7 @@ def main() -> None:
     p.add_argument(
         "--peer-probe-port",
         type=int,
-        default=_parse_int_env("MLX_PEER_PROBE_PORT", 22),
+        default=_parse_int_env("MLX_PEER_PROBE_PORT", 8081),
         help="TCP port to probe distributed peer reachability (0 disables)",
     )
     args = p.parse_args()

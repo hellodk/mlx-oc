@@ -63,6 +63,14 @@ G_KV_MAX_CTX = Gauge(
     "mlx_kv_est_bytes_max_context",
     "Approx KV bytes for one full-length context sequence",
 )
+G_KV_MAX_CTX_SHARD = Gauge(
+    "mlx_kv_est_bytes_max_context_shard",
+    "Approx KV bytes for one full-length context sequence on this shard",
+)
+G_KV_CAPACITY_SHARD = Gauge(
+    "mlx_kv_cache_capacity_bytes_shard",
+    "Configured or effective KV cache capacity bytes on this shard",
+)
 G_UTIL = Gauge(
     "mlx_kv_cache_utilization",
     "KV cache bytes / (max_sequences x KV bytes for a full context)",
@@ -196,14 +204,62 @@ def _update_gauges(log_path: str, model_name: str | None,
             degraded(f"could not resolve model info for '{model_name}': {exc!r}",
                      component="kv-agent")
     kv_max_ctx_bytes = 0
+    kv_max_ctx_bytes_shard = 0
     if info_obj is not None:
         kv_max_ctx_bytes = info_obj.kv_bytes_for_max_context
+
+        # Discover shard parameters if configured
+        shard_layers = os.environ.get("MLX_SHARD_LAYERS", "").strip()
+        l_start = -1
+        l_end = -1
+        if shard_layers and ".." in shard_layers:
+            try:
+                parts = shard_layers.split("..", 1)
+                l_start, l_end = int(parts[0]), int(parts[1])
+            except (ValueError, TypeError):
+                pass
+        elif shard_layers and "-" in shard_layers:
+            try:
+                parts = shard_layers.split("-", 1)
+                l_start, l_end = int(parts[0]), int(parts[1])
+            except (ValueError, TypeError):
+                pass
+
+        shard_rank = int(os.environ.get("MLX_SHARD_RANK", "0")) if os.environ.get("MLX_SHARD_RANK", "").isdigit() else 0
+        shard_world = int(os.environ.get("MLX_SHARD_WORLD_SIZE", "1")) if os.environ.get("MLX_SHARD_WORLD_SIZE", "").isdigit() else 1
+        shard_kv_heads = int(os.environ.get("MLX_SHARD_KV_HEADS", "0")) if os.environ.get("MLX_SHARD_KV_HEADS", "").isdigit() else 0
+        tp_size = int(os.environ.get("MLX_TP_SIZE", "1")) if os.environ.get("MLX_TP_SIZE", "").isdigit() else 1
+
+        if l_start < 0 and info_obj.num_layers > 0:
+            if shard_world > 1:
+                per_rank = info_obj.num_layers // shard_world
+                rem = info_obj.num_layers % shard_world
+                l_start = shard_rank * per_rank + min(shard_rank, rem)
+                layers_here = per_rank + (1 if shard_rank < rem else 0)
+                l_end = max(l_start, l_start + layers_here - 1)
+            else:
+                l_start, l_end = 0, info_obj.num_layers - 1
+
+        kv_max_ctx_bytes_shard = info_obj.kv_bytes_for_max_context_shard(
+            layer_start=max(0, l_start),
+            layer_end=l_end if l_end >= 0 else (info_obj.num_layers - 1),
+            dim_kv_heads=shard_kv_heads if shard_kv_heads > 0 else None,
+            tp_size=tp_size,
+        )
+
     G_KV_MAX_CTX.set(kv_max_ctx_bytes)
+    G_KV_MAX_CTX_SHARD.set(kv_max_ctx_bytes_shard or kv_max_ctx_bytes)
 
     total_bytes = stats.get("total", (0, 0))[1]
     if not total_bytes:
         total_bytes = max((b for n, b in stats.values()), default=0)
-    capacity = MAX_SEQ_DEFAULT * kv_max_ctx_bytes
+
+    # Configured server byte limit (e.g. from MLX_MAX_KV_SIZE) or theoretical capacity
+    raw_max_bytes = os.environ.get("MLX_MAX_KV_SIZE", "")
+    cfg_limit = int(raw_max_bytes) if raw_max_bytes.isdigit() and int(raw_max_bytes) > 0 else 0
+    effective_ctx_bytes = kv_max_ctx_bytes_shard if kv_max_ctx_bytes_shard > 0 else kv_max_ctx_bytes
+    capacity = cfg_limit if cfg_limit > 0 else (MAX_SEQ_DEFAULT * effective_ctx_bytes)
+    G_KV_CAPACITY_SHARD.set(capacity)
     G_UTIL.set(total_bytes / capacity if capacity else 0.0)
 
 

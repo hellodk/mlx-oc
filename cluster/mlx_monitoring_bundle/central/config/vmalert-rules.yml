@@ -344,7 +344,9 @@ groups:
         runbook: "https://docs.example.com/mlx-monitoring/runbook#generation-slow"
 
     - alert: MLXTokenRateLow
-      expr: histogram_quantile(0.5, rate(mlx_token_rate_tokens_per_second_bucket[5m])) < 5
+      expr: |
+        histogram_quantile(0.5, rate(mlx_token_rate_tokens_per_second_bucket[5m])) < 5
+        and on(device) (sum by (device) (rate(mlx_requests_total[5m])) > 0.05)
       for: 10m
       labels:
         severity: warning
@@ -352,10 +354,39 @@ groups:
       annotations:
         summary: "Low token rate on {{ $labels.device }}: {{ $value }} tok/s"
         description: |
-          Median token rate below 5 tok/s on Device {{ $labels.device }}
+          Median token rate below 5 tok/s for active requests on Device {{ $labels.device }}
           ({{ $labels.macbook }}). Consistent with thermal throttling or a
           memory-bandwidth-bound generation.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#token-rate-low"
+
+    - alert: MLXDecodeTokenRateLow
+      expr: |
+        histogram_quantile(0.5, sum by (le, device, model) (rate(mlx_decode_token_rate_tokens_per_second_bucket[5m]))) < 5
+        and on(device, model) (sum by (device, model) (rate(mlx_requests_total[5m])) > 0.05)
+      for: 5m
+      labels:
+        severity: warning
+        category: inference
+      annotations:
+        summary: "Low decode token rate on {{ $labels.device }}: {{ $value }} tok/s"
+        description: |
+          Autoregressive token generation speed has fallen below 5 tok/s for active
+          requests on {{ $labels.device }}.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#decode-token-rate-low"
+
+    - alert: MLXPrefillSlow
+      expr: |
+        histogram_quantile(0.95, sum by (le, device, model) (rate(mlx_prefill_seconds_bucket[5m]))) > 5
+        and on(device, model) (sum by (device, model) (rate(mlx_requests_total[5m])) > 0.05)
+      for: 5m
+      labels:
+        severity: warning
+        category: inference
+      annotations:
+        summary: "Slow prompt evaluation/prefill on {{ $labels.device }}: p95 {{ $value }}s"
+        description: |
+          Prompt evaluation latency exceeds 5s for active requests on {{ $labels.device }}.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#prefill-slow"
 
   - name: mlx.quality
     rules:
@@ -507,18 +538,32 @@ groups:
           ring/pipeline forward passes will stall.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#shard-peer-down"
 
-    - alert: MLXShardMemoryOverbudget
+    - alert: MLXShardPeerLatencyHigh
       expr: |
-        (mlx_shard_weight_bytes / on(device) group_left() (mlx_hw_gpu_mem_total_bytes > 0)) > 0.85
+        histogram_quantile(0.95, sum by (le, device, peer_ip, peer_rank) (rate(mlx_shard_peer_connect_seconds_bucket[5m]))) > 0.05
       for: 5m
       labels:
         severity: warning
         category: sharding
       annotations:
-        summary: "Shard weight footprint >85% of GPU memory on {{ $labels.device }} (rank {{ $labels.rank }})"
+        summary: "High peer interconnect latency from {{ $labels.device }} to peer {{ $labels.peer_ip }} (rank {{ $labels.peer_rank }})"
         description: |
-          Assigned model shard on rank {{ $labels.rank }} leaves minimal headroom
-          for KV cache and activations on {{ $labels.device }}.
+          TCP connect latency to peer transport exceeds 50ms. Inter-device sync
+          will bottleneck token decode speeds.
+        runbook: "https://docs.example.com/mlx-monitoring/runbook#shard-peer-latency-high"
+
+    - alert: MLXShardMemoryOverbudget
+      expr: |
+        (mlx_hw_gpu_mem_alloc_bytes / on(device) group_left() (mlx_hw_gpu_mem_total_bytes > 0)) > 0.85
+      for: 5m
+      labels:
+        severity: warning
+        category: sharding
+      annotations:
+        summary: "GPU memory allocated >85% on {{ $labels.device }} (rank {{ $labels.rank }})"
+        description: |
+          Actual GPU memory allocated exceeds 85% of total memory on {{ $labels.device }},
+          leaving minimal headroom for KV cache and activations on rank {{ $labels.rank }}.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#shard-memory"
 
     - alert: MLXShardFilesIncomplete
