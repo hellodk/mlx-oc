@@ -367,7 +367,7 @@
     {
       "id": 8,
       "type": "timeseries",
-      "title": "Peer Interconnect Connect Latency",
+      "title": "Peer Interconnect Round-Trip & Connect Latency",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
@@ -377,14 +377,24 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le, device, rank, peer_rank, peer_ip) (rate(mlx_shard_peer_connect_seconds_bucket{device=~\"$device\"}[5m])))",
-          "legendFormat": "p95 {{device}} r{{rank}} -> r{{peer_rank}} ({{peer_ip}})",
+          "expr": "histogram_quantile(0.95, sum by (le, device, rank, peer_rank, peer_ip) (rate(mlx_shard_peer_app_rtt_seconds_bucket{device=~\"$device\"}[5m])))",
+          "legendFormat": "p95 App RTT {{device}} r{{rank}} -> r{{peer_rank}} ({{peer_ip}})",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.50, sum by (le, device, rank, peer_rank, peer_ip) (rate(mlx_shard_peer_connect_seconds_bucket{device=~\"$device\"}[5m])))",
-          "legendFormat": "p50 {{device}} r{{rank}} -> r{{peer_rank}} ({{peer_ip}})",
+          "expr": "histogram_quantile(0.95, sum by (le, device, rank, peer_rank, peer_ip) (rate(mlx_shard_peer_connect_seconds_bucket{device=~\"$device\"}[5m])))",
+          "legendFormat": "p95 TCP Connect {{device}} r{{rank}} -> r{{peer_rank}} ({{peer_ip}})",
           "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, device, rank, peer_rank, peer_ip) (rate(mlx_shard_peer_app_rtt_seconds_bucket{device=~\"$device\"}[5m])))",
+          "legendFormat": "p50 App RTT {{device}} r{{rank}} -> r{{peer_rank}} ({{peer_ip}})",
+          "refId": "C"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, device, rank, peer_rank, peer_ip) (rate(mlx_shard_peer_connect_seconds_bucket{device=~\"$device\"}[5m])))",
+          "legendFormat": "p50 TCP Connect {{device}} r{{rank}} -> r{{peer_rank}} ({{peer_ip}})",
+          "refId": "D"
         }
       ],
       "fieldConfig": {

@@ -154,12 +154,13 @@ class ModelInfo:
         if dim_kv_heads is not None and dim_kv_heads > 0:
             local_kv_heads = dim_kv_heads
         elif tp_size > 1:
+            effective_tp_rank = (rank % tp_size) if tp_size > 0 else 0
             if self.num_key_value_heads % tp_size == 0:
                 local_kv_heads = max(1, self.num_key_value_heads // tp_size)
             else:
                 base = self.num_key_value_heads // tp_size
                 rem = self.num_key_value_heads % tp_size
-                local_kv_heads = max(1, base + (1 if rank < rem else 0))
+                local_kv_heads = max(1, base + (1 if effective_tp_rank < rem else 0))
         else:
             local_kv_heads = self.num_key_value_heads
 
@@ -196,12 +197,13 @@ class ModelInfo:
         if dim_kv_heads is not None and dim_kv_heads > 0:
             local_kv_heads = dim_kv_heads
         elif tp_size > 1:
+            effective_tp_rank = (rank % tp_size) if tp_size > 0 else 0
             if self.num_key_value_heads % tp_size == 0:
                 local_kv_heads = max(1, self.num_key_value_heads // tp_size)
             else:
                 base = self.num_key_value_heads // tp_size
                 rem = self.num_key_value_heads % tp_size
-                local_kv_heads = max(1, base + (1 if rank < rem else 0))
+                local_kv_heads = max(1, base + (1 if effective_tp_rank < rem else 0))
         else:
             local_kv_heads = self.num_key_value_heads
 

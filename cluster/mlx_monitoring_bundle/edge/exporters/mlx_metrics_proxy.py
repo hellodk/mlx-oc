@@ -109,6 +109,8 @@ _MODEL_PATH = None
 
 _tokenizers: dict[str, Any] = {}
 _tokenizer_lock = threading.Lock()
+_chat_templates: dict[str, Any] = {}
+_template_lock = threading.Lock()
 
 
 def _get_tokenizer_for_model(model_name: str, model_path: str | None = None) -> Any:
@@ -139,6 +141,53 @@ def _get_tokenizer_for_model(model_name: str, model_path: str | None = None) -> 
                     pass
         _tokenizers[model_name] = tok
         return tok
+
+
+def _get_chat_template_for_model(model_name: str, model_path: str | None = None) -> Any:
+    """Retrieve or load a compiled Jinja2 chat template for model if available."""
+    with _template_lock:
+        if model_name in _chat_templates:
+            return _chat_templates[model_name]
+        tpl = None
+        paths_to_try: list[Path] = []
+        target_path = model_path or _MODEL_PATH
+        if target_path:
+            paths_to_try.append(Path(target_path))
+        if _model_info:
+            try:
+                info = _model_info(model_name, model_path=target_path)
+                if info and info.model_path:
+                    paths_to_try.append(Path(info.model_path))
+            except Exception:
+                pass
+        for p in paths_to_try:
+            cfg_path = p / "tokenizer_config.json"
+            if cfg_path.is_file():
+                try:
+                    data = json.loads(cfg_path.read_text(encoding="utf8"))
+                    ct = data.get("chat_template")
+                    raw_template = None
+                    if isinstance(ct, str) and ct.strip():
+                        raw_template = ct
+                    elif isinstance(ct, list) and ct:
+                        for item in ct:
+                            if isinstance(item, dict) and item.get("template"):
+                                raw_template = item["template"]
+                                break
+                    if raw_template:
+                        import jinja2
+                        env = jinja2.Environment(
+                            loader=jinja2.BaseLoader(),
+                            trim_blocks=True,
+                            lstrip_blocks=True,
+                        )
+                        env.filters["raise_exception"] = lambda msg: msg
+                        tpl = env.from_string(raw_template)
+                        break
+                except Exception:
+                    pass
+        _chat_templates[model_name] = tpl
+        return tpl
 
 _CTX_MAX_TOKENS = 0
 
@@ -1460,32 +1509,56 @@ class Proxy(BaseHTTPRequestHandler):
                         debug(f"opik_trace.end failed: {exc2!r}", component="proxy")
                 return
 
-            tokens_exact = False
+            prompt_tokens_exact = False
+            comp_tokens_exact = False
             if usage:
                 prompt_tokens = int(usage.get("prompt_tokens") or 0)
                 comp_tokens = int(usage.get("completion_tokens") or 0)
-                tokens_exact = True
+                prompt_tokens_exact = True
+                comp_tokens_exact = True
             else:
                 tok = _get_tokenizer_for_model(model, _MODEL_PATH)
+                tpl = _get_chat_template_for_model(model, _MODEL_PATH)
+                if tok is not None and tpl is not None:
+                    try:
+                        templated_prompt = tpl.render(
+                            messages=messages,
+                            tools=tools if tools_provided else None,
+                            add_generation_prompt=True,
+                        )
+                        prompt_tokens = len(tok.encode(templated_prompt).ids)
+                        prompt_tokens_exact = True
+                    except Exception:
+                        prompt_tokens_exact = False
+                if not prompt_tokens_exact:
+                    if tok is not None:
+                        try:
+                            prompt_tokens = sum(
+                                len(tok.encode(str(m.get("content", ""))).ids)
+                                for m in messages
+                            )
+                        except Exception:
+                            prompt_tokens = sum(
+                                len(str(m.get("content", "")).split()) for m in messages
+                            )
+                    else:
+                        prompt_tokens = sum(
+                            len(str(m.get("content", "")).split()) for m in messages
+                        )
+                    TOKENS_ESTIMATED.labels(model, kind, "prompt").inc(prompt_tokens)
+
+                combined_comp = " ".join(p for p in (content, reasoning) if p)
                 if tok is not None:
                     try:
-                        prompt_tokens = sum(
-                            len(tok.encode(str(m.get("content", ""))).ids)
-                            for m in messages
-                        )
-                        combined_comp = " ".join(p for p in (content, reasoning) if p)
                         comp_tokens = len(tok.encode(combined_comp).ids)
-                        tokens_exact = True
+                        comp_tokens_exact = True
                     except Exception:
-                        tokens_exact = False
-                if not tokens_exact:
-                    prompt_tokens = sum(
-                        len(str(m.get("content", "")).split()) for m in messages
-                    )
-                    combined_comp = " ".join(p for p in (content, reasoning) if p)
+                        comp_tokens = len(combined_comp.split())
+                        TOKENS_ESTIMATED.labels(model, kind, "completion").inc(comp_tokens)
+                else:
                     comp_tokens = len(combined_comp.split())
-                    TOKENS_ESTIMATED.labels(model, kind, "prompt").inc(prompt_tokens)
                     TOKENS_ESTIMATED.labels(model, kind, "completion").inc(comp_tokens)
+
             TOKENS_PROMPT.labels(model, kind).inc(prompt_tokens)
             TOKENS_COMPLETION.labels(model, kind).inc(comp_tokens)
             if usage:
@@ -1512,17 +1585,17 @@ class Proxy(BaseHTTPRequestHandler):
                 # Prefill telemetry
                 prefill_dur = ttft
                 PREFILL_TIME.labels(model).observe(prefill_dur)
-                if prompt_tokens > 0 and prefill_dur > 0 and tokens_exact:
+                if prompt_tokens > 0 and prefill_dur > 0 and prompt_tokens_exact:
                     PREFILL_RATE.labels(model).observe(prompt_tokens / prefill_dur)
 
                 # Decode telemetry
                 decode_dur = max(0.0, t_done - t_first_token)
                 DECODE_TIME.labels(model).observe(decode_dur)
-                if comp_tokens > 1 and decode_dur > 0 and tokens_exact:
+                if comp_tokens > 1 and decode_dur > 0 and comp_tokens_exact:
                     # Number of inter-token intervals is (completion_tokens - 1)
                     DECODE_RATE.labels(model).observe((comp_tokens - 1) / decode_dur)
 
-            if comp_tokens > 0 and gen_time > 0 and tokens_exact:
+            if comp_tokens > 0 and gen_time > 0 and comp_tokens_exact:
                 TOKEN_RATE.labels(model).observe(comp_tokens / gen_time)
 
             REQUESTS.labels(model, "true" if streaming else "false", kind).inc()

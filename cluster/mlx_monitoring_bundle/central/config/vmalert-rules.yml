@@ -532,10 +532,10 @@ groups:
         severity: warning
         category: sharding
       annotations:
-        summary: "High peer interconnect latency from {{ $labels.device }} (rank {{ $labels.rank }}) to peer {{ $labels.peer_ip }} (rank {{ $labels.peer_rank }})"
+        summary: "High peer interconnect TCP connect latency from {{ $labels.device }} (rank {{ $labels.rank }}) to peer {{ $labels.peer_ip }} (rank {{ $labels.peer_rank }})"
         description: |
-          TCP connect latency to peer transport exceeds 50ms. Inter-device sync
-          will bottleneck token decode speeds.
+          TCP connection establishment latency (SYN-ACK) to peer transport exceeds 50ms,
+          indicating network transport congestion or degraded reachability to the peer rank.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#shard-peer-latency-high"
 
     - alert: MLXShardMemoryOverbudget

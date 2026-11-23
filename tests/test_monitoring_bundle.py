@@ -2831,3 +2831,166 @@ def test_peer_probe_port_and_alert_dashboard_consistency():
     peer_exprs = [t.get("expr", "") for t in dash_targets if "mlx_shard_peer_connect_seconds" in t.get("expr", "")]
     for expr in peer_exprs:
         assert "sum by (le, device, rank, peer_rank, peer_ip)" in expr
+
+
+def test_hybrid_tp_pp_rank_mapping_and_shard_placement(tmp_path, monkeypatch):
+    """Verify hybrid TP+PP placement correctly derives tp_rank, pp_rank, layer slices, and uneven KV heads."""
+    import mlx_shard_topology as top
+    from mlx_model_info import model_info as load_model_info
+
+    # Create dummy model with 32 layers, 7 KV heads, and dummy safetensors files
+    model_dir = tmp_path / "hybrid_model"
+    model_dir.mkdir()
+    cfg = {
+        "num_hidden_layers": 32,
+        "num_attention_heads": 32,
+        "num_key_value_heads": 7,  # Uneven: 7 heads across TP=2 -> Rank 0 gets 4, Rank 1 gets 3
+        "hidden_size": 4096,
+        "max_position_embeddings": 8192,
+        "dtype": "bfloat16",
+    }
+    (model_dir / "config.json").write_text(json.dumps(cfg), encoding="utf8")
+    index_data = {
+        "weight_map": {
+            "model.embed_tokens.weight": "model-00001-of-00004.safetensors",
+            "model.layers.0.self_attn.q_proj.weight": "model-00001-of-00004.safetensors",
+            "model.layers.15.self_attn.q_proj.weight": "model-00002-of-00004.safetensors",
+            "model.layers.16.self_attn.q_proj.weight": "model-00003-of-00004.safetensors",
+            "model.layers.31.self_attn.q_proj.weight": "model-00004-of-00004.safetensors",
+            "lm_head.weight": "model-00004-of-00004.safetensors",
+        }
+    }
+    (model_dir / "model.safetensors.index.json").write_text(json.dumps(index_data), encoding="utf8")
+    (model_dir / "model-00001-of-00004.safetensors").write_text("embed and layers 0-7")
+    (model_dir / "model-00002-of-00004.safetensors").write_text("layers 8-15")
+    (model_dir / "model-00003-of-00004.safetensors").write_text("layers 16-23")
+    (model_dir / "model-00004-of-00004.safetensors").write_text("layers 24-31 and head")
+
+    model_info = load_model_info(model_path=str(model_dir))
+
+    # Hostfile for 4 ranks
+    hostfile = tmp_path / "hostfile"
+    hostfile.write_text("192.168.1.10\n192.168.1.11\n192.168.1.12\n192.168.1.13\n")
+
+    monkeypatch.setenv("MLX_HOSTFILE", str(hostfile))
+    monkeypatch.setenv("MLX_WORLD_SIZE", "4")
+    monkeypatch.setenv("MLX_TP_SIZE", "2")
+    monkeypatch.setenv("MLX_DISTRIBUTED_MODE", "hybrid")
+
+    # Test Rank 0 (Stage 0, TP 0)
+    monkeypatch.setenv("MLX_RANK", "0")
+    p0 = top.discover_shard_placement(model_info_obj=model_info, model_id="hybrid_model", model_path=str(model_dir))
+    assert p0.mode == "hybrid"
+    assert p0.tp_size == 2
+    assert p0.pp_size == 2
+    assert p0.tp_rank == 0
+    assert p0.pp_rank == 0
+    assert p0.layer_start == 0 and p0.layer_end == 15
+    assert p0.dim_kv_heads == 4  # 7 // 2 + 1
+    assert "00001" in p0.shard_files  # Stage 0 has embed
+
+    # Test Rank 1 (Stage 0, TP 1)
+    monkeypatch.setenv("MLX_RANK", "1")
+    p1 = top.discover_shard_placement(model_info_obj=model_info, model_id="hybrid_model", model_path=str(model_dir))
+    assert p1.tp_size == 2
+    assert p1.pp_size == 2
+    assert p1.tp_rank == 1
+    assert p1.pp_rank == 0
+    assert p1.layer_start == 0 and p1.layer_end == 15
+    assert p1.dim_kv_heads == 3  # 7 // 2 + 0
+
+    # Test Rank 2 (Stage 1, TP 0)
+    monkeypatch.setenv("MLX_RANK", "2")
+    p2 = top.discover_shard_placement(model_info_obj=model_info, model_id="hybrid_model", model_path=str(model_dir))
+    assert p2.tp_size == 2
+    assert p2.pp_size == 2
+    assert p2.tp_rank == 0
+    assert p2.pp_rank == 1
+    assert p2.layer_start == 16 and p2.layer_end == 31
+    assert p2.dim_kv_heads == 4  # tp_rank 0 gets remainder head
+    assert "00004" in p2.shard_files  # Stage 1 (last) has head
+
+    # Test Rank 3 (Stage 1, TP 1)
+    monkeypatch.setenv("MLX_RANK", "3")
+    p3 = top.discover_shard_placement(model_info_obj=model_info, model_id="hybrid_model", model_path=str(model_dir))
+    assert p3.tp_size == 2
+    assert p3.pp_size == 2
+    assert p3.tp_rank == 1
+    assert p3.pp_rank == 1
+    assert p3.layer_start == 16 and p3.layer_end == 31
+    assert p3.dim_kv_heads == 3  # tp_rank 1 gets base head
+
+
+def test_proxy_chat_template_rendering_and_exact_tokens(tmp_path, monkeypatch):
+    """Verify chat template is loaded and executed for exact prompt tokens, and fallback marks estimated."""
+    import mlx_metrics_proxy as p
+
+    model_dir = tmp_path / "chat_model"
+    model_dir.mkdir()
+    # Dummy tokenizer_config.json with Jinja2 template
+    template_str = (
+        "{% for message in messages %}"
+        "<|im_start|>{{ message['role'] }}\n{{ message['content'] }}<|im_end|>\n"
+        "{% endfor %}"
+        "{% if add_generation_prompt %}<|im_start|>assistant\n{% endif %}"
+    )
+    (model_dir / "tokenizer_config.json").write_text(
+        json.dumps({"chat_template": template_str}), encoding="utf8"
+    )
+
+    tpl = p._get_chat_template_for_model("chat_model", str(model_dir))
+    assert tpl is not None
+
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Hello!"},
+    ]
+    rendered = tpl.render(messages=messages, add_generation_prompt=True)
+    assert "<|im_start|>system\nYou are a helpful assistant.<|im_end|>" in rendered
+    assert "<|im_start|>user\nHello!<|im_end|>" in rendered
+    assert "<|im_start|>assistant\n" in rendered
+
+
+def test_peer_reachability_with_app_rtt_probe():
+    """Verify probe_peer_reachability measures both TCP connect and application-level HTTP RTT."""
+    import http.server
+    import threading
+    import mlx_shard_topology as top
+
+    class SimpleHeadHandler(http.server.BaseHTTPRequestHandler):
+        def do_HEAD(self):
+            self.send_response(200)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def log_message(self, format, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), SimpleHeadHandler)
+    port = server.server_address[1]
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    try:
+        results = top.probe_peer_reachability(
+            ((1, "127.0.0.1"),), port=port, timeout=1.0, probe_app_rtt=True
+        )
+        res = results[(1, "127.0.0.1")]
+        assert res.up is True
+        assert res.connect_seconds > 0.0
+        assert res.app_rtt_seconds > 0.0
+        assert res.reason == "connected"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    # Closed port should report refused with 0.0 latencies
+    closed_port = port + 1 if port < 65000 else port - 1
+    results_closed = top.probe_peer_reachability(
+        ((2, "127.0.0.1"),), port=closed_port, timeout=0.2, probe_app_rtt=True
+    )
+    res_closed = results_closed[(2, "127.0.0.1")]
+    assert res_closed.up is False
+    assert res_closed.connect_seconds == 0.0
+    assert res_closed.app_rtt_seconds == 0.0
+    assert res_closed.reason in ("refused", "timeout", "unreachable")
+

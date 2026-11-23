@@ -32,11 +32,12 @@ _SHARD_NUM_RE = re.compile(r"-(\d+)-of-\d+\.safetensors$")
 
 @dataclass(frozen=True)
 class PeerProbeResult:
-    """Reachability status and connect duration for a single peer rank."""
+    """Reachability status, TCP connect duration, and application RTT for a single peer rank."""
 
     up: bool
     connect_seconds: float
     reason: str  # "connected", "refused", "timeout", "unreachable", "disabled"
+    app_rtt_seconds: float = 0.0
 
     def __bool__(self) -> bool:
         return self.up
@@ -66,6 +67,10 @@ class ShardPlacement:
     iface: str
     peers: tuple[tuple[int, str], ...]
     cluster_nodes: tuple[dict[str, Any], ...]
+    tp_rank: int = 0
+    pp_rank: int = 0
+    tp_size: int = 1
+    pp_size: int = 1
 
 
 def inspect_safetensors_index(model_dir: Path | None) -> dict[str, Any]:
@@ -249,12 +254,22 @@ def infer_runtime_sharding(
     world_override: int | None = None,
 ) -> dict[str, Any]:
     """Passively inspect server and parent launcher flags for sharding metadata."""
+    env_rank = None
+    raw_rk = os.environ.get("MLX_RANK") or os.environ.get("RANK")
+    if raw_rk and raw_rk.isdigit():
+        env_rank = int(raw_rk)
+
+    env_ws = None
+    raw_ws = os.environ.get("MLX_WORLD_SIZE") or os.environ.get("WORLD_SIZE")
+    if raw_ws and raw_ws.isdigit():
+        env_ws = int(raw_ws)
+
     info: dict[str, Any] = {
         "hostfile": hostfile_override or os.environ.get("MLX_HOSTFILE", ""),
-        "mode": mode_override or os.environ.get("MLX_PARALLEL_MODE", ""),
+        "mode": mode_override or os.environ.get("MLX_DISTRIBUTED_MODE", "") or os.environ.get("MLX_PARALLEL_MODE", ""),
         "backend": backend_override or os.environ.get("MLX_DISTRIBUTED_BACKEND", ""),
-        "rank": rank_override,
-        "world_size": world_override,
+        "rank": rank_override if rank_override is not None else env_rank,
+        "world_size": world_override if world_override is not None else env_ws,
         "tp_size": 0,
         "pp_size": 0,
     }
@@ -409,6 +424,8 @@ def _select_rank_files(
     mode: str,
     rank: int,
     world_size: int,
+    pp_rank: int = 0,
+    pp_size: int = 1,
 ) -> tuple[list[str], int]:
     """Return (shard filenames for rank, expected weight bytes)."""
     expected = index_info["expected_files"]
@@ -425,9 +442,11 @@ def _select_rank_files(
         selected: set[str] = set()
         for lidx in range(layer_start, layer_end + 1):
             selected.update(layer_to_files.get(lidx, set()))
-        if rank == 0:
+        is_first_stage = (pp_rank == 0) if mode == "hybrid" else (rank == 0)
+        is_last_stage = (pp_rank == pp_size - 1) if mode == "hybrid" else (rank == world_size - 1)
+        if is_first_stage:
             selected.update(index_info["embed_files"])
-        if rank == world_size - 1:
+        if is_last_stage:
             selected.update(index_info["head_files"])
         sel_list = sorted(selected)
         sel_bytes = sum(file_sizes.get(f, 0) for f in sel_list)
@@ -492,6 +511,24 @@ def discover_shard_placement(
     if world_size <= 1:
         mode = "standalone"
 
+    tp_size = max(1, runtime["tp_size"] or (world_size if mode == "tensor" else int(os.environ.get("MLX_TP_SIZE", "1") or "1")))
+    pp_size = max(1, runtime["pp_size"] or (world_size // tp_size if tp_size > 1 and world_size % tp_size == 0 else (world_size if mode == "pipeline" else 1)))
+
+    if mode == "hybrid" or (tp_size > 1 and pp_size > 1 and world_size > 1):
+        mode = "hybrid"
+        tp_rank = rank % tp_size
+        pp_rank = rank // tp_size
+    elif mode == "tensor":
+        tp_rank = rank
+        pp_rank = 0
+        tp_size = world_size
+        pp_size = 1
+    else:
+        tp_rank = 0
+        pp_rank = rank
+        tp_size = 1
+        pp_size = world_size
+
     eff_path = Path(model_info_obj.model_path if model_info_obj else model_path) if (
         model_info_obj or model_path
     ) else None
@@ -505,6 +542,8 @@ def discover_shard_placement(
         l_start, l_end = parsed_override
     elif mode == "tensor":
         l_start, l_end = (0, max(0, num_layers - 1)) if num_layers > 0 else (-1, -1)
+    elif mode == "hybrid":
+        l_start, l_end = _split_layer_range(num_layers, pp_rank, pp_size)
     else:
         l_start, l_end = _split_layer_range(num_layers, rank, world_size)
 
@@ -512,12 +551,12 @@ def discover_shard_placement(
     layer_range = f"{l_start}..{l_end}" if l_end >= l_start >= 0 else "unknown"
 
     rank_files, exp_bytes = _select_rank_files(
-        index_info, l_start, l_end, mode, rank, world_size
+        index_info, l_start, l_end, mode, rank, world_size, pp_rank=pp_rank, pp_size=pp_size
     )
     if not exp_bytes and model_info_obj and model_info_obj.total_weight_bytes:
         exp_bytes = model_info_obj.total_weight_bytes // max(1, world_size)
 
-    tp_div = max(1, runtime["tp_size"] or (world_size if mode == "tensor" else 1))
+    tp_div = max(1, tp_size)
     dim_hidden = model_info_obj.hidden_size if model_info_obj else 0
     raw_shard_kv = os.environ.get("MLX_SHARD_KV_HEADS", "")
     if raw_shard_kv and raw_shard_kv.isdigit():
@@ -530,7 +569,7 @@ def discover_shard_placement(
         else:
             base = model_info_obj.num_key_value_heads // tp_div
             rem = model_info_obj.num_key_value_heads % tp_div
-            dim_kv = max(1, base + (1 if rank < rem else 0))
+            dim_kv = max(1, base + (1 if tp_rank < rem else 0))
     else:
         dim_kv = 0
     dim_inter = (
@@ -547,11 +586,12 @@ def discover_shard_placement(
             pip = (h.get("ips") or [h.get("ssh") or "unknown"])[0]
             if pr != rank and pip not in ("127.0.0.1", "localhost"):
                 peers.append((pr, pip))
-            ps, pe = (
-                (0, max(0, num_layers - 1))
-                if mode == "tensor" and num_layers > 0
-                else _split_layer_range(num_layers, pr, world_size)
-            )
+            if mode == "tensor" and num_layers > 0:
+                ps, pe = (0, max(0, num_layers - 1))
+            elif mode == "hybrid" and num_layers > 0:
+                ps, pe = _split_layer_range(num_layers, pr // tp_size, pp_size)
+            else:
+                ps, pe = _split_layer_range(num_layers, pr, world_size)
             node_name = device_id if pr == rank and device_id else f"rank{pr}"
             if nodes_devices:
                 for dev in nodes_devices:
@@ -605,6 +645,10 @@ def discover_shard_placement(
         iface=iface,
         peers=tuple(peers),
         cluster_nodes=tuple(cluster_nodes),
+        tp_rank=tp_rank,
+        pp_rank=pp_rank,
+        tp_size=tp_size,
+        pp_size=pp_size,
     )
 
 
@@ -612,13 +656,13 @@ def probe_peer_reachability(
     peers: tuple[tuple[int, str], ...],
     port: int = 8081,
     timeout: float = 0.5,
+    probe_app_rtt: bool = True,
 ) -> dict[tuple[int, str], PeerProbeResult]:
     """Passively check TCP reachability & connect latency of peer ranks.
 
-    Defaults to MLX distributed transport / upstream service port (default 8081).
-    Distinguishes successful connection from ConnectionRefusedError, timeout,
-    and host unreachable. ConnectionRefusedError marks the transport as DOWN
-    because the target service is not listening.
+    Measures TCP connection establishment duration (SYN-ACK).
+    If probe_app_rtt is True and TCP connects, sends a lightweight HTTP HEAD /
+    request to measure actual application-level request/response RTT.
     """
     status: dict[tuple[int, str], PeerProbeResult] = {}
     if port <= 0:
@@ -626,29 +670,47 @@ def probe_peer_reachability(
     for pr, pip in peers:
         t0 = time.monotonic()
         try:
-            with socket.create_connection((pip, port), timeout=timeout):
-                elapsed = max(0.0, time.monotonic() - t0)
+            with socket.create_connection((pip, port), timeout=timeout) as sock:
+                t_connect = time.monotonic()
+                connect_elapsed = max(0.0, t_connect - t0)
+                app_rtt = 0.0
+                if probe_app_rtt:
+                    try:
+                        sock.settimeout(timeout)
+                        sock.sendall(
+                            b"HEAD / HTTP/1.1\r\nHost: "
+                            + pip.encode("ascii", "replace")
+                            + b"\r\nUser-Agent: mlx-probe\r\nConnection: close\r\n\r\n"
+                        )
+                        _ = sock.recv(512)
+                        app_rtt = max(0.0, time.monotonic() - t_connect)
+                    except Exception:
+                        app_rtt = 0.0
                 status[(pr, pip)] = PeerProbeResult(
                     up=True,
-                    connect_seconds=elapsed,
+                    connect_seconds=connect_elapsed,
                     reason="connected",
+                    app_rtt_seconds=app_rtt,
                 )
         except ConnectionRefusedError:
             status[(pr, pip)] = PeerProbeResult(
                 up=False,
                 connect_seconds=0.0,
                 reason="refused",
+                app_rtt_seconds=0.0,
             )
         except socket.timeout:
             status[(pr, pip)] = PeerProbeResult(
                 up=False,
                 connect_seconds=0.0,
                 reason="timeout",
+                app_rtt_seconds=0.0,
             )
         except OSError:
             status[(pr, pip)] = PeerProbeResult(
                 up=False,
                 connect_seconds=0.0,
                 reason="unreachable",
+                app_rtt_seconds=0.0,
             )
     return status

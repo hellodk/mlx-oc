@@ -216,9 +216,15 @@ G_SHARD_PEER_UP = Gauge(
 )
 G_SHARD_PEER_CONNECT_SECONDS = Histogram(
     "mlx_shard_peer_connect_seconds",
-    "TCP connection establishment latency to peer shard node",
+    "TCP connection establishment latency (SYN-ACK) to peer port - transport reachability probe only, not application RTT or MLX distributed communication latency",
     ["rank", "peer_rank", "peer_ip"],
     buckets=(0.0005, 0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0),
+)
+G_SHARD_PEER_APP_RTT_SECONDS = Histogram(
+    "mlx_shard_peer_app_rtt_seconds",
+    "Application request/response round-trip time (RTT) to peer service endpoint",
+    ["rank", "peer_rank", "peer_ip"],
+    buckets=(0.0005, 0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5),
 )
 G_CLUSTER_SHARD_PLACEMENT = Gauge(
     "mlx_cluster_shard_placement_info",
@@ -633,9 +639,12 @@ class PassiveServerObserver:
         )
         for (pr, pip), res in peers_up.items():
             conn_sec = getattr(res, "connect_seconds", 0.0)
+            app_rtt = getattr(res, "app_rtt_seconds", 0.0)
             is_up = getattr(res, "up", bool(res))
             if is_up and conn_sec > 0.0:
                 G_SHARD_PEER_CONNECT_SECONDS.labels(rk, str(pr), pip).observe(conn_sec)
+            if is_up and app_rtt > 0.0:
+                G_SHARD_PEER_APP_RTT_SECONDS.labels(rk, str(pr), pip).observe(app_rtt)
         self._set_gauge_series(
             G_CLUSTER_SHARD_PLACEMENT,
             {

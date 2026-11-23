@@ -288,13 +288,14 @@ def _update_gauges(log_path: str, model_name: str | None,
                 or raw_rank is not None
             )
 
-            tp_size = placement.world_size if placement.mode == "tensor" else int(os.environ.get("MLX_TP_SIZE", "1") or "1")
+            tp_size = getattr(placement, "tp_size", 1) or (placement.world_size if placement.mode == "tensor" else int(os.environ.get("MLX_TP_SIZE", "1") or "1"))
+            tp_rank = getattr(placement, "tp_rank", placement.rank % tp_size if tp_size > 0 else 0)
             kv_max_ctx_bytes_shard = info_obj.kv_bytes_for_max_context_shard(
                 layer_start=placement.layer_start,
                 layer_end=placement.layer_end,
                 dim_kv_heads=placement.dim_kv_heads if placement.dim_kv_heads > 0 else None,
                 tp_size=tp_size,
-                rank=placement.rank,
+                rank=tp_rank,
             )
         else:
             shard_resolved = bool(raw_rank is not None or raw_ws and raw_ws > 1)
