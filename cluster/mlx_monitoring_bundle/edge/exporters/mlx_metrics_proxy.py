@@ -332,25 +332,25 @@ TOKEN_RATE = Histogram(
 )
 PREFILL_TIME = Histogram(
     "mlx_prefill_seconds",
-    "TTFT-derived prompt evaluation duration per request (client-to-first-token)",
+    "Proxy-observed TTFT-derived prompt evaluation duration per request (client-to-first-token, not server-side generation-engine timing)",
     ["model"],
     buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0),
 )
 PREFILL_RATE = Histogram(
     "mlx_prefill_token_rate_tokens_per_second",
-    "Prompt tokens processed per second of TTFT-derived prompt duration",
+    "Prompt tokens processed per second of proxy-observed TTFT-derived prompt duration",
     ["model"],
     buckets=(10, 25, 50, 100, 250, 500, 1000, 2000, 4000),
 )
 DECODE_TIME = Histogram(
     "mlx_decode_seconds",
-    "Post-first-token streaming response duration",
+    "Proxy-observed post-first-token streaming response duration (not server-side generation-engine timing)",
     ["model"],
     buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0),
 )
 DECODE_RATE = Histogram(
     "mlx_decode_token_rate_tokens_per_second",
-    "Completion tokens per second across post-first-token streaming decode interval",
+    "Completion tokens per second across proxy-observed post-first-token streaming decode interval",
     ["model"],
     buckets=(1, 2, 5, 10, 20, 40, 80, 160, 320, 640),
 )

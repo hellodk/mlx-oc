@@ -548,8 +548,9 @@ groups:
       annotations:
         summary: "High peer application RTT from {{ $labels.device }} (rank {{ $labels.rank }}) to peer {{ $labels.peer_ip }} (rank {{ $labels.peer_rank }})"
         description: |
-          Application-level request/response RTT to peer service exceeds 100ms.
-          Distributed synchronization and collective communication will bottleneck token generation.
+          Application-level HTTP request/response RTT to peer service exceeds 100ms.
+          High peer service latency may indicate host resource contention or network delay.
+          Note: Probes external HTTP endpoint; does not measure MLX internal collective or ring communication latency.
         runbook: "https://docs.example.com/mlx-monitoring/runbook#shard-peer-app-rtt-high"
 
     - alert: MLXShardPeerAppDown

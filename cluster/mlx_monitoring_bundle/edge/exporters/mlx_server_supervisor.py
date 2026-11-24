@@ -232,7 +232,7 @@ G_SHARD_PEER_CONNECT_SECONDS = Histogram(
 )
 G_SHARD_PEER_APP_RTT_SECONDS = Histogram(
     "mlx_shard_peer_app_rtt_seconds",
-    "Application request/response round-trip time (RTT) to peer service endpoint",
+    "Application request/response round-trip time (RTT) to peer service endpoint - HTTP probe only, not MLX collective communication latency",
     ["rank", "peer_rank", "peer_ip"],
     buckets=(0.0005, 0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5),
 )

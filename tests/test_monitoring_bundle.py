@@ -2854,6 +2854,8 @@ def test_peer_probe_port_and_alert_dashboard_consistency():
     assert "alert: MLXPrefillSlow" not in alert_text, "Duplicate MLXPrefillSlow alert must be removed"
     assert "alert: MLXShardPeerLatencyHigh" in alert_text
     assert "alert: MLXShardPeerAppRTTHigh" in alert_text
+    assert "Distributed synchronization and collective communication" not in alert_text
+    assert "does not measure MLX internal collective or ring communication latency" in alert_text
     assert "alert: MLXShardPeerAppDown" in alert_text
     assert "sum by (le, device, rank, peer_rank, peer_ip)" in alert_text
     # MLXShardMemoryOverbudget must not have dangling rank label
@@ -2977,6 +2979,52 @@ def test_hybrid_tp_pp_rank_mapping_and_shard_placement(tmp_path, monkeypatch):
     assert p3.layer_start == 16 and p3.layer_end == 31
     assert p3.dim_kv_heads == 3  # tp_rank 1 gets base head
     assert p3.kv_heads_exact is False
+
+
+def test_even_tp_kv_head_division_labeled_estimate_without_runtime_evidence(tmp_path, monkeypatch):
+    """Verify even KV-head division across TP ranks is treated as an estimate unless explicitly configured."""
+    import mlx_shard_topology as top
+    from mlx_model_info import model_info as load_model_info
+
+    model_dir = tmp_path / "even_tp_model"
+    model_dir.mkdir()
+    cfg = {
+        "num_hidden_layers": 16,
+        "num_attention_heads": 16,
+        "num_key_value_heads": 8,  # Even: 8 heads across TP=2 -> 4 heads per rank
+        "hidden_size": 2048,
+        "max_position_embeddings": 4096,
+        "dtype": "bfloat16",
+    }
+    (model_dir / "config.json").write_text(json.dumps(cfg), encoding="utf8")
+    model_info = load_model_info(str(model_dir))
+
+    monkeypatch.setenv("MLX_WORLD_SIZE", "2")
+    monkeypatch.setenv("MLX_TP_SIZE", "2")
+    monkeypatch.setenv("MLX_DISTRIBUTED_MODE", "tensor")
+    monkeypatch.setenv("MLX_RANK", "0")
+
+    # 1. Without runtime evidence or explicit override -> estimate
+    p_fallback = top.discover_shard_placement(model_info_obj=model_info, model_id="even_tp_model", model_path=str(model_dir))
+    assert p_fallback.dim_kv_heads == 4
+    assert p_fallback.kv_heads_exact is False
+    assert p_fallback.kv_source == "uniform_division_estimate"
+
+    # 2. With explicit override via MLX_SHARD_KV_HEADS -> exact
+    monkeypatch.setenv("MLX_SHARD_KV_HEADS", "4")
+    p_override = top.discover_shard_placement(model_info_obj=model_info, model_id="even_tp_model", model_path=str(model_dir))
+    assert p_override.dim_kv_heads == 4
+    assert p_override.kv_heads_exact is True
+    assert p_override.kv_source == "env_override"
+    monkeypatch.delenv("MLX_SHARD_KV_HEADS")
+
+    # 3. Single rank / TP=1 -> exact full model
+    monkeypatch.setenv("MLX_WORLD_SIZE", "1")
+    monkeypatch.setenv("MLX_TP_SIZE", "1")
+    p_full = top.discover_shard_placement(model_info_obj=model_info, model_id="even_tp_model", model_path=str(model_dir))
+    assert p_full.dim_kv_heads == 8
+    assert p_full.kv_heads_exact is True
+    assert p_full.kv_source == "full_model"
 
 
 def test_proxy_chat_template_rendering_and_exact_tokens(tmp_path, monkeypatch):

@@ -624,7 +624,8 @@ def discover_shard_placement(
             kv_source = "full_model"
         elif model_info_obj.num_key_value_heads % tp_div == 0:
             dim_kv = model_info_obj.num_key_value_heads // tp_div
-            kv_source = "uniform_division"
+            kv_heads_exact = False
+            kv_source = "uniform_division_estimate"
         else:
             base = model_info_obj.num_key_value_heads // tp_div
             rem = model_info_obj.num_key_value_heads % tp_div
