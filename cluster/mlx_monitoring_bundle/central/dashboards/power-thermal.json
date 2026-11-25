@@ -43,7 +43,7 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 8,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -64,9 +64,9 @@
       "title": "Package Power (CPU+GPU+ANE) (mW)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
+        "x": 12,
         "y": 0,
-        "w": 8,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -89,7 +89,7 @@
       "gridPos": {
         "x": 0,
         "y": 6,
-        "w": 8,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -110,9 +110,9 @@
       "title": "ANE Power (mW)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
+        "x": 12,
         "y": 6,
-        "w": 8,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -135,7 +135,7 @@
       "gridPos": {
         "x": 0,
         "y": 12,
-        "w": 8,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -159,9 +159,9 @@
       "title": "GPU Utilization (%)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
+        "x": 12,
         "y": 12,
-        "w": 8,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -186,7 +186,7 @@
       "gridPos": {
         "x": 0,
         "y": 18,
-        "w": 8,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -208,9 +208,9 @@
       "title": "GPU Active Residency (%)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
+        "x": 12,
         "y": 18,
-        "w": 8,
+        "w": 12,
         "h": 6
       },
       "targets": [

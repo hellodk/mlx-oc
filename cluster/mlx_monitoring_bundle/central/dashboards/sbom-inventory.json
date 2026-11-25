@@ -68,8 +68,8 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -100,10 +100,10 @@
       "title": "Python / pip Packages",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 3,
+        "x": 6,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -134,10 +134,10 @@
       "title": "Homebrew Formulae",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 6,
+        "x": 12,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -168,10 +168,10 @@
       "title": "MLX Model Artifacts",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 9,
+        "x": 18,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -204,8 +204,8 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 3,
-        "w": 12,
+        "y": 4,
+        "w": 24,
         "h": 14
       },
       "targets": [

@@ -260,7 +260,7 @@
       "gridPos": {
         "x": 0,
         "y": 24,
-        "w": 16,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -299,9 +299,9 @@
       "title": "Hallucination Flags (count)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 0,
-        "y": 30,
-        "w": 16,
+        "x": 12,
+        "y": 24,
+        "w": 12,
         "h": 6
       },
       "targets": [

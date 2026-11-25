@@ -602,14 +602,29 @@ class Bundle:
             return
         if not self._render_vmagent_config():
             return
-        remote_write_url = f"{self.otlp_scheme}://{self.central_vm}/api/v1/write"
+        remote_write_urls = []
+        rw_env = config_val(self.config, "VMAGENT_REMOTE_WRITE_URL", "")
+        if rw_env:
+            for u in rw_env.split(","):
+                u = u.strip()
+                if u:
+                    remote_write_urls.append(u if "://" in u else f"{self.otlp_scheme}://{u}/api/v1/write")
+        elif self.central_vm:
+            for vm in self.central_vm.split(","):
+                vm = vm.strip()
+                if vm:
+                    remote_write_urls.append(f"{self.otlp_scheme}://{vm}/api/v1/write")
+        if not remote_write_urls:
+            remote_write_urls.append(f"{self.otlp_scheme}://127.0.0.1:8428/api/v1/write")
+
         cmd = [
             self.vmagent_binary,
             "-promscrape.config", str(self.vmagent_config_rendered),
             "-promscrape.configCheckInterval", "30s",
-            "-remoteWrite.url", remote_write_url,
-            "-remoteWrite.maxDiskUsagePerURL", "10GB",
         ]
+        for r_url in remote_write_urls:
+            cmd += ["-remoteWrite.url", r_url]
+        cmd += ["-remoteWrite.maxDiskUsagePerURL", "10GB"]
         pq_dir = config_val(self.config, "VMAGENT_PERSISTENT_QUEUE", "")
         if pq_dir:
             pq_path = Path(pq_dir).expanduser()

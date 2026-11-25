@@ -42,7 +42,7 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 6,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -84,9 +84,9 @@
       "title": "CPU Count",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 6,
+        "x": 12,
         "y": 0,
-        "w": 6,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -120,7 +120,7 @@
       "gridPos": {
         "x": 0,
         "y": 6,
-        "w": 8,
+        "w": 14,
         "h": 6
       },
       "targets": [
@@ -158,9 +158,9 @@
       "title": "Free Pages (Pressure)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
+        "x": 14,
         "y": 6,
-        "w": 4,
+        "w": 10,
         "h": 6
       },
       "targets": [
@@ -178,7 +178,7 @@
       "gridPos": {
         "x": 0,
         "y": 12,
-        "w": 8,
+        "w": 14,
         "h": 6
       },
       "targets": [
@@ -204,9 +204,9 @@
       "title": "GPU Memory (IOKit)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
+        "x": 14,
         "y": 12,
-        "w": 4,
+        "w": 10,
         "h": 6
       },
       "targets": [
@@ -251,7 +251,7 @@
       "gridPos": {
         "x": 0,
         "y": 18,
-        "w": 6,
+        "w": 8,
         "h": 6
       },
       "targets": [
@@ -284,9 +284,9 @@
       "title": "Uptime",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 6,
+        "x": 8,
         "y": 18,
-        "w": 6,
+        "w": 8,
         "h": 6
       },
       "targets": [
@@ -307,9 +307,9 @@
       "title": "Exporter Up",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 12,
+        "x": 16,
         "y": 18,
-        "w": 6,
+        "w": 8,
         "h": 6
       },
       "targets": [

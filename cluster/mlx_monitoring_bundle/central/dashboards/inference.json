@@ -42,8 +42,8 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -64,10 +64,10 @@
       "title": "Requests per Second",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 3,
+        "x": 6,
         "y": 0,
-        "w": 7,
-        "h": 6
+        "w": 18,
+        "h": 4
       },
       "targets": [
         {
@@ -88,8 +88,8 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 3,
-        "w": 8,
+        "y": 4,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -110,9 +110,9 @@
       "title": "Generation Time (p95)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
-        "y": 3,
-        "w": 8,
+        "x": 12,
+        "y": 4,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -134,8 +134,8 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 9,
-        "w": 8,
+        "y": 10,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -156,9 +156,9 @@
       "title": "Queue Wait (p95)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
-        "y": 9,
-        "w": 8,
+        "x": 12,
+        "y": 10,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -180,8 +180,8 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 15,
-        "w": 16,
+        "y": 23,
+        "w": 24,
         "h": 6
       },
       "targets": [
@@ -208,8 +208,8 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 21,
-        "w": 16,
+        "y": 29,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -225,9 +225,9 @@
       "title": "Tool Calls",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 0,
-        "y": 27,
-        "w": 16,
+        "x": 12,
+        "y": 29,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -244,7 +244,7 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 20,
+        "y": 16,
         "w": 12,
         "h": 7
       },
@@ -272,7 +272,7 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 12,
-        "y": 20,
+        "y": 16,
         "w": 12,
         "h": 7
       },

@@ -35,8 +35,8 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 4,
-        "h": 3
+        "w": 8,
+        "h": 4
       },
       "targets": [
         {
@@ -71,10 +71,10 @@
       "title": "Degraded / Firing Alerts",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 4,
+        "x": 8,
         "y": 0,
-        "w": 4,
-        "h": 3
+        "w": 8,
+        "h": 4
       },
       "targets": [
         {
@@ -109,10 +109,10 @@
       "title": "SSH Connectivity (Fleet)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
+        "x": 16,
         "y": 0,
-        "w": 4,
-        "h": 3
+        "w": 8,
+        "h": 4
       },
       "targets": [
         {
@@ -149,8 +149,8 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 3,
-        "w": 12,
+        "y": 4,
+        "w": 24,
         "h": 7
       },
       "targets": [
@@ -251,8 +251,8 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 10,
-        "w": 12,
+        "y": 11,
+        "w": 24,
         "h": 7
       },
       "targets": [
@@ -311,9 +311,9 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 17,
-        "w": 12,
-        "h": 6
+        "y": 18,
+        "w": 24,
+        "h": 7
       },
       "targets": [
         {

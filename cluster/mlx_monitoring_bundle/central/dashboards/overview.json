@@ -42,8 +42,8 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -84,10 +84,10 @@
       "title": "Requests / sec (cluster)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 3,
+        "x": 6,
         "y": 0,
-        "w": 4,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -108,10 +108,10 @@
       "title": "Avg Token Rate (tok/s)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 7,
+        "x": 12,
         "y": 0,
-        "w": 4,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -132,10 +132,10 @@
       "title": "5xx Error Rate",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 11,
+        "x": 18,
         "y": 0,
-        "w": 4,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {

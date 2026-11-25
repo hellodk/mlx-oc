@@ -53,8 +53,8 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 8,
-        "h": 6
+        "w": 12,
+        "h": 7
       },
       "targets": [
         {
@@ -86,10 +86,10 @@
       "title": "TX Bytes per Second",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
+        "x": 12,
         "y": 0,
-        "w": 8,
-        "h": 6
+        "w": 12,
+        "h": 7
       },
       "targets": [
         {
@@ -122,9 +122,9 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 6,
-        "w": 8,
-        "h": 6
+        "y": 7,
+        "w": 12,
+        "h": 7
       },
       "targets": [
         {
@@ -156,10 +156,10 @@
       "title": "TX Errors",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
-        "y": 6,
-        "w": 8,
-        "h": 6
+        "x": 12,
+        "y": 7,
+        "w": 12,
+        "h": 7
       },
       "targets": [
         {

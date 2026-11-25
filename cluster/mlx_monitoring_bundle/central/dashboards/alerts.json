@@ -27,10 +27,26 @@
         "type": "custom",
         "query": "critical,warning,info",
         "options": [
-          {"text": "All", "value": "$__all", "selected": true},
-          {"text": "critical", "value": "critical", "selected": false},
-          {"text": "warning", "value": "warning", "selected": false},
-          {"text": "info", "value": "info", "selected": false}
+          {
+            "text": "All",
+            "value": "$__all",
+            "selected": true
+          },
+          {
+            "text": "critical",
+            "value": "critical",
+            "selected": false
+          },
+          {
+            "text": "warning",
+            "value": "warning",
+            "selected": false
+          },
+          {
+            "text": "info",
+            "value": "info",
+            "selected": false
+          }
         ],
         "includeAll": true,
         "allValue": ".*",
@@ -50,49 +66,13 @@
   },
   "panels": [
     {
-      "type": "graph",
-      "title": "Active Alerts by Device",
-      "datasource": "VictoriaMetrics",
-      "gridPos": {
-        "x": 0,
-        "y": 0,
-        "w": 16,
-        "h": 6
-      },
-      "targets": [
-        {
-          "expr": "ALERTS{alertname=~\"$alertname\", device=~\"$device\", severity=~\"$severity\"}",
-          "legendFormat": "{{alertname}} {{severity}} {{device}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "min": 0,
-          "max": 1,
-          "links": [
-            {
-              "title": "\ud83d\udcca Drilldown: Per-Device Detail for ${__field.labels.device}",
-              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
-              "targetBlank": false
-            },
-            {
-              "title": "\u26a1 Drilldown: Device Health Matrix",
-              "url": "/d/mlx-device-health?var-device=${__field.labels.device}",
-              "targetBlank": false
-            }
-          ]
-        }
-      }
-    },
-    {
       "type": "stat",
       "title": "Critical Alerts",
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 6,
-        "w": 4,
+        "y": 0,
+        "w": 6,
         "h": 4
       },
       "targets": [
@@ -124,9 +104,9 @@
       "title": "Warning Alerts",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 4,
-        "y": 6,
-        "w": 4,
+        "x": 6,
+        "y": 0,
+        "w": 6,
         "h": 4
       },
       "targets": [
@@ -154,14 +134,118 @@
       }
     },
     {
+      "type": "stat",
+      "title": "Total Active Firing Alerts",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(ALERTS{alertname=~\"\", device=~\"\", severity=~\"\", alertstate=\"firing\"}) or vector(0)",
+          "legendFormat": "firing",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "links": [
+            {
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail",
+              "url": "/d/mlx-detail?var-device=${device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: Device Health Matrix",
+              "url": "/d/mlx-device-health?var-device=${device}",
+              "targetBlank": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Affected Devices",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "count(count by (device) (ALERTS{alertname=~\"\", device=~\"\", severity=~\"\", alertstate=\"firing\"})) or vector(0)",
+          "legendFormat": "devices",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "links": [
+            {
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail",
+              "url": "/d/mlx-detail?var-device=${device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: Device Health Matrix",
+              "url": "/d/mlx-device-health?var-device=${device}",
+              "targetBlank": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "graph",
+      "title": "Active Alerts by Device",
+      "datasource": "VictoriaMetrics",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "ALERTS{alertname=~\"$alertname\", device=~\"$device\", severity=~\"$severity\"}",
+          "legendFormat": "{{alertname}} {{severity}} {{device}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "links": [
+            {
+              "title": "\ud83d\udcca Drilldown: Per-Device Detail for ${__field.labels.device}",
+              "url": "/d/mlx-detail?var-device=${__field.labels.device}",
+              "targetBlank": false
+            },
+            {
+              "title": "\u26a1 Drilldown: Device Health Matrix",
+              "url": "/d/mlx-device-health?var-device=${__field.labels.device}",
+              "targetBlank": false
+            }
+          ]
+        }
+      }
+    },
+    {
       "type": "graph",
       "title": "Alert State Over Time",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
-        "y": 6,
-        "w": 8,
-        "h": 6
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 7
       },
       "targets": [
         {
@@ -195,9 +279,9 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 12,
-        "w": 16,
-        "h": 8
+        "y": 11,
+        "w": 24,
+        "h": 10
       },
       "targets": [
         {

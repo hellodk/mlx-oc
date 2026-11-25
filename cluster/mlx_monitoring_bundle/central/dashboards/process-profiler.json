@@ -35,8 +35,8 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -68,10 +68,10 @@
       "title": "Top CPU Consumer",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 3,
+        "x": 6,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -107,10 +107,10 @@
       "title": "Top Memory Consumer",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 6,
+        "x": 12,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -142,10 +142,10 @@
       "title": "Top GPU Consumer",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 9,
+        "x": 18,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -179,8 +179,8 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 3,
-        "w": 6,
+        "y": 4,
+        "w": 12,
         "h": 8
       },
       "targets": [
@@ -209,9 +209,9 @@
       "description": "Resident Set Size (RAM) consumed by top 10 processes on $device.",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 6,
-        "y": 3,
-        "w": 6,
+        "x": 12,
+        "y": 4,
+        "w": 12,
         "h": 8
       },
       "targets": [
@@ -241,8 +241,8 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 11,
-        "w": 6,
+        "y": 12,
+        "w": 12,
         "h": 7
       },
       "targets": [
@@ -273,9 +273,9 @@
       "description": "Per-process GPU active residency and Apple Neural Engine power draw.",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 6,
-        "y": 11,
-        "w": 6,
+        "x": 12,
+        "y": 12,
+        "w": 12,
         "h": 7
       },
       "targets": [
@@ -306,9 +306,9 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 18,
-        "w": 12,
-        "h": 8
+        "y": 19,
+        "w": 24,
+        "h": 9
       },
       "targets": [
         {

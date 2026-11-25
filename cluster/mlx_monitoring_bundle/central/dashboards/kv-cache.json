@@ -32,7 +32,7 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 8,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -56,9 +56,9 @@
       "title": "Cached Sequences by Type",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
+        "x": 12,
         "y": 0,
-        "w": 8,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -76,7 +76,7 @@
       "gridPos": {
         "x": 0,
         "y": 6,
-        "w": 8,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -97,9 +97,9 @@
       "title": "Prompt Cache Ratio",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
+        "x": 12,
         "y": 6,
-        "w": 8,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -125,7 +125,7 @@
       "gridPos": {
         "x": 0,
         "y": 12,
-        "w": 6,
+        "w": 8,
         "h": 6
       },
       "targets": [
@@ -141,9 +141,9 @@
       "title": "Context Utilization",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 6,
+        "x": 8,
         "y": 12,
-        "w": 6,
+        "w": 8,
         "h": 6
       },
       "targets": [
@@ -167,9 +167,9 @@
       "title": "KV Bytes per Token",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 12,
+        "x": 16,
         "y": 12,
-        "w": 4,
+        "w": 8,
         "h": 6
       },
       "targets": [
@@ -187,7 +187,7 @@
       "gridPos": {
         "x": 0,
         "y": 18,
-        "w": 8,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -208,9 +208,9 @@
       "title": "Prompt Cached Tokens",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
+        "x": 12,
         "y": 18,
-        "w": 8,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -232,8 +232,8 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 20,
-        "w": 12,
+        "y": 24,
+        "w": 24,
         "h": 7
       },
       "targets": [

@@ -32,8 +32,8 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -69,10 +69,10 @@
       "title": "Server Ready (/v1/models)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 3,
+        "x": 6,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -93,10 +93,10 @@
       "title": "Model Loaded",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 6,
+        "x": 12,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -117,10 +117,10 @@
       "title": "Restarts (15m)",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 9,
+        "x": 18,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -136,8 +136,8 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 3,
-        "w": 8,
+        "y": 4,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -159,9 +159,9 @@
       "title": "Server Uptime",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
-        "y": 3,
-        "w": 8,
+        "x": 12,
+        "y": 4,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -183,8 +183,8 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 9,
-        "w": 8,
+        "y": 10,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -200,9 +200,9 @@
       "title": "Last Exit Code",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 8,
-        "y": 9,
-        "w": 8,
+        "x": 12,
+        "y": 10,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -219,8 +219,8 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 15,
-        "w": 16,
+        "y": 16,
+        "w": 12,
         "h": 6
       },
       "targets": [
@@ -236,9 +236,9 @@
       "title": "Backoff Seconds",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 0,
-        "y": 21,
-        "w": 16,
+        "x": 12,
+        "y": 16,
+        "w": 12,
         "h": 6
       },
       "targets": [

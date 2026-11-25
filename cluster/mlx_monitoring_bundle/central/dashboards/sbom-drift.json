@@ -45,8 +45,8 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -81,10 +81,10 @@
       "title": "Version Mismatches",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 3,
+        "x": 6,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -119,10 +119,10 @@
       "title": "Missing Packages",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 6,
+        "x": 12,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -157,10 +157,10 @@
       "title": "Cluster Fleet Uniformity",
       "datasource": "VictoriaMetrics",
       "gridPos": {
-        "x": 9,
+        "x": 18,
         "y": 0,
-        "w": 3,
-        "h": 3
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
@@ -202,9 +202,9 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 3,
-        "w": 12,
-        "h": 6
+        "y": 4,
+        "w": 24,
+        "h": 7
       },
       "targets": [
         {
@@ -238,8 +238,8 @@
       "datasource": "VictoriaMetrics",
       "gridPos": {
         "x": 0,
-        "y": 9,
-        "w": 12,
+        "y": 11,
+        "w": 24,
         "h": 10
       },
       "targets": [
