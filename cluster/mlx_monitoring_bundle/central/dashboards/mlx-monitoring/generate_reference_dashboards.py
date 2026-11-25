@@ -360,7 +360,7 @@ def build_01_cluster_overview() -> Dict[str, Any]:
         ),
         make_stat_panel(
             4, "TTFT p95 (Proxy-Observed)", 12, 0, 4, 4,
-            "histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))",
+            "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or vector(0)",
             unit="s", decimals=2,
             description="95th percentile Time to First Token observed at the proxy HTTP edge",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1.5}, {"color": "red", "value": 3.0}],
@@ -388,8 +388,8 @@ def build_01_cluster_overview() -> Dict[str, Any]:
         make_timeseries_panel(
             8, "TTFT Latency Distribution (p50 / p95)", 12, 4, 12, 8,
             [
-                make_target("histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))", legend="p95 TTFT"),
-                make_target("histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))", legend="p50 TTFT"),
+                make_target("(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))", legend="p95 TTFT"),
+                make_target("(histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))", legend="p50 TTFT"),
             ],
             unit="s", description="Proxy-observed time-to-first-token latency progression",
         ),
@@ -397,7 +397,7 @@ def build_01_cluster_overview() -> Dict[str, Any]:
             9, "Fleet Status Summary", 0, 12, 12, 8,
             [
                 make_target("mlx_server_state{device=~\"$device\"}", legend="State", instant=True),
-                make_target("histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\"}[5m])) by (le, device))", legend="TTFT p95", instant=True, ref_id="B"),
+                make_target("(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\"}[5m])) by (le, device))) or (0 * count by (device) (mlx_server_state{device=~\"$device\"}))", legend="TTFT p95", instant=True, ref_id="B"),
             ],
             description="Current device state (0=Down, 1=Ready, 2=Starting, 3=Backoff) and p95 TTFT",
             drilldown_url="/d/mlx-mon-03-per-device-detail?var-device=${__data.fields.device}&${__all_variables}",
@@ -582,7 +582,7 @@ def build_03_per_device_detail() -> Dict[str, Any]:
             8, "Serving Throughput (Requests & Token Rate)", 12, 4, 12, 8,
             [
                 make_target("rate(mlx_requests_total{device=\"$device\"}[1m])", legend="Requests/s"),
-                make_target("rate(mlx_token_rate_tokens_per_second_sum{device=\"$device\"}[1m]) / (rate(mlx_token_rate_tokens_per_second_count{device=\"$device\"}[1m]) > 0)", legend="Tokens/s (decode)"),
+                make_target("(rate(mlx_token_rate_tokens_per_second_sum{device=\"$device\"}[1m]) / (rate(mlx_token_rate_tokens_per_second_count{device=\"$device\"}[1m]) > 0)) or (0 * rate(mlx_requests_total{device=\"$device\"}[1m]))", legend="Tokens/s (decode)"),
             ],
             description="Throughput metrics observed on this specific host",
         ),
@@ -760,21 +760,21 @@ def build_06_inference_metrics() -> Dict[str, Any]:
         ),
         make_stat_panel(
             2, "[Proxy-Observed] TTFT p95", 4, 0, 4, 4,
-            "histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))",
+            "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or vector(0)",
             unit="s", decimals=2,
             description="Time to First Token measured at proxy boundary (includes network and queue)",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1.5}, {"color": "red", "value": 3.0}],
         ),
         make_stat_panel(
             3, "[Engine] Generation Duration p95", 8, 0, 4, 4,
-            "histogram_quantile(0.95, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))",
+            "(histogram_quantile(0.95, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or vector(0)",
             unit="s", decimals=2,
             description="Token generation execution time on model engine (excluding prompt queue)",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 2.0}, {"color": "red", "value": 5.0}],
         ),
         make_stat_panel(
             4, "Token Rate (tok/s)", 12, 0, 4, 4,
-            "avg(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\", model=~\"$model\"}[1m]) / (rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\", model=~\"$model\"}[1m]) > 0))",
+            "(avg(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\", model=~\"$model\"}[1m]) / (rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\", model=~\"$model\"}[1m]) > 0))) or vector(0)",
             unit="tok/s", decimals=1,
             description="Average tokens per second generated during decode phase",
         ),
@@ -793,10 +793,10 @@ def build_06_inference_metrics() -> Dict[str, Any]:
         make_timeseries_panel(
             7, "[Latency Decomposition] TTFT vs Engine Generation Time", 0, 4, 12, 8,
             [
-                make_target("histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))", legend="Proxy TTFT p95"),
-                make_target("histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))", legend="Proxy TTFT p50"),
-                make_target("histogram_quantile(0.95, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))", legend="Engine Gen Time p95"),
-                make_target("histogram_quantile(0.50, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))", legend="Engine Gen Time p50"),
+                make_target("(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))", legend="Proxy TTFT p95"),
+                make_target("(histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))", legend="Proxy TTFT p50"),
+                make_target("(histogram_quantile(0.95, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))", legend="Engine Gen Time p95"),
+                make_target("(histogram_quantile(0.50, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))", legend="Engine Gen Time p50"),
             ],
             unit="s", description="Separation of proxy-observed latency from internal engine execution",
         ),
@@ -817,8 +817,8 @@ def build_06_inference_metrics() -> Dict[str, Any]:
             10, "Inference Performance Leaderboard by Model", 12, 12, 12, 8,
             [
                 make_target("sum(rate(mlx_requests_total[5m])) by (model)", legend="Requests/s", instant=True),
-                make_target("avg(rate(mlx_token_rate_tokens_per_second_sum[5m]) / (rate(mlx_token_rate_tokens_per_second_count[5m]) > 0)) by (model)", legend="Decode tok/s", instant=True, ref_id="B"),
-                make_target("histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket[5m])) by (le, model))", legend="TTFT p95 (s)", instant=True, ref_id="C"),
+                make_target("(avg(rate(mlx_token_rate_tokens_per_second_sum[5m]) / (rate(mlx_token_rate_tokens_per_second_count[5m]) > 0)) by (model)) or (0 * count by (model) (mlx_requests_total))", legend="Decode tok/s", instant=True, ref_id="B"),
+                make_target("(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket[5m])) by (le, model))) or (0 * count by (model) (mlx_requests_total))", legend="TTFT p95 (s)", instant=True, ref_id="C"),
             ],
             description="Comparative model latency and throughput summary",
             drilldown_url="/d/mlx-mon-09-quality-confidence?var-model=${__data.fields.model}",
@@ -864,25 +864,30 @@ def build_07_model_sharding() -> Dict[str, Any]:
             drilldown_url="/d/mlx-mon-16-network-host-peers?${__all_variables}",
         ),
         make_table_panel(
-            5, "Shard Placement Matrix (Which Shard Is Where)", 0, 4, 12, 8,
+            5, "Shard Placement & Attention Head Allocation Matrix", 0, 4, 12, 8,
             [
                 make_target("mlx_shard_rank{device=~\"$device\"}", legend="Rank", instant=True),
                 make_target("mlx_shard_layer_start{device=~\"$device\"}", legend="Layer Start", instant=True, ref_id="B"),
                 make_target("mlx_shard_layer_end{device=~\"$device\"}", legend="Layer End", instant=True, ref_id="C"),
+                make_target("mlx_shard_dim_attention_heads{device=~\"$device\"}", legend="Assigned Query Heads", instant=True, ref_id="D"),
+                make_target("mlx_shard_dim_kv_heads{device=~\"$device\"}", legend="Assigned KV Heads", instant=True, ref_id="E"),
             ],
-            description="Mapping of physical host devices to distributed rank and assigned transformer layer ranges",
+            description="Mapping of physical host devices to distributed rank, assigned transformer layer ranges, and attention head partition",
             drilldown_url="/d/mlx-mon-03-per-device-detail?var-device=${__data.fields.device}",
             drilldown_title="Open Device Detail",
         ),
         make_table_panel(
-            6, "Model Architecture Metadata", 12, 4, 12, 8,
+            6, "Model Architecture & Attention Head Dimensions", 12, 4, 12, 8,
             [
                 make_target("mlx_shard_layers_assigned{device=~\"$device\"} or mlx_model_info{attr=\"layer_count\", device=~\"$device\"}", legend="Total Layers", instant=True),
                 make_target("mlx_shard_dim_hidden{device=~\"$device\"} or mlx_model_info{attr=\"hidden_size\", device=~\"$device\"}", legend="Hidden Dim", instant=True, ref_id="B"),
-                make_target("mlx_model_info{attr=\"attention_heads\", device=~\"$device\"}", legend="Attention Heads", instant=True, ref_id="C"),
+                make_target("mlx_shard_dim_attention_heads{device=~\"$device\"} or mlx_model_info{attr=\"attention_heads\", device=~\"$device\"}", legend="Query Heads", instant=True, ref_id="C"),
                 make_target("mlx_shard_dim_kv_heads{device=~\"$device\"} or mlx_model_info{attr=\"kv_heads\", device=~\"$device\"}", legend="KV Heads", instant=True, ref_id="D"),
+                make_target("mlx_shard_dim_head_dim{device=~\"$device\"} or mlx_model_info{attr=\"head_dim\", device=~\"$device\"}", legend="Head Dim", instant=True, ref_id="E"),
+                make_target("mlx_shard_gqa_ratio{device=~\"$device\"} or mlx_model_info{attr=\"gqa_ratio\", device=~\"$device\"}", legend="GQA Ratio", instant=True, ref_id="F"),
+                make_target("mlx_shard_attention_layers_assigned{device=~\"$device\"} or mlx_model_info{attr=\"attention_layers\", device=~\"$device\"}", legend="Attention Layers", instant=True, ref_id="G"),
             ],
-            description="Structural dimensions and architectural hyperparameters of active model",
+            description="Structural dimensions, attention heads, GQA ratio and architectural hyperparameters of active model",
             drilldown_url="/d/mlx-mon-08-kv-cache?var-device=${__data.fields.device}",
             drilldown_title="Open KV Cache",
         ),
@@ -966,11 +971,14 @@ def build_08_kv_cache() -> Dict[str, Any]:
         make_table_panel(
             9, "Per-Rank KV Head & Memory Allocation", 0, 12, 24, 8,
             [
-                make_target("mlx_kv_cache_utilization{device=~\"$device\"}", legend="Utilization Ratio", instant=True),
-                make_target("mlx_shard_dim_kv_heads{device=~\"$device\"}", legend="Assigned KV Heads", instant=True, ref_id="B"),
-                make_target("mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"}", legend="Total KV Bytes", instant=True, ref_id="C"),
+                make_target("mlx_kv_cache_utilization{device=~\"$device\"} * 100", legend="Utilization %", instant=True),
+                make_target("mlx_kv_heads_assigned{device=~\"$device\"} or mlx_shard_dim_kv_heads{device=~\"$device\"}", legend="Assigned KV Heads", instant=True, ref_id="B"),
+                make_target("mlx_kv_head_dim{device=~\"$device\"} or mlx_shard_dim_head_dim{device=~\"$device\"}", legend="Head Dim", instant=True, ref_id="C"),
+                make_target("mlx_kv_bytes_per_head{device=~\"$device\"}", legend="Max Context Bytes/Head", instant=True, ref_id="D"),
+                make_target("mlx_kv_cache_bytes_per_kv_head{device=~\"$device\"}", legend="Active Bytes/KV Head", instant=True, ref_id="E"),
+                make_target("mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"}", legend="Total KV Bytes", instant=True, ref_id="F"),
             ],
-            description="Per-device KV head allocation, total bytes, and measurement attribution",
+            description="Per-device KV head allocation, head dimensions, memory per head, total bytes, and measurement attribution",
             drilldown_url="/d/mlx-mon-03-per-device-detail?var-device=${__data.fields.device}",
             drilldown_title="Open Device Detail",
         ),
@@ -1033,8 +1041,8 @@ def build_09_quality_confidence() -> Dict[str, Any]:
         make_timeseries_panel(
             7, "[Entropy Monitoring] Token Entropy Distribution (p50 / p95)", 0, 4, 12, 8,
             [
-                make_target("histogram_quantile(0.95, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))", legend="Entropy p95 (nats)"),
-                make_target("histogram_quantile(0.50, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))", legend="Entropy p50 (nats)"),
+                make_target("(histogram_quantile(0.95, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))) or (0 * mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"})", legend="Entropy p95 (nats)"),
+                make_target("(histogram_quantile(0.50, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))) or (0 * mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"})", legend="Entropy p50 (nats)"),
                 make_target("mlx_token_entropy_tail_nats{device=~\"$device\", model=~\"$model\"}", legend="Tail-Corrected Bound (nats)"),
                 make_target("mlx_token_topk_mass_mean{device=~\"$device\", model=~\"$model\"}", legend="Top-k Mass"),
             ],
@@ -1234,19 +1242,19 @@ def build_12_server_logs() -> Dict[str, Any]:
         ),
         make_stat_panel(
             2, "Lines Classified / s", 4, 0, 4, 4,
-            "sum(rate(mlx_log_tailer_lines_total[1m]))",
+            "sum(rate(mlx_log_tailer_lines_total[1m])) or vector(0)",
             unit="ops", decimals=1,
             description="Rate of server log lines processed and parsed into telemetry",
         ),
         make_stat_panel(
             3, "Lines Shipped / s", 8, 0, 4, 4,
-            "sum(rate(mlx_log_tailer_shipped_total[1m]))",
+            "sum(rate(mlx_log_tailer_shipped_total[1m])) or vector(0)",
             unit="ops", decimals=1,
             description="Structured log entries successfully delivered to OTLP collector",
         ),
         make_stat_panel(
             4, "Lines Dropped / s", 12, 0, 4, 4,
-            "sum(rate(mlx_log_tailer_dropped_total[1m]))",
+            "sum(rate(mlx_log_tailer_dropped_total[1m])) or vector(0)",
             unit="ops", decimals=1,
             description="Log lines dropped due to shipper buffer overflows",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 0.1}],
@@ -1266,16 +1274,16 @@ def build_12_server_logs() -> Dict[str, Any]:
         make_timeseries_panel(
             7, "Log Event Ingestion by Classification", 0, 4, 24, 8,
             [
-                make_target("sum(rate(mlx_log_tailer_lines_total{level=\"INFO\"}[1m]))", legend="INFO Lines/s"),
-                make_target("sum(rate(mlx_log_tailer_lines_total{level=\"WARN\"}[1m]))", legend="WARN Lines/s"),
-                make_target("sum(rate(mlx_log_tailer_lines_total{level=\"ERROR\"}[1m]))", legend="ERROR Lines/s"),
-                make_target("sum(rate(mlx_log_tailer_lines_total{event_type=\"OOM\"}[1m]))", legend="OOM Events/s"),
+                make_target("sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)info\"}[1m])) or vector(0)", legend="INFO Lines/s"),
+                make_target("sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)warn.*\"}[1m])) or vector(0)", legend="WARN Lines/s"),
+                make_target("sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)err.*\"}[1m])) or vector(0)", legend="ERROR Lines/s"),
+                make_target("sum(rate(mlx_log_tailer_lines_total{category=\"gpu\"}[1m])) or vector(0)", legend="GPU Events/s"),
             ],
             unit="ops", description="Real-time log message throughput grouped by severity and lifecycle event",
         ),
         make_table_panel(
             8, "Recent Critical Server Log Events", 0, 12, 24, 8,
-            [make_target("mlx_log_tailer_lines_total{level=~\"ERROR|WARN\"}", legend="{{device}} [{{level}}] - {{event_type}}", instant=True)],
+            [make_target("mlx_log_tailer_lines_total{severity=~\"(?i)err.*|warn.*\"} or (0 * mlx_log_tailer_up)", legend="{{device}} [{{severity}}] - {{category}}", instant=True)],
             description="Aggregated log alerts, model load failures and memory warning events",
             drilldown_url="/d/mlx-mon-03-per-device-detail?var-device=${__data.fields.device}",
             drilldown_title="Open Affected Device",
@@ -1764,6 +1772,28 @@ def main():
     ]
 
     os.makedirs(OUT_DIR, exist_ok=True)
+    parent_dir = os.path.dirname(OUT_DIR)
+    legacy_map = {
+        "01-cluster-overview.json": ("overview.json", "mlx-overview", "MLX Cluster Overview"),
+        "02-device-health-diagnostics.json": ("device-health.json", "mlx-device-health", "MLX Device Health & Diagnostics"),
+        "03-per-device-detail.json": ("detail.json", "mlx-detail", "MLX Per-Device Detail"),
+        "04-alerts-incidents.json": ("alerts.json", "mlx-alerts", "MLX Alerts"),
+        "05-serving-health.json": ("serving.json", "mlx-serving", "MLX Serving Health"),
+        "06-inference-metrics.json": ("inference.json", "mlx-inference", "MLX Inference Metrics"),
+        "07-model-architecture-sharding.json": ("model-sharding.json", "mlx-model-sharding", "MLX Model Architecture & Sharding"),
+        "08-kv-cache.json": ("kv-cache.json", "mlx-kv-cache", "MLX KV Cache"),
+        "09-quality-confidence.json": ("quality.json", "mlx-quality", "MLX Quality & Confidence"),
+        "10-opik-tracing-evaluation.json": ("opik.json", "mlx-opik", "MLX Opik Tracing"),
+        "11-slo-error-budget.json": ("slo.json", "mlx-slo", "MLX SLO / Error Budget"),
+        "12-server-logs.json": ("logs.json", "mlx-logs", "MLX Server Logs"),
+        "13-hardware-telemetry.json": ("hardware.json", "mlx-hardware", "MLX Hardware Telemetry"),
+        "14-power-thermal.json": ("power-thermal.json", "mlx-power-thermal", "MLX Power & Thermal"),
+        "15-process-profiler.json": ("process-profiler.json", "mlx-process-profiler", "MLX Process & Resource Profiler"),
+        "16-network-host-peers.json": ("network.json", "mlx-network", "MLX Network (Ring Interconnect)"),
+        "17-sbom-fleet-inventory.json": ("sbom-inventory.json", "mlx-sbom-inventory", "MLX SBOM Fleet Inventory"),
+        "18-sbom-drift-delta.json": ("sbom-drift.json", "mlx-sbom-drift", "MLX SBOM Drift & Delta Engine"),
+    }
+
     generated = []
     for filename, gen_fn in generators:
         dash_obj = gen_fn()
@@ -1771,9 +1801,20 @@ def main():
         with open(path, "w", encoding="utf-8") as f:
             json.dump(dash_obj, f, indent=2)
         generated.append(filename)
+
+        # Also write synchronized legacy dashboard with preserved legacy UID
+        if filename in legacy_map:
+            leg_name, leg_uid, leg_title = legacy_map[filename]
+            leg_path = os.path.join(parent_dir, leg_name)
+            leg_obj = json.loads(json.dumps(dash_obj))  # deep copy
+            leg_obj["uid"] = leg_uid
+            leg_obj["title"] = leg_title
+            with open(leg_path, "w", encoding="utf-8") as lf:
+                json.dump(leg_obj, lf, indent=2)
+
         print(f"Generated {filename} (UID: {dash_obj['uid']}, Panels: {len(dash_obj['panels'])})")
 
-    print(f"\nSuccessfully generated {len(generated)} reference dashboards in {OUT_DIR}")
+    print(f"\nSuccessfully generated {len(generated)} reference dashboards in {OUT_DIR} and synced {len(legacy_map)} to {parent_dir}")
 
 if __name__ == "__main__":
     main()

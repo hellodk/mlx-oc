@@ -833,7 +833,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Per-device KV head allocation, total bytes, and measurement attribution",
+      "description": "Per-device KV head allocation, head dimensions, memory per head, total bytes, and measurement attribution",
       "targets": [
         {
           "datasource": {
@@ -841,8 +841,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_kv_cache_utilization{device=~\"$device\"}",
-          "legendFormat": "Utilization Ratio",
+          "expr": "mlx_kv_cache_utilization{device=~\"$device\"} * 100",
+          "legendFormat": "Utilization %",
           "range": false,
           "instant": true,
           "refId": "A",
@@ -854,7 +854,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_shard_dim_kv_heads{device=~\"$device\"}",
+          "expr": "mlx_kv_heads_assigned{device=~\"$device\"} or mlx_shard_dim_kv_heads{device=~\"$device\"}",
           "legendFormat": "Assigned KV Heads",
           "range": false,
           "instant": true,
@@ -867,11 +867,50 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
+          "expr": "mlx_kv_head_dim{device=~\"$device\"} or mlx_shard_dim_head_dim{device=~\"$device\"}",
+          "legendFormat": "Head Dim",
+          "range": false,
+          "instant": true,
+          "refId": "C",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_kv_bytes_per_head{device=~\"$device\"}",
+          "legendFormat": "Max Context Bytes/Head",
+          "range": false,
+          "instant": true,
+          "refId": "D",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_kv_cache_bytes_per_kv_head{device=~\"$device\"}",
+          "legendFormat": "Active Bytes/KV Head",
+          "range": false,
+          "instant": true,
+          "refId": "E",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
           "expr": "mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"}",
           "legendFormat": "Total KV Bytes",
           "range": false,
           "instant": true,
-          "refId": "C",
+          "refId": "F",
           "format": "time_series"
         }
       ],

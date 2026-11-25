@@ -99,6 +99,10 @@ class ShardPlacement:
     pp_size: int = 1
     kv_heads_exact: bool = True
     kv_source: str = "exact"
+    dim_attention_heads: int = 0
+    dim_head_dim: int = 0
+    gqa_ratio: int = 0
+    attention_layers_assigned: int = 0
 
 
 def inspect_safetensors_index(model_dir: Path | None) -> dict[str, Any]:
@@ -366,6 +370,9 @@ def infer_runtime_sharding(
         kv_val = _extract_flag_value(toks, ("--shard-kv-heads", "--kv-heads", "--num-kv-heads"))
         if kv_val.isdigit() and int(kv_val) > 0:
             info["shard_kv_heads"] = int(kv_val)
+        attn_val = _extract_flag_value(toks, ("--shard-attention-heads", "--attention-heads", "--num-attention-heads"))
+        if attn_val.isdigit() and int(attn_val) > 0:
+            info["shard_attention_heads"] = int(attn_val)
         if not info["mode"] and ("--pipeline" in toks or info["pp_size"] > 1):
             info["mode"] = "pipeline"
 
@@ -636,6 +643,41 @@ def discover_shard_placement(
         dim_kv = 0
         kv_heads_exact = False
         kv_source = "unknown"
+    raw_shard_attn = os.environ.get("MLX_SHARD_ATTENTION_HEADS", "")
+    node_attn = local_dev.get("shard_attention_heads") if local_dev else None
+
+    if raw_shard_attn and raw_shard_attn.isdigit() and int(raw_shard_attn) > 0:
+        dim_attn = int(raw_shard_attn)
+    elif node_attn is not None and str(node_attn).isdigit() and int(node_attn) > 0:
+        dim_attn = int(node_attn)
+    elif runtime.get("shard_attention_heads"):
+        dim_attn = int(runtime["shard_attention_heads"])
+    elif model_info_obj and model_info_obj.num_attention_heads:
+        if tp_div <= 1:
+            dim_attn = model_info_obj.num_attention_heads
+        elif model_info_obj.num_attention_heads % tp_div == 0:
+            dim_attn = model_info_obj.num_attention_heads // tp_div
+        else:
+            base_attn = model_info_obj.num_attention_heads // tp_div
+            rem_attn = model_info_obj.num_attention_heads % tp_div
+            dim_attn = max(1, base_attn + (1 if tp_rank < rem_attn else 0))
+    else:
+        dim_attn = 0
+
+    head_dim = model_info_obj.head_dim if model_info_obj else 0
+    gqa_rat = (
+        max(1, dim_attn // max(1, dim_kv))
+        if (dim_attn > 0 and dim_kv > 0)
+        else (model_info_obj.gqa_ratio if model_info_obj else 0)
+    )
+
+    if model_info_obj and model_info_obj.attention_layer_indices:
+        attn_assigned = sum(1 for idx in model_info_obj.attention_layer_indices if l_start <= idx <= l_end)
+    elif model_info_obj and model_info_obj.attention_layers > 0:
+        attn_assigned = min(layers_assigned, model_info_obj.attention_layers)
+    else:
+        attn_assigned = layers_assigned
+
     dim_inter = (
         max(1, model_info_obj.intermediate_size // tp_div)
         if model_info_obj and model_info_obj.intermediate_size
@@ -715,6 +757,10 @@ def discover_shard_placement(
         pp_size=pp_size,
         kv_heads_exact=kv_heads_exact,
         kv_source=kv_source,
+        dim_attention_heads=dim_attn,
+        dim_head_dim=head_dim,
+        gqa_ratio=gqa_rat,
+        attention_layers_assigned=attn_assigned,
     )
 
 

@@ -516,7 +516,7 @@
     },
     {
       "id": 5,
-      "title": "Shard Placement Matrix (Which Shard Is Where)",
+      "title": "Shard Placement & Attention Head Allocation Matrix",
       "type": "table",
       "gridPos": {
         "h": 8,
@@ -528,7 +528,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Mapping of physical host devices to distributed rank and assigned transformer layer ranges",
+      "description": "Mapping of physical host devices to distributed rank, assigned transformer layer ranges, and attention head partition",
       "targets": [
         {
           "datasource": {
@@ -568,6 +568,32 @@
           "instant": true,
           "refId": "C",
           "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_shard_dim_attention_heads{device=~\"$device\"}",
+          "legendFormat": "Assigned Query Heads",
+          "range": false,
+          "instant": true,
+          "refId": "D",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_shard_dim_kv_heads{device=~\"$device\"}",
+          "legendFormat": "Assigned KV Heads",
+          "range": false,
+          "instant": true,
+          "refId": "E",
+          "format": "time_series"
         }
       ],
       "transformations": [],
@@ -605,7 +631,7 @@
     },
     {
       "id": 6,
-      "title": "Model Architecture Metadata",
+      "title": "Model Architecture & Attention Head Dimensions",
       "type": "table",
       "gridPos": {
         "h": 8,
@@ -617,7 +643,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Structural dimensions and architectural hyperparameters of active model",
+      "description": "Structural dimensions, attention heads, GQA ratio and architectural hyperparameters of active model",
       "targets": [
         {
           "datasource": {
@@ -651,8 +677,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_model_info{attr=\"attention_heads\", device=~\"$device\"}",
-          "legendFormat": "Attention Heads",
+          "expr": "mlx_shard_dim_attention_heads{device=~\"$device\"} or mlx_model_info{attr=\"attention_heads\", device=~\"$device\"}",
+          "legendFormat": "Query Heads",
           "range": false,
           "instant": true,
           "refId": "C",
@@ -669,6 +695,45 @@
           "range": false,
           "instant": true,
           "refId": "D",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_shard_dim_head_dim{device=~\"$device\"} or mlx_model_info{attr=\"head_dim\", device=~\"$device\"}",
+          "legendFormat": "Head Dim",
+          "range": false,
+          "instant": true,
+          "refId": "E",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_shard_gqa_ratio{device=~\"$device\"} or mlx_model_info{attr=\"gqa_ratio\", device=~\"$device\"}",
+          "legendFormat": "GQA Ratio",
+          "range": false,
+          "instant": true,
+          "refId": "F",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_shard_attention_layers_assigned{device=~\"$device\"} or mlx_model_info{attr=\"attention_layers\", device=~\"$device\"}",
+          "legendFormat": "Attention Layers",
+          "range": false,
+          "instant": true,
+          "refId": "G",
           "format": "time_series"
         }
       ],

@@ -322,7 +322,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_log_tailer_lines_total[1m]))",
+          "expr": "sum(rate(mlx_log_tailer_lines_total[1m])) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -385,7 +385,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_log_tailer_shipped_total[1m]))",
+          "expr": "sum(rate(mlx_log_tailer_shipped_total[1m])) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -448,7 +448,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_log_tailer_dropped_total[1m]))",
+          "expr": "sum(rate(mlx_log_tailer_dropped_total[1m])) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -643,7 +643,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_log_tailer_lines_total{level=\"INFO\"}[1m]))",
+          "expr": "sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)info\"}[1m])) or vector(0)",
           "legendFormat": "INFO Lines/s",
           "range": true,
           "instant": false,
@@ -656,7 +656,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_log_tailer_lines_total{level=\"WARN\"}[1m]))",
+          "expr": "sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)warn.*\"}[1m])) or vector(0)",
           "legendFormat": "WARN Lines/s",
           "range": true,
           "instant": false,
@@ -669,7 +669,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_log_tailer_lines_total{level=\"ERROR\"}[1m]))",
+          "expr": "sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)err.*\"}[1m])) or vector(0)",
           "legendFormat": "ERROR Lines/s",
           "range": true,
           "instant": false,
@@ -682,8 +682,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_log_tailer_lines_total{event_type=\"OOM\"}[1m]))",
-          "legendFormat": "OOM Events/s",
+          "expr": "sum(rate(mlx_log_tailer_lines_total{category=\"gpu\"}[1m])) or vector(0)",
+          "legendFormat": "GPU Events/s",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -758,8 +758,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_log_tailer_lines_total{level=~\"ERROR|WARN\"}",
-          "legendFormat": "{{device}} [{{level}}] - {{event_type}}",
+          "expr": "mlx_log_tailer_lines_total{severity=~\"(?i)err.*|warn.*\"} or (0 * mlx_log_tailer_up)",
+          "legendFormat": "{{device}} [{{severity}}] - {{category}}",
           "range": false,
           "instant": true,
           "refId": "A",

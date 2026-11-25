@@ -323,7 +323,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))",
+          "expr": "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -394,7 +394,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))",
+          "expr": "(histogram_quantile(0.95, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -465,7 +465,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\", model=~\"$model\"}[1m]) / (rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\", model=~\"$model\"}[1m]) > 0))",
+          "expr": "(avg(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\", model=~\"$model\"}[1m]) / (rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\", model=~\"$model\"}[1m]) > 0))) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -659,7 +659,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))",
+          "expr": "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))",
           "legendFormat": "Proxy TTFT p95",
           "range": true,
           "instant": false,
@@ -672,7 +672,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))",
+          "expr": "(histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))",
           "legendFormat": "Proxy TTFT p50",
           "range": true,
           "instant": false,
@@ -685,7 +685,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))",
+          "expr": "(histogram_quantile(0.95, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))",
           "legendFormat": "Engine Gen Time p95",
           "range": true,
           "instant": false,
@@ -698,7 +698,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))",
+          "expr": "(histogram_quantile(0.50, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))",
           "legendFormat": "Engine Gen Time p50",
           "range": true,
           "instant": false,
@@ -952,7 +952,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(rate(mlx_token_rate_tokens_per_second_sum[5m]) / (rate(mlx_token_rate_tokens_per_second_count[5m]) > 0)) by (model)",
+          "expr": "(avg(rate(mlx_token_rate_tokens_per_second_sum[5m]) / (rate(mlx_token_rate_tokens_per_second_count[5m]) > 0)) by (model)) or (0 * count by (model) (mlx_requests_total))",
           "legendFormat": "Decode tok/s",
           "range": false,
           "instant": true,
@@ -965,7 +965,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket[5m])) by (le, model))",
+          "expr": "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket[5m])) by (le, model))) or (0 * count by (model) (mlx_requests_total))",
           "legendFormat": "TTFT p95 (s)",
           "range": false,
           "instant": true,

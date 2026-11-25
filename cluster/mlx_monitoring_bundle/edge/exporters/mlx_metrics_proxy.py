@@ -1909,6 +1909,9 @@ def _set_model_info_gauges(info_obj, model_name: str) -> None:
         ("shared_expert_intermediate_size", info_obj.shared_expert_intermediate_size),
         ("sliding_window", info_obj.sliding_window),
         ("gqa_ratio", info_obj.gqa_ratio),
+        ("total_attention_heads", info_obj.attention_layers * info_obj.num_attention_heads),
+        ("total_kv_heads", info_obj.attention_layers * info_obj.num_key_value_heads),
+        ("bytes_per_kv_head", 2 * info_obj.head_dim * info_obj.bytes_per_element),
         ("total_weight_bytes", info_obj.total_weight_bytes),
         ("shard_file_count", info_obj.shard_file_count),
     ):

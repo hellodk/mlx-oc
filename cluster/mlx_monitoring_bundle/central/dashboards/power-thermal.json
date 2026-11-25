@@ -1,235 +1,12 @@
 {
-  "id": null,
-  "title": "MLX Power & Thermal",
-  "tags": [
-    "cluster",
-    "mlx",
-    "power",
-    "thermal"
-  ],
-  "timezone": "Asia/Kolkata",
-  "schemaVersion": 38,
-  "version": 1,
-  "refresh": "5m",
-  "templating": {
-    "list": [
-      {
-        "name": "device",
-        "type": "query",
-        "datasource": "VictoriaMetrics",
-        "query": "label_values(mlx_hw_gpu_power_milliwatts, device)",
-        "includeAll": true,
-        "allValue": ".+",
-        "multi": false,
-        "refresh": 1
-      },
-      {
-        "name": "node",
-        "type": "query",
-        "datasource": "VictoriaMetrics",
-        "query": "label_values(mlx_hw_gpu_power_milliwatts, node)",
-        "includeAll": true,
-        "allValue": ".+",
-        "multi": false,
-        "refresh": 1
-      }
-    ]
+  "annotations": {
+    "list": []
   },
-  "panels": [
-    {
-      "type": "graph",
-      "title": "GPU Power (mW)",
-      "datasource": "VictoriaMetrics",
-      "gridPos": {
-        "x": 0,
-        "y": 0,
-        "w": 12,
-        "h": 6
-      },
-      "targets": [
-        {
-          "expr": "mlx_hw_gpu_power_milliwatts{device=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{device}} {{node}} GPU",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "mW"
-        }
-      }
-    },
-    {
-      "type": "graph",
-      "title": "Package Power (CPU+GPU+ANE) (mW)",
-      "datasource": "VictoriaMetrics",
-      "gridPos": {
-        "x": 12,
-        "y": 0,
-        "w": 12,
-        "h": 6
-      },
-      "targets": [
-        {
-          "expr": "mlx_hw_package_power_milliwatts{device=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{device}} {{node}} pkg",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "mW"
-        }
-      }
-    },
-    {
-      "type": "graph",
-      "title": "CPU Power (mW)",
-      "datasource": "VictoriaMetrics",
-      "gridPos": {
-        "x": 0,
-        "y": 6,
-        "w": 12,
-        "h": 6
-      },
-      "targets": [
-        {
-          "expr": "mlx_hw_cpu_power_milliwatts{device=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{device}} {{node}} CPU",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "mW"
-        }
-      }
-    },
-    {
-      "type": "graph",
-      "title": "ANE Power (mW)",
-      "datasource": "VictoriaMetrics",
-      "gridPos": {
-        "x": 12,
-        "y": 6,
-        "w": 12,
-        "h": 6
-      },
-      "targets": [
-        {
-          "expr": "mlx_hw_ane_power_milliwatts{device=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{device}} {{node}} ANE",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "mW"
-        }
-      }
-    },
-    {
-      "type": "graph",
-      "title": "Thermal Pressure (0..1)",
-      "datasource": "VictoriaMetrics",
-      "gridPos": {
-        "x": 0,
-        "y": 12,
-        "w": 12,
-        "h": 6
-      },
-      "targets": [
-        {
-          "expr": "mlx_hw_thermal_pressure{device=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{device}} {{node}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "min": 0,
-          "max": 1,
-          "decimals": 2
-        }
-      }
-    },
-    {
-      "type": "graph",
-      "title": "GPU Utilization (%)",
-      "datasource": "VictoriaMetrics",
-      "gridPos": {
-        "x": 12,
-        "y": 12,
-        "w": 12,
-        "h": 6
-      },
-      "targets": [
-        {
-          "expr": "mlx_hw_gpu_utilization_percent{device=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{device}} {{node}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100
-        }
-      }
-    },
-    {
-      "type": "graph",
-      "title": "GPU Frequency",
-      "datasource": "VictoriaMetrics",
-      "gridPos": {
-        "x": 0,
-        "y": 18,
-        "w": 12,
-        "h": 6
-      },
-      "targets": [
-        {
-          "expr": "mlx_hw_gpu_frequency_mhz{device=~\"$device\", node=~\"$node\"} * 1000000",
-          "legendFormat": "{{device}} {{node}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "hertz",
-          "decimals": 0
-        }
-      }
-    },
-    {
-      "type": "graph",
-      "title": "GPU Active Residency (%)",
-      "datasource": "VictoriaMetrics",
-      "gridPos": {
-        "x": 12,
-        "y": 18,
-        "w": 12,
-        "h": 6
-      },
-      "targets": [
-        {
-          "expr": "mlx_hw_gpu_iokit_util_percent{device=~\"$device\", node=~\"$node\"}",
-          "legendFormat": "{{device}} {{node}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "min": 0,
-          "max": 100
-        }
-      }
-    }
-  ],
-  "uid": "mlx-power-thermal",
+  "description": "Apple Silicon SoC power draw, thermal throttling and temperature trends",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
   "links": [
     {
       "asDropdown": true,
@@ -237,91 +14,954 @@
       "includeVars": true,
       "keepTime": true,
       "tags": [
-        "mlx"
+        "mlx-monitoring"
       ],
-      "title": "MLX Dashboards",
+      "title": "MLX Monitoring Suite",
       "type": "dashboards"
     },
     {
+      "asDropdown": false,
       "icon": "dashboard",
       "includeVars": true,
       "keepTime": true,
-      "title": "Cluster Overview",
-      "tooltip": "Fleet-wide health and throughput",
+      "tags": [],
+      "targetBlank": false,
+      "title": "01. Cluster Overview",
+      "tooltip": "01. Cluster Overview \u2014 Fleet availability, serving health and key inference KPIs",
       "type": "link",
-      "url": "/d/mlx-overview"
+      "url": "/d/mlx-mon-01-overview"
     },
     {
-      "icon": "heart",
+      "asDropdown": false,
+      "icon": "dashboard",
       "includeVars": true,
       "keepTime": true,
-      "title": "Device Health",
-      "tooltip": "Square tile matrix and fleet diagnostics",
+      "tags": [],
+      "targetBlank": false,
+      "title": "02. Device Health",
+      "tooltip": "02. Device Health \u2014 Per-device component status, exporter freshness and connectivity",
       "type": "link",
-      "url": "/d/mlx-device-health"
+      "url": "/d/mlx-mon-02-device-health"
     },
     {
-      "icon": "server",
+      "asDropdown": false,
+      "icon": "dashboard",
       "includeVars": true,
       "keepTime": true,
-      "title": "Device Detail",
-      "tooltip": "Per-device serving and hardware deep dive",
+      "tags": [],
+      "targetBlank": false,
+      "title": "03. Per-Device Detail",
+      "tooltip": "03. Per-Device Detail \u2014 Single-node deep dive from host resources to inference",
       "type": "link",
-      "url": "/d/mlx-detail"
+      "url": "/d/mlx-mon-03-per-device-detail"
     },
     {
-      "icon": "bolt",
+      "asDropdown": false,
+      "icon": "dashboard",
       "includeVars": true,
       "keepTime": true,
-      "title": "Hardware",
-      "tooltip": "CPU, GPU, RAM, Disk telemetry",
+      "tags": [],
+      "targetBlank": false,
+      "title": "04. Alerts & Incidents",
+      "tooltip": "04. Alerts & Incidents \u2014 Active alert triage, severity distribution and runbooks",
       "type": "link",
-      "url": "/d/mlx-hardware"
+      "url": "/d/mlx-mon-04-alerts-incidents"
     },
     {
-      "icon": "process",
+      "asDropdown": false,
+      "icon": "dashboard",
       "includeVars": true,
       "keepTime": true,
-      "title": "Process Profiler",
-      "tooltip": "Top 10 CPU/RSS/Disk/Network/GPU consumers",
+      "tags": [],
+      "targetBlank": false,
+      "title": "05. Serving Health",
+      "tooltip": "05. Serving Health \u2014 MLX server lifecycle, readiness and restart history",
       "type": "link",
-      "url": "/d/mlx-process-profiler"
+      "url": "/d/mlx-mon-05-serving-health"
     },
     {
-      "icon": "sitemap",
+      "asDropdown": false,
+      "icon": "dashboard",
       "includeVars": true,
       "keepTime": true,
-      "title": "Network & TB4",
-      "tooltip": "Thunderbolt bridge & 10GbE network throughput",
+      "tags": [],
+      "targetBlank": false,
+      "title": "06. Inference Metrics",
+      "tooltip": "06. Inference Metrics \u2014 Inference latency breakdown, token throughput and concurrency",
       "type": "link",
-      "url": "/d/mlx-network"
+      "url": "/d/mlx-mon-06-inference-metrics"
     },
     {
-      "icon": "cube",
+      "asDropdown": false,
+      "icon": "dashboard",
       "includeVars": true,
       "keepTime": true,
-      "title": "SBOM Inventory & Drift",
-      "tooltip": "Packages, paths, versions, and drift delta",
+      "tags": [],
+      "targetBlank": false,
+      "title": "07. Model Sharding",
+      "tooltip": "07. Model Sharding \u2014 Model metadata, rank placement, layer ranges and peer probes",
       "type": "link",
-      "url": "/d/mlx-sbom-inventory"
+      "url": "/d/mlx-mon-07-model-sharding"
     },
     {
-      "icon": "compass",
+      "asDropdown": false,
+      "icon": "dashboard",
       "includeVars": true,
       "keepTime": true,
-      "title": "Opik Traces",
-      "tooltip": "LLM inference traces and token confidence",
+      "tags": [],
+      "targetBlank": false,
+      "title": "08. KV Cache",
+      "tooltip": "08. KV Cache \u2014 Prompt cache utilization, context capacity and per-rank allocation",
       "type": "link",
-      "url": "/d/mlx-opik"
+      "url": "/d/mlx-mon-08-kv-cache"
     },
     {
-      "icon": "bell",
+      "asDropdown": false,
+      "icon": "dashboard",
       "includeVars": true,
       "keepTime": true,
-      "title": "Alerts",
-      "tooltip": "Active cluster alerts and silences",
+      "tags": [],
+      "targetBlank": false,
+      "title": "09. Quality & Confidence",
+      "tooltip": "09. Quality & Confidence \u2014 Logprob scores, token entropy and canary evaluation",
       "type": "link",
-      "url": "/d/mlx-alerts"
+      "url": "/d/mlx-mon-09-quality-confidence"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "10. Opik Tracing",
+      "tooltip": "10. Opik Tracing \u2014 Trace volume, scoring coverage, judge scores and traces",
+      "type": "link",
+      "url": "/d/mlx-mon-10-opik-tracing"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "11. SLO & Budget",
+      "tooltip": "11. SLO & Budget \u2014 Latency & availability SLOs, error budgets, and burn rates",
+      "type": "link",
+      "url": "/d/mlx-mon-11-slo-error-budget"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "12. Server Logs",
+      "tooltip": "12. Server Logs \u2014 Searchable server logs, structured events and log pipeline health",
+      "type": "link",
+      "url": "/d/mlx-mon-12-server-logs"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "13. Hardware Telemetry",
+      "tooltip": "13. Hardware Telemetry \u2014 CPU, memory, disk, thermal pressure, and Apple Silicon metrics",
+      "type": "link",
+      "url": "/d/mlx-mon-13-hardware-telemetry"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "14. Power & Thermal",
+      "tooltip": "14. Power & Thermal \u2014 Apple Silicon SoC power draw, thermal throttling and temperature",
+      "type": "link",
+      "url": "/d/mlx-mon-14-power-thermal"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "15. Process Profiler",
+      "tooltip": "15. Process Profiler \u2014 Top process CPU/RSS and measured host GPU vs process attribution",
+      "type": "link",
+      "url": "/d/mlx-mon-15-process-profiler"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "16. Network Host & Peers",
+      "tooltip": "16. Network Host & Peers \u2014 Host interface throughput, errors and peer reachability probes",
+      "type": "link",
+      "url": "/d/mlx-mon-16-network-host-peers"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "17. SBOM Inventory",
+      "tooltip": "17. SBOM Inventory \u2014 Package and model inventory across Python, Homebrew and system",
+      "type": "link",
+      "url": "/d/mlx-mon-17-sbom-inventory"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "18. SBOM Drift",
+      "tooltip": "18. SBOM Drift \u2014 Version, hash, path and missing-package differences against baseline",
+      "type": "link",
+      "url": "/d/mlx-mon-18-sbom-drift-delta"
     }
-  ]
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Package Power (W)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Total SoC package power draw across CPU, GPU, and ANE",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(mlx_hw_package_power_milliwatts{device=~\"$device\"}) / 1000",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "GPU Power (W)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Apple Silicon integrated GPU power consumption",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(mlx_hw_gpu_power_milliwatts{device=~\"$device\"}) / 1000",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "CPU Power (W)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Apple Silicon Performance and Efficiency core cluster power draw",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(mlx_hw_cpu_power_milliwatts{device=~\"$device\"}) / 1000",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "ANE Power (W)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Apple Neural Engine matrix accelerator power draw",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(mlx_hw_ane_power_milliwatts{device=~\"$device\"}) / 1000",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "title": "Thermal Throttling Events",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Nodes currently experiencing non-nominal thermal pressure",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "count(mlx_hw_thermal_pressure{device=~\"$device\"} > 0.5) or vector(0)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "mappings": [],
+          "links": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Energy / Token (mJ/tok)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Estimated energetic efficiency per generated output token",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "(sum(mlx_hw_package_power_milliwatts{device=~\"$device\"}) / (sum(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\"}[1m])) > 0)) or vector(0)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "title": "Apple Silicon SoC Power Decomposition (Watts)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Continuous component power breakdown measured via Apple powermetrics",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_hw_gpu_power_milliwatts{device=~\"$device\"} / 1000",
+          "legendFormat": "{{device}} GPU (W)",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_hw_cpu_power_milliwatts{device=~\"$device\"} / 1000",
+          "legendFormat": "{{device}} CPU (W)",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_hw_ane_power_milliwatts{device=~\"$device\"} / 1000",
+          "legendFormat": "{{device}} ANE (W)",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "axisPlacement": "auto"
+          },
+          "unit": "watt",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Thermal Pressure State Over Time",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Mach IOKit thermal pressure transitions (0=Nominal, 1=Moderate, 2=Heavy, 3=Trapping)",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_hw_thermal_pressure{device=~\"$device\"}",
+          "legendFormat": "{{device}} Thermal State",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto"
+          },
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Power & Thermal Fleet Leaderboard",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Per-device power consumption and thermal throttling status",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_hw_package_power_milliwatts{device=~\"$device\"} / 1000",
+          "legendFormat": "Package Power (W)",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_hw_gpu_power_milliwatts{device=~\"$device\"} / 1000",
+          "legendFormat": "GPU Power (W)",
+          "range": false,
+          "instant": true,
+          "refId": "B",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_hw_thermal_pressure{device=~\"$device\"}",
+          "legendFormat": "Thermal State",
+          "range": false,
+          "instant": true,
+          "refId": "C",
+          "format": "time_series"
+        }
+      ],
+      "transformations": [],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "links": [
+            {
+              "title": "Open Device Detail",
+              "url": "/d/mlx-mon-03-per-device-detail?var-device=${__data.fields.device}",
+              "targetBlank": false
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": []
+      }
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 39,
+  "tags": [
+    "mlx",
+    "mlx-monitoring",
+    "reference-suite"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "label": "Device",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "VictoriaMetrics"
+        },
+        "definition": "label_values(mlx_hw_up, device)",
+        "query": "label_values(mlx_hw_up, device)",
+        "regex": "",
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 1,
+        "sort": 1
+      },
+      {
+        "name": "model",
+        "label": "Model",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "VictoriaMetrics"
+        },
+        "definition": "label_values(mlx_requests_total, model)",
+        "query": "label_values(mlx_requests_total, model)",
+        "regex": "",
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 1,
+        "sort": 1
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "15s",
+      "30s",
+      "1m",
+      "5m"
+    ]
+  },
+  "timezone": "browser",
+  "title": "MLX Power & Thermal",
+  "uid": "mlx-power-thermal",
+  "version": 1
 }

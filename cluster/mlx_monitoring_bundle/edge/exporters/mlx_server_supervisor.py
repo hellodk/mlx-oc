@@ -189,6 +189,26 @@ G_SHARD_DIM_KV_HEADS = Gauge(
     "KV attention heads assigned to this rank (override, runtime inspection, or estimated fallback)",
     ["model", "rank"],
 )
+G_SHARD_DIM_ATTENTION_HEADS = Gauge(
+    "mlx_shard_dim_attention_heads",
+    "Query attention heads assigned to this rank (override, runtime inspection, or estimated fallback)",
+    ["model", "rank"],
+)
+G_SHARD_DIM_HEAD_DIM = Gauge(
+    "mlx_shard_dim_head_dim",
+    "Head dimension visible on this shard",
+    ["model", "rank"],
+)
+G_SHARD_GQA_RATIO = Gauge(
+    "mlx_shard_gqa_ratio",
+    "Grouped-query attention ratio (query heads / KV heads) on this shard",
+    ["model", "rank"],
+)
+G_SHARD_ATTENTION_LAYERS_ASSIGNED = Gauge(
+    "mlx_shard_attention_layers_assigned",
+    "Number of transformer attention layers assigned to this shard",
+    ["model", "rank"],
+)
 G_SHARD_DIM_KV_HEADS_EXACT = Gauge(
     "mlx_shard_dim_kv_heads_exact",
     "1 if shard KV heads allocation is explicitly configured/discovered or uniformly divisible, 0 if estimated fallback",
@@ -631,6 +651,22 @@ class PassiveServerObserver:
         )
         self._set_gauge_series(
             G_SHARD_DIM_KV_HEADS, {(mid, rk): float(placement.dim_kv_heads)}
+        )
+        self._set_gauge_series(
+            G_SHARD_DIM_ATTENTION_HEADS,
+            {(mid, rk): float(getattr(placement, "dim_attention_heads", 0))},
+        )
+        self._set_gauge_series(
+            G_SHARD_DIM_HEAD_DIM,
+            {(mid, rk): float(getattr(placement, "dim_head_dim", 0))},
+        )
+        self._set_gauge_series(
+            G_SHARD_GQA_RATIO,
+            {(mid, rk): float(getattr(placement, "gqa_ratio", 0))},
+        )
+        self._set_gauge_series(
+            G_SHARD_ATTENTION_LAYERS_ASSIGNED,
+            {(mid, rk): float(getattr(placement, "attention_layers_assigned", placement.layers_assigned))},
         )
         self._set_gauge_series(
             G_SHARD_DIM_KV_HEADS_EXACT,

@@ -3415,4 +3415,119 @@ def test_deploy_setup_edge_standalone_detection_and_proxy_listen(tmp_path):
             nodes_file.unlink()
 
 
+def test_attention_heads_monitoring_and_shard_allocation(tmp_path):
+    """Verify attention head dimensions, GQA ratio, and shard allocation are discovered and exported."""
+    import argparse
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from prometheus_client import generate_latest
+    import mlx_shard_topology as top
+    import mlx_server_supervisor as sup
+    import mlx_kv_cache_agent as kva
+    import mlx_model_info
+
+    mdir = tmp_path / "AttentionTestModel"
+    mdir.mkdir()
+    (mdir / "config.json").write_text(
+        json.dumps({
+            "num_hidden_layers": 24,
+            "hidden_size": 896,
+            "num_attention_heads": 14,
+            "num_key_value_heads": 2,
+            "intermediate_size": 4864,
+            "max_position_embeddings": 32768,
+        }),
+        encoding="utf8",
+    )
+    (mdir / "model.safetensors").write_bytes(b"dummy" * 50)
+
+    mi = mlx_model_info.model_info("AttentionTestModel", model_path=str(mdir))
+
+    # 1. Single node / pipeline discovery
+    p_single = top.discover_shard_placement(
+        model_info_obj=mi,
+        model_id="AttentionTestModel",
+        mode_override="pipeline",
+        world_override=1,
+        rank_override=0,
+    )
+    assert p_single.dim_attention_heads == 14
+    assert p_single.dim_kv_heads == 2
+    assert p_single.dim_head_dim == 64
+    assert p_single.gqa_ratio == 7
+    assert p_single.attention_layers_assigned == 24
+
+    # 2. Tensor parallel split (tp_size=2)
+    p_tp = top.discover_shard_placement(
+        model_info_obj=mi,
+        model_id="AttentionTestModel",
+        mode_override="tensor",
+        world_override=2,
+        rank_override=0,
+    )
+    assert p_tp.dim_attention_heads == 7
+    assert p_tp.dim_kv_heads == 1
+    assert p_tp.dim_head_dim == 64
+    assert p_tp.gqa_ratio == 7
+    assert p_tp.dim_attention_heads == 7
+    assert p_tp.dim_kv_heads == 1
+    assert p_tp.dim_head_dim == 64
+    assert p_tp.gqa_ratio == 7
+
+    # 3. Supervisor metrics emission
+    class _MockModelHandler(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            return
+        def do_GET(self):
+            body = json.dumps({"data": [{"id": "AttentionTestModel"}]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), _MockModelHandler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        args = argparse.Namespace(
+            health=f"http://127.0.0.1:{srv.server_address[1]}/v1/models",
+            model="AttentionTestModel",
+            model_path=str(mdir),
+            server_log=str(tmp_path / "mock.log"),
+            process_pattern="",
+            launchd_label="",
+            systemd_unit="",
+            probe_interval=5.0,
+            health_timeout=2.0,
+            fail_threshold=1,
+            shard_rank=0,
+            shard_world_size=1,
+            peer_probe_port=0,
+            peer_app_port=0,
+            shard_refresh_interval=0.0,
+        )
+        obs = sup.PassiveServerObserver(args)
+        obs.poll_once()
+        text = generate_latest().decode()
+        assert 'mlx_shard_dim_attention_heads{model="AttentionTestModel",rank="0"} 14.0' in text
+        assert 'mlx_shard_dim_head_dim{model="AttentionTestModel",rank="0"} 64.0' in text
+        assert 'mlx_shard_gqa_ratio{model="AttentionTestModel",rank="0"} 7.0' in text
+        assert 'mlx_shard_attention_layers_assigned{model="AttentionTestModel",rank="0"} 24.0' in text
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+    # 4. KV cache agent metrics
+    kva._update_gauges(
+        log_path=str(tmp_path / "mock.log"),
+        model_name="AttentionTestModel",
+        model_path=str(mdir),
+        upstream_url=None,
+    )
+    kva_text = generate_latest().decode()
+    assert 'mlx_kv_heads_assigned 2.0' in kva_text
+    assert 'mlx_kv_head_dim 64.0' in kva_text
+
+
+
 

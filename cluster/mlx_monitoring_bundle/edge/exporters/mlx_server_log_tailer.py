@@ -122,6 +122,14 @@ G_ERRORS = Counter(
 G_POS = Gauge("mlx_log_tailer_file_bytes", "current read offset in server.log")
 G_QUEUE = Gauge("mlx_log_tailer_queue_depth", "lines buffered awaiting export")
 
+# Initialize default label values so Prometheus/VictoriaMetrics scrapes have active series
+for _sev in ("info", "warning", "error"):
+    G_SHIPPED.labels(severity=_sev)
+    for _cat in ("gpu", "rank", "python", "http", "generation", "other"):
+        G_LINES.labels(severity=_sev, category=_cat)
+for _r in ("rate_limit", "filter"):
+    G_DROPPED.labels(reason=_r)
+
 
 def sig_url(endpoint: str, signal_name: str) -> str:
     """Return the full OTLP URL for a signal, e.g. <endpoint>/v1/logs."""

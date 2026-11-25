@@ -81,9 +81,26 @@ G_KV_EXACT = Gauge(
     "mlx_kv_cache_shard_exact",
     "1 if shard KV capacity calculation is exact (explicitly configured or uniformly divisible), 0 if estimated fallback",
 )
-G_UTIL = Gauge(
+G_KV_UTIL = Gauge(
     "mlx_kv_cache_utilization",
     "KV cache bytes / (max_sequences x KV bytes for a full context)",
+)
+G_UTIL = G_KV_UTIL
+G_KV_BYTES_PER_HEAD = Gauge(
+    "mlx_kv_bytes_per_head",
+    "Approximate KV cache bytes per key-value attention head for full context",
+)
+G_KV_CACHE_BYTES_PER_HEAD = Gauge(
+    "mlx_kv_cache_bytes_per_kv_head",
+    "Active KV cache memory bytes per assigned key-value attention head",
+)
+G_KV_HEAD_DIM = Gauge(
+    "mlx_kv_head_dim",
+    "Attention head dimension used for KV cache calculations",
+)
+G_KV_HEADS_ASSIGNED = Gauge(
+    "mlx_kv_heads_assigned",
+    "Key-value attention heads assigned to this node / shard",
 )
 
 
@@ -326,6 +343,20 @@ def _update_gauges(log_path: str, model_name: str | None,
 
     is_exact = getattr(placement, "kv_heads_exact", False) if placement is not None else False
     G_KV_EXACT.set(1.0 if is_exact else 0.0)
+
+    assigned_kv_heads = (
+        placement.dim_kv_heads if (placement and placement.dim_kv_heads > 0)
+        else (info_obj.num_key_value_heads if info_obj else 1)
+    )
+    assigned_head_dim = info_obj.head_dim if info_obj else 0
+    G_KV_HEADS_ASSIGNED.set(float(assigned_kv_heads))
+    G_KV_HEAD_DIM.set(float(assigned_head_dim))
+    if assigned_kv_heads > 0:
+        G_KV_BYTES_PER_HEAD.set(effective_ctx_bytes / float(assigned_kv_heads))
+        G_KV_CACHE_BYTES_PER_HEAD.set(total_bytes / float(assigned_kv_heads))
+    else:
+        G_KV_BYTES_PER_HEAD.set(0.0)
+        G_KV_CACHE_BYTES_PER_HEAD.set(0.0)
 
 
 class Handler(BaseHTTPRequestHandler):
