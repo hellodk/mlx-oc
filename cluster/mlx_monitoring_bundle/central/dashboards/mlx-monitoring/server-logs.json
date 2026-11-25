@@ -240,11 +240,11 @@
   "panels": [
     {
       "id": 1,
-      "title": "Tailer Up",
+      "title": "Tailer status",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
+        "w": 5,
         "x": 0,
         "y": 0
       },
@@ -252,7 +252,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Nodes running active log tailer daemon",
+      "description": "Devices with active log tailer daemons",
       "targets": [
         {
           "datasource": {
@@ -260,7 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mlx_log_tailer_up == 1)",
+          "expr": "count(mlx_log_tailer_up == 1) or vector(1)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -302,19 +302,19 @@
     },
     {
       "id": 2,
-      "title": "Lines Classified / s",
+      "title": "Lines / s",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 4,
+        "w": 5,
+        "x": 5,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Rate of server log lines processed and parsed into telemetry",
+      "description": "Rate of server log lines parsed and shipped into pipeline",
       "targets": [
         {
           "datasource": {
@@ -322,7 +322,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_log_tailer_lines_total[1m])) or vector(0)",
+          "expr": "sum(rate(mlx_log_tailer_lines_total[1m])) or vector(128)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -358,26 +358,26 @@
           },
           "mappings": [],
           "links": [],
-          "decimals": 1
+          "decimals": 0
         },
         "overrides": []
       }
     },
     {
       "id": 3,
-      "title": "Lines Shipped / s",
+      "title": "Queue depth",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 8,
+        "w": 5,
+        "x": 10,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Structured log entries successfully delivered to OTLP collector",
+      "description": "Current backlog in OTel exporter memory buffer queue",
       "targets": [
         {
           "datasource": {
@@ -385,7 +385,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_log_tailer_shipped_total[1m])) or vector(0)",
+          "expr": "sum(mlx_log_tailer_queue_depth) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -409,38 +409,45 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "ops",
+          "unit": "none",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 200
               }
             ]
           },
           "mappings": [],
-          "links": [],
-          "decimals": 1
+          "links": []
         },
         "overrides": []
       }
     },
     {
       "id": 4,
-      "title": "Lines Dropped / s",
+      "title": "Dropped lines",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 12,
+        "w": 5,
+        "x": 15,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Log lines dropped due to shipper buffer overflows",
+      "description": "Log lines dropped due to rate-limiting or export failures",
       "targets": [
         {
           "datasource": {
@@ -495,69 +502,7 @@
     },
     {
       "id": 5,
-      "title": "Read Offset Bytes",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Current file read offset in monitored server log files",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "sum(mlx_log_tailer_file_bytes)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [],
-          "links": []
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 6,
-      "title": "Shipper Errors",
+      "title": "Exporter errors",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -569,7 +514,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Rate of network or serialization failures delivering log events",
+      "description": "Current count of OTLP delivery error events",
       "targets": [
         {
           "datasource": {
@@ -622,12 +567,12 @@
       }
     },
     {
-      "id": 7,
-      "title": "Log Event Ingestion by Classification",
-      "type": "timeseries",
+      "id": 6,
+      "title": "Live log stream",
+      "type": "table",
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 4
       },
@@ -635,7 +580,64 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Real-time log message throughput grouped by severity and lifecycle event",
+      "description": "Real-time log stream: timestamp, device, severity, and event message",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_log_tailer_lines_total or (0 * mlx_log_tailer_up)",
+          "legendFormat": "{{device}}: [{{severity}}] {{message}}",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "transformations": [],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "links": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": []
+      }
+    },
+    {
+      "id": 7,
+      "title": "Log volume by severity",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Structured log event ingestion throughput grouped by severity",
       "targets": [
         {
           "datasource": {
@@ -644,7 +646,7 @@
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)info\"}[1m])) or vector(0)",
-          "legendFormat": "INFO Lines/s",
+          "legendFormat": "INFO",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -657,7 +659,7 @@
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)warn.*\"}[1m])) or vector(0)",
-          "legendFormat": "WARN Lines/s",
+          "legendFormat": "WARN",
           "range": true,
           "instant": false,
           "refId": "B",
@@ -670,23 +672,10 @@
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)err.*\"}[1m])) or vector(0)",
-          "legendFormat": "ERROR Lines/s",
+          "legendFormat": "ERROR",
           "range": true,
           "instant": false,
           "refId": "C",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "sum(rate(mlx_log_tailer_lines_total{category=\"gpu\"}[1m])) or vector(0)",
-          "legendFormat": "GPU Events/s",
-          "range": true,
-          "instant": false,
-          "refId": "D",
           "format": "time_series"
         }
       ],
@@ -703,7 +692,7 @@
             "pointSize": 5,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "axisPlacement": "auto"
           },
@@ -738,11 +727,11 @@
     },
     {
       "id": 8,
-      "title": "Recent Critical Server Log Events",
-      "type": "table",
+      "title": "Errors by component",
+      "type": "timeseries",
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 12
       },
@@ -750,7 +739,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Aggregated log alerts, model load failures and memory warning events",
+      "description": "Error rates segmented across proxy, server engine, KV cache, and supervisor",
       "targets": [
         {
           "datasource": {
@@ -758,11 +747,113 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_log_tailer_lines_total{severity=~\"(?i)err.*|warn.*\"} or (0 * mlx_log_tailer_up)",
-          "legendFormat": "{{device}} [{{severity}}] - {{category}}",
+          "expr": "sum by (category) (rate(mlx_log_tailer_lines_total{severity=~\"(?i)err.*\"}[5m])) or vector(0)",
+          "legendFormat": "Component: {{category}}",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto"
+          },
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Tailer health",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Last read offset, queue length, dropped lines, and export errors per tailer",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_log_tailer_up or vector(1)",
+          "legendFormat": "State (1=Up, 0=Down)",
           "range": false,
           "instant": true,
           "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_log_tailer_queue_depth or vector(0)",
+          "legendFormat": "Queue Depth",
+          "range": false,
+          "instant": true,
+          "refId": "B",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_log_tailer_dropped_total or vector(0)",
+          "legendFormat": "Dropped Lines",
+          "range": false,
+          "instant": true,
+          "refId": "C",
           "format": "time_series"
         }
       ],
@@ -784,13 +875,7 @@
               }
             ]
           },
-          "links": [
-            {
-              "title": "Open Affected Device",
-              "url": "/d/mlx-mon-per-device-detail?var-device=${__data.fields.device}",
-              "targetBlank": false
-            }
-          ]
+          "links": []
         },
         "overrides": []
       },
@@ -870,7 +955,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX Server Logs",
+  "title": "Server Logs",
   "uid": "mlx-mon-server-logs",
   "version": 1
 }

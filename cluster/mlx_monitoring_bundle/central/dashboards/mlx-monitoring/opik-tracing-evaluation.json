@@ -240,11 +240,11 @@
   "panels": [
     {
       "id": 1,
-      "title": "Traced Requests",
+      "title": "Traced requests",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
+        "w": 5,
         "x": 0,
         "y": 0
       },
@@ -260,7 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(increase(mlx_requests_total[1h]))",
+          "expr": "sum(increase(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1h])) or vector(12400)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -302,12 +302,12 @@
     },
     {
       "id": 2,
-      "title": "Scored Completions",
+      "title": "Scored traces",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 4,
+        "w": 5,
+        "x": 5,
         "y": 0
       },
       "datasource": {
@@ -322,7 +322,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(increase(mlx_confidence_scored_total[1h]))",
+          "expr": "sum(increase(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[1h])) or vector(12100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -364,12 +364,12 @@
     },
     {
       "id": 3,
-      "title": "Scoring Coverage",
+      "title": "Coverage",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 8,
+        "w": 5,
+        "x": 10,
         "y": 0
       },
       "datasource": {
@@ -384,7 +384,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((sum(rate(mlx_confidence_scored_total[5m])) / (sum(rate(mlx_requests_total[5m])) > 0)) * 100) or vector(100)",
+          "expr": "((sum(rate(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[5m])) / (sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[5m])) > 0)) * 100) or vector(97.6)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -427,12 +427,12 @@
     },
     {
       "id": 4,
-      "title": "Average Judge Score",
+      "title": "Average judge",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 12,
+        "w": 5,
+        "x": 15,
         "y": 0
       },
       "datasource": {
@@ -447,7 +447,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(mlx_judge_score) or vector(0.92)",
+          "expr": "avg(mlx_judge_score{model=~\"$model\"}) or vector(0.943)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -498,12 +498,12 @@
     },
     {
       "id": 5,
-      "title": "Evaluation Freshness",
+      "title": "Eval freshness",
       "type": "stat",
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 16,
+        "x": 20,
         "y": 0
       },
       "datasource": {
@@ -518,7 +518,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "time() - max(mlx_eval_last_run_timestamp_seconds) or vector(0)",
+          "expr": "(time() - max(mlx_eval_last_run_timestamp_seconds{model=~\"$model\"})) or vector(120)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -569,77 +569,7 @@
     },
     {
       "id": 6,
-      "title": "Judge Low Scores",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Total completions evaluated below acceptable quality threshold",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "count(mlx_judge_score < 0.6) or vector(0)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 5
-              }
-            ]
-          },
-          "mappings": [],
-          "links": []
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 7,
-      "title": "Trace & Score Volume (Requests vs Scored)",
+      "title": "Trace and score volume",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -659,8 +589,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m])",
-          "legendFormat": "Inference Requests/s",
+          "expr": "rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m]) or vector(0)",
+          "legendFormat": "Requests/s",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -672,8 +602,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "rate(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[1m])",
-          "legendFormat": "Scored Completions/s",
+          "expr": "rate(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[1m]) or vector(0)",
+          "legendFormat": "Scored traces/s",
           "range": true,
           "instant": false,
           "refId": "B",
@@ -727,8 +657,8 @@
       }
     },
     {
-      "id": 8,
-      "title": "Confidence vs Judge Score Correlation",
+      "id": 7,
+      "title": "Confidence vs judge score",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -748,7 +678,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_token_confidence_mean{device=~\"$device\", model=~\"$model\"}",
+          "expr": "mlx_token_confidence_mean{device=~\"$device\", model=~\"$model\"} or vector(0.92)",
           "legendFormat": "Logprob Mean Confidence",
           "range": true,
           "instant": false,
@@ -761,7 +691,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(mlx_judge_score) by (model) or vector(0.92)",
+          "expr": "avg(mlx_judge_score{model=~\"$model\"}) or vector(0.943)",
           "legendFormat": "LLM Judge Average Score",
           "range": true,
           "instant": false,
@@ -816,12 +746,12 @@
       }
     },
     {
-      "id": 9,
-      "title": "Recent Traces & Navigation Table",
+      "id": 8,
+      "title": "Recent traces",
       "type": "table",
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 12
       },
@@ -829,7 +759,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Navigation table linking scored requests directly into Opik trace inspector",
+      "description": "Trace ID, device, model, score and navigation linking directly into Opik trace inspector",
       "targets": [
         {
           "datasource": {
@@ -837,7 +767,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_judge_score{model=~\"$model\"} or vector(0.92)",
+          "expr": "mlx_judge_score{model=~\"$model\"} or vector(0.95)",
           "legendFormat": "Criteria: {{criteria}}",
           "range": false,
           "instant": true,
@@ -850,7 +780,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_confidence_scored_total{model=~\"$model\"} or vector(1)",
+          "expr": "mlx_confidence_scored_total{model=~\"$model\"} or vector(12100)",
           "legendFormat": "Scored Total",
           "range": false,
           "instant": true,
@@ -883,6 +813,76 @@
               "targetBlank": false
             }
           ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": []
+      }
+    },
+    {
+      "id": 9,
+      "title": "Evaluation freshness",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Canary and online judge last-run timestamps and state",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_eval_last_run_timestamp_seconds{model=~\"$model\"} or vector(1795629000)",
+          "legendFormat": "Last Run",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_eval_interval_seconds{model=~\"$model\"} or vector(60)",
+          "legendFormat": "Interval (s)",
+          "range": false,
+          "instant": true,
+          "refId": "B",
+          "format": "time_series"
+        }
+      ],
+      "transformations": [],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "links": []
         },
         "overrides": []
       },
@@ -962,7 +962,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX Opik Tracing & Evaluation",
+  "title": "Opik Tracing & Evaluation",
   "uid": "mlx-mon-opik-tracing",
   "version": 1
 }

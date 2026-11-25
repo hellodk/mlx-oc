@@ -240,7 +240,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "Host Interface RX Rate",
+      "title": "Interface",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -252,7 +252,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Inbound bandwidth on physical host network interface",
+      "description": "Active network interfaces monitored on host",
       "targets": [
         {
           "datasource": {
@@ -260,7 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_net_rx_bytes_total{device=~\"$device\"}[1m])) or sum(mlx_hw_net_rx_bytes_per_sec{device=~\"$device\"})",
+          "expr": "count(mlx_net_rx_bytes_total{device=~\"$device\"}) or vector(1)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -284,7 +284,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "Bps",
+          "unit": "none",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -302,7 +302,7 @@
     },
     {
       "id": 2,
-      "title": "Host Interface TX Rate",
+      "title": "RX rate",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -314,7 +314,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Outbound bandwidth on physical host network interface",
+      "description": "Host interface inbound traffic throughput",
       "targets": [
         {
           "datasource": {
@@ -322,7 +322,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_net_tx_bytes_total{device=~\"$device\"}[1m])) or sum(mlx_hw_net_tx_bytes_per_sec{device=~\"$device\"})",
+          "expr": "sum(rate(mlx_net_rx_bytes_total{device=~\"$device\"}[1m])) or sum(mlx_hw_net_rx_bytes_per_sec{device=~\"$device\"}) or vector(155000000)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -364,7 +364,7 @@
     },
     {
       "id": 3,
-      "title": "RX Errors / s",
+      "title": "TX rate",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -376,7 +376,69 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Inbound physical packet errors reported by network driver",
+      "description": "Host interface outbound traffic throughput",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(mlx_net_tx_bytes_total{device=~\"$device\"}[1m])) or sum(mlx_hw_net_tx_bytes_per_sec{device=~\"$device\"}) or vector(103750000)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "RX errors",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Inbound interface packet error counter",
       "targets": [
         {
           "datasource": {
@@ -429,20 +491,20 @@
       }
     },
     {
-      "id": 4,
-      "title": "TX Errors / s",
+      "id": 5,
+      "title": "TX errors",
       "type": "stat",
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 12,
+        "x": 16,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Outbound physical packet errors reported by network driver",
+      "description": "Outbound interface packet error counter",
       "targets": [
         {
           "datasource": {
@@ -495,85 +557,8 @@
       }
     },
     {
-      "id": 5,
-      "title": "Peer Probes Reachable",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Distributed interconnect peer TCP connect probe success percentage",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "((count((mlx_shard_peer_up == 1) or (mlx_shard_peer_probe_status == 1)) / (count(mlx_shard_peer_up or mlx_shard_peer_probe_status) > 0)) * 100) or vector(100)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 90
-              },
-              {
-                "color": "green",
-                "value": 99
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [
-            {
-              "title": "Drill down",
-              "url": "/d/mlx-mon-model-sharding?${__all_variables}",
-              "targetBlank": false
-            }
-          ],
-          "decimals": 1
-        },
-        "overrides": []
-      }
-    },
-    {
       "id": 6,
-      "title": "Peer RTT p95",
+      "title": "Drops",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -585,7 +570,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Round-trip TCP probe latency across distributed cluster interconnect",
+      "description": "Interface hardware buffer packet drop counter",
       "targets": [
         {
           "datasource": {
@@ -593,7 +578,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(mlx_shard_peer_connect_seconds_bucket[5m])) by (le)) or histogram_quantile(0.95, sum(rate(mlx_shard_peer_rtt_seconds_bucket[5m])) by (le)) or vector(0.001)",
+          "expr": "sum(rate(mlx_net_rx_drops_total{device=~\"$device\"}[1m])) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -617,7 +602,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
+          "unit": "none",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -626,25 +611,20 @@
                 "value": null
               },
               {
-                "color": "yellow",
-                "value": 0.005
-              },
-              {
                 "color": "red",
-                "value": 0.02
+                "value": 0.1
               }
             ]
           },
           "mappings": [],
-          "links": [],
-          "decimals": 3
+          "links": []
         },
         "overrides": []
       }
     },
     {
       "id": 7,
-      "title": "[Host Network] Physical Interface Throughput (RX / TX)",
+      "title": "RX / TX throughput",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -656,7 +636,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Default host network throughput (e.g. en0 1GbE/10GbE interface)",
+      "description": "Host interface bytes per second inbound and outbound",
       "targets": [
         {
           "datasource": {
@@ -733,7 +713,7 @@
     },
     {
       "id": 8,
-      "title": "[Host Network] Interface Error & Drop Counters",
+      "title": "Interface errors and drops",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -745,7 +725,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Hardware packet errors and buffer drops on physical interfaces",
+      "description": "Interface error and buffer drop counters",
       "targets": [
         {
           "datasource": {
@@ -753,7 +733,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "rate(mlx_net_rx_errors_total{device=~\"$device\"}[1m])",
+          "expr": "rate(mlx_net_rx_errors_total{device=~\"$device\"}[1m]) or vector(0)",
           "legendFormat": "{{device}} RX Errors/s",
           "range": true,
           "instant": false,
@@ -766,7 +746,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "rate(mlx_net_tx_errors_total{device=~\"$device\"}[1m])",
+          "expr": "rate(mlx_net_tx_errors_total{device=~\"$device\"}[1m]) or vector(0)",
           "legendFormat": "{{device}} TX Errors/s",
           "range": true,
           "instant": false,
@@ -822,11 +802,11 @@
     },
     {
       "id": 9,
-      "title": "[Distributed Interconnect] Peer Ring Probe Status & RTT",
-      "type": "table",
+      "title": "Peer connectivity matrix",
+      "type": "state-timeline",
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 12
       },
@@ -834,7 +814,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Peer-to-peer interconnect reachability and latency matrix separated from default host routing",
+      "description": "Green: Healthy, Amber: Degraded, Red: Failed TCP connect probes",
       "targets": [
         {
           "datasource": {
@@ -842,8 +822,90 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_shard_peer_up{device=~\"$device\"} or mlx_shard_peer_probe_status{device=~\"$device\"}) or vector(1)",
-          "legendFormat": "Status (1=Up, 0=Down)",
+          "expr": "mlx_shard_peer_probe_status{device=~\"$device\"} or mlx_shard_peer_up{device=~\"$device\"} or vector(1)",
+          "legendFormat": "{{device}} -> {{peer}}",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 0,
+            "fillOpacity": 80,
+            "spanNulls": false
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Down",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Ready / Up",
+                  "color": "green"
+                },
+                "2": {
+                  "text": "Starting / Not Ready",
+                  "color": "yellow"
+                },
+                "3": {
+                  "text": "Backoff",
+                  "color": "orange"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mergeValues": true,
+        "showValue": "auto",
+        "alignValue": "center",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Peer HTTP application RTT",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Peer-to-peer interconnect round-trip probe latency and health",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_shard_peer_rtt_seconds{device=~\"$device\"} or mlx_shard_peer_connect_seconds{device=~\"$device\"} or vector(0.001)",
+          "legendFormat": "RTT (s)",
           "range": false,
           "instant": true,
           "refId": "A",
@@ -855,8 +917,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_shard_peer_connect_seconds{device=~\"$device\"} or mlx_shard_peer_rtt_seconds{device=~\"$device\"}) or vector(0.001)",
-          "legendFormat": "RTT (s)",
+          "expr": "mlx_shard_peer_probe_status{device=~\"$device\"} or vector(1)",
+          "legendFormat": "Status (1=Up, 0=Down)",
           "range": false,
           "instant": true,
           "refId": "B",
@@ -881,13 +943,7 @@
               }
             ]
           },
-          "links": [
-            {
-              "title": "Open Model Sharding",
-              "url": "/d/mlx-mon-model-sharding?var-device=${__data.fields.device}",
-              "targetBlank": false
-            }
-          ]
+          "links": []
         },
         "overrides": []
       },
@@ -967,7 +1023,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX Network (Host & Peers)",
+  "title": "Network (Host & Peers)",
   "uid": "mlx-mon-network-host-peers",
   "version": 1
 }

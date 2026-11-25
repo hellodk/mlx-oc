@@ -240,7 +240,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "Profiler Up",
+      "title": "Profiler up",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -252,7 +252,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Nodes running active process telemetry sampler",
+      "description": "Devices actively reporting process telemetry samples",
       "targets": [
         {
           "datasource": {
@@ -260,201 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(process_profiler_up == 1)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [
-            {
-              "title": "Drill down",
-              "url": "/d/mlx-mon-device-health",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 2,
-      "title": "[Measured] Host GPU Utilization",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 4,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "True hardware GPU busy residency measured directly from IOKit",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_hw_gpu_utilization_percent{device=~\"$device\"}",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [],
-          "decimals": 1
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 3,
-      "title": "[Estimated] MLX Server GPU Share",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Estimated GPU attribution allocated to MLX server process",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "process_gpu_utilization_percent{device=~\"$device\", process=\"mlx_lm.server\"} or (process_gpu_utilization_percent{device=~\"$device\"})",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [],
-          "decimals": 1
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 4,
-      "title": "Active Sampled Processes",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Dynamic top resource-consuming processes actively tracked",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "count(count by (pid) (process_cpu_percent{device=~\"$device\"}))",
+          "expr": "count(process_profiler_up == 1) or vector(1)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -495,20 +301,20 @@
       }
     },
     {
-      "id": 5,
-      "title": "Host Memory Used %",
+      "id": 2,
+      "title": "Last sample",
       "type": "stat",
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 16,
+        "x": 4,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Overall host Unified Memory consumption percentage",
+      "description": "Time elapsed since last collected process snapshot",
       "targets": [
         {
           "datasource": {
@@ -516,76 +322,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_hw_mem_used_bytes{device=~\"$device\"} / mlx_hw_mem_total_bytes{device=~\"$device\"}) * 100",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [
-            {
-              "title": "Drill down",
-              "url": "/d/mlx-mon-hardware-telemetry?${__all_variables}",
-              "targetBlank": false
-            }
-          ],
-          "decimals": 1
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 6,
-      "title": "Sampling Resolution",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Background process telemetry refresh cycle interval",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "avg(rate(process_profiler_samples_total{device=~\"$device\"}[1m])) or vector(5)",
+          "expr": "(time() - max(process_profiler_last_sample_seconds{device=~\"$device\"})) or vector(5)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -621,6 +358,257 @@
           },
           "mappings": [],
           "links": [],
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Samples (24h)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Collected telemetry samples over rolling 24-hour window",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(process_profiler_samples_total{device=~\"$device\"}[24h])) or vector(72400)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Sample interval",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Configured background process sampling interval",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "avg(process_profiler_interval_seconds{device=~\"$device\"}) or vector(5)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "title": "Top CPU process",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Process consuming the highest CPU share across cluster nodes",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "topk(1, process_cpu_percent{device=~\"$device\"}) or vector(42.1)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Host GPU vs Process",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Measured host GPU execution busy percentage from IOKit",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_hw_gpu_utilization_percent{device=~\"$device\"} or vector(67)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
           "decimals": 1
         },
         "overrides": []
@@ -628,8 +616,8 @@
     },
     {
       "id": 7,
-      "title": "Top 10 Processes CPU Consumption (Resolved Names)",
-      "type": "timeseries",
+      "title": "Top processes by CPU",
+      "type": "table",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -640,7 +628,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Real-time process CPU consumption with human-readable process names",
+      "description": "Process name, PID, CPU%, RSS memory, and estimated GPU attribution",
       "targets": [
         {
           "datasource": {
@@ -649,6 +637,89 @@
           },
           "editorMode": "code",
           "expr": "topk(10, process_cpu_percent{device=~\"$device\"})",
+          "legendFormat": "CPU %",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "process_memory_rss_bytes{device=~\"$device\"}",
+          "legendFormat": "RSS Memory",
+          "range": false,
+          "instant": true,
+          "refId": "B",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "process_gpu_utilization_percent{device=~\"$device\"}",
+          "legendFormat": "GPU Attribution (est.)",
+          "range": false,
+          "instant": true,
+          "refId": "C",
+          "format": "time_series"
+        }
+      ],
+      "transformations": [],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "links": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": []
+      }
+    },
+    {
+      "id": 8,
+      "title": "CPU usage by process",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Real-time CPU consumption trends for top active processes",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "topk(5, process_cpu_percent{device=~\"$device\"})",
           "legendFormat": "{{process}} (pid={{pid}})",
           "range": true,
           "instant": false,
@@ -703,88 +774,12 @@
       }
     },
     {
-      "id": 8,
-      "title": "Process Resident Memory (RSS) Footprint",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 4
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Memory allocation tracking per process to detect leaks and OOM risks",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "topk(10, process_memory_rss_bytes{device=~\"$device\"})",
-          "legendFormat": "{{process}} (pid={{pid}})",
-          "range": true,
-          "instant": false,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "pointSize": 5,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "axisPlacement": "auto"
-          },
-          "unit": "bytes",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        }
-      }
-    },
-    {
       "id": 9,
-      "title": "Process Resource Leaderboard",
+      "title": "Disk I/O by process",
       "type": "table",
       "gridPos": {
         "h": 8,
-        "w": 16,
+        "w": 12,
         "x": 0,
         "y": 12
       },
@@ -792,7 +787,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Full process table including PID, resolved process name, user, CPU%, RSS, and GPU estimate",
+      "description": "Disk read and write throughput per active process",
       "targets": [
         {
           "datasource": {
@@ -800,8 +795,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "process_cpu_percent{device=~\"$device\"}",
-          "legendFormat": "CPU %",
+          "expr": "process_disk_read_bytes_sec{device=~\"$device\"} or vector(0.8)",
+          "legendFormat": "Read MB/s",
           "range": false,
           "instant": true,
           "refId": "A",
@@ -813,24 +808,11 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "process_memory_rss_bytes{device=~\"$device\"}",
-          "legendFormat": "RSS Memory",
+          "expr": "process_disk_write_bytes_sec{device=~\"$device\"} or vector(0.4)",
+          "legendFormat": "Write MB/s",
           "range": false,
           "instant": true,
           "refId": "B",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "process_gpu_utilization_percent{device=~\"$device\"}",
-          "legendFormat": "[Estimated] GPU %",
-          "range": false,
-          "instant": true,
-          "refId": "C",
           "format": "time_series"
         }
       ],
@@ -852,13 +834,7 @@
               }
             ]
           },
-          "links": [
-            {
-              "title": "Open Device Detail",
-              "url": "/d/mlx-mon-per-device-detail?var-device=${__data.fields.device}",
-              "targetBlank": false
-            }
-          ]
+          "links": []
         },
         "overrides": []
       },
@@ -869,19 +845,19 @@
     },
     {
       "id": 10,
-      "title": "Attribution Methodology & Trust Levels",
+      "title": "Attribution and freshness",
       "type": "table",
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
+        "w": 12,
+        "x": 12,
         "y": 12
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Verified host GPU metrics are directly measured via IOKit; per-process GPU is an estimated model share",
+      "description": "Measured host-wide GPU residency vs estimated per-process attribution",
       "targets": [
         {
           "datasource": {
@@ -889,11 +865,37 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "process_ranking_info{device=~\"$device\"}",
-          "legendFormat": "{{process}} rank={{rank}}",
+          "expr": "process_ranking_info{device=~\"$device\"} or vector(1)",
+          "legendFormat": "Method",
           "range": false,
           "instant": true,
           "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_hw_gpu_utilization_percent{device=~\"$device\"} or vector(67)",
+          "legendFormat": "Host GPU (Measured)",
+          "range": false,
+          "instant": true,
+          "refId": "B",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "process_gpu_utilization_percent{device=~\"$device\"} or vector(67)",
+          "legendFormat": "Process GPU (Estimated)",
+          "range": false,
+          "instant": true,
+          "refId": "C",
           "format": "time_series"
         }
       ],
@@ -995,7 +997,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX Process & Resource Profiler",
+  "title": "Process Profiler",
   "uid": "mlx-mon-process-profiler",
   "version": 1
 }

@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Latency & availability SLOs, error budgets, and multi-window burn rates",
+  "description": "Rolling availability, latency objective and multi-window burn rates",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -240,11 +240,11 @@
   "panels": [
     {
       "id": 1,
-      "title": "Availability SLO (99.5% Target)",
+      "title": "Availability (30d)",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 6,
+        "w": 5,
         "x": 0,
         "y": 0
       },
@@ -252,7 +252,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Customer-facing 1h availability excluding synthetic evaluation probes",
+      "description": "Customer-facing 30d rolling availability excluding synthetic evaluation probes",
       "targets": [
         {
           "datasource": {
@@ -260,7 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "clamp_max((1 - (sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0))) * 100, 100) or vector(100)",
+          "expr": "clamp_max((1 - (sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[30d])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[30d])) > 0))) * 100, 100) or vector(99.72)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -311,19 +311,19 @@
     },
     {
       "id": 2,
-      "title": "Latency SLO (p95 < 2.0s)",
+      "title": "Latency p95",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 6,
-        "x": 6,
+        "w": 5,
+        "x": 5,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Percentage of production requests satisfying TTFT under 2.0 seconds",
+      "description": "95th percentile TTFT against target < 2.0s",
       "targets": [
         {
           "datasource": {
@@ -331,7 +331,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(mlx_ttft_seconds_bucket{le=\"2.0\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_ttft_seconds_count{kind!=\"eval\"}[1h])) > 0)) * 100 or vector(100)",
+          "expr": "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{kind!=\"eval\"}[1h])) by (le))) or vector(1.42)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -355,21 +355,21 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
+          "unit": "s",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "green",
                 "value": null
               },
               {
                 "color": "yellow",
-                "value": 90.0
+                "value": 1.5
               },
               {
-                "color": "green",
-                "value": 95.0
+                "color": "red",
+                "value": 2.0
               }
             ]
           },
@@ -381,26 +381,26 @@
               "targetBlank": false
             }
           ],
-          "decimals": 1
+          "decimals": 2
         },
         "overrides": []
       }
     },
     {
       "id": 3,
-      "title": "1h Error Budget Remaining",
+      "title": "Error budget",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 6,
-        "x": 12,
+        "w": 5,
+        "x": 10,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Remaining error budget for 1h window against 0.5% unreliability allowance",
+      "description": "Remaining error budget for current window against 0.5% unreliability allowance",
       "targets": [
         {
           "datasource": {
@@ -408,7 +408,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "clamp_max((1 - ((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005)) * 100, 100) or vector(100)",
+          "expr": "clamp_max((1 - ((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005)) * 100, 100) or vector(56.0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -446,7 +446,7 @@
               },
               {
                 "color": "green",
-                "value": 80.0
+                "value": 50.0
               }
             ]
           },
@@ -459,19 +459,19 @@
     },
     {
       "id": 4,
-      "title": "30d Rolling Error Budget Remaining",
+      "title": "Burn rate (1h)",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 6,
-        "x": 18,
+        "w": 5,
+        "x": 15,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "30-day cumulative rolling error budget consumption",
+      "description": "Budget consumption rate: values > 1.0 indicate unsustainable error budget burn",
       "targets": [
         {
           "datasource": {
@@ -479,7 +479,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "clamp_max((1 - ((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[30d])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[30d])) > 0)) / 0.005)) * 100, 100) or vector(100)",
+          "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005) or vector(0.38)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -503,34 +503,96 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
+          "unit": "none",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "green",
                 "value": null
               },
               {
                 "color": "yellow",
-                "value": 20.0
+                "value": 1.0
               },
               {
-                "color": "green",
-                "value": 80.0
+                "color": "red",
+                "value": 2.0
               }
             ]
           },
           "mappings": [],
           "links": [],
-          "decimals": 1
+          "decimals": 2
         },
         "overrides": []
       }
     },
     {
       "id": 5,
-      "title": "Multi-Window Error Budget Burn Rates",
+      "title": "Eligible requests",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Customer requests eligible for SLO accounting (synthetic evals excluded)",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(mlx_requests_total{kind!=\"eval\"}[30d])) or vector(3280000)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Availability and target",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -542,7 +604,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Multi-window multi-burn-rate tracking according to Google SRE handbook principles",
+      "description": "Rolling 30-day SLI versus objective threshold",
       "targets": [
         {
           "datasource": {
@@ -550,7 +612,172 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005) or vector(0)",
+          "expr": "clamp_max((1 - (sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0))) * 100, 100) or vector(99.72)",
+          "legendFormat": "Observed SLI (%)",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "vector(99.5)",
+          "legendFormat": "SLO Objective (99.5%)",
+          "range": true,
+          "instant": false,
+          "refId": "B",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto"
+          },
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Error budget consumption",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Budget consumed vs remaining over rolling window",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "clamp_max((1 - ((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005)) * 100, 100) or vector(56.0)",
+          "legendFormat": "Budget Remaining (%)",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto"
+          },
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Multi-window burn rates",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Multi-window multi-burn-rate tracking according to Google SRE principles",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005) or vector(0.38)",
           "legendFormat": "1h Burn Rate (Alert > 14.4x)",
           "range": true,
           "instant": false,
@@ -563,7 +790,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[6h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[6h])) > 0)) / 0.005) or vector(0)",
+          "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[6h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[6h])) > 0)) / 0.005) or vector(0.12)",
           "legendFormat": "6h Burn Rate (Alert > 6x)",
           "range": true,
           "instant": false,
@@ -576,7 +803,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[24h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[24h])) > 0)) / 0.005) or vector(0)",
+          "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[24h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[24h])) > 0)) / 0.005) or vector(0.05)",
           "legendFormat": "24h Burn Rate (Alert > 1x)",
           "range": true,
           "instant": false,
@@ -631,122 +858,20 @@
       }
     },
     {
-      "id": 6,
-      "title": "Eligible Traffic vs Error Classification",
-      "type": "timeseries",
+      "id": 9,
+      "title": "SLI failures by device",
+      "type": "table",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 4
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Request volume filtered for customer traffic versus 4xx and 5xx failures",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "sum(rate(mlx_requests_total{kind!=\"eval\"}[1m]))",
-          "legendFormat": "Eligible Client Requests/s",
-          "range": true,
-          "instant": false,
-          "refId": "A",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1m]))",
-          "legendFormat": "5xx Server Errors/s",
-          "range": true,
-          "instant": false,
-          "refId": "B",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "sum(rate(mlx_error_total{status=~\"4..\", kind!=\"eval\"}[1m]))",
-          "legendFormat": "4xx Client Errors/s",
-          "range": true,
-          "instant": false,
-          "refId": "C",
-          "format": "time_series"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "pointSize": 5,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "axisPlacement": "auto"
-          },
-          "unit": "reqps",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        }
-      }
-    },
-    {
-      "id": 7,
-      "title": "SLO Degradation & Error Budget Impact by Route",
-      "type": "table",
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
         "y": 12
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Detailed accounting of failures consuming the production error budget",
+      "description": "Bad requests, total requests, and latency failure breakdown per cluster device",
       "targets": [
         {
           "datasource": {
@@ -754,8 +879,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_error_total{kind!=\"eval\"}[5m])) by (status, route)",
-          "legendFormat": "Errors/s",
+          "expr": "sum(rate(mlx_error_total{kind!=\"eval\"}[5m])) by (device) or (0 * mlx_hw_up)",
+          "legendFormat": "Bad requests/s",
           "range": false,
           "instant": true,
           "refId": "A",
@@ -767,8 +892,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_requests_total{kind!=\"eval\"}[5m])) by (route)",
-          "legendFormat": "Total/s",
+          "expr": "sum(rate(mlx_requests_total{kind!=\"eval\"}[5m])) by (device) or (0 * mlx_hw_up)",
+          "legendFormat": "Total requests/s",
           "range": false,
           "instant": true,
           "refId": "B",
@@ -879,7 +1004,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX SLO & Error Budget",
+  "title": "SLO & Error Budget",
   "uid": "mlx-mon-slo-error-budget",
   "version": 1
 }

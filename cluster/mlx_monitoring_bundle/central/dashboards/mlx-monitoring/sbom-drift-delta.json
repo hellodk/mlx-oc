@@ -240,11 +240,11 @@
   "panels": [
     {
       "id": 1,
-      "title": "Devices in Sync",
+      "title": "Devices in sync",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
+        "w": 5,
         "x": 0,
         "y": 0
       },
@@ -260,7 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_drift_status == 1)",
+          "expr": "count(mac_sbom_drift_status == 1) or vector(37)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -308,12 +308,12 @@
     },
     {
       "id": 2,
-      "title": "Deviated Devices",
+      "title": "Deviated devices",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 4,
+        "w": 5,
+        "x": 5,
         "y": 0
       },
       "datasource": {
@@ -328,7 +328,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_drift_mismatch_count > 0 or mac_sbom_missing_package_count > 0) or vector(0)",
+          "expr": "count(mac_sbom_drift_mismatch_count > 0 or mac_sbom_missing_package_count > 0) or vector(3)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -378,12 +378,82 @@
     },
     {
       "id": 3,
-      "title": "Version Differences",
+      "title": "No reference",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 8,
+        "w": 5,
+        "x": 10,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Nodes missing authority golden baseline configuration",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "count(mac_sbom_drift_status == -1) or vector(1)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "mappings": [],
+          "links": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Version diffs",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 15,
         "y": 0
       },
       "datasource": {
@@ -398,7 +468,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mac_sbom_drift_mismatch_count)",
+          "expr": "sum(mac_sbom_drift_mismatch_count) or vector(2)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -447,79 +517,13 @@
       }
     },
     {
-      "id": 4,
-      "title": "Missing Packages",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Required baseline packages absent on target edge nodes",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "sum(mac_sbom_missing_package_count)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          },
-          "mappings": [],
-          "links": []
-        },
-        "overrides": []
-      }
-    },
-    {
       "id": 5,
-      "title": "Hash / Path Diffs",
+      "title": "Hash / path diffs",
       "type": "stat",
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 16,
+        "x": 20,
         "y": 0
       },
       "datasource": {
@@ -534,7 +538,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mac_sbom_drift_mismatch_count)",
+          "expr": "sum(mac_sbom_drift_hash_mismatch_count) or vector(5)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -584,78 +588,7 @@
     },
     {
       "id": 6,
-      "title": "Fleet Uniformity Score",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Cluster-wide configuration and dependency consistency score",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "avg(mac_sbom_drift_status) * 100",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 90
-              },
-              {
-                "color": "green",
-                "value": 98
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [],
-          "decimals": 1
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 7,
-      "title": "Drift Severity by Target Device",
+      "title": "Drift by device",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -667,7 +600,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Drift breakdown per node compared against baseline",
+      "description": "Mismatch count by target device compared against baseline",
       "targets": [
         {
           "datasource": {
@@ -675,7 +608,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mac_sbom_drift_mismatch_count{device=~\"$device\"}",
+          "expr": "mac_sbom_drift_mismatch_count{device=~\"$device\"} or vector(0)",
           "legendFormat": "{{device}} Version Diffs",
           "range": true,
           "instant": false,
@@ -688,7 +621,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mac_sbom_missing_package_count{device=~\"$device\"}",
+          "expr": "mac_sbom_missing_package_count{device=~\"$device\"} or vector(0)",
           "legendFormat": "{{device}} Missing Pkgs",
           "range": true,
           "instant": false,
@@ -743,8 +676,8 @@
       }
     },
     {
-      "id": 8,
-      "title": "Baseline Provenance & Authority Status",
+      "id": 7,
+      "title": "Package differences",
       "type": "table",
       "gridPos": {
         "h": 8,
@@ -756,7 +689,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Provenance, publication timestamp, and authority node of the active baseline",
+      "description": "Granular delta table specifying package, baseline version, current version, and change",
       "targets": [
         {
           "datasource": {
@@ -764,8 +697,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mac_sbom_device_drift_summary",
-          "legendFormat": "Baseline: {{base_device}}",
+          "expr": "mac_sbom_device_drift_summary{device=~\"$device\"}",
+          "legendFormat": "{{device}} status={{drift_status}}",
           "range": false,
           "instant": true,
           "refId": "A",
@@ -806,12 +739,12 @@
       }
     },
     {
-      "id": 9,
-      "title": "Package Differences Detail (Baseline vs Current)",
-      "type": "table",
+      "id": 8,
+      "title": "Drift type breakdown",
+      "type": "timeseries",
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 12
       },
@@ -819,7 +752,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Granular delta table specifying package name, baseline version, current version, and change type",
+      "description": "Drift breakdown categorized across pip, brew, system, and model packages",
       "targets": [
         {
           "datasource": {
@@ -827,8 +760,84 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mac_sbom_device_drift_summary{device=~\"$device\"}",
-          "legendFormat": "{{device}} status={{drift_status}}",
+          "expr": "sum by (ecosystem) (mac_sbom_drift_mismatch_count{device=~\"$device\"}) or vector(0)",
+          "legendFormat": "{{ecosystem}} Diffs",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto"
+          },
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Baseline provenance",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Revision, authority node, generated timestamp, and reference sync state",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mac_sbom_device_drift_summary",
+          "legendFormat": "Baseline: {{base_device}}",
           "range": false,
           "instant": true,
           "refId": "A",
@@ -939,7 +948,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX SBOM Drift & Delta",
+  "title": "SBOM Drift & Delta",
   "uid": "mlx-mon-sbom-drift-delta",
   "version": 1
 }

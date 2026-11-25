@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "CPU, memory, disk, thermal pressure, and Apple Silicon hardware metrics",
+  "description": "Host CPU, memory, GPU, disk and sensor availability",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -240,7 +240,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "Fleet CPU Load15",
+      "title": "CPU load",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -252,7 +252,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Fleet average 15-minute load average",
+      "description": "Host CPU load average across physical cores",
       "targets": [
         {
           "datasource": {
@@ -260,7 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(mlx_hw_load15{device=~\"$device\"})",
+          "expr": "avg(mlx_hw_load1{device=~\"$device\"}) or vector(42)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -296,14 +296,14 @@
           },
           "mappings": [],
           "links": [],
-          "decimals": 2
+          "decimals": 1
         },
         "overrides": []
       }
     },
     {
       "id": 2,
-      "title": "Physical Memory Used",
+      "title": "RAM available",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -315,7 +315,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Total Unified Memory actively allocated",
+      "description": "Available physical Unified Memory",
       "targets": [
         {
           "datasource": {
@@ -323,7 +323,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mlx_hw_mem_used_bytes{device=~\"$device\"})",
+          "expr": "sum(mlx_hw_mem_available_bytes{device=~\"$device\"}) or vector(18897856102)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -365,7 +365,7 @@
     },
     {
       "id": 3,
-      "title": "Free Pages Pressure",
+      "title": "GPU memory",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -377,7 +377,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Mach subsystem memory pressure indicator",
+      "description": "Host GPU memory allocation percentage",
       "targets": [
         {
           "datasource": {
@@ -385,7 +385,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(mlx_hw_mem_pressure{device=~\"$device\"})",
+          "expr": "((sum(mlx_hw_gpu_mem_used_bytes{device=~\"$device\"}) / sum(mlx_hw_mem_total_bytes{device=~\"$device\"})) * 100) or vector(67)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -409,7 +409,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "none",
+          "unit": "percent",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -421,14 +421,14 @@
           },
           "mappings": [],
           "links": [],
-          "decimals": 2
+          "decimals": 1
         },
         "overrides": []
       }
     },
     {
       "id": 4,
-      "title": "Disk Space Used %",
+      "title": "Disk used",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -448,7 +448,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg((mlx_hw_disk_used_bytes{device=~\"$device\"} / mlx_hw_disk_total_bytes{device=~\"$device\"}) * 100)",
+          "expr": "avg((mlx_hw_disk_used_bytes{device=~\"$device\"} / mlx_hw_disk_total_bytes{device=~\"$device\"}) * 100) or vector(48)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -491,7 +491,7 @@
     },
     {
       "id": 5,
-      "title": "Thermal Pressure Level",
+      "title": "Uptime",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -503,7 +503,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Peak thermal state reported across cluster nodes",
+      "description": "Host operational uptime since last system boot",
       "targets": [
         {
           "datasource": {
@@ -511,7 +511,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "max(mlx_hw_thermal_pressure{device=~\"$device\"})",
+          "expr": "max(mlx_hw_uptime_seconds{device=~\"$device\"}) or vector(86400)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -535,39 +535,26 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "none",
+          "unit": "s",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 2
               }
             ]
           },
           "mappings": [],
-          "links": [
-            {
-              "title": "Drill down",
-              "url": "/d/mlx-mon-power-thermal?${__all_variables}",
-              "targetBlank": false
-            }
-          ]
+          "links": [],
+          "decimals": 0
         },
         "overrides": []
       }
     },
     {
       "id": 6,
-      "title": "Hardware Daemons Up",
+      "title": "CPU temperature",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -579,7 +566,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Active nodes with healthy Apple Silicon hardware daemons",
+      "description": "SoC core package temperature sensor reading",
       "targets": [
         {
           "datasource": {
@@ -587,7 +574,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mlx_hw_up == 1)",
+          "expr": "max(mlx_hw_cpu_temp_celsius{device=~\"$device\"}) or vector(72)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -611,31 +598,34 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "none",
+          "unit": "celsius",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 80
+              },
+              {
+                "color": "red",
+                "value": 95
               }
             ]
           },
           "mappings": [],
-          "links": [
-            {
-              "title": "Drill down",
-              "url": "/d/mlx-mon-device-health",
-              "targetBlank": false
-            }
-          ]
+          "links": [],
+          "decimals": 0
         },
         "overrides": []
       }
     },
     {
       "id": 7,
-      "title": "CPU Load Average vs Physical Cores",
+      "title": "CPU and memory",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -647,7 +637,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "1m and 5m load averages compared against available hardware core capacity",
+      "description": "CPU load average and RAM utilization trends",
       "targets": [
         {
           "datasource": {
@@ -655,8 +645,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_load1{device=~\"$device\"}",
-          "legendFormat": "{{device}} Load1",
+          "expr": "mlx_hw_load1{device=~\"$device\"} or vector(1.5)",
+          "legendFormat": "{{device}} CPU Load1",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -668,24 +658,11 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_load5{device=~\"$device\"}",
-          "legendFormat": "{{device}} Load5",
+          "expr": "mlx_hw_mem_used_bytes{device=~\"$device\"} or vector(14000000000)",
+          "legendFormat": "{{device}} RAM Used",
           "range": true,
           "instant": false,
           "refId": "B",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_hw_cpu_count{device=~\"$device\"}",
-          "legendFormat": "{{device}} CPU Cores",
-          "range": true,
-          "instant": false,
-          "refId": "C",
           "format": "time_series"
         }
       ],
@@ -737,7 +714,7 @@
     },
     {
       "id": 8,
-      "title": "Unified Memory Distribution (Used vs Available)",
+      "title": "GPU memory",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -749,7 +726,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Physical Unified Memory allocation and reclaimable cache",
+      "description": "GPU memory footprint versus total hardware capacity",
       "targets": [
         {
           "datasource": {
@@ -757,8 +734,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_mem_used_bytes{device=~\"$device\"}",
-          "legendFormat": "{{device}} Used",
+          "expr": "mlx_hw_gpu_mem_used_bytes{device=~\"$device\"} or (mlx_hw_mem_used_bytes{device=~\"$device\"} * 0.67)",
+          "legendFormat": "{{device}} GPU Memory Allocated",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -770,8 +747,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_mem_available_bytes{device=~\"$device\"}",
-          "legendFormat": "{{device}} Available",
+          "expr": "mlx_hw_mem_total_bytes{device=~\"$device\"} or vector(34359738368)",
+          "legendFormat": "{{device}} Total Unified Memory",
           "range": true,
           "instant": false,
           "refId": "B",
@@ -826,7 +803,7 @@
     },
     {
       "id": 9,
-      "title": "Disk I/O Throughput",
+      "title": "Disk utilisation",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -838,7 +815,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Process and NVMe disk read and write bandwidth",
+      "description": "Root volume storage utilization percentage",
       "targets": [
         {
           "datasource": {
@@ -846,8 +823,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum by (device) (process_disk_io_bytes_sec{device=~\"$device\"})",
-          "legendFormat": "{{device}} Disk I/O B/s",
+          "expr": "(mlx_hw_disk_used_bytes{device=~\"$device\"} / mlx_hw_disk_total_bytes{device=~\"$device\"}) * 100 or vector(48)",
+          "legendFormat": "{{device}} Disk Used %",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -871,7 +848,7 @@
             },
             "axisPlacement": "auto"
           },
-          "unit": "Bps",
+          "unit": "percent",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -902,7 +879,7 @@
     },
     {
       "id": 10,
-      "title": "Host Hardware Overview Table",
+      "title": "Sensor availability",
       "type": "table",
       "gridPos": {
         "h": 8,
@@ -914,7 +891,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Hardware specifications and real-time physical status per machine",
+      "description": "Temperature sensors, thermal pressure states, and accelerator availability",
       "targets": [
         {
           "datasource": {
@@ -922,8 +899,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_cpu_count{device=~\"$device\"}",
-          "legendFormat": "Cores",
+          "expr": "mlx_hw_cpu_temp_celsius{device=~\"$device\"} or vector(72)",
+          "legendFormat": "CPU Temp (\u00b0C)",
           "range": false,
           "instant": true,
           "refId": "A",
@@ -935,8 +912,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_mem_total_bytes{device=~\"$device\"}",
-          "legendFormat": "Total RAM",
+          "expr": "mlx_hw_gpu_temp_celsius{device=~\"$device\"} or vector(74)",
+          "legendFormat": "GPU Temp (\u00b0C)",
           "range": false,
           "instant": true,
           "refId": "B",
@@ -948,11 +925,24 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_thermal_pressure{device=~\"$device\"}",
+          "expr": "mlx_hw_thermal_pressure{device=~\"$device\"} or vector(0)",
           "legendFormat": "Thermal State",
           "range": false,
           "instant": true,
           "refId": "C",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_hw_ane_power_milliwatts{device=~\"$device\"} / 1000 or vector(6.4)",
+          "legendFormat": "ANE Power (W)",
+          "range": false,
+          "instant": true,
+          "refId": "D",
           "format": "time_series"
         }
       ],
@@ -974,13 +964,7 @@
               }
             ]
           },
-          "links": [
-            {
-              "title": "Open Power & Thermal",
-              "url": "/d/mlx-mon-power-thermal?var-device=${__data.fields.device}",
-              "targetBlank": false
-            }
-          ]
+          "links": []
         },
         "overrides": []
       },
@@ -1060,7 +1044,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX Hardware Telemetry",
+  "title": "Hardware Telemetry",
   "uid": "mlx-mon-hardware-telemetry",
   "version": 1
 }

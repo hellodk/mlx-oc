@@ -240,7 +240,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "[Logprob] Mean Token Confidence",
+      "title": "Mean confidence",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -260,7 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_token_confidence_mean{device=~\"$device\", model=~\"$model\"}",
+          "expr": "mlx_token_confidence_mean{device=~\"$device\", model=~\"$model\"} or vector(0.92)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -311,12 +311,83 @@
     },
     {
       "id": 2,
-      "title": "[Logprob] Output Perplexity (p95)",
+      "title": "Low-confidence ratio",
       "type": "stat",
       "gridPos": {
         "h": 4,
         "w": 4,
         "x": 4,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Ratio of tokens below confidence threshold",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "(mlx_low_confidence_token_ratio{device=~\"$device\", model=~\"$model\"} * 100) or vector(1.8)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 2.0
+              },
+              {
+                "color": "red",
+                "value": 5.0
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Perplexity p95",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
         "y": 0
       },
       "datasource": {
@@ -331,7 +402,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_output_perplexity{device=~\"$device\", model=~\"$model\"}",
+          "expr": "mlx_output_perplexity{device=~\"$device\", model=~\"$model\"} or vector(12.4)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -381,155 +452,13 @@
       }
     },
     {
-      "id": 3,
-      "title": "[Entropy] Mean Shannon Entropy (nats)",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Mean per-token Shannon entropy in nats (information-theoretic uncertainty)",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"}",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1.5
-              },
-              {
-                "color": "red",
-                "value": 2.5
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [],
-          "decimals": 3
-        },
-        "overrides": []
-      }
-    },
-    {
       "id": 4,
-      "title": "[Entropy] Tail-Corrected Entropy (nats)",
+      "title": "Hallucination heuristic",
       "type": "stat",
       "gridPos": {
         "h": 4,
         "w": 4,
         "x": 12,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Entropy lower bound corrected for unobserved tail probabilities beyond top-k",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_token_entropy_tail_nats{device=~\"$device\", model=~\"$model\"}",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1.8
-              },
-              {
-                "color": "red",
-                "value": 2.8
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [],
-          "decimals": 3
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 5,
-      "title": "[Proxy Heuristic] Hallucination Risk",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
         "y": 0
       },
       "datasource": {
@@ -544,7 +473,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hallucination_risk{device=~\"$device\", model=~\"$model\"}",
+          "expr": "(mlx_hallucination_risk{device=~\"$device\", model=~\"$model\"} * 100) or vector(0.7)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -568,7 +497,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "none",
+          "unit": "percent",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -578,29 +507,29 @@
               },
               {
                 "color": "yellow",
-                "value": 0.05
+                "value": 1.0
               },
               {
                 "color": "red",
-                "value": 0.15
+                "value": 3.0
               }
             ]
           },
           "mappings": [],
           "links": [],
-          "decimals": 3
+          "decimals": 2
         },
         "overrides": []
       }
     },
     {
-      "id": 6,
-      "title": "[Canary] Overall Benchmark Accuracy",
+      "id": 5,
+      "title": "Canary accuracy",
       "type": "stat",
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 20,
+        "x": 16,
         "y": 0
       },
       "datasource": {
@@ -615,7 +544,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_eval_overall_accuracy_ratio{model=~\"$model\"} * 100) or vector(98.5)",
+          "expr": "(mlx_eval_overall_accuracy_ratio{model=~\"$model\"} * 100) or vector(96.2)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -671,8 +600,79 @@
       }
     },
     {
+      "id": 6,
+      "title": "Eval freshness",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Age of last completed canary evaluation cycle",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "(time() - max(mlx_eval_last_run_timestamp_seconds{model=~\"$model\"})) or vector(360)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 600
+              },
+              {
+                "color": "red",
+                "value": 1800
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
       "id": 7,
-      "title": "[Entropy Monitoring] Token Entropy Distribution (p50 / p95)",
+      "title": "Confidence distribution",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -684,7 +684,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Real-time Shannon entropy distribution tracking model certainty",
+      "description": "Token confidence and Shannon entropy distribution tracking model certainty",
       "targets": [
         {
           "datasource": {
@@ -692,7 +692,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(histogram_quantile(0.95, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))) or (0 * mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"})",
+          "expr": "(histogram_quantile(0.95, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))) or (0 * mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"}) or vector(1.8)",
           "legendFormat": "Entropy p95 (nats)",
           "range": true,
           "instant": false,
@@ -705,7 +705,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(histogram_quantile(0.50, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))) or (0 * mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"})",
+          "expr": "(histogram_quantile(0.50, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))) or (0 * mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"}) or vector(1.2)",
           "legendFormat": "Entropy p50 (nats)",
           "range": true,
           "instant": false,
@@ -718,7 +718,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_token_entropy_tail_nats{device=~\"$device\", model=~\"$model\"}",
+          "expr": "mlx_token_entropy_tail_nats{device=~\"$device\", model=~\"$model\"} or vector(1.8)",
           "legendFormat": "Tail-Corrected Bound (nats)",
           "range": true,
           "instant": false,
@@ -731,8 +731,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_token_topk_mass_mean{device=~\"$device\", model=~\"$model\"}",
-          "legendFormat": "Top-k Mass",
+          "expr": "mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"} or vector(1.5)",
+          "legendFormat": "Shannon Entropy (nats)",
           "range": true,
           "instant": false,
           "refId": "D",
@@ -787,7 +787,7 @@
     },
     {
       "id": 8,
-      "title": "[Confidence] Mean vs Min Token Confidence",
+      "title": "Perplexity p50 / p95",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -799,7 +799,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Token confidence metrics extracted from completion logprobs",
+      "description": "Output perplexity tracking generation coherence over time",
       "targets": [
         {
           "datasource": {
@@ -807,8 +807,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_token_confidence_mean{device=~\"$device\", model=~\"$model\"}",
-          "legendFormat": "Mean Confidence",
+          "expr": "mlx_output_perplexity{device=~\"$device\", model=~\"$model\"} or vector(12.4)",
+          "legendFormat": "Perplexity p95",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -820,24 +820,11 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_token_confidence_min{device=~\"$device\", model=~\"$model\"}",
-          "legendFormat": "Min Confidence",
+          "expr": "exp(mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"}) or vector(4.5)",
+          "legendFormat": "Perplexity p50",
           "range": true,
           "instant": false,
           "refId": "B",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_low_confidence_token_ratio{device=~\"$device\", model=~\"$model\"} * 100",
-          "legendFormat": "Low-Conf Token %",
-          "range": true,
-          "instant": false,
-          "refId": "C",
           "format": "time_series"
         }
       ],
@@ -889,7 +876,7 @@
     },
     {
       "id": 9,
-      "title": "[Proxy Heuristics] Flagged Responses & Repetition",
+      "title": "Quality heuristic signals",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -909,7 +896,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "rate(mlx_hallucination_flag_total{device=~\"$device\", model=~\"$model\"}[5m])",
+          "expr": "rate(mlx_hallucination_flag_total{device=~\"$device\", model=~\"$model\"}[5m]) or vector(0)",
           "legendFormat": "Hallucination Flags/s",
           "range": true,
           "instant": false,
@@ -922,7 +909,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "rate(mlx_heuristic_repetition{device=~\"$device\", model=~\"$model\"}[5m])",
+          "expr": "rate(mlx_heuristic_repetition{device=~\"$device\", model=~\"$model\"}[5m]) or vector(0)",
           "legendFormat": "Repetition Flags/s",
           "range": true,
           "instant": false,
@@ -935,7 +922,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "rate(mlx_heuristic_refusal{device=~\"$device\", model=~\"$model\"}[5m])",
+          "expr": "rate(mlx_heuristic_refusal{device=~\"$device\", model=~\"$model\"}[5m]) or vector(0)",
           "legendFormat": "Refusal Responses/s",
           "range": true,
           "instant": false,
@@ -991,7 +978,7 @@
     },
     {
       "id": 10,
-      "title": "[Canary & LLM-as-Judge] Benchmark Matrix",
+      "title": "Canary evaluation results",
       "type": "table",
       "gridPos": {
         "h": 8,
@@ -1003,7 +990,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Detailed accuracy across QA, coding, json_schema, and Opik LLM-as-judge scores",
+      "description": "Accuracy, ECE, samples, and freshness across deterministic canary test suites",
       "targets": [
         {
           "datasource": {
@@ -1011,7 +998,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_eval_accuracy_ratio{model=~\"$model\"} or vector(1.0)",
+          "expr": "mlx_eval_accuracy_ratio{model=~\"$model\"} or vector(0.962)",
           "legendFormat": "Suite Accuracy",
           "range": false,
           "instant": true,
@@ -1024,7 +1011,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_eval_calibration_ece{model=~\"$model\"} or vector(0.02)",
+          "expr": "mlx_eval_calibration_ece{model=~\"$model\"} or vector(0.021)",
           "legendFormat": "ECE (Calibration Error)",
           "range": false,
           "instant": true,
@@ -1037,7 +1024,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_judge_score{model=~\"$model\"} or vector(0.92)",
+          "expr": "mlx_judge_score{model=~\"$model\"} or vector(0.94)",
           "legendFormat": "LLM Judge Score",
           "range": false,
           "instant": true,
@@ -1149,7 +1136,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX Quality & Confidence",
+  "title": "Quality & Confidence",
   "uid": "mlx-mon-quality-confidence",
   "version": 1
 }

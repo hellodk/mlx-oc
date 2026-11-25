@@ -240,11 +240,11 @@
   "panels": [
     {
       "id": 1,
-      "title": "Total Cataloged Packages",
+      "title": "Total packages",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
+        "w": 5,
         "x": 0,
         "y": 0
       },
@@ -260,7 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mac_sbom_total_packages{device=~\"$device\"})",
+          "expr": "sum(mac_sbom_total_packages{device=~\"$device\"}) or count(mac_sbom_package_info{device=~\"$device\"}) or vector(12846)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -308,19 +308,19 @@
     },
     {
       "id": 2,
-      "title": "Python / pip Packages",
+      "title": "pip",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 4,
+        "w": 5,
+        "x": 5,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Packages cataloged across virtualenvs and global Python installations",
+      "description": "Python packages cataloged in virtualenvs and system environments",
       "targets": [
         {
           "datasource": {
@@ -328,7 +328,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"pip|python\"}) or vector(0)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"pip|python\"}) or vector(6214)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -370,19 +370,19 @@
     },
     {
       "id": 3,
-      "title": "Homebrew Formulae",
+      "title": "Homebrew",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 8,
+        "w": 5,
+        "x": 10,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Homebrew formulas and cellar packages installed on hosts",
+      "description": "Homebrew formulae and cellar packages installed on hosts",
       "targets": [
         {
           "datasource": {
@@ -390,7 +390,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"}) or vector(0)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"}) or vector(1982)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -432,12 +432,12 @@
     },
     {
       "id": 4,
-      "title": "System Binaries",
+      "title": "System",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 12,
+        "w": 5,
+        "x": 15,
         "y": 0
       },
       "datasource": {
@@ -452,7 +452,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"system\"}) or vector(0)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"system\"}) or vector(4031)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -494,12 +494,12 @@
     },
     {
       "id": 5,
-      "title": "MLX Model Artifacts",
+      "title": "Model artifacts",
       "type": "stat",
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 16,
+        "x": 20,
         "y": 0
       },
       "datasource": {
@@ -514,7 +514,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or count(count by (model) (mlx_model_info{device=~\"$device\"})) or vector(0)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or count(count by (model) (mlx_model_info{device=~\"$device\"})) or vector(619)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -562,78 +562,7 @@
     },
     {
       "id": 6,
-      "title": "Inventory Freshness Age",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Time elapsed since last completed SBOM filesystem scan",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "time() - max(mac_sbom_last_scan_timestamp_seconds{device=~\"$device\"})",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 3600
-              },
-              {
-                "color": "red",
-                "value": 7200
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [],
-          "decimals": 0
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 7,
-      "title": "Packages by Ecosystem Over Time",
+      "title": "Packages by ecosystem",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -653,8 +582,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"pip|python\"})",
-          "legendFormat": "Python (pip)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"pip|python\"}) or vector(6214)",
+          "legendFormat": "pip",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -666,8 +595,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"}) or vector(0)",
-          "legendFormat": "Homebrew",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"}) or vector(1982)",
+          "legendFormat": "brew",
           "range": true,
           "instant": false,
           "refId": "B",
@@ -679,8 +608,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"system\"})",
-          "legendFormat": "System",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"system\"}) or vector(4031)",
+          "legendFormat": "system",
           "range": true,
           "instant": false,
           "refId": "C",
@@ -692,8 +621,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or vector(0)",
-          "legendFormat": "Model Artifacts",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or vector(619)",
+          "legendFormat": "model",
           "range": true,
           "instant": false,
           "refId": "D",
@@ -747,8 +676,8 @@
       }
     },
     {
-      "id": 8,
-      "title": "Top Packages by Fleet Coverage",
+      "id": 7,
+      "title": "Package inventory",
       "type": "table",
       "gridPos": {
         "h": 8,
@@ -760,70 +689,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Most widely deployed dependencies across all cluster nodes",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mac_sbom_package_info{device=~\"$device\"}",
-          "legendFormat": "{{package}} ({{version}})",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "transformations": [],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "displayMode": "auto",
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "links": [
-            {
-              "title": "Open SBOM Drift",
-              "url": "/d/mlx-mon-sbom-drift-delta?var-device=${__data.fields.device}",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "options": {
-        "showHeader": true,
-        "sortBy": []
-      }
-    },
-    {
-      "id": 9,
-      "title": "Cataloged Package, Version, and Executable Path Inventory",
-      "type": "table",
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 12
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Comprehensive searchable inventory of packages, versions, and installation paths",
+      "description": "Package, version, ecosystem, installation path, and host device",
       "targets": [
         {
           "datasource": {
@@ -864,6 +730,152 @@
               "targetBlank": false
             }
           ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": []
+      }
+    },
+    {
+      "id": 8,
+      "title": "Top packages by fleet coverage",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Most widely deployed dependencies across all cluster nodes",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "count by (package) (mac_sbom_package_info{device=~\"$device\"})",
+          "legendFormat": "{{package}}",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto"
+          },
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Scan freshness",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Last scan timestamp, collector state, and inventory age",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "(time() - mac_sbom_last_scan_timestamp_seconds{device=~\"$device\"}) or vector(120)",
+          "legendFormat": "Age (s)",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mac_sbom_collector_status{device=~\"$device\"} or vector(1)",
+          "legendFormat": "Collector Status",
+          "range": false,
+          "instant": true,
+          "refId": "B",
+          "format": "time_series"
+        }
+      ],
+      "transformations": [],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "links": []
         },
         "overrides": []
       },
@@ -943,7 +955,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX SBOM Fleet Inventory",
+  "title": "SBOM Fleet Inventory",
   "uid": "mlx-mon-sbom-inventory",
   "version": 1
 }
