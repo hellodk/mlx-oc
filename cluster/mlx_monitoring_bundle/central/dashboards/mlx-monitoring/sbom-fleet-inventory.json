@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Per-device component status, exporter freshness and network connectivity",
+  "description": "Package and model inventory across Python, Homebrew and system ecosystems",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -26,10 +26,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "01. Cluster Overview",
-      "tooltip": "01. Cluster Overview \u2014 Fleet availability, serving health and key inference KPIs",
+      "title": "Cluster Overview",
+      "tooltip": "Cluster Overview \u2014 Fleet availability, serving health and key inference KPIs",
       "type": "link",
-      "url": "/d/mlx-mon-01-overview"
+      "url": "/d/mlx-cluster-overview"
     },
     {
       "asDropdown": false,
@@ -38,10 +38,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "02. Device Health",
-      "tooltip": "02. Device Health \u2014 Per-device component status, exporter freshness and connectivity",
+      "title": "Device Health & Diagnostics",
+      "tooltip": "Device Health & Diagnostics \u2014 Per-device component status, exporter freshness and connectivity",
       "type": "link",
-      "url": "/d/mlx-mon-02-device-health"
+      "url": "/d/mlx-device-health"
     },
     {
       "asDropdown": false,
@@ -50,10 +50,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "03. Per-Device Detail",
-      "tooltip": "03. Per-Device Detail \u2014 Single-node deep dive from host resources to inference",
+      "title": "Per-Device Detail",
+      "tooltip": "Per-Device Detail \u2014 Single-node deep dive from host resources to inference",
       "type": "link",
-      "url": "/d/mlx-mon-03-per-device-detail"
+      "url": "/d/mlx-per-device-detail"
     },
     {
       "asDropdown": false,
@@ -62,10 +62,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "04. Alerts & Incidents",
-      "tooltip": "04. Alerts & Incidents \u2014 Active alert triage, severity distribution and runbooks",
+      "title": "Alerts & Incidents",
+      "tooltip": "Alerts & Incidents \u2014 Active alert triage, severity distribution and runbooks",
       "type": "link",
-      "url": "/d/mlx-mon-04-alerts-incidents"
+      "url": "/d/mlx-alerts-incidents"
     },
     {
       "asDropdown": false,
@@ -74,10 +74,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "05. Serving Health",
-      "tooltip": "05. Serving Health \u2014 MLX server lifecycle, readiness and restart history",
+      "title": "Serving Health",
+      "tooltip": "Serving Health \u2014 MLX server lifecycle, readiness and restart history",
       "type": "link",
-      "url": "/d/mlx-mon-05-serving-health"
+      "url": "/d/mlx-serving-health"
     },
     {
       "asDropdown": false,
@@ -86,10 +86,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "06. Inference Metrics",
-      "tooltip": "06. Inference Metrics \u2014 Inference latency breakdown, token throughput and concurrency",
+      "title": "Inference Metrics",
+      "tooltip": "Inference Metrics \u2014 Inference latency breakdown, token throughput and concurrency",
       "type": "link",
-      "url": "/d/mlx-mon-06-inference-metrics"
+      "url": "/d/mlx-inference-metrics"
     },
     {
       "asDropdown": false,
@@ -98,10 +98,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "07. Model Sharding",
-      "tooltip": "07. Model Sharding \u2014 Model metadata, rank placement, layer ranges and peer probes",
+      "title": "Model Architecture & Sharding",
+      "tooltip": "Model Architecture & Sharding \u2014 Model metadata, rank placement, layer ranges and peer probes",
       "type": "link",
-      "url": "/d/mlx-mon-07-model-sharding"
+      "url": "/d/mlx-model-sharding"
     },
     {
       "asDropdown": false,
@@ -110,10 +110,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "08. KV Cache",
-      "tooltip": "08. KV Cache \u2014 Prompt cache utilization, context capacity and per-rank allocation",
+      "title": "KV Cache",
+      "tooltip": "KV Cache \u2014 Prompt cache utilization, context capacity and per-rank allocation",
       "type": "link",
-      "url": "/d/mlx-mon-08-kv-cache"
+      "url": "/d/mlx-kv-cache"
     },
     {
       "asDropdown": false,
@@ -122,10 +122,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "09. Quality & Confidence",
-      "tooltip": "09. Quality & Confidence \u2014 Logprob scores, token entropy and canary evaluation",
+      "title": "Quality & Confidence",
+      "tooltip": "Quality & Confidence \u2014 Logprob scores, token entropy and canary evaluation",
       "type": "link",
-      "url": "/d/mlx-mon-09-quality-confidence"
+      "url": "/d/mlx-quality-confidence"
     },
     {
       "asDropdown": false,
@@ -134,10 +134,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "10. Opik Tracing",
-      "tooltip": "10. Opik Tracing \u2014 Trace volume, scoring coverage, judge scores and traces",
+      "title": "Opik Tracing & Evaluation",
+      "tooltip": "Opik Tracing & Evaluation \u2014 Trace volume, scoring coverage, judge scores and traces",
       "type": "link",
-      "url": "/d/mlx-mon-10-opik-tracing"
+      "url": "/d/mlx-opik-tracing"
     },
     {
       "asDropdown": false,
@@ -146,10 +146,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "11. SLO & Budget",
-      "tooltip": "11. SLO & Budget \u2014 Latency & availability SLOs, error budgets, and burn rates",
+      "title": "SLO & Error Budget",
+      "tooltip": "SLO & Error Budget \u2014 Latency & availability SLOs, error budgets, and burn rates",
       "type": "link",
-      "url": "/d/mlx-mon-11-slo-error-budget"
+      "url": "/d/mlx-slo-error-budget"
     },
     {
       "asDropdown": false,
@@ -158,10 +158,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "12. Server Logs",
-      "tooltip": "12. Server Logs \u2014 Searchable server logs, structured events and log pipeline health",
+      "title": "Server Logs",
+      "tooltip": "Server Logs \u2014 Searchable server logs, structured events and log pipeline health",
       "type": "link",
-      "url": "/d/mlx-mon-12-server-logs"
+      "url": "/d/mlx-server-logs"
     },
     {
       "asDropdown": false,
@@ -170,10 +170,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "13. Hardware Telemetry",
-      "tooltip": "13. Hardware Telemetry \u2014 CPU, memory, disk, thermal pressure, and Apple Silicon metrics",
+      "title": "Hardware Telemetry",
+      "tooltip": "Hardware Telemetry \u2014 CPU, memory, disk, thermal pressure, and Apple Silicon metrics",
       "type": "link",
-      "url": "/d/mlx-mon-13-hardware-telemetry"
+      "url": "/d/mlx-hardware-telemetry"
     },
     {
       "asDropdown": false,
@@ -182,10 +182,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "14. Power & Thermal",
-      "tooltip": "14. Power & Thermal \u2014 Apple Silicon SoC power draw, thermal throttling and temperature",
+      "title": "Power & Thermal",
+      "tooltip": "Power & Thermal \u2014 Apple Silicon SoC power draw, thermal throttling and temperature",
       "type": "link",
-      "url": "/d/mlx-mon-14-power-thermal"
+      "url": "/d/mlx-power-thermal"
     },
     {
       "asDropdown": false,
@@ -194,10 +194,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "15. Process Profiler",
-      "tooltip": "15. Process Profiler \u2014 Top process CPU/RSS and measured host GPU vs process attribution",
+      "title": "Process & Resource Profiler",
+      "tooltip": "Process & Resource Profiler \u2014 Top process CPU/RSS and measured host GPU vs process attribution",
       "type": "link",
-      "url": "/d/mlx-mon-15-process-profiler"
+      "url": "/d/mlx-process-profiler"
     },
     {
       "asDropdown": false,
@@ -206,10 +206,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "16. Network Host & Peers",
-      "tooltip": "16. Network Host & Peers \u2014 Host interface throughput, errors and peer reachability probes",
+      "title": "Network (Host & Peers)",
+      "tooltip": "Network (Host & Peers) \u2014 Host interface throughput, errors and peer reachability probes",
       "type": "link",
-      "url": "/d/mlx-mon-16-network-host-peers"
+      "url": "/d/mlx-network-host-peers"
     },
     {
       "asDropdown": false,
@@ -218,10 +218,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "17. SBOM Inventory",
-      "tooltip": "17. SBOM Inventory \u2014 Package and model inventory across Python, Homebrew and system",
+      "title": "SBOM Fleet Inventory",
+      "tooltip": "SBOM Fleet Inventory \u2014 Package and model inventory across Python, Homebrew and system",
       "type": "link",
-      "url": "/d/mlx-mon-17-sbom-inventory"
+      "url": "/d/mlx-sbom-inventory"
     },
     {
       "asDropdown": false,
@@ -230,17 +230,17 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "18. SBOM Drift",
-      "tooltip": "18. SBOM Drift \u2014 Version, hash, path and missing-package differences against baseline",
+      "title": "SBOM Drift & Delta",
+      "tooltip": "SBOM Drift & Delta \u2014 Version, hash, path and missing-package differences against baseline",
       "type": "link",
-      "url": "/d/mlx-mon-18-sbom-drift-delta"
+      "url": "/d/mlx-sbom-drift-delta"
     }
   ],
   "liveNow": false,
   "panels": [
     {
       "id": 1,
-      "title": "Hardware Exporters",
+      "title": "Total Cataloged Packages",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -252,7 +252,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Nodes running active Apple Silicon hardware telemetry daemon",
+      "description": "Aggregate count of cataloged software packages across all environments",
       "targets": [
         {
           "datasource": {
@@ -260,7 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mlx_hw_up == 1)",
+          "expr": "sum(mac_sbom_total_packages{device=~\"$device\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -298,7 +298,7 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-mon-13-hardware-telemetry?${__all_variables}",
+              "url": "/d/mlx-mon-18-sbom-drift-delta?${__all_variables}",
               "targetBlank": false
             }
           ]
@@ -308,7 +308,7 @@
     },
     {
       "id": 2,
-      "title": "Server Ready",
+      "title": "Python / pip Packages",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -320,7 +320,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Model server instances passing HTTP /v1/models readiness",
+      "description": "Packages cataloged across virtualenvs and global Python installations",
       "targets": [
         {
           "datasource": {
@@ -328,7 +328,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mlx_server_ready == 1)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"pip|python\"}) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -363,20 +363,14 @@
             ]
           },
           "mappings": [],
-          "links": [
-            {
-              "title": "Drill down",
-              "url": "/d/mlx-mon-05-serving-health",
-              "targetBlank": false
-            }
-          ]
+          "links": []
         },
         "overrides": []
       }
     },
     {
       "id": 3,
-      "title": "Failed Exporters",
+      "title": "Homebrew Formulae",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -388,7 +382,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Number of edge exporter services currently offline or failing probes",
+      "description": "Homebrew formulas and cellar packages installed on hosts",
       "targets": [
         {
           "datasource": {
@@ -396,7 +390,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count((mlx_hw_up == 0) or (mlx_kv_agent_up == 0) or (mlx_up == 0) or (process_profiler_up == 0) or (mac_sbom_collector_up == 0) or (mlx_accuracy_eval_up == 0) or (mlx_log_tailer_up == 0)) or vector(0)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"}) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -427,10 +421,6 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
               }
             ]
           },
@@ -442,7 +432,7 @@
     },
     {
       "id": 4,
-      "title": "Affected Devices",
+      "title": "System Binaries",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -454,7 +444,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Total cluster nodes with at least one active firing alert",
+      "description": "System binaries cataloged in Darwin/Linux core utilities",
       "targets": [
         {
           "datasource": {
@@ -462,7 +452,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(count by (device) (ALERTS{alertstate=\"firing\"})) or vector(0)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"system\"}) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -493,32 +483,18 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 2
               }
             ]
           },
           "mappings": [],
-          "links": [
-            {
-              "title": "Drill down",
-              "url": "/d/mlx-mon-04-alerts-incidents",
-              "targetBlank": false
-            }
-          ]
+          "links": []
         },
         "overrides": []
       }
     },
     {
       "id": 5,
-      "title": "Missing Telemetry",
+      "title": "MLX Model Artifacts",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -530,7 +506,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Devices configured in inventory but absent from current scrape series",
+      "description": "Model snapshot weights, tokenizers, and configuration files cataloged",
       "targets": [
         {
           "datasource": {
@@ -538,7 +514,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(count by (device) (absent(mlx_hw_up{device=~\"$device\"}))) or vector(0)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or count(count by (model) (mlx_model_info{device=~\"$device\"})) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -569,22 +545,24 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
               }
             ]
           },
           "mappings": [],
-          "links": []
+          "links": [
+            {
+              "title": "Drill down",
+              "url": "/d/mlx-mon-07-model-sharding?${__all_variables}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       }
     },
     {
       "id": 6,
-      "title": "Peer Probes Reachable",
+      "title": "Inventory Freshness Age",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -596,7 +574,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Percentage of peer TCP and HTTP probes returning successful connectivity",
+      "description": "Time elapsed since last completed SBOM filesystem scan",
       "targets": [
         {
           "datasource": {
@@ -604,7 +582,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((count((mlx_shard_peer_up == 1) or (mlx_shard_peer_probe_status == 1)) / (count(mlx_shard_peer_up or mlx_shard_peer_probe_status) > 0)) * 100) or vector(100)",
+          "expr": "time() - max(mac_sbom_last_scan_timestamp_seconds{device=~\"$device\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -628,44 +606,38 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
+          "unit": "s",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "green",
                 "value": null
               },
               {
                 "color": "yellow",
-                "value": 90
+                "value": 3600
               },
               {
-                "color": "green",
-                "value": 99
+                "color": "red",
+                "value": 7200
               }
             ]
           },
           "mappings": [],
-          "links": [
-            {
-              "title": "Drill down",
-              "url": "/d/mlx-mon-16-network-host-peers?${__all_variables}",
-              "targetBlank": false
-            }
-          ],
-          "decimals": 1
+          "links": [],
+          "decimals": 0
         },
         "overrides": []
       }
     },
     {
       "id": 7,
-      "title": "Device Component Health Matrix",
-      "type": "state-timeline",
+      "title": "Packages by Ecosystem Over Time",
+      "type": "timeseries",
       "gridPos": {
         "h": 8,
-        "w": 16,
+        "w": 12,
         "x": 0,
         "y": 4
       },
@@ -673,7 +645,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Real-time multi-exporter operational state timeline per node",
+      "description": "Ecosystem package count evolution over time",
       "targets": [
         {
           "datasource": {
@@ -681,8 +653,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_up{device=~\"$device\"}",
-          "legendFormat": "{{device}} [hw]",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"pip|python\"})",
+          "legendFormat": "Python (pip)",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -694,8 +666,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_server_ready{device=~\"$device\"}",
-          "legendFormat": "{{device}} [server]",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"}) or vector(0)",
+          "legendFormat": "Homebrew",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -707,8 +679,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_up{device=~\"$device\"}",
-          "legendFormat": "{{device}} [proxy]",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"system\"})",
+          "legendFormat": "System",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -720,116 +692,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_kv_agent_up{device=~\"$device\"}",
-          "legendFormat": "{{device}} [kv]",
-          "range": true,
-          "instant": false,
-          "refId": "A",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "process_profiler_up{device=~\"$device\"}",
-          "legendFormat": "{{device}} [process]",
-          "range": true,
-          "instant": false,
-          "refId": "A",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mac_sbom_collector_up{device=~\"$device\"}",
-          "legendFormat": "{{device}} [sbom]",
-          "range": true,
-          "instant": false,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineWidth": 0,
-            "fillOpacity": 80,
-            "spanNulls": false
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "Down",
-                  "color": "red"
-                },
-                "1": {
-                  "text": "Ready / Up",
-                  "color": "green"
-                },
-                "2": {
-                  "text": "Starting / Not Ready",
-                  "color": "yellow"
-                },
-                "3": {
-                  "text": "Backoff",
-                  "color": "orange"
-                }
-              }
-            }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "mergeValues": true,
-        "showValue": "auto",
-        "alignValue": "center",
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      }
-    },
-    {
-      "id": 8,
-      "title": "Fleet Availability Timeline",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 4
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Overall cluster serving availability ratio over time",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "((count(mlx_server_ready == 1) / (count(mlx_hw_up) > 0)) * 100) or vector(100)",
-          "legendFormat": "Fleet Ready %",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or vector(0)",
+          "legendFormat": "Model Artifacts",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -849,11 +713,11 @@
             "pointSize": 5,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "axisPlacement": "auto"
           },
-          "unit": "percent",
+          "unit": "none",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -883,20 +747,20 @@
       }
     },
     {
-      "id": 9,
-      "title": "Exporter Freshness & Scrape Status",
+      "id": 8,
+      "title": "Top Packages by Fleet Coverage",
       "type": "table",
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 12
+        "x": 12,
+        "y": 4
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "State and availability of all edge exporter daemons on target nodes",
+      "description": "Most widely deployed dependencies across all cluster nodes",
       "targets": [
         {
           "datasource": {
@@ -904,50 +768,11 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_up{device=~\"$device\"}",
-          "legendFormat": "HW Exporter",
+          "expr": "mac_sbom_package_info{device=~\"$device\"}",
+          "legendFormat": "{{package}} ({{version}})",
           "range": false,
           "instant": true,
           "refId": "A",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_up{device=~\"$device\"}",
-          "legendFormat": "Proxy",
-          "range": false,
-          "instant": true,
-          "refId": "B",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_kv_agent_up{device=~\"$device\"}",
-          "legendFormat": "KV Agent",
-          "range": false,
-          "instant": true,
-          "refId": "C",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "process_profiler_up{device=~\"$device\"}",
-          "legendFormat": "Process Profiler",
-          "range": false,
-          "instant": true,
-          "refId": "D",
           "format": "time_series"
         }
       ],
@@ -971,8 +796,8 @@
           },
           "links": [
             {
-              "title": "Open Device Detail",
-              "url": "/d/mlx-mon-03-per-device-detail?var-device=${__data.fields.device}&${__all_variables}",
+              "title": "Open SBOM Drift",
+              "url": "/d/mlx-mon-18-sbom-drift-delta?var-device=${__data.fields.device}",
               "targetBlank": false
             }
           ]
@@ -985,20 +810,20 @@
       }
     },
     {
-      "id": 10,
-      "title": "Connectivity & Interconnect Checks",
+      "id": 9,
+      "title": "Cataloged Package, Version, and Executable Path Inventory",
       "type": "table",
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
+        "w": 24,
+        "x": 0,
         "y": 12
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Peer TCP connect probes and HTTP health RTT latency measurements",
+      "description": "Comprehensive searchable inventory of packages, versions, and installation paths",
       "targets": [
         {
           "datasource": {
@@ -1006,24 +831,11 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_shard_peer_up{device=~\"$device\"} or mlx_shard_peer_probe_status{device=~\"$device\"}) or vector(1)",
-          "legendFormat": "Peer Probe (1=Up, 0=Down)",
+          "expr": "mac_sbom_package_info{device=~\"$device\"}",
+          "legendFormat": "{{device}}: {{package}}=={{version}} ({{ecosystem}})",
           "range": false,
           "instant": true,
           "refId": "A",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "(mlx_shard_peer_connect_seconds{device=~\"$device\"} or mlx_shard_peer_rtt_seconds{device=~\"$device\"}) or vector(0.001)",
-          "legendFormat": "Peer RTT (s)",
-          "range": false,
-          "instant": true,
-          "refId": "B",
           "format": "time_series"
         }
       ],
@@ -1047,8 +859,8 @@
           },
           "links": [
             {
-              "title": "Open Network Detail",
-              "url": "/d/mlx-mon-16-network-host-peers?var-device=${__data.fields.device}&${__all_variables}",
+              "title": "Open SBOM Drift",
+              "url": "/d/mlx-mon-18-sbom-drift-delta?var-device=${__data.fields.device}",
               "targetBlank": false
             }
           ]
@@ -1131,7 +943,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX Device Health & Diagnostics",
-  "uid": "mlx-mon-02-device-health",
+  "title": "MLX SBOM Fleet Inventory",
+  "uid": "mlx-mon-17-sbom-inventory",
   "version": 1
 }

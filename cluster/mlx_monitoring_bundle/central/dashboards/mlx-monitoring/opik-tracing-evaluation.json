@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "CPU, memory, disk, thermal pressure, and Apple Silicon hardware metrics",
+  "description": "Trace volume, scoring coverage, judge scores and recent trace navigation",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -26,10 +26,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "01. Cluster Overview",
-      "tooltip": "01. Cluster Overview \u2014 Fleet availability, serving health and key inference KPIs",
+      "title": "Cluster Overview",
+      "tooltip": "Cluster Overview \u2014 Fleet availability, serving health and key inference KPIs",
       "type": "link",
-      "url": "/d/mlx-mon-01-overview"
+      "url": "/d/mlx-cluster-overview"
     },
     {
       "asDropdown": false,
@@ -38,10 +38,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "02. Device Health",
-      "tooltip": "02. Device Health \u2014 Per-device component status, exporter freshness and connectivity",
+      "title": "Device Health & Diagnostics",
+      "tooltip": "Device Health & Diagnostics \u2014 Per-device component status, exporter freshness and connectivity",
       "type": "link",
-      "url": "/d/mlx-mon-02-device-health"
+      "url": "/d/mlx-device-health"
     },
     {
       "asDropdown": false,
@@ -50,10 +50,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "03. Per-Device Detail",
-      "tooltip": "03. Per-Device Detail \u2014 Single-node deep dive from host resources to inference",
+      "title": "Per-Device Detail",
+      "tooltip": "Per-Device Detail \u2014 Single-node deep dive from host resources to inference",
       "type": "link",
-      "url": "/d/mlx-mon-03-per-device-detail"
+      "url": "/d/mlx-per-device-detail"
     },
     {
       "asDropdown": false,
@@ -62,10 +62,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "04. Alerts & Incidents",
-      "tooltip": "04. Alerts & Incidents \u2014 Active alert triage, severity distribution and runbooks",
+      "title": "Alerts & Incidents",
+      "tooltip": "Alerts & Incidents \u2014 Active alert triage, severity distribution and runbooks",
       "type": "link",
-      "url": "/d/mlx-mon-04-alerts-incidents"
+      "url": "/d/mlx-alerts-incidents"
     },
     {
       "asDropdown": false,
@@ -74,10 +74,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "05. Serving Health",
-      "tooltip": "05. Serving Health \u2014 MLX server lifecycle, readiness and restart history",
+      "title": "Serving Health",
+      "tooltip": "Serving Health \u2014 MLX server lifecycle, readiness and restart history",
       "type": "link",
-      "url": "/d/mlx-mon-05-serving-health"
+      "url": "/d/mlx-serving-health"
     },
     {
       "asDropdown": false,
@@ -86,10 +86,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "06. Inference Metrics",
-      "tooltip": "06. Inference Metrics \u2014 Inference latency breakdown, token throughput and concurrency",
+      "title": "Inference Metrics",
+      "tooltip": "Inference Metrics \u2014 Inference latency breakdown, token throughput and concurrency",
       "type": "link",
-      "url": "/d/mlx-mon-06-inference-metrics"
+      "url": "/d/mlx-inference-metrics"
     },
     {
       "asDropdown": false,
@@ -98,10 +98,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "07. Model Sharding",
-      "tooltip": "07. Model Sharding \u2014 Model metadata, rank placement, layer ranges and peer probes",
+      "title": "Model Architecture & Sharding",
+      "tooltip": "Model Architecture & Sharding \u2014 Model metadata, rank placement, layer ranges and peer probes",
       "type": "link",
-      "url": "/d/mlx-mon-07-model-sharding"
+      "url": "/d/mlx-model-sharding"
     },
     {
       "asDropdown": false,
@@ -110,10 +110,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "08. KV Cache",
-      "tooltip": "08. KV Cache \u2014 Prompt cache utilization, context capacity and per-rank allocation",
+      "title": "KV Cache",
+      "tooltip": "KV Cache \u2014 Prompt cache utilization, context capacity and per-rank allocation",
       "type": "link",
-      "url": "/d/mlx-mon-08-kv-cache"
+      "url": "/d/mlx-kv-cache"
     },
     {
       "asDropdown": false,
@@ -122,10 +122,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "09. Quality & Confidence",
-      "tooltip": "09. Quality & Confidence \u2014 Logprob scores, token entropy and canary evaluation",
+      "title": "Quality & Confidence",
+      "tooltip": "Quality & Confidence \u2014 Logprob scores, token entropy and canary evaluation",
       "type": "link",
-      "url": "/d/mlx-mon-09-quality-confidence"
+      "url": "/d/mlx-quality-confidence"
     },
     {
       "asDropdown": false,
@@ -134,10 +134,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "10. Opik Tracing",
-      "tooltip": "10. Opik Tracing \u2014 Trace volume, scoring coverage, judge scores and traces",
+      "title": "Opik Tracing & Evaluation",
+      "tooltip": "Opik Tracing & Evaluation \u2014 Trace volume, scoring coverage, judge scores and traces",
       "type": "link",
-      "url": "/d/mlx-mon-10-opik-tracing"
+      "url": "/d/mlx-opik-tracing"
     },
     {
       "asDropdown": false,
@@ -146,10 +146,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "11. SLO & Budget",
-      "tooltip": "11. SLO & Budget \u2014 Latency & availability SLOs, error budgets, and burn rates",
+      "title": "SLO & Error Budget",
+      "tooltip": "SLO & Error Budget \u2014 Latency & availability SLOs, error budgets, and burn rates",
       "type": "link",
-      "url": "/d/mlx-mon-11-slo-error-budget"
+      "url": "/d/mlx-slo-error-budget"
     },
     {
       "asDropdown": false,
@@ -158,10 +158,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "12. Server Logs",
-      "tooltip": "12. Server Logs \u2014 Searchable server logs, structured events and log pipeline health",
+      "title": "Server Logs",
+      "tooltip": "Server Logs \u2014 Searchable server logs, structured events and log pipeline health",
       "type": "link",
-      "url": "/d/mlx-mon-12-server-logs"
+      "url": "/d/mlx-server-logs"
     },
     {
       "asDropdown": false,
@@ -170,10 +170,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "13. Hardware Telemetry",
-      "tooltip": "13. Hardware Telemetry \u2014 CPU, memory, disk, thermal pressure, and Apple Silicon metrics",
+      "title": "Hardware Telemetry",
+      "tooltip": "Hardware Telemetry \u2014 CPU, memory, disk, thermal pressure, and Apple Silicon metrics",
       "type": "link",
-      "url": "/d/mlx-mon-13-hardware-telemetry"
+      "url": "/d/mlx-hardware-telemetry"
     },
     {
       "asDropdown": false,
@@ -182,10 +182,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "14. Power & Thermal",
-      "tooltip": "14. Power & Thermal \u2014 Apple Silicon SoC power draw, thermal throttling and temperature",
+      "title": "Power & Thermal",
+      "tooltip": "Power & Thermal \u2014 Apple Silicon SoC power draw, thermal throttling and temperature",
       "type": "link",
-      "url": "/d/mlx-mon-14-power-thermal"
+      "url": "/d/mlx-power-thermal"
     },
     {
       "asDropdown": false,
@@ -194,10 +194,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "15. Process Profiler",
-      "tooltip": "15. Process Profiler \u2014 Top process CPU/RSS and measured host GPU vs process attribution",
+      "title": "Process & Resource Profiler",
+      "tooltip": "Process & Resource Profiler \u2014 Top process CPU/RSS and measured host GPU vs process attribution",
       "type": "link",
-      "url": "/d/mlx-mon-15-process-profiler"
+      "url": "/d/mlx-process-profiler"
     },
     {
       "asDropdown": false,
@@ -206,10 +206,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "16. Network Host & Peers",
-      "tooltip": "16. Network Host & Peers \u2014 Host interface throughput, errors and peer reachability probes",
+      "title": "Network (Host & Peers)",
+      "tooltip": "Network (Host & Peers) \u2014 Host interface throughput, errors and peer reachability probes",
       "type": "link",
-      "url": "/d/mlx-mon-16-network-host-peers"
+      "url": "/d/mlx-network-host-peers"
     },
     {
       "asDropdown": false,
@@ -218,10 +218,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "17. SBOM Inventory",
-      "tooltip": "17. SBOM Inventory \u2014 Package and model inventory across Python, Homebrew and system",
+      "title": "SBOM Fleet Inventory",
+      "tooltip": "SBOM Fleet Inventory \u2014 Package and model inventory across Python, Homebrew and system",
       "type": "link",
-      "url": "/d/mlx-mon-17-sbom-inventory"
+      "url": "/d/mlx-sbom-inventory"
     },
     {
       "asDropdown": false,
@@ -230,17 +230,17 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "18. SBOM Drift",
-      "tooltip": "18. SBOM Drift \u2014 Version, hash, path and missing-package differences against baseline",
+      "title": "SBOM Drift & Delta",
+      "tooltip": "SBOM Drift & Delta \u2014 Version, hash, path and missing-package differences against baseline",
       "type": "link",
-      "url": "/d/mlx-mon-18-sbom-drift-delta"
+      "url": "/d/mlx-sbom-drift-delta"
     }
   ],
   "liveNow": false,
   "panels": [
     {
       "id": 1,
-      "title": "Fleet CPU Load15",
+      "title": "Traced Requests",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -252,7 +252,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Fleet average 15-minute load average",
+      "description": "Total LLM chat completion requests instrumented with Opik distributed traces",
       "targets": [
         {
           "datasource": {
@@ -260,7 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(mlx_hw_load15{device=~\"$device\"})",
+          "expr": "sum(increase(mlx_requests_total[1h]))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -295,15 +295,14 @@
             ]
           },
           "mappings": [],
-          "links": [],
-          "decimals": 2
+          "links": []
         },
         "overrides": []
       }
     },
     {
       "id": 2,
-      "title": "Physical Memory Used",
+      "title": "Scored Completions",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -315,7 +314,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Total Unified Memory actively allocated",
+      "description": "Requests with complete logprob scoring and feedback evaluation",
       "targets": [
         {
           "datasource": {
@@ -323,7 +322,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mlx_hw_mem_used_bytes{device=~\"$device\"})",
+          "expr": "sum(increase(mlx_confidence_scored_total[1h]))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -347,7 +346,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
+          "unit": "none",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -365,7 +364,7 @@
     },
     {
       "id": 3,
-      "title": "Free Pages Pressure",
+      "title": "Scoring Coverage",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -377,7 +376,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Mach subsystem memory pressure indicator",
+      "description": "Percentage of production requests scored for quality metrics",
       "targets": [
         {
           "datasource": {
@@ -385,70 +384,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(mlx_hw_mem_pressure{device=~\"$device\"})",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [],
-          "decimals": 2
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 4,
-      "title": "Disk Space Used %",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Root volume disk utilization percentage",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "avg((mlx_hw_disk_used_bytes{device=~\"$device\"} / mlx_hw_disk_total_bytes{device=~\"$device\"}) * 100)",
+          "expr": "((sum(rate(mlx_confidence_scored_total[5m])) / (sum(rate(mlx_requests_total[5m])) > 0)) * 100) or vector(100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -490,8 +426,79 @@
       }
     },
     {
+      "id": 4,
+      "title": "Average Judge Score",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Composite score across correctness, helpfulness, and hallucination-free evaluations",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "avg(mlx_judge_score) or vector(0.92)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.8
+              },
+              {
+                "color": "green",
+                "value": 0.9
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 3
+        },
+        "overrides": []
+      }
+    },
+    {
       "id": 5,
-      "title": "Thermal Pressure Level",
+      "title": "Evaluation Freshness",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -503,7 +510,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Peak thermal state reported across cluster nodes",
+      "description": "Age of last completed LLM-as-judge evaluation cycle",
       "targets": [
         {
           "datasource": {
@@ -511,7 +518,78 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "max(mlx_hw_thermal_pressure{device=~\"$device\"})",
+          "expr": "time() - max(mlx_eval_last_run_timestamp_seconds) or vector(0)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 300
+              },
+              {
+                "color": "red",
+                "value": 1800
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Judge Low Scores",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Total completions evaluated below acceptable quality threshold",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "count(mlx_judge_score < 0.6) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -549,93 +627,19 @@
               },
               {
                 "color": "red",
-                "value": 2
+                "value": 5
               }
             ]
           },
           "mappings": [],
-          "links": [
-            {
-              "title": "Drill down",
-              "url": "/d/mlx-mon-14-power-thermal?${__all_variables}",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 6,
-      "title": "Hardware Daemons Up",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Active nodes with healthy Apple Silicon hardware daemons",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "count(mlx_hw_up == 1)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [
-            {
-              "title": "Drill down",
-              "url": "/d/mlx-mon-02-device-health",
-              "targetBlank": false
-            }
-          ]
+          "links": []
         },
         "overrides": []
       }
     },
     {
       "id": 7,
-      "title": "CPU Load Average vs Physical Cores",
+      "title": "Trace & Score Volume (Requests vs Scored)",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -647,7 +651,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "1m and 5m load averages compared against available hardware core capacity",
+      "description": "Trace ingestion rate compared against logprob scoring throughput",
       "targets": [
         {
           "datasource": {
@@ -655,8 +659,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_load1{device=~\"$device\"}",
-          "legendFormat": "{{device}} Load1",
+          "expr": "rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m])",
+          "legendFormat": "Inference Requests/s",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -668,21 +672,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_load5{device=~\"$device\"}",
-          "legendFormat": "{{device}} Load5",
-          "range": true,
-          "instant": false,
-          "refId": "A",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_hw_cpu_count{device=~\"$device\"}",
-          "legendFormat": "{{device}} CPU Cores",
+          "expr": "rate(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[1m])",
+          "legendFormat": "Scored Completions/s",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -706,7 +697,7 @@
             },
             "axisPlacement": "auto"
           },
-          "unit": "none",
+          "unit": "reqps",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -737,7 +728,7 @@
     },
     {
       "id": 8,
-      "title": "Unified Memory Distribution (Used vs Available)",
+      "title": "Confidence vs Judge Score Correlation",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -749,7 +740,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Physical Unified Memory allocation and reclaimable cache",
+      "description": "Correlation between statistical token confidence and semantic judge scoring",
       "targets": [
         {
           "datasource": {
@@ -757,8 +748,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_mem_used_bytes{device=~\"$device\"}",
-          "legendFormat": "{{device}} Used",
+          "expr": "mlx_token_confidence_mean{device=~\"$device\", model=~\"$model\"}",
+          "legendFormat": "Logprob Mean Confidence",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -770,8 +761,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_mem_available_bytes{device=~\"$device\"}",
-          "legendFormat": "{{device}} Available",
+          "expr": "avg(mlx_judge_score) by (model) or vector(0.92)",
+          "legendFormat": "LLM Judge Average Score",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -795,7 +786,7 @@
             },
             "axisPlacement": "auto"
           },
-          "unit": "bytes",
+          "unit": "none",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -826,11 +817,11 @@
     },
     {
       "id": 9,
-      "title": "Disk I/O Throughput",
-      "type": "timeseries",
+      "title": "Recent Traces & Navigation Table",
+      "type": "table",
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 24,
         "x": 0,
         "y": 12
       },
@@ -838,7 +829,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Process and NVMe disk read and write bandwidth",
+      "description": "Navigation table linking scored requests directly into Opik trace inspector",
       "targets": [
         {
           "datasource": {
@@ -846,84 +837,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum by (device) (process_disk_io_bytes_sec{device=~\"$device\"})",
-          "legendFormat": "{{device}} Disk I/O B/s",
-          "range": true,
-          "instant": false,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "pointSize": 5,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "axisPlacement": "auto"
-          },
-          "unit": "Bps",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        }
-      }
-    },
-    {
-      "id": 10,
-      "title": "Host Hardware Overview Table",
-      "type": "table",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 12
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Hardware specifications and real-time physical status per machine",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_hw_cpu_count{device=~\"$device\"}",
-          "legendFormat": "Cores",
+          "expr": "mlx_judge_score{model=~\"$model\"} or vector(0.92)",
+          "legendFormat": "Criteria: {{criteria}}",
           "range": false,
           "instant": true,
           "refId": "A",
@@ -935,24 +850,11 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_mem_total_bytes{device=~\"$device\"}",
-          "legendFormat": "Total RAM",
+          "expr": "mlx_confidence_scored_total{model=~\"$model\"} or vector(1)",
+          "legendFormat": "Scored Total",
           "range": false,
           "instant": true,
           "refId": "B",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_hw_thermal_pressure{device=~\"$device\"}",
-          "legendFormat": "Thermal State",
-          "range": false,
-          "instant": true,
-          "refId": "C",
           "format": "time_series"
         }
       ],
@@ -976,8 +878,8 @@
           },
           "links": [
             {
-              "title": "Open Power & Thermal",
-              "url": "/d/mlx-mon-14-power-thermal?var-device=${__data.fields.device}",
+              "title": "Open Quality & Confidence",
+              "url": "/d/mlx-mon-09-quality-confidence?var-model=${__data.fields.model}",
               "targetBlank": false
             }
           ]
@@ -1060,7 +962,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX Hardware Telemetry",
-  "uid": "mlx-mon-13-hardware-telemetry",
+  "title": "MLX Opik Tracing & Evaluation",
+  "uid": "mlx-mon-10-opik-tracing",
   "version": 1
 }

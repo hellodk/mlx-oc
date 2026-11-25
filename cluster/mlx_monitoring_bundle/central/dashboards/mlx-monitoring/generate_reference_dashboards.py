@@ -12,24 +12,24 @@ OUT_DIR = "/home/dk/Documents/git/mlx-oc/cluster/mlx_monitoring_bundle/central/d
 DS_VM = {"type": "prometheus", "uid": "VictoriaMetrics"}
 
 DASHBOARD_SUITE = [
-    ("mlx-mon-01-overview", "01. Cluster Overview", "Fleet availability, serving health and key inference KPIs"),
-    ("mlx-mon-02-device-health", "02. Device Health", "Per-device component status, exporter freshness and connectivity"),
-    ("mlx-mon-03-per-device-detail", "03. Per-Device Detail", "Single-node deep dive from host resources to inference"),
-    ("mlx-mon-04-alerts-incidents", "04. Alerts & Incidents", "Active alert triage, severity distribution and runbooks"),
-    ("mlx-mon-05-serving-health", "05. Serving Health", "MLX server lifecycle, readiness and restart history"),
-    ("mlx-mon-06-inference-metrics", "06. Inference Metrics", "Inference latency breakdown, token throughput and concurrency"),
-    ("mlx-mon-07-model-sharding", "07. Model Sharding", "Model metadata, rank placement, layer ranges and peer probes"),
-    ("mlx-mon-08-kv-cache", "08. KV Cache", "Prompt cache utilization, context capacity and per-rank allocation"),
-    ("mlx-mon-09-quality-confidence", "09. Quality & Confidence", "Logprob scores, token entropy and canary evaluation"),
-    ("mlx-mon-10-opik-tracing", "10. Opik Tracing", "Trace volume, scoring coverage, judge scores and traces"),
-    ("mlx-mon-11-slo-error-budget", "11. SLO & Budget", "Latency & availability SLOs, error budgets, and burn rates"),
-    ("mlx-mon-12-server-logs", "12. Server Logs", "Searchable server logs, structured events and log pipeline health"),
-    ("mlx-mon-13-hardware-telemetry", "13. Hardware Telemetry", "CPU, memory, disk, thermal pressure, and Apple Silicon metrics"),
-    ("mlx-mon-14-power-thermal", "14. Power & Thermal", "Apple Silicon SoC power draw, thermal throttling and temperature"),
-    ("mlx-mon-15-process-profiler", "15. Process Profiler", "Top process CPU/RSS and measured host GPU vs process attribution"),
-    ("mlx-mon-16-network-host-peers", "16. Network Host & Peers", "Host interface throughput, errors and peer reachability probes"),
-    ("mlx-mon-17-sbom-inventory", "17. SBOM Inventory", "Package and model inventory across Python, Homebrew and system"),
-    ("mlx-mon-18-sbom-drift-delta", "18. SBOM Drift", "Version, hash, path and missing-package differences against baseline"),
+    ("mlx-cluster-overview", "Cluster Overview", "Fleet availability, serving health and key inference KPIs"),
+    ("mlx-device-health", "Device Health & Diagnostics", "Per-device component status, exporter freshness and connectivity"),
+    ("mlx-per-device-detail", "Per-Device Detail", "Single-node deep dive from host resources to inference"),
+    ("mlx-alerts-incidents", "Alerts & Incidents", "Active alert triage, severity distribution and runbooks"),
+    ("mlx-serving-health", "Serving Health", "MLX server lifecycle, readiness and restart history"),
+    ("mlx-inference-metrics", "Inference Metrics", "Inference latency breakdown, token throughput and concurrency"),
+    ("mlx-model-sharding", "Model Architecture & Sharding", "Model metadata, rank placement, layer ranges and peer probes"),
+    ("mlx-kv-cache", "KV Cache", "Prompt cache utilization, context capacity and per-rank allocation"),
+    ("mlx-quality-confidence", "Quality & Confidence", "Logprob scores, token entropy and canary evaluation"),
+    ("mlx-opik-tracing", "Opik Tracing & Evaluation", "Trace volume, scoring coverage, judge scores and traces"),
+    ("mlx-slo-error-budget", "SLO & Error Budget", "Latency & availability SLOs, error budgets, and burn rates"),
+    ("mlx-server-logs", "Server Logs", "Searchable server logs, structured events and log pipeline health"),
+    ("mlx-hardware-telemetry", "Hardware Telemetry", "CPU, memory, disk, thermal pressure, and Apple Silicon metrics"),
+    ("mlx-power-thermal", "Power & Thermal", "Apple Silicon SoC power draw, thermal throttling and temperature"),
+    ("mlx-process-profiler", "Process & Resource Profiler", "Top process CPU/RSS and measured host GPU vs process attribution"),
+    ("mlx-network-host-peers", "Network (Host & Peers)", "Host interface throughput, errors and peer reachability probes"),
+    ("mlx-sbom-inventory", "SBOM Fleet Inventory", "Package and model inventory across Python, Homebrew and system"),
+    ("mlx-sbom-drift-delta", "SBOM Drift & Delta", "Version, hash, path and missing-package differences against baseline"),
 ]
 
 def make_target(
@@ -65,6 +65,9 @@ def make_stat_panel(
     sparkline: bool = True,
     decimals: Optional[int] = None,
     drilldown_url: Optional[str] = None,
+    mappings: Optional[List[Dict[str, Any]]] = None,
+    text_mode: str = "auto",
+    legend: str = "",
 ) -> Dict[str, Any]:
     if thresholds is None:
         thresholds = [{"color": "green", "value": None}]
@@ -82,11 +85,11 @@ def make_stat_panel(
         "gridPos": {"h": h, "w": w, "x": x, "y": y},
         "datasource": DS_VM,
         "description": description,
-        "targets": [make_target(expr, instant=True)],
+        "targets": [make_target(expr, legend=legend, instant=True)],
         "options": {
             "reduceOptions": {"values": False, "calcs": ["lastNotNull"], "fields": ""},
             "orientation": "auto",
-            "textMode": "auto",
+            "textMode": text_mode,
             "colorMode": color_mode,
             "graphMode": "area" if sparkline else "none",
             "justifyMode": "auto",
@@ -95,7 +98,7 @@ def make_stat_panel(
             "defaults": {
                 "unit": unit,
                 "thresholds": {"mode": "absolute", "steps": thresholds},
-                "mappings": [],
+                "mappings": mappings or [],
                 "links": links,
             },
             "overrides": [],
@@ -333,60 +336,60 @@ def make_dashboard(
     }
 
 # -------------------------------------------------------------------------
-# 01. Cluster Overview
+# Cluster Overview
 # -------------------------------------------------------------------------
-def build_01_cluster_overview() -> Dict[str, Any]:
+def build_cluster_overview() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
-            1, "Devices Online", 0, 0, 4, 4,
+            1, "Devices online", 0, 0, 4, 4,
             "count(count by (device) (mlx_hw_up == 1))",
             description="Total Apple Silicon cluster nodes reporting healthy hardware telemetry",
             thresholds=[{"color": "red", "value": None}, {"color": "green", "value": 1}],
-            drilldown_url="/d/mlx-mon-02-device-health",
+            drilldown_url="/d/mlx-device-health",
         ),
         make_stat_panel(
-            2, "Serving Ready", 4, 0, 4, 4,
+            2, "Serving ready", 4, 0, 4, 4,
             "count(count by (device) (mlx_server_ready == 1))",
             description="MLX inference model server instances passing HTTP /v1/models readiness",
             thresholds=[{"color": "red", "value": None}, {"color": "green", "value": 1}],
-            drilldown_url="/d/mlx-mon-05-serving-health",
+            drilldown_url="/d/mlx-serving-health",
         ),
         make_stat_panel(
             3, "Requests / s", 8, 0, 4, 4,
-            "sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[5m]))",
+            "(sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[5m]))) or vector(0)",
             unit="reqps", decimals=1,
             description="Cluster-wide client inference request throughput observed at proxy layer",
-            drilldown_url="/d/mlx-mon-06-inference-metrics?${__all_variables}",
+            drilldown_url="/d/mlx-inference-metrics?${__all_variables}",
         ),
         make_stat_panel(
-            4, "TTFT p95 (Proxy-Observed)", 12, 0, 4, 4,
+            4, "TTFT p95", 12, 0, 4, 4,
             "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or vector(0)",
             unit="s", decimals=2,
             description="95th percentile Time to First Token observed at the proxy HTTP edge",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1.5}, {"color": "red", "value": 3.0}],
-            drilldown_url="/d/mlx-mon-06-inference-metrics?${__all_variables}",
+            drilldown_url="/d/mlx-inference-metrics?${__all_variables}",
         ),
         make_stat_panel(
             5, "Decode tok/s", 16, 0, 4, 4,
             "(sum(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\", model=~\"$model\"}[5m])) / (sum(rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\", model=~\"$model\"}[5m])) > 0)) or vector(0)",
             unit="tok/s", decimals=1,
             description="Cluster average token generation throughput for active completions",
-            drilldown_url="/d/mlx-mon-06-inference-metrics?${__all_variables}",
+            drilldown_url="/d/mlx-inference-metrics?${__all_variables}",
         ),
         make_stat_panel(
-            6, "Active Alerts", 20, 0, 4, 4,
+            6, "Active alerts", 20, 0, 4, 4,
             "count(ALERTS{alertstate=\"firing\", severity=~\"critical|warning\"}) or vector(0)",
             description="Total critical and warning alerts actively firing in VictoriaMetrics alert manager",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}],
-            drilldown_url="/d/mlx-mon-04-alerts-incidents",
+            drilldown_url="/d/mlx-alerts-incidents",
         ),
         make_timeseries_panel(
-            7, "Request Rate by Device", 0, 4, 12, 8,
+            7, "Request rate by device", 0, 4, 12, 8,
             [make_target("rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m])", legend="{{device}} - {{model}}")],
             unit="reqps", description="Per-device request volume over time",
         ),
         make_timeseries_panel(
-            8, "TTFT Latency Distribution (p50 / p95)", 12, 4, 12, 8,
+            8, "TTFT p50 / p95", 12, 4, 12, 8,
             [
                 make_target("(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))", legend="p95 TTFT"),
                 make_target("(histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))", legend="p50 TTFT"),
@@ -394,76 +397,70 @@ def build_01_cluster_overview() -> Dict[str, Any]:
             unit="s", description="Proxy-observed time-to-first-token latency progression",
         ),
         make_table_panel(
-            9, "Fleet Status Summary", 0, 12, 12, 8,
+            9, "Fleet status", 0, 12, 12, 8,
             [
-                make_target("mlx_server_state{device=~\"$device\"}", legend="State", instant=True),
+                make_target("mlx_server_state{device=~\"$device\"}", legend="Status", instant=True),
                 make_target("(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\"}[5m])) by (le, device))) or (0 * count by (device) (mlx_server_state{device=~\"$device\"}))", legend="TTFT p95", instant=True, ref_id="B"),
+                make_target("mlx_model_info{attr=\"layer_count\", device=~\"$device\"}", legend="Model", instant=True, ref_id="C"),
+                make_target("(count by (device) (ALERTS{alertstate=\"firing\"})) or (0 * count by (device) (mlx_server_state{device=~\"$device\"}))", legend="Alerts", instant=True, ref_id="D"),
             ],
             description="Current device state (0=Down, 1=Ready, 2=Starting, 3=Backoff) and p95 TTFT",
-            drilldown_url="/d/mlx-mon-03-per-device-detail?var-device=${__data.fields.device}&${__all_variables}",
+            drilldown_url="/d/mlx-per-device-detail?var-device=${__data.fields.device}&${__all_variables}",
             drilldown_title="Open Device Detail",
         ),
         make_table_panel(
-            10, "Active Incidents & Alerts Queue", 12, 12, 12, 8,
+            10, "Active incidents", 12, 12, 12, 8,
             [make_target("ALERTS{alertstate=\"firing\"}", legend="{{alertname}} - {{severity}}", instant=True)],
             description="Real-time alert inventory displaying severity, affected device and alert name",
-            drilldown_url="/d/mlx-mon-04-alerts-incidents",
+            drilldown_url="/d/mlx-alerts-incidents",
             drilldown_title="Open Alerts & Incidents",
         ),
     ]
     return make_dashboard(
-        "mlx-mon-01-overview",
-        "MLX Cluster Overview",
+        "mlx-cluster-overview",
+        "Cluster Overview",
         "Fleet availability, serving health and key inference KPIs across all Apple Silicon nodes",
         panels,
     )
 
 # -------------------------------------------------------------------------
-# 02. Device Health & Diagnostics
+# Device Health & Diagnostics
 # -------------------------------------------------------------------------
-def build_02_device_health() -> Dict[str, Any]:
+def build_device_health() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
-            1, "Hardware Exporters", 0, 0, 4, 4,
+            1, "Hardware exporters", 0, 0, 5, 4,
             "count(mlx_hw_up == 1)",
-            description="Nodes running active Apple Silicon hardware telemetry daemon",
-            drilldown_url="/d/mlx-mon-13-hardware-telemetry?${__all_variables}",
+            description="Reporting healthy hardware telemetry",
+            drilldown_url="/d/mlx-hardware-telemetry?${__all_variables}",
         ),
         make_stat_panel(
-            2, "Server Ready", 4, 0, 4, 4,
+            2, "Server ready", 5, 0, 5, 4,
             "count(mlx_server_ready == 1)",
-            description="Model server instances passing HTTP /v1/models readiness",
-            drilldown_url="/d/mlx-mon-05-serving-health",
+            description="Ready devices passing HTTP /v1/models probe",
+            drilldown_url="/d/mlx-serving-health",
         ),
         make_stat_panel(
-            3, "Failed Exporters", 8, 0, 4, 4,
+            3, "Failed exporters", 10, 0, 5, 4,
             "count((mlx_hw_up == 0) or (mlx_kv_agent_up == 0) or (mlx_up == 0) or (process_profiler_up == 0) or (mac_sbom_collector_up == 0) or (mlx_accuracy_eval_up == 0) or (mlx_log_tailer_up == 0)) or vector(0)",
-            description="Number of edge exporter services currently offline or failing probes",
+            description="Needs investigation",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
         ),
         make_stat_panel(
-            4, "Affected Devices", 12, 0, 4, 4,
+            4, "Affected devices", 15, 0, 5, 4,
             "count(count by (device) (ALERTS{alertstate=\"firing\"})) or vector(0)",
-            description="Total cluster nodes with at least one active firing alert",
+            description="Alerting devices",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 2}],
-            drilldown_url="/d/mlx-mon-04-alerts-incidents",
+            drilldown_url="/d/mlx-alerts-incidents",
         ),
         make_stat_panel(
-            5, "Missing Telemetry", 16, 0, 4, 4,
+            5, "Unknown status", 20, 0, 4, 4,
             "count(count by (device) (absent(mlx_hw_up{device=~\"$device\"}))) or vector(0)",
-            description="Devices configured in inventory but absent from current scrape series",
+            description="Missing telemetry",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
-        ),
-        make_stat_panel(
-            6, "Peer Probes Reachable", 20, 0, 4, 4,
-            "((count((mlx_shard_peer_up == 1) or (mlx_shard_peer_probe_status == 1)) / (count(mlx_shard_peer_up or mlx_shard_peer_probe_status) > 0)) * 100) or vector(100)",
-            unit="percent", decimals=1,
-            description="Percentage of peer TCP and HTTP probes returning successful connectivity",
-            thresholds=[{"color": "red", "value": None}, {"color": "yellow", "value": 90}, {"color": "green", "value": 99}],
-            drilldown_url="/d/mlx-mon-16-network-host-peers?${__all_variables}",
         ),
         make_state_timeline_panel(
-            7, "Device Component Health Matrix", 0, 4, 16, 8,
+            6, "Device component matrix", 0, 4, 14, 8,
             [
                 make_target("mlx_hw_up{device=~\"$device\"}", legend="{{device}} [hw]"),
                 make_target("mlx_server_ready{device=~\"$device\"}", legend="{{device}} [server]"),
@@ -472,47 +469,49 @@ def build_02_device_health() -> Dict[str, Any]:
                 make_target("process_profiler_up{device=~\"$device\"}", legend="{{device}} [process]"),
                 make_target("mac_sbom_collector_up{device=~\"$device\"}", legend="{{device}} [sbom]"),
             ],
-            description="Real-time multi-exporter operational state timeline per node",
-        ),
-        make_timeseries_panel(
-            8, "Fleet Availability Timeline", 16, 4, 8, 8,
-            [make_target("((count(mlx_server_ready == 1) / (count(mlx_hw_up) > 0)) * 100) or vector(100)", legend="Fleet Ready %")],
-            unit="percent", description="Overall cluster serving availability ratio over time",
+            description="Host · Proxy · Server · KV · Process · SBOM operational state timeline",
         ),
         make_table_panel(
-            9, "Exporter Freshness & Scrape Status", 0, 12, 12, 8,
+            7, "Exporter freshness", 14, 4, 10, 8,
             [
-                make_target("mlx_hw_up{device=~\"$device\"}", legend="HW Exporter", instant=True),
-                make_target("mlx_up{device=~\"$device\"}", legend="Proxy", instant=True, ref_id="B"),
-                make_target("mlx_kv_agent_up{device=~\"$device\"}", legend="KV Agent", instant=True, ref_id="C"),
-                make_target("process_profiler_up{device=~\"$device\"}", legend="Process Profiler", instant=True, ref_id="D"),
+                make_target("mlx_hw_up{device=~\"$device\"}", legend="mlx-hw", instant=True),
+                make_target("mlx_up{device=~\"$device\"}", legend="mlx-proxy", instant=True, ref_id="B"),
+                make_target("mlx_kv_agent_up{device=~\"$device\"}", legend="mlx-kv", instant=True, ref_id="C"),
+                make_target("process_profiler_up{device=~\"$device\"}", legend="mlx-process", instant=True, ref_id="D"),
             ],
-            description="State and availability of all edge exporter daemons on target nodes",
-            drilldown_url="/d/mlx-mon-03-per-device-detail?var-device=${__data.fields.device}&${__all_variables}",
+            description="Last successful scrape / sample",
+            drilldown_url="/d/mlx-per-device-detail?var-device=${__data.fields.device}&${__all_variables}",
             drilldown_title="Open Device Detail",
         ),
+        make_state_timeline_panel(
+            8, "Availability timeline", 0, 12, 12, 8,
+            [make_target("mlx_server_state{device=~\"$device\"}", legend="{{device}}")],
+            description="Last 6 hours device state timeline",
+        ),
         make_table_panel(
-            10, "Connectivity & Interconnect Checks", 12, 12, 12, 8,
+            9, "Connectivity checks", 12, 12, 12, 8,
             [
-                make_target("(mlx_shard_peer_up{device=~\"$device\"} or mlx_shard_peer_probe_status{device=~\"$device\"}) or vector(1)", legend="Peer Probe (1=Up, 0=Down)", instant=True),
-                make_target("(mlx_shard_peer_connect_seconds{device=~\"$device\"} or mlx_shard_peer_rtt_seconds{device=~\"$device\"}) or vector(0.001)", legend="Peer RTT (s)", instant=True, ref_id="B"),
+                make_target("(mlx_shard_peer_up{device=~\"$device\"} or mlx_shard_peer_probe_status{device=~\"$device\"}) or vector(1)", legend="Peer TCP", instant=True),
+                make_target("mlx_server_ready{device=~\"$device\"}", legend="HTTP Health", instant=True, ref_id="B"),
+                make_target("mlx_hw_up{device=~\"$device\"}", legend="SSH / Host", instant=True, ref_id="C"),
+                make_target("(mlx_shard_peer_connect_seconds{device=~\"$device\"} or mlx_shard_peer_rtt_seconds{device=~\"$device\"}) or vector(0.001)", legend="Latency", instant=True, ref_id="D"),
             ],
-            description="Peer TCP connect probes and HTTP health RTT latency measurements",
-            drilldown_url="/d/mlx-mon-16-network-host-peers?var-device=${__data.fields.device}&${__all_variables}",
+            description="Local SSH, HTTP health, peer TCP connectivity verification",
+            drilldown_url="/d/mlx-network-host-peers?var-device=${__data.fields.device}&${__all_variables}",
             drilldown_title="Open Network Detail",
         ),
     ]
     return make_dashboard(
-        "mlx-mon-02-device-health",
-        "MLX Device Health & Diagnostics",
+        "mlx-device-health",
+        "Device Health & Diagnostics",
         "Per-device component status, exporter freshness and network connectivity",
         panels,
     )
 
 # -------------------------------------------------------------------------
-# 03. Per-Device Detail
+# Per-Device Detail
 # -------------------------------------------------------------------------
-def build_03_per_device_detail() -> Dict[str, Any]:
+def build_per_device_detail() -> Dict[str, Any]:
     node_vars = [
         {
             "name": "device",
@@ -529,48 +528,59 @@ def build_03_per_device_detail() -> Dict[str, Any]:
     ]
     panels = [
         make_stat_panel(
-            1, "Device Serving State", 0, 0, 4, 4,
+            1, "Device status", 0, 0, 4, 4,
             "mlx_server_state{device=\"$device\"}",
             description="Current MLX model server status (0=Down, 1=Ready, 2=Starting, 3=Backoff)",
             thresholds=[{"color": "red", "value": None}, {"color": "green", "value": 1}, {"color": "yellow", "value": 2}],
-            drilldown_url="/d/mlx-mon-05-serving-health",
+            drilldown_url="/d/mlx-serving-health",
+            mappings=[
+                {
+                    "type": "value",
+                    "options": {
+                        "0": {"text": "DOWN", "color": "red"},
+                        "1": {"text": "READY", "color": "green"},
+                        "2": {"text": "STARTING", "color": "yellow"},
+                        "3": {"text": "BACKOFF", "color": "orange"},
+                    },
+                }
+            ],
         ),
         make_stat_panel(
-            2, "CPU Usage", 4, 0, 4, 4,
+            2, "Model", 4, 0, 4, 4,
+            "mlx_model_info{device=\"$device\", attr=\"layer_count\"}",
+            description="Loaded on node",
+            legend="{{model}}",
+            text_mode="name",
+        ),
+        make_stat_panel(
+            3, "Rank", 8, 0, 4, 4,
+            "mlx_shard_rank{device=\"$device\"} or vector(0)",
+            description="Distributed world rank",
+            drilldown_url="/d/mlx-model-sharding?var-device=$device",
+        ),
+        make_stat_panel(
+            4, "CPU", 12, 0, 4, 4,
             "mlx_proc_cpu_percent{device=\"$device\"} or (avg by (device) (process_cpu_percent{device=\"$device\"}))",
             unit="percent", decimals=1,
             description="Host Apple Silicon physical CPU core utilization",
-            drilldown_url="/d/mlx-mon-15-process-profiler?var-device=$device",
+            drilldown_url="/d/mlx-process-profiler?var-device=$device",
         ),
         make_stat_panel(
-            3, "RAM Available", 8, 0, 4, 4,
+            5, "RAM available", 16, 0, 4, 4,
             "(mlx_hw_mem_available_bytes{device=\"$device\"} / mlx_hw_mem_total_bytes{device=\"$device\"}) * 100",
             unit="percent", decimals=1,
             description="Available Unified Memory percentage",
-            drilldown_url="/d/mlx-mon-13-hardware-telemetry?var-device=$device",
+            drilldown_url="/d/mlx-hardware-telemetry?var-device=$device",
         ),
         make_stat_panel(
-            4, "GPU Memory Used", 12, 0, 4, 4,
+            6, "GPU memory", 20, 0, 4, 4,
             "(mlx_hw_gpu_mem_used_bytes{device=\"$device\"} / (mlx_hw_gpu_mem_total_bytes{device=\"$device\"} > 0)) * 100 or ((mlx_hw_mem_used_bytes{device=\"$device\"} / mlx_hw_mem_total_bytes{device=\"$device\"}) * 100)",
             unit="percent", decimals=1,
             description="Allocated Unified Memory percentage",
-            drilldown_url="/d/mlx-mon-13-hardware-telemetry?var-device=$device",
-        ),
-        make_stat_panel(
-            5, "Assigned Shard Rank", 16, 0, 4, 4,
-            "mlx_shard_rank{device=\"$device\"} or vector(0)",
-            description="Assigned distributed model rank for this node",
-            drilldown_url="/d/mlx-mon-07-model-sharding?var-device=$device",
-        ),
-        make_stat_panel(
-            6, "Thermal Pressure", 20, 0, 4, 4,
-            "mlx_hw_thermal_pressure{device=\"$device\"}",
-            description="Apple Silicon thermal level (0=Nominal, 1=Moderate, 2=Heavy, 3=Trapping)",
-            thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 2}],
-            drilldown_url="/d/mlx-mon-14-power-thermal?var-device=$device",
+            drilldown_url="/d/mlx-hardware-telemetry?var-device=$device",
         ),
         make_timeseries_panel(
-            7, "Host Resource Trends (CPU, Memory, GPU)", 0, 4, 12, 8,
+            7, "Host resource trends", 0, 4, 12, 8,
             [
                 make_target("mlx_proc_cpu_percent{device=\"$device\"} or (avg by (device) (process_cpu_percent{device=\"$device\"}))", legend="CPU Usage %"),
                 make_target("(mlx_hw_mem_used_bytes{device=\"$device\"} / mlx_hw_mem_total_bytes{device=\"$device\"}) * 100", legend="Memory Used %"),
@@ -579,7 +589,7 @@ def build_03_per_device_detail() -> Dict[str, Any]:
             unit="percent", description="SoC resource utilization on target device over time",
         ),
         make_timeseries_panel(
-            8, "Serving Throughput (Requests & Token Rate)", 12, 4, 12, 8,
+            8, "Serving throughput", 12, 4, 12, 8,
             [
                 make_target("rate(mlx_requests_total{device=\"$device\"}[1m])", legend="Requests/s"),
                 make_target("(rate(mlx_token_rate_tokens_per_second_sum{device=\"$device\"}[1m]) / (rate(mlx_token_rate_tokens_per_second_count{device=\"$device\"}[1m]) > 0)) or (0 * rate(mlx_requests_total{device=\"$device\"}[1m]))", legend="Tokens/s (decode)"),
@@ -587,87 +597,115 @@ def build_03_per_device_detail() -> Dict[str, Any]:
             description="Throughput metrics observed on this specific host",
         ),
         make_table_panel(
-            9, "Incidents & Firing Alerts on Node", 0, 12, 12, 8,
+            9, "Current incidents", 0, 12, 12, 8,
             [make_target("ALERTS{alertstate=\"firing\", device=\"$device\"}", legend="{{alertname}} - {{severity}}", instant=True)],
             description="Active alerts specifically targeting this selected node",
-            drilldown_url="/d/mlx-mon-04-alerts-incidents",
+            drilldown_url="/d/mlx-alerts-incidents",
             drilldown_title="Open Alerts & Incidents",
         ),
         make_table_panel(
-            10, "Component Service Status on Node", 12, 12, 12, 8,
+            10, "Component health", 12, 12, 12, 8,
             [
-                make_target("mlx_hw_up{device=\"$device\"}", legend="Hardware Daemon", instant=True),
-                make_target("mlx_server_ready{device=\"$device\"}", legend="MLX Model Server", instant=True, ref_id="B"),
-                make_target("mlx_up{device=\"$device\"}", legend="Metrics Proxy", instant=True, ref_id="C"),
-                make_target("mlx_kv_agent_up{device=\"$device\"}", legend="KV Cache Agent", instant=True, ref_id="D"),
+                make_target("mlx_hw_up{device=\"$device\"}", legend="mlx-hw", instant=True),
+                make_target("mlx_server_ready{device=\"$device\"}", legend="mlx-server", instant=True, ref_id="B"),
+                make_target("mlx_up{device=\"$device\"}", legend="mlx-proxy", instant=True, ref_id="C"),
+                make_target("mlx_kv_agent_up{device=\"$device\"}", legend="mlx-kv", instant=True, ref_id="D"),
+                make_target("process_profiler_up{device=\"$device\"}", legend="mlx-process", instant=True, ref_id="E"),
             ],
             description="Verification of individual edge daemons on this node",
-            drilldown_url="/d/mlx-mon-02-device-health",
+            drilldown_url="/d/mlx-device-health",
             drilldown_title="Open Device Health",
         ),
     ]
     return make_dashboard(
-        "mlx-mon-03-per-device-detail",
-        "MLX Per-Device Detail",
+        "mlx-per-device-detail",
+        "Per-Device Detail",
         "Single-node deep dive from host resources to inference and incidents",
         panels,
         variables=node_vars,
     )
 
 # -------------------------------------------------------------------------
-# 04. Alerts & Incidents
+# Alerts & Incidents
 # -------------------------------------------------------------------------
-def build_04_alerts_incidents() -> Dict[str, Any]:
+def build_alerts_incidents() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
-            1, "Critical Alerts", 0, 0, 6, 4,
+            1, "Critical", 0, 0, 5, 4,
             "count(ALERTS{alertstate=\"firing\", severity=\"critical\"}) or vector(0)",
-            description="Active severity=critical alerts requiring immediate intervention",
+            description="Needs immediate action",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
+            drilldown_url="/d/mlx-device-health",
         ),
         make_stat_panel(
-            2, "Warning Alerts", 6, 0, 6, 4,
+            2, "Warning", 5, 0, 5, 4,
             "count(ALERTS{alertstate=\"firing\", severity=\"warning\"}) or vector(0)",
-            description="Active severity=warning alerts indicating degraded performance",
+            description="Investigate",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}],
+            drilldown_url="/d/mlx-device-health",
         ),
         make_stat_panel(
-            3, "Total Active Firing Alerts", 12, 0, 6, 4,
+            3, "Firing total", 10, 0, 5, 4,
             "count(ALERTS{alertstate=\"firing\"}) or vector(0)",
-            description="Aggregate count of all firing alerts across the cluster",
+            description="Current alerts",
+            thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}],
         ),
         make_stat_panel(
-            4, "Affected Devices", 18, 0, 6, 4,
+            4, "Affected devices", 15, 0, 5, 4,
             "count(count by (device) (ALERTS{alertstate=\"firing\"})) or vector(0)",
-            description="Number of distinct hosts affected by active alerts",
-            thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}],
-            drilldown_url="/d/mlx-mon-02-device-health",
+            description="Unique devices",
+            thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 2}],
+            drilldown_url="/d/mlx-device-health",
+        ),
+        make_stat_panel(
+            5, "Resolved (24h)", 20, 0, 4, 4,
+            "(sum(changes(ALERTS{alertstate=\"firing\"}[24h])) - count(ALERTS{alertstate=\"firing\"})) or vector(0)",
+            description="Historical alerts",
+            thresholds=[{"color": "green", "value": None}],
         ),
         make_table_panel(
-            5, "Active Alert Queue & Details", 0, 4, 14, 8,
+            6, "Active alert queue", 0, 4, 14, 8,
             [make_target("ALERTS{alertstate=\"firing\"}", legend="{{alertname}} on {{device}}", instant=True)],
-            description="Real-time alert inventory with alertname, device, severity, and firing timestamp",
-            drilldown_url="/d/mlx-mon-03-per-device-detail?var-device=${__data.fields.device}",
+            description="Severity, alert, device, duration",
+            drilldown_url="/d/mlx-per-device-detail?var-device=${__data.fields.device}",
             drilldown_title="Open Affected Device",
         ),
-        make_timeseries_panel(
-            6, "Alert Firing Activity Over Time", 14, 4, 10, 8,
-            [
-                make_target("count(ALERTS{alertstate=\"firing\", severity=\"critical\"}) or vector(0)", legend="Critical Alerts"),
-                make_target("count(ALERTS{alertstate=\"firing\", severity=\"warning\"}) or vector(0)", legend="Warning Alerts"),
+        make_state_timeline_panel(
+            7, "Alert timeline", 14, 4, 10, 8,
+            [make_target("(count by (device) (ALERTS{alertstate=\"firing\"})) or (0 * count by (device) (mlx_hw_up))", legend="{{device}}")],
+            description="Firing intervals by device",
+            mappings=[
+                {
+                    "type": "value",
+                    "options": {
+                        "0": {"text": "Clear", "color": "green"},
+                        "1": {"text": "Warning", "color": "orange"},
+                        "2": {"text": "Critical", "color": "red"},
+                    },
+                }
             ],
-            description="Historical alert volume trends by severity level",
+        ),
+        make_timeseries_panel(
+            8, "Alert counts over time", 0, 12, 12, 8,
+            [
+                make_target("count(ALERTS{alertstate=\"firing\", severity=\"critical\"}) or vector(0)", legend="Critical"),
+                make_target("count(ALERTS{alertstate=\"firing\", severity=\"warning\"}) or vector(0)", legend="Warning"),
+                make_target("count(ALERTS{alertstate=\"firing\", severity=~\"info|none\"}) or vector(0)", legend="Info"),
+            ],
+            draw_style="bars",
+            stack=True,
+            description="Critical / warning / info",
         ),
         make_table_panel(
-            7, "Alert Runbooks and Remediation Guide", 0, 12, 24, 8,
-            [make_target("ALERTS{alertstate=\"firing\"}", legend="{{alertname}} - {{summary}}", instant=True)],
-            description="Direct operational runbook links and owner triage guidance",
+            9, "Runbook and ownership", 12, 12, 12, 8,
+            [make_target("ALERTS{alertstate=\"firing\"}", legend="{{alertname}}", instant=True)],
+            description="Alert owner and runbook action",
         ),
     ]
     return make_dashboard(
-        "mlx-mon-04-alerts-incidents",
-        "MLX Alerts & Incidents",
-        "Active alert triage, duration, affected devices and incident history",
+        "mlx-alerts-incidents",
+        "Alerts & Incidents",
+        "Active alert triage, duration, affected devices and history",
         panels,
     )
 
@@ -1751,49 +1789,27 @@ def build_18_sbom_drift_delta() -> Dict[str, Any]:
 
 def main():
     generators = [
-        ("01-cluster-overview.json", build_01_cluster_overview),
-        ("02-device-health-diagnostics.json", build_02_device_health),
-        ("03-per-device-detail.json", build_03_per_device_detail),
-        ("04-alerts-incidents.json", build_04_alerts_incidents),
-        ("05-serving-health.json", build_05_serving_health),
-        ("06-inference-metrics.json", build_06_inference_metrics),
-        ("07-model-architecture-sharding.json", build_07_model_sharding),
-        ("08-kv-cache.json", build_08_kv_cache),
-        ("09-quality-confidence.json", build_09_quality_confidence),
-        ("10-opik-tracing-evaluation.json", build_10_opik_tracing),
-        ("11-slo-error-budget.json", build_11_slo_error_budget),
-        ("12-server-logs.json", build_12_server_logs),
-        ("13-hardware-telemetry.json", build_13_hardware_telemetry),
-        ("14-power-thermal.json", build_14_power_thermal),
-        ("15-process-profiler.json", build_15_process_profiler),
-        ("16-network-host-peers.json", build_16_network_host_peers),
-        ("17-sbom-fleet-inventory.json", build_17_sbom_inventory),
-        ("18-sbom-drift-delta.json", build_18_sbom_drift_delta),
+        ("cluster-overview.json", build_cluster_overview),
+        ("device-health-diagnostics.json", build_device_health),
+        ("per-device-detail.json", build_per_device_detail),
+        ("alerts-incidents.json", build_alerts_incidents),
+        ("serving-health.json", build_05_serving_health),
+        ("inference-metrics.json", build_06_inference_metrics),
+        ("model-architecture-sharding.json", build_07_model_sharding),
+        ("kv-cache.json", build_08_kv_cache),
+        ("quality-confidence.json", build_09_quality_confidence),
+        ("opik-tracing-evaluation.json", build_10_opik_tracing),
+        ("slo-error-budget.json", build_11_slo_error_budget),
+        ("server-logs.json", build_12_server_logs),
+        ("hardware-telemetry.json", build_13_hardware_telemetry),
+        ("power-thermal.json", build_14_power_thermal),
+        ("process-profiler.json", build_15_process_profiler),
+        ("network-host-peers.json", build_16_network_host_peers),
+        ("sbom-fleet-inventory.json", build_17_sbom_inventory),
+        ("sbom-drift-delta.json", build_18_sbom_drift_delta),
     ]
 
     os.makedirs(OUT_DIR, exist_ok=True)
-    parent_dir = os.path.dirname(OUT_DIR)
-    legacy_map = {
-        "01-cluster-overview.json": ("overview.json", "mlx-overview", "MLX Cluster Overview"),
-        "02-device-health-diagnostics.json": ("device-health.json", "mlx-device-health", "MLX Device Health & Diagnostics"),
-        "03-per-device-detail.json": ("detail.json", "mlx-detail", "MLX Per-Device Detail"),
-        "04-alerts-incidents.json": ("alerts.json", "mlx-alerts", "MLX Alerts"),
-        "05-serving-health.json": ("serving.json", "mlx-serving", "MLX Serving Health"),
-        "06-inference-metrics.json": ("inference.json", "mlx-inference", "MLX Inference Metrics"),
-        "07-model-architecture-sharding.json": ("model-sharding.json", "mlx-model-sharding", "MLX Model Architecture & Sharding"),
-        "08-kv-cache.json": ("kv-cache.json", "mlx-kv-cache", "MLX KV Cache"),
-        "09-quality-confidence.json": ("quality.json", "mlx-quality", "MLX Quality & Confidence"),
-        "10-opik-tracing-evaluation.json": ("opik.json", "mlx-opik", "MLX Opik Tracing"),
-        "11-slo-error-budget.json": ("slo.json", "mlx-slo", "MLX SLO / Error Budget"),
-        "12-server-logs.json": ("logs.json", "mlx-logs", "MLX Server Logs"),
-        "13-hardware-telemetry.json": ("hardware.json", "mlx-hardware", "MLX Hardware Telemetry"),
-        "14-power-thermal.json": ("power-thermal.json", "mlx-power-thermal", "MLX Power & Thermal"),
-        "15-process-profiler.json": ("process-profiler.json", "mlx-process-profiler", "MLX Process & Resource Profiler"),
-        "16-network-host-peers.json": ("network.json", "mlx-network", "MLX Network (Ring Interconnect)"),
-        "17-sbom-fleet-inventory.json": ("sbom-inventory.json", "mlx-sbom-inventory", "MLX SBOM Fleet Inventory"),
-        "18-sbom-drift-delta.json": ("sbom-drift.json", "mlx-sbom-drift", "MLX SBOM Drift & Delta Engine"),
-    }
-
     generated = []
     for filename, gen_fn in generators:
         dash_obj = gen_fn()
@@ -1801,20 +1817,9 @@ def main():
         with open(path, "w", encoding="utf-8") as f:
             json.dump(dash_obj, f, indent=2)
         generated.append(filename)
-
-        # Also write synchronized legacy dashboard with preserved legacy UID
-        if filename in legacy_map:
-            leg_name, leg_uid, leg_title = legacy_map[filename]
-            leg_path = os.path.join(parent_dir, leg_name)
-            leg_obj = json.loads(json.dumps(dash_obj))  # deep copy
-            leg_obj["uid"] = leg_uid
-            leg_obj["title"] = leg_title
-            with open(leg_path, "w", encoding="utf-8") as lf:
-                json.dump(leg_obj, lf, indent=2)
-
         print(f"Generated {filename} (UID: {dash_obj['uid']}, Panels: {len(dash_obj['panels'])})")
 
-    print(f"\nSuccessfully generated {len(generated)} reference dashboards in {OUT_DIR} and synced {len(legacy_map)} to {parent_dir}")
+    print(f"\nSuccessfully generated {len(generated)} reference dashboards in {OUT_DIR}")
 
 if __name__ == "__main__":
     main()

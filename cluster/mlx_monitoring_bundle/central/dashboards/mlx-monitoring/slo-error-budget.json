@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Version, hash, path and missing-package differences against a versioned baseline",
+  "description": "Latency & availability SLOs, error budgets, and multi-window burn rates",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -26,10 +26,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "01. Cluster Overview",
-      "tooltip": "01. Cluster Overview \u2014 Fleet availability, serving health and key inference KPIs",
+      "title": "Cluster Overview",
+      "tooltip": "Cluster Overview \u2014 Fleet availability, serving health and key inference KPIs",
       "type": "link",
-      "url": "/d/mlx-mon-01-overview"
+      "url": "/d/mlx-cluster-overview"
     },
     {
       "asDropdown": false,
@@ -38,10 +38,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "02. Device Health",
-      "tooltip": "02. Device Health \u2014 Per-device component status, exporter freshness and connectivity",
+      "title": "Device Health & Diagnostics",
+      "tooltip": "Device Health & Diagnostics \u2014 Per-device component status, exporter freshness and connectivity",
       "type": "link",
-      "url": "/d/mlx-mon-02-device-health"
+      "url": "/d/mlx-device-health"
     },
     {
       "asDropdown": false,
@@ -50,10 +50,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "03. Per-Device Detail",
-      "tooltip": "03. Per-Device Detail \u2014 Single-node deep dive from host resources to inference",
+      "title": "Per-Device Detail",
+      "tooltip": "Per-Device Detail \u2014 Single-node deep dive from host resources to inference",
       "type": "link",
-      "url": "/d/mlx-mon-03-per-device-detail"
+      "url": "/d/mlx-per-device-detail"
     },
     {
       "asDropdown": false,
@@ -62,10 +62,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "04. Alerts & Incidents",
-      "tooltip": "04. Alerts & Incidents \u2014 Active alert triage, severity distribution and runbooks",
+      "title": "Alerts & Incidents",
+      "tooltip": "Alerts & Incidents \u2014 Active alert triage, severity distribution and runbooks",
       "type": "link",
-      "url": "/d/mlx-mon-04-alerts-incidents"
+      "url": "/d/mlx-alerts-incidents"
     },
     {
       "asDropdown": false,
@@ -74,10 +74,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "05. Serving Health",
-      "tooltip": "05. Serving Health \u2014 MLX server lifecycle, readiness and restart history",
+      "title": "Serving Health",
+      "tooltip": "Serving Health \u2014 MLX server lifecycle, readiness and restart history",
       "type": "link",
-      "url": "/d/mlx-mon-05-serving-health"
+      "url": "/d/mlx-serving-health"
     },
     {
       "asDropdown": false,
@@ -86,10 +86,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "06. Inference Metrics",
-      "tooltip": "06. Inference Metrics \u2014 Inference latency breakdown, token throughput and concurrency",
+      "title": "Inference Metrics",
+      "tooltip": "Inference Metrics \u2014 Inference latency breakdown, token throughput and concurrency",
       "type": "link",
-      "url": "/d/mlx-mon-06-inference-metrics"
+      "url": "/d/mlx-inference-metrics"
     },
     {
       "asDropdown": false,
@@ -98,10 +98,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "07. Model Sharding",
-      "tooltip": "07. Model Sharding \u2014 Model metadata, rank placement, layer ranges and peer probes",
+      "title": "Model Architecture & Sharding",
+      "tooltip": "Model Architecture & Sharding \u2014 Model metadata, rank placement, layer ranges and peer probes",
       "type": "link",
-      "url": "/d/mlx-mon-07-model-sharding"
+      "url": "/d/mlx-model-sharding"
     },
     {
       "asDropdown": false,
@@ -110,10 +110,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "08. KV Cache",
-      "tooltip": "08. KV Cache \u2014 Prompt cache utilization, context capacity and per-rank allocation",
+      "title": "KV Cache",
+      "tooltip": "KV Cache \u2014 Prompt cache utilization, context capacity and per-rank allocation",
       "type": "link",
-      "url": "/d/mlx-mon-08-kv-cache"
+      "url": "/d/mlx-kv-cache"
     },
     {
       "asDropdown": false,
@@ -122,10 +122,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "09. Quality & Confidence",
-      "tooltip": "09. Quality & Confidence \u2014 Logprob scores, token entropy and canary evaluation",
+      "title": "Quality & Confidence",
+      "tooltip": "Quality & Confidence \u2014 Logprob scores, token entropy and canary evaluation",
       "type": "link",
-      "url": "/d/mlx-mon-09-quality-confidence"
+      "url": "/d/mlx-quality-confidence"
     },
     {
       "asDropdown": false,
@@ -134,10 +134,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "10. Opik Tracing",
-      "tooltip": "10. Opik Tracing \u2014 Trace volume, scoring coverage, judge scores and traces",
+      "title": "Opik Tracing & Evaluation",
+      "tooltip": "Opik Tracing & Evaluation \u2014 Trace volume, scoring coverage, judge scores and traces",
       "type": "link",
-      "url": "/d/mlx-mon-10-opik-tracing"
+      "url": "/d/mlx-opik-tracing"
     },
     {
       "asDropdown": false,
@@ -146,10 +146,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "11. SLO & Budget",
-      "tooltip": "11. SLO & Budget \u2014 Latency & availability SLOs, error budgets, and burn rates",
+      "title": "SLO & Error Budget",
+      "tooltip": "SLO & Error Budget \u2014 Latency & availability SLOs, error budgets, and burn rates",
       "type": "link",
-      "url": "/d/mlx-mon-11-slo-error-budget"
+      "url": "/d/mlx-slo-error-budget"
     },
     {
       "asDropdown": false,
@@ -158,10 +158,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "12. Server Logs",
-      "tooltip": "12. Server Logs \u2014 Searchable server logs, structured events and log pipeline health",
+      "title": "Server Logs",
+      "tooltip": "Server Logs \u2014 Searchable server logs, structured events and log pipeline health",
       "type": "link",
-      "url": "/d/mlx-mon-12-server-logs"
+      "url": "/d/mlx-server-logs"
     },
     {
       "asDropdown": false,
@@ -170,10 +170,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "13. Hardware Telemetry",
-      "tooltip": "13. Hardware Telemetry \u2014 CPU, memory, disk, thermal pressure, and Apple Silicon metrics",
+      "title": "Hardware Telemetry",
+      "tooltip": "Hardware Telemetry \u2014 CPU, memory, disk, thermal pressure, and Apple Silicon metrics",
       "type": "link",
-      "url": "/d/mlx-mon-13-hardware-telemetry"
+      "url": "/d/mlx-hardware-telemetry"
     },
     {
       "asDropdown": false,
@@ -182,10 +182,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "14. Power & Thermal",
-      "tooltip": "14. Power & Thermal \u2014 Apple Silicon SoC power draw, thermal throttling and temperature",
+      "title": "Power & Thermal",
+      "tooltip": "Power & Thermal \u2014 Apple Silicon SoC power draw, thermal throttling and temperature",
       "type": "link",
-      "url": "/d/mlx-mon-14-power-thermal"
+      "url": "/d/mlx-power-thermal"
     },
     {
       "asDropdown": false,
@@ -194,10 +194,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "15. Process Profiler",
-      "tooltip": "15. Process Profiler \u2014 Top process CPU/RSS and measured host GPU vs process attribution",
+      "title": "Process & Resource Profiler",
+      "tooltip": "Process & Resource Profiler \u2014 Top process CPU/RSS and measured host GPU vs process attribution",
       "type": "link",
-      "url": "/d/mlx-mon-15-process-profiler"
+      "url": "/d/mlx-process-profiler"
     },
     {
       "asDropdown": false,
@@ -206,10 +206,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "16. Network Host & Peers",
-      "tooltip": "16. Network Host & Peers \u2014 Host interface throughput, errors and peer reachability probes",
+      "title": "Network (Host & Peers)",
+      "tooltip": "Network (Host & Peers) \u2014 Host interface throughput, errors and peer reachability probes",
       "type": "link",
-      "url": "/d/mlx-mon-16-network-host-peers"
+      "url": "/d/mlx-network-host-peers"
     },
     {
       "asDropdown": false,
@@ -218,10 +218,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "17. SBOM Inventory",
-      "tooltip": "17. SBOM Inventory \u2014 Package and model inventory across Python, Homebrew and system",
+      "title": "SBOM Fleet Inventory",
+      "tooltip": "SBOM Fleet Inventory \u2014 Package and model inventory across Python, Homebrew and system",
       "type": "link",
-      "url": "/d/mlx-mon-17-sbom-inventory"
+      "url": "/d/mlx-sbom-inventory"
     },
     {
       "asDropdown": false,
@@ -230,21 +230,21 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "18. SBOM Drift",
-      "tooltip": "18. SBOM Drift \u2014 Version, hash, path and missing-package differences against baseline",
+      "title": "SBOM Drift & Delta",
+      "tooltip": "SBOM Drift & Delta \u2014 Version, hash, path and missing-package differences against baseline",
       "type": "link",
-      "url": "/d/mlx-mon-18-sbom-drift-delta"
+      "url": "/d/mlx-sbom-drift-delta"
     }
   ],
   "liveNow": false,
   "panels": [
     {
       "id": 1,
-      "title": "Devices in Sync",
+      "title": "Availability SLO (99.5% Target)",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
+        "w": 6,
         "x": 0,
         "y": 0
       },
@@ -252,7 +252,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Nodes matching the golden reference baseline with zero discrepancies",
+      "description": "Customer-facing 1h availability excluding synthetic evaluation probes",
       "targets": [
         {
           "datasource": {
@@ -260,351 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_drift_status == 1)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [
-            {
-              "title": "Drill down",
-              "url": "/d/mlx-mon-17-sbom-inventory?${__all_variables}",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 2,
-      "title": "Deviated Devices",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 4,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Nodes exhibiting version, hash, or package mismatches against baseline",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "count(mac_sbom_drift_mismatch_count > 0 or mac_sbom_missing_package_count > 0) or vector(0)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 3
-              }
-            ]
-          },
-          "mappings": [],
-          "links": []
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 3,
-      "title": "Version Differences",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Total package version discrepancies detected across the cluster",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "sum(mac_sbom_drift_mismatch_count)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 5
-              }
-            ]
-          },
-          "mappings": [],
-          "links": []
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 4,
-      "title": "Missing Packages",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Required baseline packages absent on target edge nodes",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "sum(mac_sbom_missing_package_count)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          },
-          "mappings": [],
-          "links": []
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 5,
-      "title": "Hash / Path Diffs",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Binaries or libraries matching version but differing in executable path or hash",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "sum(mac_sbom_drift_mismatch_count)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 3
-              }
-            ]
-          },
-          "mappings": [],
-          "links": []
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 6,
-      "title": "Fleet Uniformity Score",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Cluster-wide configuration and dependency consistency score",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "avg(mac_sbom_drift_status) * 100",
+          "expr": "clamp_max((1 - (sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0))) * 100, 100) or vector(100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -638,11 +294,159 @@
               },
               {
                 "color": "yellow",
-                "value": 90
+                "value": 99.0
               },
               {
                 "color": "green",
-                "value": 98
+                "value": 99.5
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 2
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "Latency SLO (p95 < 2.0s)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Percentage of production requests satisfying TTFT under 2.0 seconds",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "(sum(rate(mlx_ttft_seconds_bucket{le=\"2.0\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_ttft_seconds_count{kind!=\"eval\"}[1h])) > 0)) * 100 or vector(100)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 90.0
+              },
+              {
+                "color": "green",
+                "value": 95.0
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [
+            {
+              "title": "Drill down",
+              "url": "/d/mlx-mon-06-inference-metrics?${__all_variables}",
+              "targetBlank": false
+            }
+          ],
+          "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "1h Error Budget Remaining",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Remaining error budget for 1h window against 0.5% unreliability allowance",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "clamp_max((1 - ((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005)) * 100, 100) or vector(100)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 20.0
+              },
+              {
+                "color": "green",
+                "value": 80.0
               }
             ]
           },
@@ -654,8 +458,79 @@
       }
     },
     {
-      "id": 7,
-      "title": "Drift Severity by Target Device",
+      "id": 4,
+      "title": "30d Rolling Error Budget Remaining",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "30-day cumulative rolling error budget consumption",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "clamp_max((1 - ((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[30d])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[30d])) > 0)) / 0.005)) * 100, 100) or vector(100)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 20.0
+              },
+              {
+                "color": "green",
+                "value": 80.0
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "title": "Multi-Window Error Budget Burn Rates",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -667,7 +542,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Drift breakdown per node compared against baseline",
+      "description": "Multi-window multi-burn-rate tracking according to Google SRE handbook principles",
       "targets": [
         {
           "datasource": {
@@ -675,8 +550,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mac_sbom_drift_mismatch_count{device=~\"$device\"}",
-          "legendFormat": "{{device}} Version Diffs",
+          "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005) or vector(0)",
+          "legendFormat": "1h Burn Rate (Alert > 14.4x)",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -688,8 +563,21 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mac_sbom_missing_package_count{device=~\"$device\"}",
-          "legendFormat": "{{device}} Missing Pkgs",
+          "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[6h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[6h])) > 0)) / 0.005) or vector(0)",
+          "legendFormat": "6h Burn Rate (Alert > 6x)",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[24h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[24h])) > 0)) / 0.005) or vector(0)",
+          "legendFormat": "24h Burn Rate (Alert > 1x)",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -743,9 +631,9 @@
       }
     },
     {
-      "id": 8,
-      "title": "Baseline Provenance & Authority Status",
-      "type": "table",
+      "id": 6,
+      "title": "Eligible Traffic vs Error Classification",
+      "type": "timeseries",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -756,7 +644,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Provenance, publication timestamp, and authority node of the active baseline",
+      "description": "Request volume filtered for customer traffic versus 4xx and 5xx failures",
       "targets": [
         {
           "datasource": {
@@ -764,23 +652,58 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mac_sbom_device_drift_summary",
-          "legendFormat": "Baseline: {{base_device}}",
-          "range": false,
-          "instant": true,
+          "expr": "sum(rate(mlx_requests_total{kind!=\"eval\"}[1m]))",
+          "legendFormat": "Eligible Client Requests/s",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1m]))",
+          "legendFormat": "5xx Server Errors/s",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(mlx_error_total{status=~\"4..\", kind!=\"eval\"}[1m]))",
+          "legendFormat": "4xx Client Errors/s",
+          "range": true,
+          "instant": false,
           "refId": "A",
           "format": "time_series"
         }
       ],
-      "transformations": [],
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "align": "auto",
-            "displayMode": "auto",
-            "inspect": false
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto"
           },
-          "mappings": [],
+          "unit": "reqps",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -790,24 +713,28 @@
               }
             ]
           },
-          "links": [
-            {
-              "title": "Open SBOM Inventory",
-              "url": "/d/mlx-mon-17-sbom-inventory?var-device=${__data.fields.device}",
-              "targetBlank": false
-            }
-          ]
+          "mappings": []
         },
         "overrides": []
       },
       "options": {
-        "showHeader": true,
-        "sortBy": []
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
       }
     },
     {
-      "id": 9,
-      "title": "Package Differences Detail (Baseline vs Current)",
+      "id": 7,
+      "title": "SLO Degradation & Error Budget Impact by Route",
       "type": "table",
       "gridPos": {
         "h": 8,
@@ -819,7 +746,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Granular delta table specifying package name, baseline version, current version, and change type",
+      "description": "Detailed accounting of failures consuming the production error budget",
       "targets": [
         {
           "datasource": {
@@ -827,11 +754,24 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mac_sbom_device_drift_summary{device=~\"$device\"}",
-          "legendFormat": "{{device}} status={{drift_status}}",
+          "expr": "sum(rate(mlx_error_total{kind!=\"eval\"}[5m])) by (status, route)",
+          "legendFormat": "Errors/s",
           "range": false,
           "instant": true,
           "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(mlx_requests_total{kind!=\"eval\"}[5m])) by (route)",
+          "legendFormat": "Total/s",
+          "range": false,
+          "instant": true,
+          "refId": "B",
           "format": "time_series"
         }
       ],
@@ -855,8 +795,8 @@
           },
           "links": [
             {
-              "title": "Open SBOM Inventory",
-              "url": "/d/mlx-mon-17-sbom-inventory?var-device=${__data.fields.device}",
+              "title": "Open Inference Metrics",
+              "url": "/d/mlx-mon-06-inference-metrics?${__all_variables}",
               "targetBlank": false
             }
           ]
@@ -939,7 +879,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX SBOM Drift & Delta",
-  "uid": "mlx-mon-18-sbom-drift-delta",
+  "title": "MLX SLO & Error Budget",
+  "uid": "mlx-mon-11-slo-error-budget",
   "version": 1
 }

@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Trace volume, scoring coverage, judge scores and recent trace navigation",
+  "description": "Selected host interface throughput, errors and peer reachability probes",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -26,10 +26,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "01. Cluster Overview",
-      "tooltip": "01. Cluster Overview \u2014 Fleet availability, serving health and key inference KPIs",
+      "title": "Cluster Overview",
+      "tooltip": "Cluster Overview \u2014 Fleet availability, serving health and key inference KPIs",
       "type": "link",
-      "url": "/d/mlx-mon-01-overview"
+      "url": "/d/mlx-cluster-overview"
     },
     {
       "asDropdown": false,
@@ -38,10 +38,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "02. Device Health",
-      "tooltip": "02. Device Health \u2014 Per-device component status, exporter freshness and connectivity",
+      "title": "Device Health & Diagnostics",
+      "tooltip": "Device Health & Diagnostics \u2014 Per-device component status, exporter freshness and connectivity",
       "type": "link",
-      "url": "/d/mlx-mon-02-device-health"
+      "url": "/d/mlx-device-health"
     },
     {
       "asDropdown": false,
@@ -50,10 +50,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "03. Per-Device Detail",
-      "tooltip": "03. Per-Device Detail \u2014 Single-node deep dive from host resources to inference",
+      "title": "Per-Device Detail",
+      "tooltip": "Per-Device Detail \u2014 Single-node deep dive from host resources to inference",
       "type": "link",
-      "url": "/d/mlx-mon-03-per-device-detail"
+      "url": "/d/mlx-per-device-detail"
     },
     {
       "asDropdown": false,
@@ -62,10 +62,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "04. Alerts & Incidents",
-      "tooltip": "04. Alerts & Incidents \u2014 Active alert triage, severity distribution and runbooks",
+      "title": "Alerts & Incidents",
+      "tooltip": "Alerts & Incidents \u2014 Active alert triage, severity distribution and runbooks",
       "type": "link",
-      "url": "/d/mlx-mon-04-alerts-incidents"
+      "url": "/d/mlx-alerts-incidents"
     },
     {
       "asDropdown": false,
@@ -74,10 +74,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "05. Serving Health",
-      "tooltip": "05. Serving Health \u2014 MLX server lifecycle, readiness and restart history",
+      "title": "Serving Health",
+      "tooltip": "Serving Health \u2014 MLX server lifecycle, readiness and restart history",
       "type": "link",
-      "url": "/d/mlx-mon-05-serving-health"
+      "url": "/d/mlx-serving-health"
     },
     {
       "asDropdown": false,
@@ -86,10 +86,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "06. Inference Metrics",
-      "tooltip": "06. Inference Metrics \u2014 Inference latency breakdown, token throughput and concurrency",
+      "title": "Inference Metrics",
+      "tooltip": "Inference Metrics \u2014 Inference latency breakdown, token throughput and concurrency",
       "type": "link",
-      "url": "/d/mlx-mon-06-inference-metrics"
+      "url": "/d/mlx-inference-metrics"
     },
     {
       "asDropdown": false,
@@ -98,10 +98,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "07. Model Sharding",
-      "tooltip": "07. Model Sharding \u2014 Model metadata, rank placement, layer ranges and peer probes",
+      "title": "Model Architecture & Sharding",
+      "tooltip": "Model Architecture & Sharding \u2014 Model metadata, rank placement, layer ranges and peer probes",
       "type": "link",
-      "url": "/d/mlx-mon-07-model-sharding"
+      "url": "/d/mlx-model-sharding"
     },
     {
       "asDropdown": false,
@@ -110,10 +110,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "08. KV Cache",
-      "tooltip": "08. KV Cache \u2014 Prompt cache utilization, context capacity and per-rank allocation",
+      "title": "KV Cache",
+      "tooltip": "KV Cache \u2014 Prompt cache utilization, context capacity and per-rank allocation",
       "type": "link",
-      "url": "/d/mlx-mon-08-kv-cache"
+      "url": "/d/mlx-kv-cache"
     },
     {
       "asDropdown": false,
@@ -122,10 +122,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "09. Quality & Confidence",
-      "tooltip": "09. Quality & Confidence \u2014 Logprob scores, token entropy and canary evaluation",
+      "title": "Quality & Confidence",
+      "tooltip": "Quality & Confidence \u2014 Logprob scores, token entropy and canary evaluation",
       "type": "link",
-      "url": "/d/mlx-mon-09-quality-confidence"
+      "url": "/d/mlx-quality-confidence"
     },
     {
       "asDropdown": false,
@@ -134,10 +134,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "10. Opik Tracing",
-      "tooltip": "10. Opik Tracing \u2014 Trace volume, scoring coverage, judge scores and traces",
+      "title": "Opik Tracing & Evaluation",
+      "tooltip": "Opik Tracing & Evaluation \u2014 Trace volume, scoring coverage, judge scores and traces",
       "type": "link",
-      "url": "/d/mlx-mon-10-opik-tracing"
+      "url": "/d/mlx-opik-tracing"
     },
     {
       "asDropdown": false,
@@ -146,10 +146,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "11. SLO & Budget",
-      "tooltip": "11. SLO & Budget \u2014 Latency & availability SLOs, error budgets, and burn rates",
+      "title": "SLO & Error Budget",
+      "tooltip": "SLO & Error Budget \u2014 Latency & availability SLOs, error budgets, and burn rates",
       "type": "link",
-      "url": "/d/mlx-mon-11-slo-error-budget"
+      "url": "/d/mlx-slo-error-budget"
     },
     {
       "asDropdown": false,
@@ -158,10 +158,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "12. Server Logs",
-      "tooltip": "12. Server Logs \u2014 Searchable server logs, structured events and log pipeline health",
+      "title": "Server Logs",
+      "tooltip": "Server Logs \u2014 Searchable server logs, structured events and log pipeline health",
       "type": "link",
-      "url": "/d/mlx-mon-12-server-logs"
+      "url": "/d/mlx-server-logs"
     },
     {
       "asDropdown": false,
@@ -170,10 +170,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "13. Hardware Telemetry",
-      "tooltip": "13. Hardware Telemetry \u2014 CPU, memory, disk, thermal pressure, and Apple Silicon metrics",
+      "title": "Hardware Telemetry",
+      "tooltip": "Hardware Telemetry \u2014 CPU, memory, disk, thermal pressure, and Apple Silicon metrics",
       "type": "link",
-      "url": "/d/mlx-mon-13-hardware-telemetry"
+      "url": "/d/mlx-hardware-telemetry"
     },
     {
       "asDropdown": false,
@@ -182,10 +182,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "14. Power & Thermal",
-      "tooltip": "14. Power & Thermal \u2014 Apple Silicon SoC power draw, thermal throttling and temperature",
+      "title": "Power & Thermal",
+      "tooltip": "Power & Thermal \u2014 Apple Silicon SoC power draw, thermal throttling and temperature",
       "type": "link",
-      "url": "/d/mlx-mon-14-power-thermal"
+      "url": "/d/mlx-power-thermal"
     },
     {
       "asDropdown": false,
@@ -194,10 +194,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "15. Process Profiler",
-      "tooltip": "15. Process Profiler \u2014 Top process CPU/RSS and measured host GPU vs process attribution",
+      "title": "Process & Resource Profiler",
+      "tooltip": "Process & Resource Profiler \u2014 Top process CPU/RSS and measured host GPU vs process attribution",
       "type": "link",
-      "url": "/d/mlx-mon-15-process-profiler"
+      "url": "/d/mlx-process-profiler"
     },
     {
       "asDropdown": false,
@@ -206,10 +206,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "16. Network Host & Peers",
-      "tooltip": "16. Network Host & Peers \u2014 Host interface throughput, errors and peer reachability probes",
+      "title": "Network (Host & Peers)",
+      "tooltip": "Network (Host & Peers) \u2014 Host interface throughput, errors and peer reachability probes",
       "type": "link",
-      "url": "/d/mlx-mon-16-network-host-peers"
+      "url": "/d/mlx-network-host-peers"
     },
     {
       "asDropdown": false,
@@ -218,10 +218,10 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "17. SBOM Inventory",
-      "tooltip": "17. SBOM Inventory \u2014 Package and model inventory across Python, Homebrew and system",
+      "title": "SBOM Fleet Inventory",
+      "tooltip": "SBOM Fleet Inventory \u2014 Package and model inventory across Python, Homebrew and system",
       "type": "link",
-      "url": "/d/mlx-mon-17-sbom-inventory"
+      "url": "/d/mlx-sbom-inventory"
     },
     {
       "asDropdown": false,
@@ -230,17 +230,17 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "18. SBOM Drift",
-      "tooltip": "18. SBOM Drift \u2014 Version, hash, path and missing-package differences against baseline",
+      "title": "SBOM Drift & Delta",
+      "tooltip": "SBOM Drift & Delta \u2014 Version, hash, path and missing-package differences against baseline",
       "type": "link",
-      "url": "/d/mlx-mon-18-sbom-drift-delta"
+      "url": "/d/mlx-sbom-drift-delta"
     }
   ],
   "liveNow": false,
   "panels": [
     {
       "id": 1,
-      "title": "Traced Requests",
+      "title": "Host Interface RX Rate",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -252,7 +252,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Total LLM chat completion requests instrumented with Opik distributed traces",
+      "description": "Inbound bandwidth on physical host network interface",
       "targets": [
         {
           "datasource": {
@@ -260,7 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(increase(mlx_requests_total[1h]))",
+          "expr": "sum(rate(mlx_net_rx_bytes_total{device=~\"$device\"}[1m])) or sum(mlx_hw_net_rx_bytes_per_sec{device=~\"$device\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -284,7 +284,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "none",
+          "unit": "Bps",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -302,7 +302,7 @@
     },
     {
       "id": 2,
-      "title": "Scored Completions",
+      "title": "Host Interface TX Rate",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -314,7 +314,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Requests with complete logprob scoring and feedback evaluation",
+      "description": "Outbound bandwidth on physical host network interface",
       "targets": [
         {
           "datasource": {
@@ -322,7 +322,69 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(increase(mlx_confidence_scored_total[1h]))",
+          "expr": "sum(rate(mlx_net_tx_bytes_total{device=~\"$device\"}[1m])) or sum(mlx_hw_net_tx_bytes_per_sec{device=~\"$device\"})",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "RX Errors / s",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Inbound physical packet errors reported by network driver",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(mlx_net_rx_errors_total{device=~\"$device\"}[1m])) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -353,6 +415,10 @@
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.1
               }
             ]
           },
@@ -363,20 +429,20 @@
       }
     },
     {
-      "id": 3,
-      "title": "Scoring Coverage",
+      "id": 4,
+      "title": "TX Errors / s",
       "type": "stat",
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 8,
+        "x": 12,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Percentage of production requests scored for quality metrics",
+      "description": "Outbound physical packet errors reported by network driver",
       "targets": [
         {
           "datasource": {
@@ -384,7 +450,73 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((sum(rate(mlx_confidence_scored_total[5m])) / (sum(rate(mlx_requests_total[5m])) > 0)) * 100) or vector(100)",
+          "expr": "sum(rate(mlx_net_tx_errors_total{device=~\"$device\"}[1m])) or vector(0)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.1
+              }
+            ]
+          },
+          "mappings": [],
+          "links": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "title": "Peer Probes Reachable",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Distributed interconnect peer TCP connect probe success percentage",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "((count((mlx_shard_peer_up == 1) or (mlx_shard_peer_probe_status == 1)) / (count(mlx_shard_peer_up or mlx_shard_peer_probe_status) > 0)) * 100) or vector(100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -413,33 +545,47 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "red",
                 "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 90
+              },
+              {
+                "color": "green",
+                "value": 99
               }
             ]
           },
           "mappings": [],
-          "links": [],
+          "links": [
+            {
+              "title": "Drill down",
+              "url": "/d/mlx-mon-07-model-sharding?${__all_variables}",
+              "targetBlank": false
+            }
+          ],
           "decimals": 1
         },
         "overrides": []
       }
     },
     {
-      "id": 4,
-      "title": "Average Judge Score",
+      "id": 6,
+      "title": "Peer RTT p95",
       "type": "stat",
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 12,
+        "x": 20,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Composite score across correctness, helpfulness, and hallucination-free evaluations",
+      "description": "Round-trip TCP probe latency across distributed cluster interconnect",
       "targets": [
         {
           "datasource": {
@@ -447,78 +593,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(mlx_judge_score) or vector(0.92)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 0.8
-              },
-              {
-                "color": "green",
-                "value": 0.9
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [],
-          "decimals": 3
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 5,
-      "title": "Evaluation Freshness",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Age of last completed LLM-as-judge evaluation cycle",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "time() - max(mlx_eval_last_run_timestamp_seconds) or vector(0)",
+          "expr": "histogram_quantile(0.95, sum(rate(mlx_shard_peer_connect_seconds_bucket[5m])) by (le)) or histogram_quantile(0.95, sum(rate(mlx_shard_peer_rtt_seconds_bucket[5m])) by (le)) or vector(0.001)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -552,94 +627,24 @@
               },
               {
                 "color": "yellow",
-                "value": 300
+                "value": 0.005
               },
               {
                 "color": "red",
-                "value": 1800
+                "value": 0.02
               }
             ]
           },
           "mappings": [],
           "links": [],
-          "decimals": 0
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 6,
-      "title": "Judge Low Scores",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Total completions evaluated below acceptable quality threshold",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "count(mlx_judge_score < 0.6) or vector(0)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 5
-              }
-            ]
-          },
-          "mappings": [],
-          "links": []
+          "decimals": 3
         },
         "overrides": []
       }
     },
     {
       "id": 7,
-      "title": "Trace & Score Volume (Requests vs Scored)",
+      "title": "[Host Network] Physical Interface Throughput (RX / TX)",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -651,7 +656,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Trace ingestion rate compared against logprob scoring throughput",
+      "description": "Default host network throughput (e.g. en0 1GbE/10GbE interface)",
       "targets": [
         {
           "datasource": {
@@ -659,8 +664,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m])",
-          "legendFormat": "Inference Requests/s",
+          "expr": "rate(mlx_net_rx_bytes_total{device=~\"$device\"}[1m]) or mlx_hw_net_rx_bytes_per_sec{device=~\"$device\"}",
+          "legendFormat": "{{device}} RX Bytes/s",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -672,8 +677,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "rate(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[1m])",
-          "legendFormat": "Scored Completions/s",
+          "expr": "rate(mlx_net_tx_bytes_total{device=~\"$device\"}[1m]) or mlx_hw_net_tx_bytes_per_sec{device=~\"$device\"}",
+          "legendFormat": "{{device}} TX Bytes/s",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -697,7 +702,7 @@
             },
             "axisPlacement": "auto"
           },
-          "unit": "reqps",
+          "unit": "Bps",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -728,7 +733,7 @@
     },
     {
       "id": 8,
-      "title": "Confidence vs Judge Score Correlation",
+      "title": "[Host Network] Interface Error & Drop Counters",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -740,7 +745,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Correlation between statistical token confidence and semantic judge scoring",
+      "description": "Hardware packet errors and buffer drops on physical interfaces",
       "targets": [
         {
           "datasource": {
@@ -748,8 +753,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_token_confidence_mean{device=~\"$device\", model=~\"$model\"}",
-          "legendFormat": "Logprob Mean Confidence",
+          "expr": "rate(mlx_net_rx_errors_total{device=~\"$device\"}[1m])",
+          "legendFormat": "{{device}} RX Errors/s",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -761,8 +766,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(mlx_judge_score) by (model) or vector(0.92)",
-          "legendFormat": "LLM Judge Average Score",
+          "expr": "rate(mlx_net_tx_errors_total{device=~\"$device\"}[1m])",
+          "legendFormat": "{{device}} TX Errors/s",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -817,7 +822,7 @@
     },
     {
       "id": 9,
-      "title": "Recent Traces & Navigation Table",
+      "title": "[Distributed Interconnect] Peer Ring Probe Status & RTT",
       "type": "table",
       "gridPos": {
         "h": 8,
@@ -829,7 +834,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Navigation table linking scored requests directly into Opik trace inspector",
+      "description": "Peer-to-peer interconnect reachability and latency matrix separated from default host routing",
       "targets": [
         {
           "datasource": {
@@ -837,8 +842,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_judge_score{model=~\"$model\"} or vector(0.92)",
-          "legendFormat": "Criteria: {{criteria}}",
+          "expr": "(mlx_shard_peer_up{device=~\"$device\"} or mlx_shard_peer_probe_status{device=~\"$device\"}) or vector(1)",
+          "legendFormat": "Status (1=Up, 0=Down)",
           "range": false,
           "instant": true,
           "refId": "A",
@@ -850,8 +855,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_confidence_scored_total{model=~\"$model\"} or vector(1)",
-          "legendFormat": "Scored Total",
+          "expr": "(mlx_shard_peer_connect_seconds{device=~\"$device\"} or mlx_shard_peer_rtt_seconds{device=~\"$device\"}) or vector(0.001)",
+          "legendFormat": "RTT (s)",
           "range": false,
           "instant": true,
           "refId": "B",
@@ -878,8 +883,8 @@
           },
           "links": [
             {
-              "title": "Open Quality & Confidence",
-              "url": "/d/mlx-mon-09-quality-confidence?var-model=${__data.fields.model}",
+              "title": "Open Model Sharding",
+              "url": "/d/mlx-mon-07-model-sharding?var-device=${__data.fields.device}",
               "targetBlank": false
             }
           ]
@@ -962,7 +967,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX Opik Tracing & Evaluation",
-  "uid": "mlx-mon-10-opik-tracing",
+  "title": "MLX Network (Host & Peers)",
+  "uid": "mlx-mon-16-network-host-peers",
   "version": 1
 }
