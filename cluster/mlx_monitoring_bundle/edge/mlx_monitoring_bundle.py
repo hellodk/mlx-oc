@@ -556,6 +556,13 @@ class Bundle:
         try:
             template = self.vmagent_config_template.read_text(encoding="utf8")
             # Build substitution dict from config + node config
+            def _normalize_scrape_target(addr: str) -> str:
+                if addr.startswith("0.0.0.0:"):
+                    return f"127.0.0.1:{addr.split(':', 1)[1]}"
+                if addr.startswith("[::]:"):
+                    return f"127.0.0.1:{addr.split(']:', 1)[1]}"
+                return addr
+
             subs = {
                 "CENTRAL_VICTORIA_METRICS": self.central_vm,
                 "OTLP_SCHEME": self.otlp_scheme,
@@ -567,14 +574,14 @@ class Bundle:
                 "VMAGENT_MAX_SHARDS": config_val(self.config, "VMAGENT_MAX_SHARDS", "200"),
                 "VMAGENT_QUEUE_CAPACITY": config_val(self.config, "VMAGENT_QUEUE_CAPACITY", "5000"),
                 "VMAGENT_PERSISTENT_QUEUE": config_val(self.config, "VMAGENT_PERSISTENT_QUEUE", ""),
-                "PROXY_LISTEN": config_val(self.config, "PROXY_LISTEN", "127.0.0.1:8080"),
-                "HW_LISTEN": config_val(self.config, "HW_LISTEN", "127.0.0.1:9102"),
-                "KV_LISTEN": config_val(self.config, "KV_LISTEN", "127.0.0.1:9104"),
-                "SUPERVISOR_LISTEN": config_val(self.config, "SUPERVISOR_LISTEN", "127.0.0.1:9105"),
-                "LOGTAILER_LISTEN": config_val(self.config, "LOGTAILER_LISTEN", "127.0.0.1:9106"),
-                "PROCESS_LISTEN": config_val(self.config, "PROCESS_LISTEN", "127.0.0.1:9107"),
-                "SBOM_LISTEN": config_val(self.config, "SBOM_LISTEN", "127.0.0.1:9108"),
-                "EVAL_LISTEN": config_val(self.config, "EVAL_LISTEN", "127.0.0.1:9109"),
+                "PROXY_LISTEN": _normalize_scrape_target(config_val(self.config, "PROXY_LISTEN", "127.0.0.1:8080")),
+                "HW_LISTEN": _normalize_scrape_target(config_val(self.config, "HW_LISTEN", "127.0.0.1:9102")),
+                "KV_LISTEN": _normalize_scrape_target(config_val(self.config, "KV_LISTEN", "127.0.0.1:9104")),
+                "SUPERVISOR_LISTEN": _normalize_scrape_target(config_val(self.config, "SUPERVISOR_LISTEN", "127.0.0.1:9105")),
+                "LOGTAILER_LISTEN": _normalize_scrape_target(config_val(self.config, "LOGTAILER_LISTEN", "127.0.0.1:9106")),
+                "PROCESS_LISTEN": _normalize_scrape_target(config_val(self.config, "PROCESS_LISTEN", "127.0.0.1:9107")),
+                "SBOM_LISTEN": _normalize_scrape_target(config_val(self.config, "SBOM_LISTEN", "127.0.0.1:9108")),
+                "EVAL_LISTEN": _normalize_scrape_target(config_val(self.config, "EVAL_LISTEN", "127.0.0.1:9109")),
             }
             # Single-pass substitution: replace ${VAR} and ${VAR:-default}.
 
