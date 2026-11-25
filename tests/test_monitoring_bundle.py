@@ -1202,6 +1202,80 @@ def test_dashboards_json_validity():
         assert "mlx" in data.get("tags", []), f"Dashboard {fname} missing 'mlx' tag for dynamic discovery"
 
 
+def test_reference_monitoring_suite_validity():
+    """Verify all 18 reference dashboards in mlx-monitoring exist, match feedback requirements and parse cleanly."""
+    ref_dir = BUNDLE_DIR / "central" / "dashboards" / "mlx-monitoring"
+    assert ref_dir.is_dir(), "mlx-monitoring directory missing"
+
+    expected_files = [
+        "01-cluster-overview.json",
+        "02-device-health-diagnostics.json",
+        "03-per-device-detail.json",
+        "04-alerts-incidents.json",
+        "05-serving-health.json",
+        "06-inference-metrics.json",
+        "07-model-architecture-sharding.json",
+        "08-kv-cache.json",
+        "09-quality-confidence.json",
+        "10-opik-tracing-evaluation.json",
+        "11-slo-error-budget.json",
+        "12-server-logs.json",
+        "13-hardware-telemetry.json",
+        "14-power-thermal.json",
+        "15-process-profiler.json",
+        "16-network-host-peers.json",
+        "17-sbom-fleet-inventory.json",
+        "18-sbom-drift-delta.json",
+    ]
+
+    for fname in expected_files:
+        fpath = ref_dir / fname
+        assert fpath.is_file(), f"Missing reference dashboard: {fname}"
+        data = json.loads(fpath.read_text(encoding="utf-8"))
+        assert data.get("uid"), f"{fname} missing UID"
+        assert data.get("title"), f"{fname} missing title"
+        assert len(data.get("panels", [])) >= 7, f"{fname} has fewer than 7 panels"
+        assert "mlx-monitoring" in data.get("tags", []), f"{fname} missing mlx-monitoring tag"
+
+    # Specific feedback assertions:
+    # 1. Entropy monitored in 09-quality-confidence.json
+    q_data = json.loads((ref_dir / "09-quality-confidence.json").read_text(encoding="utf-8"))
+    q_exprs = [t["expr"] for p in q_data["panels"] for t in p.get("targets", [])]
+    assert any("mlx_token_entropy_nats" in expr for expr in q_exprs), "Missing token entropy metric in quality dashboard"
+    assert any("mlx_token_entropy_tail_nats" in expr for expr in q_exprs), "Missing tail-corrected entropy in quality dashboard"
+    assert any("mlx_token_entropy_histogram_bucket" in expr for expr in q_exprs), "Missing entropy histogram in quality dashboard"
+
+    # 2. Inference separates proxy TTFT from engine execution
+    inf_data = json.loads((ref_dir / "06-inference-metrics.json").read_text(encoding="utf-8"))
+    inf_exprs = [t["expr"] for p in inf_data["panels"] for t in p.get("targets", [])]
+    assert any("mlx_ttft_seconds_bucket" in expr for expr in inf_exprs), "Missing proxy TTFT in inference dashboard"
+    assert any("mlx_generation_seconds_bucket" in expr for expr in inf_exprs), "Missing engine generation time in inference dashboard"
+
+    # 3. Sharding validates unique ranks and peer health
+    shard_data = json.loads((ref_dir / "07-model-architecture-sharding.json").read_text(encoding="utf-8"))
+    shard_exprs = [t["expr"] for p in shard_data["panels"] for t in p.get("targets", [])]
+    assert any("mlx_shard_rank" in expr for expr in shard_exprs), "Missing shard rank metric"
+    assert any("mlx_shard_peer_probe_status" in expr for expr in shard_exprs), "Missing peer probe status"
+
+    # 4. Process profiler separates measured host GPU from process GPU
+    proc_data = json.loads((ref_dir / "15-process-profiler.json").read_text(encoding="utf-8"))
+    proc_exprs = [t["expr"] for p in proc_data["panels"] for t in p.get("targets", [])]
+    assert any("mlx_hw_gpu_utilization_percent" in expr for expr in proc_exprs), "Missing host GPU metric"
+    assert any("process_gpu_utilization_percent" in expr for expr in proc_exprs), "Missing process GPU metric"
+
+    # 5. Network separates host interface from peer interconnect
+    net_data = json.loads((ref_dir / "16-network-host-peers.json").read_text(encoding="utf-8"))
+    net_exprs = [t["expr"] for p in net_data["panels"] for t in p.get("targets", [])]
+    assert any("mlx_hw_net_rx_bytes_per_sec" in expr for expr in net_exprs), "Missing host RX bytes metric"
+    assert any("mlx_shard_peer_probe_status" in expr for expr in net_exprs), "Missing peer probe status metric"
+
+    # 6. SLO filters eligible traffic
+    slo_data = json.loads((ref_dir / "11-slo-error-budget.json").read_text(encoding="utf-8"))
+    slo_exprs = [t["expr"] for p in slo_data["panels"] for t in p.get("targets", [])]
+    assert any('kind!="eval"' in expr for expr in slo_exprs), "Missing eligible traffic filter (kind!='eval') in SLO dashboard"
+
+
+
 def test_passive_server_observer_never_spawns_and_tracks_restarts(tmp_path, monkeypatch):
     """Verify mlx_server_supervisor.py is strictly passive and tracks PID-change restarts."""
     import argparse
