@@ -879,7 +879,7 @@
           "links": [
             {
               "title": "Open Quality & Confidence",
-              "url": "/d/mlx-mon-09-quality-confidence?var-model=${__data.fields.model}",
+              "url": "/d/mlx-quality-confidence?var-model=${__data.fields.model}",
               "targetBlank": false
             }
           ]
@@ -963,6 +963,6 @@
   },
   "timezone": "browser",
   "title": "MLX Opik Tracing & Evaluation",
-  "uid": "mlx-mon-10-opik-tracing",
+  "uid": "mlx-opik-tracing",
   "version": 1
 }

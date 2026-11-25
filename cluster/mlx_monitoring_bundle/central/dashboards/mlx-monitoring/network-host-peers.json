@@ -562,7 +562,7 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-mon-07-model-sharding?${__all_variables}",
+              "url": "/d/mlx-model-sharding?${__all_variables}",
               "targetBlank": false
             }
           ],
@@ -884,7 +884,7 @@
           "links": [
             {
               "title": "Open Model Sharding",
-              "url": "/d/mlx-mon-07-model-sharding?var-device=${__data.fields.device}",
+              "url": "/d/mlx-model-sharding?var-device=${__data.fields.device}",
               "targetBlank": false
             }
           ]
@@ -968,6 +968,6 @@
   },
   "timezone": "browser",
   "title": "MLX Network (Host & Peers)",
-  "uid": "mlx-mon-16-network-host-peers",
+  "uid": "mlx-network-host-peers",
   "version": 1
 }

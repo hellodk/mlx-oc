@@ -240,11 +240,11 @@
   "panels": [
     {
       "id": 1,
-      "title": "Server Up",
+      "title": "Server up",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
+        "w": 5,
         "x": 0,
         "y": 0
       },
@@ -252,7 +252,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "MLX server process running and detected by supervisor",
+      "description": "Process detected",
       "targets": [
         {
           "datasource": {
@@ -289,32 +289,42 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "red",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
               }
             ]
           },
           "mappings": [],
-          "links": []
+          "links": [
+            {
+              "title": "Drill down",
+              "url": "/d/mlx-per-device-detail?${__all_variables}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       }
     },
     {
       "id": 2,
-      "title": "Ready (/v1/models)",
+      "title": "Ready",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 4,
+        "w": 5,
+        "x": 5,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "HTTP /v1/models endpoint responding with status 200",
+      "description": "/v1/models healthy",
       "targets": [
         {
           "datasource": {
@@ -351,32 +361,42 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "red",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
               }
             ]
           },
           "mappings": [],
-          "links": []
+          "links": [
+            {
+              "title": "Drill down",
+              "url": "/d/mlx-inference-metrics?${__all_variables}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       }
     },
     {
       "id": 3,
-      "title": "Model Loaded",
+      "title": "Model loaded",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 8,
+        "w": 5,
+        "x": 10,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Model weights fully resident in Unified Memory",
+      "description": "Model discoverable",
       "targets": [
         {
           "datasource": {
@@ -413,8 +433,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "red",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
               }
             ]
           },
@@ -422,7 +446,7 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-mon-07-model-sharding?${__all_variables}",
+              "url": "/d/mlx-model-sharding?${__all_variables}",
               "targetBlank": false
             }
           ]
@@ -436,15 +460,15 @@
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 12,
+        "w": 5,
+        "x": 15,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Server process restart count over rolling 15 minutes",
+      "description": "Recent restart events",
       "targets": [
         {
           "datasource": {
@@ -498,7 +522,7 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-mon-12-server-logs?${__all_variables}",
+              "url": "/d/mlx-server-logs?${__all_variables}",
               "targetBlank": false
             }
           ]
@@ -508,19 +532,19 @@
     },
     {
       "id": 5,
-      "title": "Crash Loops Detected",
+      "title": "Crash loops",
       "type": "stat",
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 16,
+        "x": 20,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Nodes experiencing rapid repeated server terminations",
+      "description": "No repeated failures",
       "targets": [
         {
           "datasource": {
@@ -570,7 +594,7 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-mon-12-server-logs?${__all_variables}",
+              "url": "/d/mlx-server-logs?${__all_variables}",
               "targetBlank": false
             }
           ]
@@ -580,73 +604,7 @@
     },
     {
       "id": 6,
-      "title": "Backoff States",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Nodes in exponential restart backoff state",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "count(mlx_server_state == 3) or vector(0)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          },
-          "mappings": [],
-          "links": []
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 7,
-      "title": "Server Operational State Timeline",
+      "title": "Server state by device",
       "type": "state-timeline",
       "gridPos": {
         "h": 8,
@@ -658,7 +616,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Server lifecycle state (0=down, 1=running_ready, 2=up_not_ready, 3=backoff)",
+      "description": "Ready / starting / stopped",
       "targets": [
         {
           "datasource": {
@@ -727,9 +685,9 @@
       }
     },
     {
-      "id": 8,
-      "title": "HTTP Health Probe Latency",
-      "type": "timeseries",
+      "id": 7,
+      "title": "Recent restarts",
+      "type": "table",
       "gridPos": {
         "h": 8,
         "w": 10,
@@ -740,7 +698,83 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Response latency of HTTP readiness probes (/v1/models)",
+      "description": "Device, reason, exit code, time",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_server_restarts_total{device=~\"$device\"}",
+          "legendFormat": "Total Restarts",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_server_last_exit_code{device=~\"$device\"}",
+          "legendFormat": "Last Exit Code",
+          "range": false,
+          "instant": true,
+          "refId": "B",
+          "format": "time_series"
+        }
+      ],
+      "transformations": [],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "links": [
+            {
+              "title": "Open Server Logs",
+              "url": "/d/mlx-server-logs?var-device=${__data.fields.device}",
+              "targetBlank": false
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": []
+      }
+    },
+    {
+      "id": 8,
+      "title": "Readiness checks",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "HTTP health and model readiness",
       "targets": [
         {
           "datasource": {
@@ -804,19 +838,19 @@
     },
     {
       "id": 9,
-      "title": "Server Restart History & Exit Codes",
+      "title": "Server lifecycle events",
       "type": "table",
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 12
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Audit trail of server process terminations and exit status codes",
+      "description": "PID changes and state transitions",
       "targets": [
         {
           "datasource": {
@@ -824,8 +858,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_server_restarts_total{device=~\"$device\"}",
-          "legendFormat": "Total Restarts",
+          "expr": "mlx_server_state{device=~\"$device\"}",
+          "legendFormat": "State",
           "range": false,
           "instant": true,
           "refId": "A",
@@ -837,11 +871,24 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_server_last_exit_code{device=~\"$device\"}",
-          "legendFormat": "Last Exit Code",
+          "expr": "mlx_server_restarts_total{device=~\"$device\"}",
+          "legendFormat": "Restarts",
           "range": false,
           "instant": true,
           "refId": "B",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_server_last_exit_code{device=~\"$device\"}",
+          "legendFormat": "Exit Code",
+          "range": false,
+          "instant": true,
+          "refId": "C",
           "format": "time_series"
         }
       ],
@@ -866,70 +913,7 @@
           "links": [
             {
               "title": "Open Server Logs",
-              "url": "/d/mlx-mon-12-server-logs?var-device=${__data.fields.device}",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "options": {
-        "showHeader": true,
-        "sortBy": []
-      }
-    },
-    {
-      "id": 10,
-      "title": "Model Discoverability & Registry",
-      "type": "table",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 12
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Active model IDs reported by the live server endpoints",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_model_info{device=~\"$device\", attr=\"layer_count\"}",
-          "legendFormat": "{{device}} - {{model}}",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "transformations": [],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "displayMode": "auto",
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "links": [
-            {
-              "title": "Open Model Architecture",
-              "url": "/d/mlx-mon-07-model-sharding?var-device=${__data.fields.device}",
+              "url": "/d/mlx-server-logs?var-device=${__data.fields.device}",
               "targetBlank": false
             }
           ]
@@ -1012,7 +996,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX Serving Health",
-  "uid": "mlx-mon-05-serving-health",
+  "title": "Serving Health",
+  "uid": "mlx-serving-health",
   "version": 1
 }

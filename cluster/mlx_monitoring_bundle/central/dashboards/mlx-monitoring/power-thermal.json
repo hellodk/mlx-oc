@@ -878,7 +878,7 @@
           "links": [
             {
               "title": "Open Device Detail",
-              "url": "/d/mlx-mon-03-per-device-detail?var-device=${__data.fields.device}",
+              "url": "/d/mlx-per-device-detail?var-device=${__data.fields.device}",
               "targetBlank": false
             }
           ]
@@ -962,6 +962,6 @@
   },
   "timezone": "browser",
   "title": "MLX Power & Thermal",
-  "uid": "mlx-mon-14-power-thermal",
+  "uid": "mlx-power-thermal",
   "version": 1
 }

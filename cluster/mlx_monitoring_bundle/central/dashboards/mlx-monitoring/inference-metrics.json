@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Inference latency breakdown, token throughput and concurrency",
+  "description": "Requests, in-flight work, latency and token throughput",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -240,7 +240,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "Requests / sec",
+      "title": "Requests / s",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -252,7 +252,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Inference completion request rate through proxy",
+      "description": "Chat completion requests",
       "targets": [
         {
           "datasource": {
@@ -260,7 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m]))",
+          "expr": "(sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m]))) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -303,7 +303,7 @@
     },
     {
       "id": 2,
-      "title": "[Proxy-Observed] TTFT p95",
+      "title": "In-flight",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -315,7 +315,140 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Time to First Token measured at proxy boundary (includes network and queue)",
+      "description": "Active requests",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(mlx_in_flight{device=~\"$device\"}) or vector(0)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "TTFT p50",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Observed first token",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "(histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or vector(0)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1.0
+              },
+              {
+                "color": "red",
+                "value": 2.5
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 2
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "TTFT p95",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Observed first token",
       "targets": [
         {
           "datasource": {
@@ -373,20 +506,20 @@
       }
     },
     {
-      "id": 3,
-      "title": "[Engine] Generation Duration p95",
+      "id": 5,
+      "title": "Decode tok/s",
       "type": "stat",
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 8,
+        "x": 16,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Token generation execution time on model engine (excluding prompt queue)",
+      "description": "Completion throughput",
       "targets": [
         {
           "datasource": {
@@ -394,7 +527,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(histogram_quantile(0.95, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or vector(0)",
+          "expr": "(sum(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\", model=~\"$model\"}[1m])) / (sum(rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\", model=~\"$model\"}[1m])) > 0)) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -418,7 +551,70 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
+          "unit": "tok/s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "5xx rate",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Server error rate",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "((sum(rate(mlx_requests_total{device=~\"$device\", code=~\"5..\"}[1m])) / (sum(rate(mlx_requests_total{device=~\"$device\"}[1m])) > 0)) * 100) or vector(0)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -428,7 +624,7 @@
               },
               {
                 "color": "yellow",
-                "value": 2.0
+                "value": 1.0
               },
               {
                 "color": "red",
@@ -444,202 +640,8 @@
       }
     },
     {
-      "id": 4,
-      "title": "Token Rate (tok/s)",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Average tokens per second generated during decode phase",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "(avg(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\", model=~\"$model\"}[1m]) / (rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\", model=~\"$model\"}[1m]) > 0))) or vector(0)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "tok/s",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [],
-          "decimals": 1
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 5,
-      "title": "Active In-Flight Requests",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Concurrent active requests currently being processed",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "sum(mlx_in_flight{device=~\"$device\"})",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [],
-          "links": []
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 6,
-      "title": "Prompt Tokens / sec",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Prompt prefill token ingestion throughput rate",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "sum(rate(mlx_tokens_prompt_total{device=~\"$device\", model=~\"$model\"}[1m]))",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "tok/s",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [
-            {
-              "title": "Drill down",
-              "url": "/d/mlx-mon-08-kv-cache?${__all_variables}",
-              "targetBlank": false
-            }
-          ],
-          "decimals": 1
-        },
-        "overrides": []
-      }
-    },
-    {
       "id": 7,
-      "title": "[Latency Decomposition] TTFT vs Engine Generation Time",
+      "title": "Latency p50 / p95",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -651,7 +653,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Separation of proxy-observed latency from internal engine execution",
+      "description": "TTFT and response duration",
       "targets": [
         {
           "datasource": {
@@ -659,8 +661,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))",
-          "legendFormat": "Proxy TTFT p95",
+          "expr": "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m])))",
+          "legendFormat": "p95 TTFT",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -672,8 +674,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))",
-          "legendFormat": "Proxy TTFT p50",
+          "expr": "(histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m])))",
+          "legendFormat": "p50 TTFT",
           "range": true,
           "instant": false,
           "refId": "B",
@@ -685,24 +687,11 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(histogram_quantile(0.95, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))",
-          "legendFormat": "Engine Gen Time p95",
+          "expr": "(histogram_quantile(0.95, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m])))",
+          "legendFormat": "p95 Gen Duration",
           "range": true,
           "instant": false,
           "refId": "C",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "(histogram_quantile(0.50, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))",
-          "legendFormat": "Engine Gen Time p50",
-          "range": true,
-          "instant": false,
-          "refId": "D",
           "format": "time_series"
         }
       ],
@@ -754,7 +743,7 @@
     },
     {
       "id": 8,
-      "title": "Token Throughput (Prefill vs Generation tok/s)",
+      "title": "Token throughput",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -766,7 +755,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Comparison of prompt ingestion rate vs output generation rate",
+      "description": "Prompt and completion tokens/s",
       "targets": [
         {
           "datasource": {
@@ -774,8 +763,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_tokens_prompt_total{device=~\"$device\", model=~\"$model\"}[1m]))",
-          "legendFormat": "Prefill Tokens/s",
+          "expr": "(sum(rate(mlx_tokens_prompt_total{device=~\"$device\", model=~\"$model\"}[1m]))) or (0 * sum(rate(mlx_requests_total{device=~\"$device\"}[1m])))",
+          "legendFormat": "Prompt tok/s",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -787,8 +776,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_tokens_completion_total{device=~\"$device\", model=~\"$model\"}[1m]))",
-          "legendFormat": "Decode Tokens/s",
+          "expr": "(sum(rate(mlx_tokens_completion_total{device=~\"$device\", model=~\"$model\"}[1m]))) or (0 * sum(rate(mlx_requests_total{device=~\"$device\"}[1m])))",
+          "legendFormat": "Decode tok/s",
           "range": true,
           "instant": false,
           "refId": "B",
@@ -843,7 +832,7 @@
     },
     {
       "id": 9,
-      "title": "In-Flight Concurrency Load by Device",
+      "title": "Phase timing (observed)",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -855,7 +844,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Real-time concurrent request execution distribution",
+      "description": "Proxy pre-dispatch, TTFT, decode",
       "targets": [
         {
           "datasource": {
@@ -863,11 +852,24 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_in_flight{device=~\"$device\"}",
-          "legendFormat": "{{device}} in-flight",
+          "expr": "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\"}[5m])) by (le))) or (0 * sum(rate(mlx_requests_total{device=~\"$device\"}[1m])))",
+          "legendFormat": "TTFT (s)",
           "range": true,
           "instant": false,
           "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "(histogram_quantile(0.95, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\"}[5m])) by (le))) or (0 * sum(rate(mlx_requests_total{device=~\"$device\"}[1m])))",
+          "legendFormat": "Decode (s)",
+          "range": true,
+          "instant": false,
+          "refId": "B",
           "format": "time_series"
         }
       ],
@@ -888,7 +890,7 @@
             },
             "axisPlacement": "auto"
           },
-          "unit": "none",
+          "unit": "s",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -919,7 +921,7 @@
     },
     {
       "id": 10,
-      "title": "Inference Performance Leaderboard by Model",
+      "title": "Finish reasons and tools",
       "type": "table",
       "gridPos": {
         "h": 8,
@@ -931,7 +933,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Comparative model latency and throughput summary",
+      "description": "Stop / length / tool calls",
       "targets": [
         {
           "datasource": {
@@ -939,8 +941,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_requests_total[5m])) by (model)",
-          "legendFormat": "Requests/s",
+          "expr": "sum by (reason) (rate(mlx_finish_reasons_total{device=~\"$device\"}[5m])) or (0 * count by (device) (mlx_server_state{device=~\"$device\"}))",
+          "legendFormat": "{{reason}}",
           "range": false,
           "instant": true,
           "refId": "A",
@@ -952,24 +954,11 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(avg(rate(mlx_token_rate_tokens_per_second_sum[5m]) / (rate(mlx_token_rate_tokens_per_second_count[5m]) > 0)) by (model)) or (0 * count by (model) (mlx_requests_total))",
-          "legendFormat": "Decode tok/s",
+          "expr": "rate(mlx_tool_calls_total{device=~\"$device\"}[5m]) or (0 * count by (device) (mlx_server_state{device=~\"$device\"}))",
+          "legendFormat": "Tool Calls",
           "range": false,
           "instant": true,
           "refId": "B",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket[5m])) by (le, model))) or (0 * count by (model) (mlx_requests_total))",
-          "legendFormat": "TTFT p95 (s)",
-          "range": false,
-          "instant": true,
-          "refId": "C",
           "format": "time_series"
         }
       ],
@@ -994,7 +983,7 @@
           "links": [
             {
               "title": "Open Quality & Confidence",
-              "url": "/d/mlx-mon-09-quality-confidence?var-model=${__data.fields.model}",
+              "url": "/d/mlx-quality-confidence?var-model=${__data.fields.model}",
               "targetBlank": false
             }
           ]
@@ -1077,7 +1066,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX Inference Metrics",
-  "uid": "mlx-mon-06-inference-metrics",
+  "title": "Inference Metrics",
+  "uid": "mlx-inference-metrics",
   "version": 1
 }

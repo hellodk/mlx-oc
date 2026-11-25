@@ -377,7 +377,7 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-mon-06-inference-metrics?${__all_variables}",
+              "url": "/d/mlx-inference-metrics?${__all_variables}",
               "targetBlank": false
             }
           ],
@@ -796,7 +796,7 @@
           "links": [
             {
               "title": "Open Inference Metrics",
-              "url": "/d/mlx-mon-06-inference-metrics?${__all_variables}",
+              "url": "/d/mlx-inference-metrics?${__all_variables}",
               "targetBlank": false
             }
           ]
@@ -880,6 +880,6 @@
   },
   "timezone": "browser",
   "title": "MLX SLO & Error Budget",
-  "uid": "mlx-mon-11-slo-error-budget",
+  "uid": "mlx-slo-error-budget",
   "version": 1
 }

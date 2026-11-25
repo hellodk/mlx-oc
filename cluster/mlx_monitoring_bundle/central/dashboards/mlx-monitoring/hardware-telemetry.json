@@ -557,7 +557,7 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-mon-14-power-thermal?${__all_variables}",
+              "url": "/d/mlx-power-thermal?${__all_variables}",
               "targetBlank": false
             }
           ]
@@ -625,7 +625,7 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-mon-02-device-health",
+              "url": "/d/mlx-device-health",
               "targetBlank": false
             }
           ]
@@ -977,7 +977,7 @@
           "links": [
             {
               "title": "Open Power & Thermal",
-              "url": "/d/mlx-mon-14-power-thermal?var-device=${__data.fields.device}",
+              "url": "/d/mlx-power-thermal?var-device=${__data.fields.device}",
               "targetBlank": false
             }
           ]
@@ -1061,6 +1061,6 @@
   },
   "timezone": "browser",
   "title": "MLX Hardware Telemetry",
-  "uid": "mlx-mon-13-hardware-telemetry",
+  "uid": "mlx-hardware-telemetry",
   "version": 1
 }

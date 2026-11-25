@@ -298,7 +298,7 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-mon-18-sbom-drift-delta?${__all_variables}",
+              "url": "/d/mlx-sbom-drift-delta?${__all_variables}",
               "targetBlank": false
             }
           ]
@@ -552,7 +552,7 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-mon-07-model-sharding?${__all_variables}",
+              "url": "/d/mlx-model-sharding?${__all_variables}",
               "targetBlank": false
             }
           ]
@@ -797,7 +797,7 @@
           "links": [
             {
               "title": "Open SBOM Drift",
-              "url": "/d/mlx-mon-18-sbom-drift-delta?var-device=${__data.fields.device}",
+              "url": "/d/mlx-sbom-drift-delta?var-device=${__data.fields.device}",
               "targetBlank": false
             }
           ]
@@ -860,7 +860,7 @@
           "links": [
             {
               "title": "Open SBOM Drift",
-              "url": "/d/mlx-mon-18-sbom-drift-delta?var-device=${__data.fields.device}",
+              "url": "/d/mlx-sbom-drift-delta?var-device=${__data.fields.device}",
               "targetBlank": false
             }
           ]
@@ -944,6 +944,6 @@
   },
   "timezone": "browser",
   "title": "MLX SBOM Fleet Inventory",
-  "uid": "mlx-mon-17-sbom-inventory",
+  "uid": "mlx-sbom-inventory",
   "version": 1
 }

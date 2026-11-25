@@ -661,7 +661,7 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-mon-10-opik-tracing?${__all_variables}",
+              "url": "/d/mlx-opik-tracing?${__all_variables}",
               "targetBlank": false
             }
           ],
@@ -1066,7 +1066,7 @@
           "links": [
             {
               "title": "Open Opik Tracing",
-              "url": "/d/mlx-mon-10-opik-tracing?var-model=${__data.fields.model}",
+              "url": "/d/mlx-opik-tracing?var-model=${__data.fields.model}",
               "targetBlank": false
             }
           ]
@@ -1150,6 +1150,6 @@
   },
   "timezone": "browser",
   "title": "MLX Quality & Confidence",
-  "uid": "mlx-mon-09-quality-confidence",
+  "uid": "mlx-quality-confidence",
   "version": 1
 }

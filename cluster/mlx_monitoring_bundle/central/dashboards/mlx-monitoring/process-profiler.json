@@ -298,7 +298,7 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-mon-02-device-health",
+              "url": "/d/mlx-device-health",
               "targetBlank": false
             }
           ]
@@ -554,7 +554,7 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-mon-13-hardware-telemetry?${__all_variables}",
+              "url": "/d/mlx-hardware-telemetry?${__all_variables}",
               "targetBlank": false
             }
           ],
@@ -855,7 +855,7 @@
           "links": [
             {
               "title": "Open Device Detail",
-              "url": "/d/mlx-mon-03-per-device-detail?var-device=${__data.fields.device}",
+              "url": "/d/mlx-per-device-detail?var-device=${__data.fields.device}",
               "targetBlank": false
             }
           ]
@@ -996,6 +996,6 @@
   },
   "timezone": "browser",
   "title": "MLX Process & Resource Profiler",
-  "uid": "mlx-mon-15-process-profiler",
+  "uid": "mlx-process-profiler",
   "version": 1
 }

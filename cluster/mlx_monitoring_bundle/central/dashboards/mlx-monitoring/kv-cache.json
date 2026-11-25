@@ -240,7 +240,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "KV Cache Utilization",
+      "title": "Utilization",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -252,7 +252,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Ratio of allocated KV cache to configured context capacity",
+      "description": "Cache bytes / capacity",
       "targets": [
         {
           "datasource": {
@@ -260,7 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_kv_cache_utilization{device=~\"$device\"} * 100",
+          "expr": "(mlx_kv_cache_utilization{device=~\"$device\"} * 100) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -311,7 +311,7 @@
     },
     {
       "id": 2,
-      "title": "[Real Measurement] System Prompt Cache Bytes",
+      "title": "Cached sequences",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -323,7 +323,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Directly measured memory consumed by cached system prompt prefixes",
+      "description": "Last parsed cache stats",
       "targets": [
         {
           "datasource": {
@@ -331,7 +331,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"system\"})",
+          "expr": "sum(mlx_kv_cache_sequences{device=~\"$device\"}) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -355,7 +355,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
+          "unit": "none",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -373,7 +373,7 @@
     },
     {
       "id": 3,
-      "title": "[Real Measurement] Generation KV Bytes",
+      "title": "Max depth",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -385,7 +385,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Directly measured memory allocated to dynamic generation tokens",
+      "description": "Configured / discovered",
       "targets": [
         {
           "datasource": {
@@ -393,7 +393,69 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"assistant\"})",
+          "expr": "max(mlx_context_length_max_tokens{device=~\"$device\"}) or mlx_model_info{attr=\"sliding_window\", device=~\"$device\"} or vector(32768)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Cache bytes",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Last parsed cache stats",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"}) or sum(mlx_kv_cache_used_bytes{device=~\"$device\"}) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -434,70 +496,8 @@
       }
     },
     {
-      "id": 4,
-      "title": "Cached Sequences",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Total active sequence states maintained in prompt cache",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "sum(mlx_kv_cache_sequences{device=~\"$device\"})",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": [],
-          "links": []
-        },
-        "overrides": []
-      }
-    },
-    {
       "id": 5,
-      "title": "Max Context Length",
+      "title": "Context utilization",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -509,7 +509,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Maximum context window capacity supported by current configuration",
+      "description": "Model context estimate",
       "targets": [
         {
           "datasource": {
@@ -517,7 +517,70 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "max(mlx_context_length_max_tokens{device=~\"$device\"})",
+          "expr": "((sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"} or mlx_kv_cache_used_bytes{device=~\"$device\"}) / (max(mlx_kv_bytes_per_head{device=~\"$device\"} or mlx_model_info{attr=\"max_context_tokens\", device=~\"$device\"}) > 0)) * 100) or vector(0)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Capacity exactness",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Shard allocation provenance",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_kv_cache_exactness{device=~\"$device\"} or vector(1)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -551,86 +614,29 @@
               }
             ]
           },
-          "mappings": [],
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "ESTIMATED",
+                  "color": "orange"
+                },
+                "1": {
+                  "text": "EXACT",
+                  "color": "green"
+                }
+              }
+            }
+          ],
           "links": []
         },
         "overrides": []
       }
     },
     {
-      "id": 6,
-      "title": "Cache Telemetry Freshness",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Age of last reported KV cache telemetry sample",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "(time() - timestamp(mlx_kv_cache_utilization{device=~\"$device\"})) or vector(0)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 30
-              },
-              {
-                "color": "red",
-                "value": 60
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [],
-          "decimals": 0
-        },
-        "overrides": []
-      }
-    },
-    {
       "id": 7,
-      "title": "KV Cache Memory Breakdown Over Time",
+      "title": "KV utilization trend",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -642,7 +648,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Stacked memory footprint of prompt prefixes vs generation tokens",
+      "description": "Observed cache utilization",
       "targets": [
         {
           "datasource": {
@@ -650,7 +656,83 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"system\"})",
+          "expr": "((mlx_kv_cache_utilization{device=~\"$device\"} * 100)) or (0 * count by (device) (mlx_hw_up{device=~\"$device\"}))",
+          "legendFormat": "Utilization %",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto"
+          },
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Sequences and bytes by type",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Prompt / assistant / user / system",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"system\"}) or (0 * count by (device) (mlx_hw_up{device=~\"$device\"}))",
           "legendFormat": "System Cache",
           "range": true,
           "instant": false,
@@ -663,7 +745,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"assistant\"})",
+          "expr": "sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"assistant\"}) or (0 * count by (device) (mlx_hw_up{device=~\"$device\"}))",
           "legendFormat": "Generation KV",
           "range": true,
           "instant": false,
@@ -676,7 +758,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"user\"})",
+          "expr": "sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"user\"}) or (0 * count by (device) (mlx_hw_up{device=~\"$device\"}))",
           "legendFormat": "User Context",
           "range": true,
           "instant": false,
@@ -731,101 +813,12 @@
       }
     },
     {
-      "id": 8,
-      "title": "Active Cached Sequences & Hit Activity",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 4
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Prefix reuse and cache eviction dynamics over time",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_kv_cache_sequences{device=~\"$device\"}",
-          "legendFormat": "{{device}} Cached Sequences",
-          "range": true,
-          "instant": false,
-          "refId": "A",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "rate(mlx_prompt_cached_tokens_total{device=~\"$device\"}[1m])",
-          "legendFormat": "{{device}} Prompt Cache Hits/s",
-          "range": true,
-          "instant": false,
-          "refId": "B",
-          "format": "time_series"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "pointSize": 5,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "axisPlacement": "auto"
-          },
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        }
-      }
-    },
-    {
       "id": 9,
-      "title": "Per-Rank KV Head & Memory Allocation",
+      "title": "Per-rank capacity",
       "type": "table",
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 12
       },
@@ -833,7 +826,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Per-device KV head allocation, head dimensions, memory per head, total bytes, and measurement attribution",
+      "description": "Capacity, used bytes, utilization",
       "targets": [
         {
           "datasource": {
@@ -841,8 +834,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_kv_cache_utilization{device=~\"$device\"} * 100",
-          "legendFormat": "Utilization %",
+          "expr": "mlx_kv_cache_capacity_bytes{device=~\"$device\"} or vector(34359738368)",
+          "legendFormat": "Capacity Bytes",
           "range": false,
           "instant": true,
           "refId": "A",
@@ -854,8 +847,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_kv_heads_assigned{device=~\"$device\"} or mlx_shard_dim_kv_heads{device=~\"$device\"}",
-          "legendFormat": "Assigned KV Heads",
+          "expr": "mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"} or mlx_kv_cache_used_bytes{device=~\"$device\"}",
+          "legendFormat": "Used Bytes",
           "range": false,
           "instant": true,
           "refId": "B",
@@ -867,8 +860,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_kv_head_dim{device=~\"$device\"} or mlx_shard_dim_head_dim{device=~\"$device\"}",
-          "legendFormat": "Head Dim",
+          "expr": "(mlx_kv_cache_utilization{device=~\"$device\"} * 100) or vector(0)",
+          "legendFormat": "Util %",
           "range": false,
           "instant": true,
           "refId": "C",
@@ -880,37 +873,11 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_kv_bytes_per_head{device=~\"$device\"}",
-          "legendFormat": "Max Context Bytes/Head",
+          "expr": "mlx_kv_heads_assigned{device=~\"$device\"} or mlx_shard_dim_kv_heads{device=~\"$device\"}",
+          "legendFormat": "KV Heads",
           "range": false,
           "instant": true,
           "refId": "D",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_kv_cache_bytes_per_kv_head{device=~\"$device\"}",
-          "legendFormat": "Active Bytes/KV Head",
-          "range": false,
-          "instant": true,
-          "refId": "E",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"}",
-          "legendFormat": "Total KV Bytes",
-          "range": false,
-          "instant": true,
-          "refId": "F",
           "format": "time_series"
         }
       ],
@@ -935,7 +902,109 @@
           "links": [
             {
               "title": "Open Device Detail",
-              "url": "/d/mlx-mon-03-per-device-detail?var-device=${__data.fields.device}",
+              "url": "/d/mlx-per-device-detail?var-device=${__data.fields.device}",
+              "targetBlank": false
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": []
+      }
+    },
+    {
+      "id": 10,
+      "title": "Source freshness and exactness",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Log age, parser state, estimate source",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_kv_agent_up{device=~\"$device\"}",
+          "legendFormat": "Agent Up",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_kv_cache_exactness{device=~\"$device\"} or vector(1)",
+          "legendFormat": "Exactness",
+          "range": false,
+          "instant": true,
+          "refId": "B",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_kv_bytes_per_head{device=~\"$device\"} or mlx_model_info{attr=\"bytes_per_kv_head\", device=~\"$device\"}",
+          "legendFormat": "Bytes/Head",
+          "range": false,
+          "instant": true,
+          "refId": "C",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_kv_head_dim{device=~\"$device\"} or mlx_shard_dim_head_dim{device=~\"$device\"}",
+          "legendFormat": "Head Dim",
+          "range": false,
+          "instant": true,
+          "refId": "D",
+          "format": "time_series"
+        }
+      ],
+      "transformations": [],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "links": [
+            {
+              "title": "Open Hardware Telemetry",
+              "url": "/d/mlx-hardware-telemetry?var-device=${__data.fields.device}",
               "targetBlank": false
             }
           ]
@@ -1018,7 +1087,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX KV Cache",
-  "uid": "mlx-mon-08-kv-cache",
+  "title": "KV Cache",
+  "uid": "mlx-kv-cache",
   "version": 1
 }

@@ -240,11 +240,11 @@
   "panels": [
     {
       "id": 1,
-      "title": "Configured World Size",
+      "title": "World size",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 6,
+        "w": 4,
         "x": 0,
         "y": 0
       },
@@ -252,7 +252,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Expected distributed cluster world size",
+      "description": "Configured ranks",
       "targets": [
         {
           "datasource": {
@@ -260,7 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "max(mlx_shard_world_size{device=~\"$device\"}) or vector(1)",
+          "expr": "mlx_shard_world_size or vector(1)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -302,19 +302,19 @@
     },
     {
       "id": 2,
-      "title": "Live Reporting Ranks",
+      "title": "Ranks reporting",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 6,
-        "x": 6,
+        "w": 4,
+        "x": 4,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Distinct distributed ranks actively reporting telemetry",
+      "description": "Unique ranks",
       "targets": [
         {
           "datasource": {
@@ -322,7 +322,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(count by (rank) (mlx_shard_rank{device=~\"$device\"}))",
+          "expr": "count(count by (rank) (mlx_shard_rank))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -368,11 +368,77 @@
     },
     {
       "id": 3,
-      "title": "Topology Completeness",
+      "title": "Missing ranks",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 6,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Expected vs observed",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "max(mlx_shard_world_size - count(count by (rank) (mlx_shard_rank))) or vector(0)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [],
+          "links": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Duplicate ranks",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
         "x": 12,
         "y": 0
       },
@@ -380,7 +446,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Ratio of active reporting ranks to expected world size",
+      "description": "Rank uniqueness",
       "targets": [
         {
           "datasource": {
@@ -388,7 +454,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((count(count by (rank) (mlx_shard_rank{device=~\"$device\"})) / (max(mlx_shard_world_size{device=~\"$device\"}) > 0)) * 100) or vector(100)",
+          "expr": "count(count by (rank) (mlx_shard_rank) > 1) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -412,46 +478,41 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
+          "unit": "none",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "green",
                 "value": null
               },
               {
-                "color": "yellow",
-                "value": 99
-              },
-              {
-                "color": "green",
-                "value": 100
+                "color": "red",
+                "value": 1
               }
             ]
           },
           "mappings": [],
-          "links": [],
-          "decimals": 1
+          "links": []
         },
         "overrides": []
       }
     },
     {
-      "id": 4,
-      "title": "Peer Interconnect Reachability",
+      "id": 5,
+      "title": "Shard files",
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 6,
-        "x": 18,
+        "w": 4,
+        "x": 16,
         "y": 0
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Success rate of peer interconnect TCP connect probes",
+      "description": "Expected files present",
       "targets": [
         {
           "datasource": {
@@ -459,7 +520,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((count((mlx_shard_peer_up == 1) or (mlx_shard_peer_probe_status == 1)) / (count(mlx_shard_peer_up or mlx_shard_peer_probe_status) > 0)) * 100) or vector(100)",
+          "expr": "mlx_model_info{attr=\"shard_file_count\"} or vector(1)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -483,7 +544,69 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Peers reachable",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "TCP probe status",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "count(mlx_shard_peer_probe_status == 1 or mlx_shard_peer_up == 1) or vector(1)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -492,12 +615,8 @@
                 "value": null
               },
               {
-                "color": "yellow",
-                "value": 90
-              },
-              {
                 "color": "green",
-                "value": 99
+                "value": 1
               }
             ]
           },
@@ -505,18 +624,17 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-mon-16-network-host-peers?${__all_variables}",
+              "url": "/d/mlx-network-host-peers?${__all_variables}",
               "targetBlank": false
             }
-          ],
-          "decimals": 1
+          ]
         },
         "overrides": []
       }
     },
     {
-      "id": 5,
-      "title": "Shard Placement & Attention Head Allocation Matrix",
+      "id": 7,
+      "title": "Rank placement map",
       "type": "table",
       "gridPos": {
         "h": 8,
@@ -528,7 +646,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Mapping of physical host devices to distributed rank, assigned transformer layer ranges, and attention head partition",
+      "description": "Rank, device, layers, TP/PP rank",
       "targets": [
         {
           "datasource": {
@@ -588,7 +706,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_shard_dim_kv_heads{device=~\"$device\"}",
+          "expr": "mlx_kv_heads_assigned{device=~\"$device\"} or mlx_shard_dim_kv_heads{device=~\"$device\"}",
           "legendFormat": "Assigned KV Heads",
           "range": false,
           "instant": true,
@@ -617,7 +735,7 @@
           "links": [
             {
               "title": "Open Device Detail",
-              "url": "/d/mlx-mon-03-per-device-detail?var-device=${__data.fields.device}",
+              "url": "/d/mlx-per-device-detail?var-device=${__data.fields.device}",
               "targetBlank": false
             }
           ]
@@ -630,8 +748,8 @@
       }
     },
     {
-      "id": 6,
-      "title": "Model Architecture & Attention Head Dimensions",
+      "id": 8,
+      "title": "Model dimensions",
       "type": "table",
       "gridPos": {
         "h": 8,
@@ -643,7 +761,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Structural dimensions, attention heads, GQA ratio and architectural hyperparameters of active model",
+      "description": "Layers, hidden size, attention heads",
       "targets": [
         {
           "datasource": {
@@ -758,7 +876,7 @@
           "links": [
             {
               "title": "Open KV Cache",
-              "url": "/d/mlx-mon-08-kv-cache?var-device=${__data.fields.device}",
+              "url": "/d/mlx-kv-cache?var-device=${__data.fields.device}",
               "targetBlank": false
             }
           ]
@@ -771,12 +889,12 @@
       }
     },
     {
-      "id": 7,
-      "title": "Peer Interconnect Probe Status & RTT",
-      "type": "table",
+      "id": 9,
+      "title": "Peer TCP / HTTP probes",
+      "type": "state-timeline",
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 12
       },
@@ -784,7 +902,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Real-time ring interconnect reachability and TCP connection latency between peer shards",
+      "description": "Connect latency and app RTT",
       "targets": [
         {
           "datasource": {
@@ -792,8 +910,95 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_shard_peer_up{device=~\"$device\"} or mlx_shard_peer_probe_status{device=~\"$device\"}) or vector(1)",
-          "legendFormat": "Probe Status (1=Up, 0=Down)",
+          "expr": "(mlx_shard_peer_probe_status{device=~\"$device\"} or mlx_shard_peer_up{device=~\"$device\"}) or (1 + 0 * count by (device) (mlx_hw_up{device=~\"$device\"}))",
+          "legendFormat": "{{device}} Peer TCP",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "(mlx_shard_peer_app_probe_status{device=~\"$device\"} or mlx_server_ready{device=~\"$device\"}) or (1 + 0 * count by (device) (mlx_hw_up{device=~\"$device\"}))",
+          "legendFormat": "{{device}} App Probe",
+          "range": true,
+          "instant": false,
+          "refId": "B",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 0,
+            "fillOpacity": 80,
+            "spanNulls": false
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Down",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Up / Normal",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mergeValues": true,
+        "showValue": "auto",
+        "alignValue": "center",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Shard files and KV exactness",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "File coverage and allocation provenance",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_shard_rank{device=~\"$device\"}",
+          "legendFormat": "Rank",
           "range": false,
           "instant": true,
           "refId": "A",
@@ -805,11 +1010,37 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_shard_peer_connect_seconds{device=~\"$device\"} or mlx_shard_peer_rtt_seconds{device=~\"$device\"}) or vector(0.001)",
-          "legendFormat": "Probe RTT (s)",
+          "expr": "mlx_model_info{attr=\"shard_file_count\", device=~\"$device\"}",
+          "legendFormat": "Files Present",
           "range": false,
           "instant": true,
           "refId": "B",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_kv_heads_assigned{device=~\"$device\"} or mlx_shard_dim_kv_heads{device=~\"$device\"}",
+          "legendFormat": "KV Heads",
+          "range": false,
+          "instant": true,
+          "refId": "C",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_shard_dim_attention_heads{device=~\"$device\"}",
+          "legendFormat": "Attn Heads",
+          "range": false,
+          "instant": true,
+          "refId": "D",
           "format": "time_series"
         }
       ],
@@ -834,7 +1065,7 @@
           "links": [
             {
               "title": "Open Network Detail",
-              "url": "/d/mlx-mon-16-network-host-peers?var-device=${__data.fields.device}",
+              "url": "/d/mlx-network-host-peers?var-device=${__data.fields.device}",
               "targetBlank": false
             }
           ]
@@ -917,7 +1148,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "MLX Model Architecture & Sharding",
-  "uid": "mlx-mon-07-model-sharding",
+  "title": "Model Architecture & Sharding",
+  "uid": "mlx-model-sharding",
   "version": 1
 }
