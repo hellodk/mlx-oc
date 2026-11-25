@@ -22,14 +22,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Active severity=critical alerts requiring immediate intervention",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "count(ALERTS{alertstate=\"firing\", severity=\"critical\"}) or vector(0)",
@@ -87,14 +87,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Active severity=warning alerts indicating degraded performance",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "count(ALERTS{alertstate=\"firing\", severity=\"warning\"}) or vector(0)",
@@ -152,14 +152,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Aggregate count of all firing alerts across the cluster",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "count(ALERTS{alertstate=\"firing\"}) or vector(0)",
@@ -213,14 +213,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Number of distinct hosts affected by active alerts",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "count(count by (device) (ALERTS{alertstate=\"firing\"})) or vector(0)",
@@ -282,14 +282,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Real-time alert inventory with alertname, device, severity, and firing timestamp",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "ALERTS{alertstate=\"firing\"}",
@@ -338,14 +338,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Historical alert volume trends by severity level",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "count(ALERTS{alertstate=\"firing\", severity=\"critical\"}) or vector(0)",
@@ -358,7 +358,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "count(ALERTS{alertstate=\"firing\", severity=\"warning\"}) or vector(0)",
@@ -427,14 +427,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Direct operational runbook links and owner triage guidance",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "ALERTS{alertstate=\"firing\"}",
@@ -487,7 +487,7 @@
         "type": "query",
         "datasource": {
           "type": "prometheus",
-          "uid": "P1809D376AE641A70"
+          "uid": "VictoriaMetrics"
         },
         "definition": "label_values(mlx_hw_up, device)",
         "query": "label_values(mlx_hw_up, device)",
@@ -509,7 +509,7 @@
         "type": "query",
         "datasource": {
           "type": "prometheus",
-          "uid": "P1809D376AE641A70"
+          "uid": "VictoriaMetrics"
         },
         "definition": "label_values(mlx_requests_total, model)",
         "query": "label_values(mlx_requests_total, model)",

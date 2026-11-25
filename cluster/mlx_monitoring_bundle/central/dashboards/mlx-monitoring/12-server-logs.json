@@ -22,14 +22,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Nodes running active log tailer daemon",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "count(mlx_log_tailer_up == 1)",
@@ -83,14 +83,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Rate of server log lines processed and parsed into telemetry",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_log_lines_classified_total[1m]))",
@@ -145,14 +145,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Structured log entries successfully delivered to OTLP collector",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_log_lines_shipped_total[1m]))",
@@ -207,14 +207,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Log lines dropped due to shipper buffer overflows",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_log_lines_dropped_total[1m]))",
@@ -273,14 +273,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Current file read offset in monitored server log files",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(mlx_log_read_offset_bytes)",
@@ -334,14 +334,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Rate of network or serialization failures delivering log events",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_log_shipper_errors_total[5m])) or vector(0)",
@@ -399,14 +399,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Real-time log message throughput grouped by severity and lifecycle event",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_log_lines_classified_total{level=\"INFO\"}[1m]))",
@@ -419,7 +419,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_log_lines_classified_total{level=\"WARN\"}[1m]))",
@@ -432,7 +432,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_log_lines_classified_total{level=\"ERROR\"}[1m]))",
@@ -445,7 +445,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_log_lines_classified_total{event_type=\"OOM\"}[1m]))",
@@ -514,14 +514,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Aggregated log alerts, model load failures and memory warning events",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "mlx_log_lines_classified_total{level=~\"ERROR|WARN\"}",
@@ -574,7 +574,7 @@
         "type": "query",
         "datasource": {
           "type": "prometheus",
-          "uid": "P1809D376AE641A70"
+          "uid": "VictoriaMetrics"
         },
         "definition": "label_values(mlx_hw_up, device)",
         "query": "label_values(mlx_hw_up, device)",
@@ -596,7 +596,7 @@
         "type": "query",
         "datasource": {
           "type": "prometheus",
-          "uid": "P1809D376AE641A70"
+          "uid": "VictoriaMetrics"
         },
         "definition": "label_values(mlx_requests_total, model)",
         "query": "label_values(mlx_requests_total, model)",

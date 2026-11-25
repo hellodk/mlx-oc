@@ -22,14 +22,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "MLX server process running and detected by supervisor",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "count(mlx_server_up == 1)",
@@ -83,14 +83,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "HTTP /v1/models endpoint responding with status 200",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "count(mlx_server_ready == 1)",
@@ -144,14 +144,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Model weights fully resident in Unified Memory",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "count(mlx_server_model_loaded == 1)",
@@ -205,14 +205,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Server process restart count over rolling 15 minutes",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(increase(mlx_server_restarts_total[15m])) or vector(0)",
@@ -274,14 +274,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Nodes experiencing rapid repeated server terminations",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "count(rate(mlx_server_restarts_total[5m]) > 0.05) or vector(0)",
@@ -339,14 +339,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Nodes in exponential restart backoff state",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "count(mlx_server_state == 3) or vector(0)",
@@ -404,14 +404,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Server lifecycle state (0=down, 1=running_ready, 2=up_not_ready, 3=backoff)",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "mlx_server_state{device=~\"$device\"}",
@@ -486,14 +486,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Response latency of HTTP readiness probes (/v1/models)",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "mlx_server_probe_latency_seconds{device=~\"$device\"}",
@@ -562,14 +562,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Audit trail of server process terminations and exit status codes",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "mlx_server_restarts_total{device=~\"$device\"}",
@@ -582,7 +582,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "mlx_server_last_exit_code{device=~\"$device\"}",
@@ -631,14 +631,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Active model IDs reported by the live server endpoints",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "mlx_server_model_info{device=~\"$device\"}",
@@ -691,7 +691,7 @@
         "type": "query",
         "datasource": {
           "type": "prometheus",
-          "uid": "P1809D376AE641A70"
+          "uid": "VictoriaMetrics"
         },
         "definition": "label_values(mlx_hw_up, device)",
         "query": "label_values(mlx_hw_up, device)",
@@ -713,7 +713,7 @@
         "type": "query",
         "datasource": {
           "type": "prometheus",
-          "uid": "P1809D376AE641A70"
+          "uid": "VictoriaMetrics"
         },
         "definition": "label_values(mlx_requests_total, model)",
         "query": "label_values(mlx_requests_total, model)",

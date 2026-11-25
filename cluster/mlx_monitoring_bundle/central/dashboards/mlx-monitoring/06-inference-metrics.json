@@ -22,14 +22,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Inference completion request rate through proxy",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m]))",
@@ -84,14 +84,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Time to First Token measured at proxy boundary (includes network and queue)",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))",
@@ -154,14 +154,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Token generation execution time on model engine (excluding prompt queue)",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.95, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))",
@@ -224,14 +224,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Average tokens per second generated during decode phase",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "avg(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\", model=~\"$model\"}[1m]) / (rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\", model=~\"$model\"}[1m]) > 0))",
@@ -286,14 +286,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Concurrent active requests currently being processed",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(mlx_inflight_requests{device=~\"$device\"})",
@@ -347,14 +347,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Prompt prefill token ingestion throughput rate",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_prompt_tokens_total{device=~\"$device\", model=~\"$model\"}[1m]))",
@@ -409,14 +409,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Separation of proxy-observed latency from internal engine execution",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))",
@@ -429,7 +429,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))",
@@ -442,7 +442,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.95, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))",
@@ -455,7 +455,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.50, sum(rate(mlx_generation_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))",
@@ -524,14 +524,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Comparison of prompt ingestion rate vs output generation rate",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_prompt_tokens_total{device=~\"$device\", model=~\"$model\"}[1m]))",
@@ -544,7 +544,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_completion_tokens_total{device=~\"$device\", model=~\"$model\"}[1m]))",
@@ -613,14 +613,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Real-time concurrent request execution distribution",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "mlx_inflight_requests{device=~\"$device\"}",
@@ -689,14 +689,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Comparative model latency and throughput summary",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_requests_total[5m])) by (model)",
@@ -709,7 +709,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "avg(rate(mlx_token_rate_tokens_per_second_sum[5m]) / (rate(mlx_token_rate_tokens_per_second_count[5m]) > 0)) by (model)",
@@ -722,7 +722,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket[5m])) by (le, model))",
@@ -775,7 +775,7 @@
         "type": "query",
         "datasource": {
           "type": "prometheus",
-          "uid": "P1809D376AE641A70"
+          "uid": "VictoriaMetrics"
         },
         "definition": "label_values(mlx_hw_up, device)",
         "query": "label_values(mlx_hw_up, device)",
@@ -797,7 +797,7 @@
         "type": "query",
         "datasource": {
           "type": "prometheus",
-          "uid": "P1809D376AE641A70"
+          "uid": "VictoriaMetrics"
         },
         "definition": "label_values(mlx_requests_total, model)",
         "query": "label_values(mlx_requests_total, model)",

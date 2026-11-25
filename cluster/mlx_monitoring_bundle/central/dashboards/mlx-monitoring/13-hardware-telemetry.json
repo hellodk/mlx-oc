@@ -22,14 +22,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Fleet average 15-minute load average",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "avg(mlx_hw_load15{device=~\"$device\"})",
@@ -84,14 +84,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Total Unified Memory actively allocated",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(mlx_hw_memory_used_bytes{device=~\"$device\"})",
@@ -145,14 +145,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Mach subsystem memory pressure indicator",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "avg(mlx_hw_free_pages_pressure{device=~\"$device\"})",
@@ -207,14 +207,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Root volume disk utilization percentage",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "avg((mlx_hw_disk_used_bytes{device=~\"$device\"} / mlx_hw_disk_total_bytes{device=~\"$device\"}) * 100)",
@@ -269,14 +269,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Peak thermal state reported across cluster nodes",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "max(mlx_hw_thermal_pressure{device=~\"$device\"})",
@@ -338,14 +338,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Active nodes with healthy Apple Silicon hardware daemons",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "count(mlx_hw_up == 1)",
@@ -399,14 +399,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "1m and 5m load averages compared against available hardware core capacity",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "mlx_hw_load1{device=~\"$device\"}",
@@ -419,7 +419,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "mlx_hw_load5{device=~\"$device\"}",
@@ -432,7 +432,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "mlx_hw_cpu_count{device=~\"$device\"}",
@@ -501,14 +501,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Physical Unified Memory allocation and reclaimable cache",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "mlx_hw_memory_used_bytes{device=~\"$device\"}",
@@ -521,7 +521,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "mlx_hw_memory_available_bytes{device=~\"$device\"}",
@@ -590,14 +590,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Internal NVMe disk read and write bandwidth",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "rate(mlx_hw_disk_read_bytes_total{device=~\"$device\"}[1m])",
@@ -610,7 +610,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "rate(mlx_hw_disk_write_bytes_total{device=~\"$device\"}[1m])",
@@ -679,14 +679,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Hardware specifications and real-time physical status per machine",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "mlx_hw_cpu_count{device=~\"$device\"}",
@@ -699,7 +699,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "mlx_hw_memory_total_bytes{device=~\"$device\"}",
@@ -712,7 +712,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "mlx_hw_thermal_pressure{device=~\"$device\"}",
@@ -765,7 +765,7 @@
         "type": "query",
         "datasource": {
           "type": "prometheus",
-          "uid": "P1809D376AE641A70"
+          "uid": "VictoriaMetrics"
         },
         "definition": "label_values(mlx_hw_up, device)",
         "query": "label_values(mlx_hw_up, device)",
@@ -787,7 +787,7 @@
         "type": "query",
         "datasource": {
           "type": "prometheus",
-          "uid": "P1809D376AE641A70"
+          "uid": "VictoriaMetrics"
         },
         "definition": "label_values(mlx_requests_total, model)",
         "query": "label_values(mlx_requests_total, model)",

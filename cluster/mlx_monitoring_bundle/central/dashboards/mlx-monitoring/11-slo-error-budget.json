@@ -22,14 +22,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Customer-facing 1h availability excluding synthetic evaluation probes",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "(1 - (sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])))) * 100",
@@ -92,14 +92,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Percentage of production requests satisfying TTFT under 2.0 seconds",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "(sum(rate(mlx_ttft_seconds_bucket{le=\"2.0\", kind!=\"eval\"}[1h])) / sum(rate(mlx_ttft_seconds_count{kind!=\"eval\"}[1h]))) * 100",
@@ -162,14 +162,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Remaining error budget for 1h window against 0.5% unreliability allowance",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "(1 - ((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / sum(rate(mlx_requests_total{kind!=\"eval\"}[1h]))) / 0.005)) * 100",
@@ -232,14 +232,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "30-day cumulative rolling error budget consumption",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "(1 - ((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[30d])) / sum(rate(mlx_requests_total{kind!=\"eval\"}[30d]))) / 0.005)) * 100",
@@ -302,14 +302,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Multi-window multi-burn-rate tracking according to Google SRE handbook principles",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / sum(rate(mlx_requests_total{kind!=\"eval\"}[1h]))) / 0.005)",
@@ -322,7 +322,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[6h])) / sum(rate(mlx_requests_total{kind!=\"eval\"}[6h]))) / 0.005)",
@@ -335,7 +335,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[24h])) / sum(rate(mlx_requests_total{kind!=\"eval\"}[24h]))) / 0.005)",
@@ -404,14 +404,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Request volume filtered for customer traffic versus 4xx and 5xx failures",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_requests_total{kind!=\"eval\"}[1m]))",
@@ -424,7 +424,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1m]))",
@@ -437,7 +437,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_error_total{status=~\"4..\", kind!=\"eval\"}[1m]))",
@@ -506,14 +506,14 @@
       },
       "datasource": {
         "type": "prometheus",
-        "uid": "P1809D376AE641A70"
+        "uid": "VictoriaMetrics"
       },
       "description": "Detailed accounting of failures consuming the production error budget",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_error_total{kind!=\"eval\"}[5m])) by (status, route)",
@@ -526,7 +526,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P1809D376AE641A70"
+            "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
           "expr": "sum(rate(mlx_requests_total{kind!=\"eval\"}[5m])) by (route)",
@@ -579,7 +579,7 @@
         "type": "query",
         "datasource": {
           "type": "prometheus",
-          "uid": "P1809D376AE641A70"
+          "uid": "VictoriaMetrics"
         },
         "definition": "label_values(mlx_hw_up, device)",
         "query": "label_values(mlx_hw_up, device)",
@@ -601,7 +601,7 @@
         "type": "query",
         "datasource": {
           "type": "prometheus",
-          "uid": "P1809D376AE641A70"
+          "uid": "VictoriaMetrics"
         },
         "definition": "label_values(mlx_requests_total, model)",
         "query": "label_values(mlx_requests_total, model)",

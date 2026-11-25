@@ -9,7 +9,8 @@ import os
 from typing import Any, Dict, List, Optional
 
 OUT_DIR = "/home/dk/Documents/git/mlx-oc/cluster/mlx_monitoring_bundle/central/dashboards/mlx-monitoring"
-DS_VM = {"type": "prometheus", "uid": "P1809D376AE641A70"}
+DS_VM = {"type": "prometheus", "uid": "VictoriaMetrics"}
+
 
 def make_target(expr: str, legend: str = "", ref_id: str = "A", instant: bool = False, format_type: str = "time_series") -> Dict[str, Any]:
     return {
