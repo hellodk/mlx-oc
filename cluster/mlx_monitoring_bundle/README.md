@@ -574,6 +574,27 @@ Stop the edge bundle cleanly:
 
 *(To run attached in foreground instead: `./scripts/deploy.sh edge start`)*
 
+---
+
+### Network Architecture: Wildcard Listening vs. Local Scraping on macOS
+
+1. **User Control of Listen Addresses & Ports**:
+   - The user can configure the LLM server (`mlx_lm.server`) and the metrics proxy (`mlx_metrics_proxy`) on any interface and port (`0.0.0.0:8080`, `0.0.0.0:8030`, `192.168.1.64:8080`, etc.).
+   - `deploy.sh setup-edge` explicitly prompts for all required network parameters (`PROXY_LISTEN`, `MLX_UPSTREAM`, `CENTRAL_IP`) with zero hardcoded assumptions.
+
+2. **Darwin BSD Socket Wildcard (`0.0.0.0`) Connect Constraint**:
+   - On macOS Darwin (BSD network stack), `0.0.0.0` is strictly `INADDR_ANY` for server listening sockets.
+   - Outbound client TCP connections (`connect()`, Go `net.Dial()`, `curl http://0.0.0.0:<port>`) targeting destination `0.0.0.0` are rejected by the Darwin kernel with `ECONNREFUSED` (`connect: connection refused`).
+
+3. **Automatic Scraper Target Normalization**:
+   - While server processes listen on `0.0.0.0` so external LAN clients can access them, local `vmagent` scrapers on the same Mac must connect via loopback.
+   - `mlx_monitoring_bundle.py` automatically normalizes any configured wildcard listen address (`0.0.0.0:*` or `[::]:*`) to `127.0.0.1:<port>` when generating `logs/vmagent.yml` scrape targets.
+
+4. **vmagent Listen Isolation**:
+   - `vmagent` strictly binds its internal web and pprof service to loopback (`127.0.0.1:8429`), never listening on `0.0.0.0` to prevent unauthenticated network exposure.
+
+---
+
 ### Step 3: Deploy Central Observability Stack
 
 On the central server (supports both **Docker** and **Podman**):

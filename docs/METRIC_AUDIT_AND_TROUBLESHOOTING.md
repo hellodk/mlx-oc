@@ -254,6 +254,12 @@ Following corrective action, all 7 scrape jobs on edge node `mm` report `up=1`. 
 | `ALERTS` | Gauge | binary | **Active** | Evaluated alert conditions (`alertstate="firing\|pending"`) |
 | `ALERTS_FOR_STATE` | Gauge | s | **Active** | Duration current alert state has persisted |
 
+### 4.9 macOS Darwin Network Architecture: Wildcard Listening vs. Local Scraping
+- **User Listen Interface & Port**: The MLX model server (`mlx_lm.server`) and metrics proxy can bind to any IP and port chosen by the user (`0.0.0.0:8080`, `0.0.0.0:8030`, `192.168.1.64:8080`, etc.). `deploy.sh setup-edge` explicitly prompts for each address.
+- **Darwin Kernel `connect()` Constraint**: On macOS Darwin, `0.0.0.0` is strictly `INADDR_ANY` for listening sockets. Outbound client connections (`connect()`, Go `net.Dial()`, `curl http://0.0.0.0:<port>`) targeting `0.0.0.0` fail with `ECONNREFUSED` (`connect: connection refused`).
+- **Scraper Target Normalization**: `mlx_monitoring_bundle.py` automatically normalizes any wildcard listen target (`0.0.0.0:*` or `[::]:*`) to `127.0.0.1:<port>` when generating `vmagent.yml` scrape targets. This guarantees seamless local scraping while the server remains accessible externally on all interfaces.
+- **vmagent Listen Safety**: `vmagent` strictly listens on loopback (`127.0.0.1:8429`), never binding `0.0.0.0`.
+
 ---
 
 ## 5. Dashboard Drill-Down Navigation Matrix

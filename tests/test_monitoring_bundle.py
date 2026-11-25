@@ -1108,6 +1108,44 @@ def test_process_telemetry_metrics_sampling():
     assert "process_ranking_info" in output
 
 
+def test_process_telemetry_name_extraction():
+    """Verify _extract_process_name handles macOS comm truncation and python -m module naming."""
+    import mlx_process_telemetry as pt
+
+    # macOS comm truncation with trailing slash
+    name1 = pt._extract_process_name(
+        "/System/Library/",
+        "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer -daemon"
+    )
+    assert name1 == "WindowServer"
+
+    # macOS comm truncation of python path with -m module
+    name2 = pt._extract_process_name(
+        "/opt/homebrew/Ce",
+        "/opt/homebrew/Cellar/python@3.12/3.12.16/Frameworks/Python.framework/Versions/3.12/Resources/Python.app/Contents/MacOS/Python -m mlx_lm.server --model test --port 8030"
+    )
+    assert name2 == "mlx_lm.server"
+
+    # Python script execution
+    name3 = pt._extract_process_name(
+        "python",
+        "/usr/bin/python3 mlx_server_supervisor.py --listen 127.0.0.1:9105"
+    )
+    assert name3 == "mlx_server_supervisor.py"
+
+    # Virtual machine daemon on macOS
+    name4 = pt._extract_process_name(
+        "/System/Library/",
+        "/System/Library/Frameworks/Virtualization.framework/Versions/A/XPCServices/com.apple.Virtualization.VirtualMachine.xpc/Contents/MacOS/com.apple.Virtualization.VirtualMachine"
+    )
+    assert name4 == "com.apple.Virtualization.VirtualMachine"
+
+    # Plain binary
+    name5 = pt._extract_process_name("vmagent", "/usr/local/bin/vmagent -promscrape.config logs/vmagent.yml")
+    assert name5 == "vmagent"
+
+
+
 def test_sbom_collector_inventory_and_drift():
     """Verify mlx_sbom_collector builds catalog, computes drift, and exposes Prometheus metrics."""
     import mlx_sbom_collector

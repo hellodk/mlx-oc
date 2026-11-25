@@ -191,6 +191,45 @@ def _probe_apple_silicon_gpu_and_ane() -> Tuple[float, float]:
 # ---------------------------------------------------------------------------
 # Core Process Inspection Primitives
 # ---------------------------------------------------------------------------
+def _extract_process_name(comm: str, args: str) -> str:
+    """Derive an accurate, human-readable process name from command line and comm.
+
+    Resolves macOS fixed-width 16-char comm truncation (e.g. /System/Library/ -> empty basename,
+    or /opt/homebrew/Ce -> 'Ce') and extracts meaningful module/script names for runtimes
+    (e.g. 'python -m mlx_lm.server' -> 'mlx_lm.server', 'python mlx_monitoring_bundle.py' -> 'mlx_monitoring_bundle').
+    """
+    args_tokens = []
+    if args:
+        try:
+            import shlex
+            args_tokens = shlex.split(args)
+        except Exception:
+            args_tokens = args.split()
+
+    if args_tokens:
+        exe_base = os.path.basename(args_tokens[0])
+        # If interpreter/runtime, inspect args for module (-m) or script
+        if exe_base.lower().startswith(("python", "node", "ruby", "perl", "bash", "zsh", "sh")):
+            for idx, tok in enumerate(args_tokens[1:], 1):
+                if tok == "-m" and idx < len(args_tokens) - 1:
+                    return args_tokens[idx + 1]
+                if tok.endswith((".py", ".js", ".sh", ".rb")):
+                    return os.path.basename(tok)
+                if not tok.startswith("-") and ("/" in tok or tok.isalnum()):
+                    base = os.path.basename(tok)
+                    if base and base not in ("-c",):
+                        return base
+            if exe_base:
+                return exe_base
+        elif exe_base:
+            return exe_base
+
+    # Fallback to comm, stripping any trailing slash before basename
+    clean_comm = comm.strip().rstrip("/")
+    base = os.path.basename(clean_comm)
+    return base if base else clean_comm
+
+
 def _list_processes() -> List[Dict[str, Any]]:
     """Enumerate running processes using standard POSIX `ps`."""
     procs: List[Dict[str, Any]] = []
@@ -218,19 +257,23 @@ def _list_processes() -> List[Dict[str, Any]]:
                 user = parts[1]
                 cpu_pct = float(parts[2])
                 rss_kb = int(parts[3])
-                comm = os.path.basename(parts[4])
-                args = parts[5] if len(parts) > 5 else comm
+                comm = parts[4].strip()
+                args = parts[5].strip() if len(parts) > 5 else comm
 
                 # Skip PID 0, profiler itself, or transient ps probe
                 if pid <= 0 or pid == os.getpid() or comm == "ps":
                     continue
+
+                proc_name = _extract_process_name(comm, args)
+                if not proc_name:
+                    proc_name = f"pid_{pid}"
 
                 procs.append({
                     "pid": pid,
                     "user": user,
                     "cpu_pct": max(0.0, cpu_pct),
                     "rss_bytes": max(0, rss_kb * 1024),
-                    "process": comm,
+                    "process": proc_name,
                     "command": (args[:120] + "...") if len(args) > 120 else args,
                 })
             except (ValueError, IndexError):
