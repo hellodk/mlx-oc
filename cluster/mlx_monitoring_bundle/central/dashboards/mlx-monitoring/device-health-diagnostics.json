@@ -29,7 +29,7 @@
       "title": "Cluster Overview",
       "tooltip": "Cluster Overview \u2014 Fleet availability, serving health and key inference KPIs",
       "type": "link",
-      "url": "/d/mlx-cluster-overview"
+      "url": "/d/mlx-mon-cluster-overview"
     },
     {
       "asDropdown": false,
@@ -41,7 +41,7 @@
       "title": "Device Health & Diagnostics",
       "tooltip": "Device Health & Diagnostics \u2014 Per-device component status, exporter freshness and connectivity",
       "type": "link",
-      "url": "/d/mlx-device-health"
+      "url": "/d/mlx-mon-device-health"
     },
     {
       "asDropdown": false,
@@ -53,7 +53,7 @@
       "title": "Per-Device Detail",
       "tooltip": "Per-Device Detail \u2014 Single-node deep dive from host resources to inference",
       "type": "link",
-      "url": "/d/mlx-per-device-detail"
+      "url": "/d/mlx-mon-per-device-detail"
     },
     {
       "asDropdown": false,
@@ -65,7 +65,7 @@
       "title": "Alerts & Incidents",
       "tooltip": "Alerts & Incidents \u2014 Active alert triage, severity distribution and runbooks",
       "type": "link",
-      "url": "/d/mlx-alerts-incidents"
+      "url": "/d/mlx-mon-alerts-incidents"
     },
     {
       "asDropdown": false,
@@ -77,7 +77,7 @@
       "title": "Serving Health",
       "tooltip": "Serving Health \u2014 MLX server lifecycle, readiness and restart history",
       "type": "link",
-      "url": "/d/mlx-serving-health"
+      "url": "/d/mlx-mon-serving-health"
     },
     {
       "asDropdown": false,
@@ -89,7 +89,7 @@
       "title": "Inference Metrics",
       "tooltip": "Inference Metrics \u2014 Inference latency breakdown, token throughput and concurrency",
       "type": "link",
-      "url": "/d/mlx-inference-metrics"
+      "url": "/d/mlx-mon-inference-metrics"
     },
     {
       "asDropdown": false,
@@ -101,7 +101,7 @@
       "title": "Model Architecture & Sharding",
       "tooltip": "Model Architecture & Sharding \u2014 Model metadata, rank placement, layer ranges and peer probes",
       "type": "link",
-      "url": "/d/mlx-model-sharding"
+      "url": "/d/mlx-mon-model-sharding"
     },
     {
       "asDropdown": false,
@@ -113,7 +113,7 @@
       "title": "KV Cache",
       "tooltip": "KV Cache \u2014 Prompt cache utilization, context capacity and per-rank allocation",
       "type": "link",
-      "url": "/d/mlx-kv-cache"
+      "url": "/d/mlx-mon-kv-cache"
     },
     {
       "asDropdown": false,
@@ -125,7 +125,7 @@
       "title": "Quality & Confidence",
       "tooltip": "Quality & Confidence \u2014 Logprob scores, token entropy and canary evaluation",
       "type": "link",
-      "url": "/d/mlx-quality-confidence"
+      "url": "/d/mlx-mon-quality-confidence"
     },
     {
       "asDropdown": false,
@@ -137,7 +137,7 @@
       "title": "Opik Tracing & Evaluation",
       "tooltip": "Opik Tracing & Evaluation \u2014 Trace volume, scoring coverage, judge scores and traces",
       "type": "link",
-      "url": "/d/mlx-opik-tracing"
+      "url": "/d/mlx-mon-opik-tracing"
     },
     {
       "asDropdown": false,
@@ -149,7 +149,7 @@
       "title": "SLO & Error Budget",
       "tooltip": "SLO & Error Budget \u2014 Latency & availability SLOs, error budgets, and burn rates",
       "type": "link",
-      "url": "/d/mlx-slo-error-budget"
+      "url": "/d/mlx-mon-slo-error-budget"
     },
     {
       "asDropdown": false,
@@ -161,7 +161,7 @@
       "title": "Server Logs",
       "tooltip": "Server Logs \u2014 Searchable server logs, structured events and log pipeline health",
       "type": "link",
-      "url": "/d/mlx-server-logs"
+      "url": "/d/mlx-mon-server-logs"
     },
     {
       "asDropdown": false,
@@ -173,7 +173,7 @@
       "title": "Hardware Telemetry",
       "tooltip": "Hardware Telemetry \u2014 CPU, memory, disk, thermal pressure, and Apple Silicon metrics",
       "type": "link",
-      "url": "/d/mlx-hardware-telemetry"
+      "url": "/d/mlx-mon-hardware-telemetry"
     },
     {
       "asDropdown": false,
@@ -185,7 +185,7 @@
       "title": "Power & Thermal",
       "tooltip": "Power & Thermal \u2014 Apple Silicon SoC power draw, thermal throttling and temperature",
       "type": "link",
-      "url": "/d/mlx-power-thermal"
+      "url": "/d/mlx-mon-power-thermal"
     },
     {
       "asDropdown": false,
@@ -197,7 +197,7 @@
       "title": "Process & Resource Profiler",
       "tooltip": "Process & Resource Profiler \u2014 Top process CPU/RSS and measured host GPU vs process attribution",
       "type": "link",
-      "url": "/d/mlx-process-profiler"
+      "url": "/d/mlx-mon-process-profiler"
     },
     {
       "asDropdown": false,
@@ -209,7 +209,7 @@
       "title": "Network (Host & Peers)",
       "tooltip": "Network (Host & Peers) \u2014 Host interface throughput, errors and peer reachability probes",
       "type": "link",
-      "url": "/d/mlx-network-host-peers"
+      "url": "/d/mlx-mon-network-host-peers"
     },
     {
       "asDropdown": false,
@@ -221,7 +221,7 @@
       "title": "SBOM Fleet Inventory",
       "tooltip": "SBOM Fleet Inventory \u2014 Package and model inventory across Python, Homebrew and system",
       "type": "link",
-      "url": "/d/mlx-sbom-inventory"
+      "url": "/d/mlx-mon-sbom-inventory"
     },
     {
       "asDropdown": false,
@@ -233,7 +233,7 @@
       "title": "SBOM Drift & Delta",
       "tooltip": "SBOM Drift & Delta \u2014 Version, hash, path and missing-package differences against baseline",
       "type": "link",
-      "url": "/d/mlx-sbom-drift-delta"
+      "url": "/d/mlx-mon-sbom-drift-delta"
     }
   ],
   "liveNow": false,
@@ -298,7 +298,7 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-hardware-telemetry?${__all_variables}",
+              "url": "/d/mlx-mon-hardware-telemetry?${__all_variables}",
               "targetBlank": false
             }
           ]
@@ -366,7 +366,7 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-serving-health",
+              "url": "/d/mlx-mon-serving-health",
               "targetBlank": false
             }
           ]
@@ -508,7 +508,7 @@
           "links": [
             {
               "title": "Drill down",
-              "url": "/d/mlx-alerts-incidents",
+              "url": "/d/mlx-mon-alerts-incidents",
               "targetBlank": false
             }
           ]
@@ -819,7 +819,7 @@
           "links": [
             {
               "title": "Open Device Detail",
-              "url": "/d/mlx-per-device-detail?var-device=${__data.fields.device}&${__all_variables}",
+              "url": "/d/mlx-mon-per-device-detail?var-device=${__data.fields.device}&${__all_variables}",
               "targetBlank": false
             }
           ]
@@ -1003,7 +1003,7 @@
           "links": [
             {
               "title": "Open Network Detail",
-              "url": "/d/mlx-network-host-peers?var-device=${__data.fields.device}&${__all_variables}",
+              "url": "/d/mlx-mon-network-host-peers?var-device=${__data.fields.device}&${__all_variables}",
               "targetBlank": false
             }
           ]
@@ -1087,6 +1087,6 @@
   },
   "timezone": "browser",
   "title": "Device Health & Diagnostics",
-  "uid": "mlx-device-health",
+  "uid": "mlx-mon-device-health",
   "version": 1
 }
