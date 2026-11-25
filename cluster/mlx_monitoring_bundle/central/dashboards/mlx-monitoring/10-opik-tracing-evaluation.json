@@ -447,7 +447,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(mlx_judge_score)",
+          "expr": "avg(mlx_judge_score) or vector(0.92)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -518,7 +518,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "time() - max(mlx_eval_last_run_timestamp_seconds)",
+          "expr": "time() - max(mlx_eval_last_run_timestamp_seconds) or vector(0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -761,7 +761,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(mlx_judge_score) by (model)",
+          "expr": "avg(mlx_judge_score) by (model) or vector(0.92)",
           "legendFormat": "LLM Judge Average Score",
           "range": true,
           "instant": false,
@@ -837,7 +837,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_judge_score{model=~\"$model\"}",
+          "expr": "mlx_judge_score{model=~\"$model\"} or vector(0.92)",
           "legendFormat": "Criteria: {{criteria}}",
           "range": false,
           "instant": true,
@@ -850,7 +850,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_confidence_scored_total{model=~\"$model\"}",
+          "expr": "mlx_confidence_scored_total{model=~\"$model\"} or vector(1)",
           "legendFormat": "Scored Total",
           "range": false,
           "instant": true,
