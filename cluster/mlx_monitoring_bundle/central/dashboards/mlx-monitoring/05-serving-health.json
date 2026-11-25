@@ -7,7 +7,235 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
-  "links": [],
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [
+        "mlx-monitoring"
+      ],
+      "title": "MLX Monitoring Suite",
+      "type": "dashboards"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "01. Cluster Overview",
+      "tooltip": "01. Cluster Overview \u2014 Fleet availability, serving health and key inference KPIs",
+      "type": "link",
+      "url": "/d/mlx-mon-01-overview"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "02. Device Health",
+      "tooltip": "02. Device Health \u2014 Per-device component status, exporter freshness and connectivity",
+      "type": "link",
+      "url": "/d/mlx-mon-02-device-health"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "03. Per-Device Detail",
+      "tooltip": "03. Per-Device Detail \u2014 Single-node deep dive from host resources to inference",
+      "type": "link",
+      "url": "/d/mlx-mon-03-per-device-detail"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "04. Alerts & Incidents",
+      "tooltip": "04. Alerts & Incidents \u2014 Active alert triage, severity distribution and runbooks",
+      "type": "link",
+      "url": "/d/mlx-mon-04-alerts-incidents"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "05. Serving Health",
+      "tooltip": "05. Serving Health \u2014 MLX server lifecycle, readiness and restart history",
+      "type": "link",
+      "url": "/d/mlx-mon-05-serving-health"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "06. Inference Metrics",
+      "tooltip": "06. Inference Metrics \u2014 Inference latency breakdown, token throughput and concurrency",
+      "type": "link",
+      "url": "/d/mlx-mon-06-inference-metrics"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "07. Model Sharding",
+      "tooltip": "07. Model Sharding \u2014 Model metadata, rank placement, layer ranges and peer probes",
+      "type": "link",
+      "url": "/d/mlx-mon-07-model-sharding"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "08. KV Cache",
+      "tooltip": "08. KV Cache \u2014 Prompt cache utilization, context capacity and per-rank allocation",
+      "type": "link",
+      "url": "/d/mlx-mon-08-kv-cache"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "09. Quality & Confidence",
+      "tooltip": "09. Quality & Confidence \u2014 Logprob scores, token entropy and canary evaluation",
+      "type": "link",
+      "url": "/d/mlx-mon-09-quality-confidence"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "10. Opik Tracing",
+      "tooltip": "10. Opik Tracing \u2014 Trace volume, scoring coverage, judge scores and traces",
+      "type": "link",
+      "url": "/d/mlx-mon-10-opik-tracing"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "11. SLO & Budget",
+      "tooltip": "11. SLO & Budget \u2014 Latency & availability SLOs, error budgets, and burn rates",
+      "type": "link",
+      "url": "/d/mlx-mon-11-slo-error-budget"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "12. Server Logs",
+      "tooltip": "12. Server Logs \u2014 Searchable server logs, structured events and log pipeline health",
+      "type": "link",
+      "url": "/d/mlx-mon-12-server-logs"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "13. Hardware Telemetry",
+      "tooltip": "13. Hardware Telemetry \u2014 CPU, memory, disk, thermal pressure, and Apple Silicon metrics",
+      "type": "link",
+      "url": "/d/mlx-mon-13-hardware-telemetry"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "14. Power & Thermal",
+      "tooltip": "14. Power & Thermal \u2014 Apple Silicon SoC power draw, thermal throttling and temperature",
+      "type": "link",
+      "url": "/d/mlx-mon-14-power-thermal"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "15. Process Profiler",
+      "tooltip": "15. Process Profiler \u2014 Top process CPU/RSS and measured host GPU vs process attribution",
+      "type": "link",
+      "url": "/d/mlx-mon-15-process-profiler"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "16. Network Host & Peers",
+      "tooltip": "16. Network Host & Peers \u2014 Host interface throughput, errors and peer reachability probes",
+      "type": "link",
+      "url": "/d/mlx-mon-16-network-host-peers"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "17. SBOM Inventory",
+      "tooltip": "17. SBOM Inventory \u2014 Package and model inventory across Python, Homebrew and system",
+      "type": "link",
+      "url": "/d/mlx-mon-17-sbom-inventory"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "18. SBOM Drift",
+      "tooltip": "18. SBOM Drift \u2014 Version, hash, path and missing-package differences against baseline",
+      "type": "link",
+      "url": "/d/mlx-mon-18-sbom-drift-delta"
+    }
+  ],
   "liveNow": false,
   "panels": [
     {
@@ -66,7 +294,8 @@
               }
             ]
           },
-          "mappings": []
+          "mappings": [],
+          "links": []
         },
         "overrides": []
       }
@@ -127,7 +356,8 @@
               }
             ]
           },
-          "mappings": []
+          "mappings": [],
+          "links": []
         },
         "overrides": []
       }
@@ -154,7 +384,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mlx_server_model_loaded == 1)",
+          "expr": "count(mlx_model_loaded == 1)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -188,7 +418,14 @@
               }
             ]
           },
-          "mappings": []
+          "mappings": [],
+          "links": [
+            {
+              "title": "Drill down",
+              "url": "/d/mlx-mon-07-model-sharding?${__all_variables}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       }
@@ -257,7 +494,14 @@
               }
             ]
           },
-          "mappings": []
+          "mappings": [],
+          "links": [
+            {
+              "title": "Drill down",
+              "url": "/d/mlx-mon-12-server-logs?${__all_variables}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       }
@@ -322,7 +566,14 @@
               }
             ]
           },
-          "mappings": []
+          "mappings": [],
+          "links": [
+            {
+              "title": "Drill down",
+              "url": "/d/mlx-mon-12-server-logs?${__all_variables}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       }
@@ -387,7 +638,8 @@
               }
             ]
           },
-          "mappings": []
+          "mappings": [],
+          "links": []
         },
         "overrides": []
       }
@@ -496,7 +748,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_server_probe_latency_seconds{device=~\"$device\"}",
+          "expr": "scrape_duration_seconds{job=~\"mlx-supervisor|mlx-proxy\", device=~\"$device\"}",
           "legendFormat": "{{device}} probe latency",
           "range": true,
           "instant": false,
@@ -610,7 +862,14 @@
                 "value": null
               }
             ]
-          }
+          },
+          "links": [
+            {
+              "title": "Open Server Logs",
+              "url": "/d/mlx-mon-12-server-logs?var-device=${__data.fields.device}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
@@ -641,8 +900,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_server_model_info{device=~\"$device\"}",
-          "legendFormat": "{{device}} - {{model_id}}",
+          "expr": "mlx_model_info{device=~\"$device\", attr=\"layer_count\"}",
+          "legendFormat": "{{device}} - {{model}}",
           "range": false,
           "instant": true,
           "refId": "A",
@@ -666,7 +925,14 @@
                 "value": null
               }
             ]
-          }
+          },
+          "links": [
+            {
+              "title": "Open Model Architecture",
+              "url": "/d/mlx-mon-07-model-sharding?var-device=${__data.fields.device}",
+              "targetBlank": false
+            }
+          ]
         },
         "overrides": []
       },
