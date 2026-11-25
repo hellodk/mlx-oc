@@ -662,7 +662,7 @@
           "legendFormat": "{{device}} CPU (W)",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         },
         {
@@ -675,7 +675,7 @@
           "legendFormat": "{{device}} ANE (W)",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "C",
           "format": "time_series"
         }
       ],

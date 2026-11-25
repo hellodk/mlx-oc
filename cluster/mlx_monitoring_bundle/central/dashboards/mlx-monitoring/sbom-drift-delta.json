@@ -692,7 +692,7 @@
           "legendFormat": "{{device}} Missing Pkgs",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         }
       ],

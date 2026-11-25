@@ -108,6 +108,25 @@ def make_stat_panel(
         p["fieldConfig"]["defaults"]["decimals"] = decimals
     return p
 
+def assign_unique_ref_ids(targets: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    used = set()
+    result = []
+    for idx, t in enumerate(targets):
+        t_copy = dict(t)
+        current = t_copy.get("refId")
+        if not current or current in used:
+            cand_idx = idx
+            while True:
+                cand = chr(ord('A') + cand_idx) if cand_idx < 26 else f"T{cand_idx}"
+                if cand not in used:
+                    current = cand
+                    break
+                cand_idx += 1
+        t_copy["refId"] = current
+        used.add(current)
+        result.append(t_copy)
+    return result
+
 def make_timeseries_panel(
     panel_id: int,
     title: str,
@@ -130,7 +149,7 @@ def make_timeseries_panel(
         "gridPos": {"h": h, "w": w, "x": x, "y": y},
         "datasource": DS_VM,
         "description": description,
-        "targets": targets,
+        "targets": assign_unique_ref_ids(targets),
         "fieldConfig": {
             "defaults": {
                 "custom": {
@@ -184,7 +203,7 @@ def make_table_panel(
         "gridPos": {"h": h, "w": w, "x": x, "y": y},
         "datasource": DS_VM,
         "description": description,
-        "targets": targets,
+        "targets": assign_unique_ref_ids(targets),
         "transformations": transformations or [],
         "fieldConfig": {
             "defaults": {
@@ -216,7 +235,7 @@ def make_state_timeline_panel(
         "gridPos": {"h": h, "w": w, "x": x, "y": y},
         "datasource": DS_VM,
         "description": description,
-        "targets": targets,
+        "targets": assign_unique_ref_ids(targets),
         "fieldConfig": {
             "defaults": {
                 "custom": {"lineWidth": 0, "fillOpacity": 80, "spanNulls": False},
@@ -391,8 +410,8 @@ def build_cluster_overview() -> Dict[str, Any]:
         make_timeseries_panel(
             8, "TTFT p50 / p95", 12, 4, 12, 8,
             [
-                make_target("(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))", legend="p95 TTFT"),
-                make_target("(histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * rate(mlx_requests_total{device=~\"$device\"}[1m]))", legend="p50 TTFT"),
+                make_target("(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m])))", legend="p95 TTFT", ref_id="A"),
+                make_target("(histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or (0 * sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m])))", legend="p50 TTFT", ref_id="B"),
             ],
             unit="s", description="Proxy-observed time-to-first-token latency progression",
         ),

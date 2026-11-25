@@ -770,7 +770,7 @@
           "legendFormat": "Warning",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         },
         {
@@ -783,7 +783,7 @@
           "legendFormat": "Info",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "C",
           "format": "time_series"
         }
       ],

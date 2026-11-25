@@ -567,7 +567,7 @@
           "legendFormat": "6h Burn Rate (Alert > 6x)",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         },
         {
@@ -580,7 +580,7 @@
           "legendFormat": "24h Burn Rate (Alert > 1x)",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "C",
           "format": "time_series"
         }
       ],
@@ -669,7 +669,7 @@
           "legendFormat": "5xx Server Errors/s",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         },
         {
@@ -682,7 +682,7 @@
           "legendFormat": "4xx Client Errors/s",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "C",
           "format": "time_series"
         }
       ],

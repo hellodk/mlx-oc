@@ -672,7 +672,7 @@
           "legendFormat": "{{device}} Load5",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         },
         {
@@ -685,7 +685,7 @@
           "legendFormat": "{{device}} CPU Cores",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "C",
           "format": "time_series"
         }
       ],
@@ -774,7 +774,7 @@
           "legendFormat": "{{device}} Available",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         }
       ],

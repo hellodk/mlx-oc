@@ -709,7 +709,7 @@
           "legendFormat": "Entropy p50 (nats)",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         },
         {
@@ -722,7 +722,7 @@
           "legendFormat": "Tail-Corrected Bound (nats)",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "C",
           "format": "time_series"
         },
         {
@@ -735,7 +735,7 @@
           "legendFormat": "Top-k Mass",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "D",
           "format": "time_series"
         }
       ],
@@ -824,7 +824,7 @@
           "legendFormat": "Min Confidence",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         },
         {
@@ -837,7 +837,7 @@
           "legendFormat": "Low-Conf Token %",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "C",
           "format": "time_series"
         }
       ],
@@ -926,7 +926,7 @@
           "legendFormat": "Repetition Flags/s",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         },
         {
@@ -939,7 +939,7 @@
           "legendFormat": "Refusal Responses/s",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "C",
           "format": "time_series"
         }
       ],

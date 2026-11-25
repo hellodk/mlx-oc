@@ -667,7 +667,7 @@
           "legendFormat": "Generation KV",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         },
         {
@@ -680,7 +680,7 @@
           "legendFormat": "User Context",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "C",
           "format": "time_series"
         }
       ],
@@ -769,7 +769,7 @@
           "legendFormat": "{{device}} Prompt Cache Hits/s",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         }
       ],

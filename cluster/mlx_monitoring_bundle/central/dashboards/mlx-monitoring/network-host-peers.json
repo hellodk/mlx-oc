@@ -681,7 +681,7 @@
           "legendFormat": "{{device}} TX Bytes/s",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         }
       ],
@@ -770,7 +770,7 @@
           "legendFormat": "{{device}} TX Errors/s",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         }
       ],

@@ -621,7 +621,7 @@
           "legendFormat": "{{device}} [server]",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         },
         {
@@ -634,7 +634,7 @@
           "legendFormat": "{{device}} [proxy]",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "C",
           "format": "time_series"
         },
         {
@@ -647,7 +647,7 @@
           "legendFormat": "{{device}} [kv]",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "D",
           "format": "time_series"
         },
         {
@@ -660,7 +660,7 @@
           "legendFormat": "{{device}} [process]",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "E",
           "format": "time_series"
         },
         {
@@ -673,7 +673,7 @@
           "legendFormat": "{{device}} [sbom]",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "F",
           "format": "time_series"
         }
       ],

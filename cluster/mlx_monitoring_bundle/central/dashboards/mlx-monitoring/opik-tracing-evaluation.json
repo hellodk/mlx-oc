@@ -676,7 +676,7 @@
           "legendFormat": "Scored Completions/s",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         }
       ],
@@ -765,7 +765,7 @@
           "legendFormat": "LLM Judge Average Score",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         }
       ],

@@ -712,7 +712,7 @@
           "legendFormat": "Memory Used %",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         },
         {
@@ -725,7 +725,7 @@
           "legendFormat": "GPU Utilization %",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "C",
           "format": "time_series"
         }
       ],
@@ -814,7 +814,7 @@
           "legendFormat": "Tokens/s (decode)",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         }
       ],

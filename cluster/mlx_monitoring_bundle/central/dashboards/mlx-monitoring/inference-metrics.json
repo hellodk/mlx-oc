@@ -676,7 +676,7 @@
           "legendFormat": "Proxy TTFT p50",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         },
         {
@@ -689,7 +689,7 @@
           "legendFormat": "Engine Gen Time p95",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "C",
           "format": "time_series"
         },
         {
@@ -702,7 +702,7 @@
           "legendFormat": "Engine Gen Time p50",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "D",
           "format": "time_series"
         }
       ],
@@ -791,7 +791,7 @@
           "legendFormat": "Decode Tokens/s",
           "range": true,
           "instant": false,
-          "refId": "A",
+          "refId": "B",
           "format": "time_series"
         }
       ],
