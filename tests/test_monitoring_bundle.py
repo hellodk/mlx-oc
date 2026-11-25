@@ -2840,9 +2840,10 @@ def test_peer_probe_port_and_alert_dashboard_consistency():
     assert "MLX_PEER_APP_PORT=8081" in template_text
 
     deploy_text = (BUNDLE_DIR / "scripts" / "deploy.sh").read_text(encoding="utf8")
-    assert "MLX_PEER_PROBE_PORT=8081" in deploy_text
+    assert "MLX_PEER_PROBE_PORT=" in deploy_text
+    assert "default_peer_port=\"8081\"" in deploy_text or "MLX_PEER_PROBE_PORT=8081" in deploy_text
     assert "MLX_PEER_PROBE_PORT=22" not in deploy_text
-    assert "MLX_PEER_APP_PORT=8081" in deploy_text
+    assert "MLX_PEER_APP_PORT=" in deploy_text
 
     # 2. Supervisor argument default check
     import mlx_server_supervisor as sup
@@ -3243,5 +3244,63 @@ def test_proxy_prompt_token_uses_request_tools_and_tracks_exactness(tmp_path):
     tpl_no_tools = p._get_chat_template_for_model("no_tool_model", str(no_tool_dir))
     assert tpl_no_tools is not None
     assert "tools" not in getattr(tpl_no_tools, "_raw_template", "")
+
+
+def test_deploy_setup_edge_standalone_detection_and_proxy_listen(tmp_path):
+    """Verify setup-edge defaults PROXY_LISTEN to 0.0.0.0:8080 and detects standalone mode to set peer ports to 0."""
+    import subprocess
+    deploy_sh = BUNDLE_DIR / "scripts" / "deploy.sh"
+    edge_dir = BUNDLE_DIR / "edge"
+    env_file = edge_dir / "config" / "edge.env"
+    nodes_file = edge_dir / "config" / "nodes.yml"
+
+    # Backup existing edge config if present
+    env_bak = env_file.read_text(encoding="utf8") if env_file.exists() else None
+    nodes_bak = nodes_file.read_text(encoding="utf8") if nodes_file.exists() else None
+
+    try:
+        env = dict(
+            os.environ,
+            SKIP_GIT_PULL="1",
+            VENV_PYTHON=sys.executable,
+            CENTRAL_IP="192.168.1.10",
+            MLX_UPSTREAM="http://127.0.0.1:8030",
+        )
+        # Run setup-edge non-interactively
+        proc = subprocess.run(
+            [str(deploy_sh), "setup-edge", "192.168.1.10", "", "", "http://127.0.0.1:8030"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            stdin=subprocess.DEVNULL,
+            env=env,
+            timeout=30,
+        )
+        assert proc.returncode == 0, f"setup-edge failed: {proc.stderr}\n{proc.stdout}"
+
+        # Verify edge.env was generated with PROXY_LISTEN=0.0.0.0:8080 and peer ports 0 (standalone)
+        assert env_file.exists(), "edge.env was not created"
+        env_content = env_file.read_text(encoding="utf8")
+        assert "PROXY_LISTEN=0.0.0.0:8080" in env_content
+        assert "MLX_PEER_PROBE_PORT=0" in env_content
+        assert "MLX_PEER_APP_PORT=0" in env_content
+        assert "MLX_UPSTREAM=http://127.0.0.1:8030" in env_content
+
+        # Verify validation summary guide is printed
+        combined_output = proc.stdout + proc.stderr
+        assert "Edge Monitoring Bundle Configuration Summary & Validation Guide" in combined_output
+        assert "Where to check and review configuration files:" in combined_output
+        assert "How to validate edge configuration:" in combined_output
+    finally:
+        # Restore backups
+        if env_bak is not None:
+            env_file.write_text(env_bak, encoding="utf8")
+        elif env_file.exists():
+            env_file.unlink()
+        if nodes_bak is not None:
+            nodes_file.write_text(nodes_bak, encoding="utf8")
+        elif nodes_file.exists():
+            nodes_file.unlink()
+
 
 

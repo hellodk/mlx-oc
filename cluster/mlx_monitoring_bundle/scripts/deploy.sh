@@ -24,7 +24,7 @@
 set -euo pipefail
 
 # Ensure standard binary search paths on macOS / Linux (e.g. Homebrew, system bins)
-for p in /opt/homebrew/bin /usr/local/bin /usr/bin /bin; do
+for p in "${HOME}/homebrew/bin" /opt/homebrew/bin /usr/local/bin /usr/bin /bin; do
   if [[ -d "${p}" && ":${PATH}:" != *":${p}:"* ]]; then
     export PATH="${p}:${PATH}"
   fi
@@ -316,9 +316,13 @@ open(dst_path, 'w', encoding='utf-8').write(text)
 cmd_setup_edge() {
   _require_cmds python3
   local central_ip="${1:-${CENTRAL_IP:-${CENTRAL_VICTORIA_METRICS:-}}}"
-  local model_id="${2:-}"
-  local model_path="${3:-}"
+  local model_id="${2:-${MLX_MODEL:-}}"
+  local model_path="${3:-${MLX_MODEL_PATH:-}}"
   local mlx_upstream="${4:-${MLX_UPSTREAM:-}}"
+  local proxy_listen="${5:-${PROXY_LISTEN:-}}"
+  local mlx_server_log="${6:-${MLX_SERVER_LOG:-}}"
+  local mlx_process_pattern="${7:-${MLX_PROCESS_PATTERN:-}}"
+  local peer_probe_port="${8:-${MLX_PEER_PROBE_PORT:-}}"
   local vmagent_bin="${MLX_MONITORING_DIR}/bin/vmagent"
 
   info "setting up edge monitoring bundle on local machine"
@@ -332,10 +336,32 @@ cmd_setup_edge() {
   mkdir -p "${EDGE_DIR}/logs"
   mkdir -p "${EDGE_DIR}/bin"
 
+  # Read existing defaults from edge.env if available
+  local cur_proxy_listen="0.0.0.0:8080"
+  local cur_server_log="${EDGE_DIR}/logs/server.log"
+  local cur_pattern="mlx_lm.server"
+  local cur_peer_port=""
+
+  if [[ -f "${ENV_FILE}" ]]; then
+    local v
+    v="$(grep -E '^PROXY_LISTEN=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr -d '\"' || true)"
+    [[ -n "${v}" ]] && cur_proxy_listen="${v}"
+    v="$(grep -E '^MLX_SERVER_LOG=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr -d '\"' || true)"
+    [[ -n "${v}" ]] && cur_server_log="${v}"
+    v="$(grep -E '^MLX_PROCESS_PATTERN=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr -d '\"' || true)"
+    [[ -n "${v}" ]] && cur_pattern="${v}"
+    v="$(grep -E '^MLX_PEER_PROBE_PORT=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr -d '\"' || true)"
+    [[ -n "${v}" ]] && cur_peer_port="${v}"
+    if [[ -z "${mlx_upstream}" ]]; then
+      v="$(grep -E '^MLX_UPSTREAM=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- | tr -d '\"' || true)"
+      [[ -n "${v}" ]] && mlx_upstream="${v}"
+    fi
+  fi
+
   # Interactive prompt if parameters are omitted and not provided in environment
   if [[ -z "${central_ip}" ]]; then
     if [[ -t 0 ]]; then
-      central_ip="$(_prompt_input "Central VictoriaMetrics IP / Host (e.g. 192.168.1.10)")"
+      central_ip="$(_prompt_input "Central VictoriaMetrics IP / Host (e.g. 192.168.1.10)" "192.168.1.10")"
     fi
     [[ -n "${central_ip}" ]] || die "central_ip is required (pass as 1st arg, set CENTRAL_IP / CENTRAL_VICTORIA_METRICS, or enter interactively)"
   fi
@@ -352,15 +378,39 @@ cmd_setup_edge() {
 
   if [[ -z "${mlx_upstream}" ]]; then
     if [[ -t 0 ]]; then
-      mlx_upstream="$(_prompt_input "External LLM Upstream URL (e.g. http://127.0.0.1:8000)")"
+      mlx_upstream="$(_prompt_input "External LLM Upstream URL (e.g. http://127.0.0.1:8030)" "http://127.0.0.1:8030")"
     fi
-    [[ -n "${mlx_upstream}" ]] || die "MLX_UPSTREAM is required (e.g. http://127.0.0.1:8000). Pass as 4th arg, set MLX_UPSTREAM in env, or enter when prompted."
+    [[ -n "${mlx_upstream}" ]] || die "MLX_UPSTREAM is required (e.g. http://127.0.0.1:8030). Pass as 4th arg, set MLX_UPSTREAM in env, or enter when prompted."
   fi
   mlx_upstream="${mlx_upstream#"${mlx_upstream%%[![:space:]]*}"}"
   mlx_upstream="${mlx_upstream%"${mlx_upstream##*[![:space:]]}"}"
   [[ "${mlx_upstream}" != *[[:space:]]* ]] || die "Invalid MLX_UPSTREAM '${mlx_upstream}': URL must not contain whitespace"
   [[ "${mlx_upstream}" == *"://"* ]] || mlx_upstream="http://${mlx_upstream}"
   mlx_upstream="${mlx_upstream%/}"
+
+  if [[ -z "${proxy_listen}" ]]; then
+    if [[ -t 0 ]]; then
+      proxy_listen="$(_prompt_input "Metrics Proxy Listen Address (use 0.0.0.0:8080 for LAN or 127.0.0.1:8080 for local only)" "${cur_proxy_listen:-0.0.0.0:8080}")"
+    else
+      proxy_listen="${cur_proxy_listen:-0.0.0.0:8080}"
+    fi
+  fi
+
+  if [[ -z "${mlx_server_log}" ]]; then
+    if [[ -t 0 ]]; then
+      mlx_server_log="$(_prompt_input "MLX Server Log File Path for Logtailer" "${cur_server_log:-${EDGE_DIR}/logs/server.log}")"
+    else
+      mlx_server_log="${cur_server_log:-${EDGE_DIR}/logs/server.log}"
+    fi
+  fi
+
+  if [[ -z "${mlx_process_pattern}" ]]; then
+    if [[ -t 0 ]]; then
+      mlx_process_pattern="$(_prompt_input "MLX Process Pattern for Supervisor/Profiler" "${cur_pattern:-mlx_lm.server}")"
+    else
+      mlx_process_pattern="${cur_pattern:-mlx_lm.server}"
+    fi
+  fi
 
   if [[ -z "${model_id}" && -t 0 ]]; then
     model_id="$(_prompt_input "Model ID (press Enter to skip or specify served model)")"
@@ -405,6 +455,37 @@ devs = data.get("devices") or data.get("macbooks") or []
 print(devs[0].get("id", "unknown") if devs else "unknown")
 ' "${EDGE_DIR}/config/nodes.yml" 2>/dev/null || hostname -s)"
 
+  # Detect standalone mode vs multi-node cluster topology
+  local device_count
+  device_count="$("${mon_python}" -c '
+import sys, yaml
+data = yaml.safe_load(open(sys.argv[1], encoding="utf8")) or {}
+devs = [d for d in (data.get("devices") or data.get("macbooks") or []) if isinstance(d, dict) and d.get("enabled", True)]
+print(len(devs))
+' "${EDGE_DIR}/config/nodes.yml" 2>/dev/null || echo 1)"
+
+  local default_peer_port="0"
+  if [[ "${device_count}" -gt 1 ]]; then
+    default_peer_port="8081"
+  fi
+  if [[ -n "${cur_peer_port}" ]]; then
+    default_peer_port="${cur_peer_port}"
+  fi
+
+  if [[ -z "${peer_probe_port}" ]]; then
+    if [[ -t 0 ]]; then
+      if [[ "${device_count}" -le 1 ]]; then
+        info "Topology detection: standalone single-node deployment (1 device in nodes.yml)."
+        peer_probe_port="$(_prompt_input "Peer Probe Port (0 to disable peer network probes in standalone mode)" "${default_peer_port}")"
+      else
+        info "Topology detection: multi-node cluster deployment (${device_count} devices in nodes.yml)."
+        peer_probe_port="$(_prompt_input "Peer Probe Port for inter-node communication probes" "${default_peer_port}")"
+      fi
+    else
+      peer_probe_port="${default_peer_port}"
+    fi
+  fi
+
   info "generating ${ENV_FILE}"
   cat <<EOF > "${ENV_FILE}"
 ENABLE_PROXY=true
@@ -442,15 +523,15 @@ RATE_WINDOW=10.0
 MLX_NET_IFACE=
 
 ENABLE_CONTAINER_STATS=false
-MLX_SERVER_LOG=${EDGE_DIR}/logs/server.log
+MLX_SERVER_LOG=${mlx_server_log}
 
 # Passive process/external-supervisor monitoring overrides
-MLX_PROCESS_PATTERN=mlx_lm.server
+MLX_PROCESS_PATTERN=${mlx_process_pattern}
 MLX_LAUNCHD_LABEL=
 MLX_SYSTEMD_UNIT=
 
 # Process Profiler & SBOM Collector
-PROXY_LISTEN=127.0.0.1:8080
+PROXY_LISTEN=${proxy_listen}
 HW_LISTEN=127.0.0.1:9102
 KV_LISTEN=127.0.0.1:9104
 SUPERVISOR_LISTEN=127.0.0.1:9105
@@ -466,8 +547,8 @@ ENABLE_CANARY_EVAL=true
 ENABLE_OPIK_JUDGE=true
 JUDGE_INTERVAL=60
 MLX_HOSTFILE=${MLX_HOSTFILE:-}
-MLX_PEER_PROBE_PORT=8081
-MLX_PEER_APP_PORT=8081
+MLX_PEER_PROBE_PORT=${peer_probe_port}
+MLX_PEER_APP_PORT=${peer_probe_port}
 
 VMAGENT_SCRAPE_INTERVAL=10s
 VMAGENT_QUEUE_CAPACITY=5000
@@ -483,6 +564,35 @@ EOF
 
   info "edge setup complete; validating configuration"
   cmd_validate
+
+  local peer_mode_desc="disabled (standalone single-node mode)"
+  if [[ "${peer_probe_port}" != "0" ]]; then
+    peer_mode_desc="active on port ${peer_probe_port} (distributed cluster mode)"
+  fi
+
+  info "======================================================================"
+  info "Edge Monitoring Bundle Configuration Summary & Validation Guide"
+  info "======================================================================"
+  info "Configured parameters in ${ENV_FILE}:"
+  info "  • MLX_UPSTREAM:        ${mlx_upstream}"
+  info "  • PROXY_LISTEN:        ${proxy_listen}"
+  info "  • MLX_SERVER_LOG:      ${mlx_server_log}"
+  info "  • MLX_PROCESS_PATTERN: ${mlx_process_pattern}"
+  info "  • PEER_PROBE_PORTS:    ${peer_probe_port} (${peer_mode_desc})"
+  info "  • CENTRAL_IP:          ${central_ip}"
+  info "----------------------------------------------------------------------"
+  info "Where to check and review configuration files:"
+  info "  1. Edge environment:   ${ENV_FILE}"
+  info "  2. Cluster topology:   ${EDGE_DIR}/config/nodes.yml"
+  info "  3. Scrape targets:     ${EDGE_DIR}/logs/vmagent.yml (rendered after bundle start)"
+  info "----------------------------------------------------------------------"
+  info "How to validate edge configuration:"
+  info "  1. CLI validation:     ./scripts/deploy.sh validate"
+  info "  2. Exporter review:    ./scripts/deploy.sh review-edge"
+  info "  3. vmagent review:     ./scripts/deploy.sh review-vmagent"
+  info "  4. Live health check:  curl -s http://${proxy_listen}/v1/models"
+  info "                         curl -s http://127.0.0.1:9105/health"
+  info "======================================================================"
 
   if [[ -t 0 ]]; then
     local review
@@ -2173,8 +2283,9 @@ Clean & Reinstall options:
   -y, --yes, -f, --force   skip confirmation prompt
 
 Setup-edge arguments:
-  ./scripts/deploy.sh setup-edge <central_ip> [model_id] [model_path] [mlx_upstream]
-  If arguments are omitted, the script asks interactively.
+  ./scripts/deploy.sh setup-edge [central_ip] [model_id] [model_path] [mlx_upstream] [proxy_listen] [mlx_server_log] [mlx_process_pattern] [peer_probe_port]
+  If arguments are omitted, the script prompts interactively with sensible defaults
+  and auto-detects standalone vs multi-node topology.
 
 Edge arguments:
   ./scripts/deploy.sh edge start                  start in foreground
