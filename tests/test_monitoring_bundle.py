@@ -1226,6 +1226,7 @@ def test_reference_monitoring_suite_validity():
         "network-host-peers.json",
         "sbom-fleet-inventory.json",
         "sbom-drift-delta.json",
+        "network-topology.json",
     ]
 
     for fname in expected_files:

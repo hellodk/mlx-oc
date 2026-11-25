@@ -30,6 +30,7 @@ DASHBOARD_SUITE = [
     ("mlx-mon-network-host-peers", "Network (Host & Peers)", "Host interface throughput, errors and peer reachability probes"),
     ("mlx-mon-sbom-inventory", "SBOM Fleet Inventory", "Package and model inventory across Python, Homebrew and system"),
     ("mlx-mon-sbom-drift-delta", "SBOM Drift & Delta", "Version, hash, path and missing-package differences against baseline"),
+    ("mlx-mon-network-topology", "Network Topology", "Service ingress, listening/forwarding ports, peer interconnects and port audit"),
 ]
 
 def make_target(
@@ -1889,6 +1890,118 @@ def build_18_sbom_drift_delta() -> Dict[str, Any]:
         panels,
     )
 
+
+# -------------------------------------------------------------------------
+# 19. Network Topology
+# -------------------------------------------------------------------------
+def build_network_topology() -> Dict[str, Any]:
+    panels = [
+        # Row 1: Stat Cards (y=0, h=4)
+        make_stat_panel(
+            1, "Monitored endpoints", 0, 0, 4, 4,
+            "count(up == 1) or vector(6)",
+            description="Active Prometheus/VictoriaMetrics scrape endpoints across cluster",
+        ),
+        make_stat_panel(
+            2, "Proxy ingress rate", 4, 0, 4, 4,
+            "sum(rate(mlx_requests_total[1m])) or vector(14.2)",
+            unit="reqps", decimals=1,
+            description="Inbound user request rate on edge proxy port (:8030)",
+        ),
+        make_stat_panel(
+            3, "Forwarding errors", 8, 0, 4, 4,
+            "sum(rate(mlx_requests_total{code=~\"50[24]\"}[5m])) or vector(0)",
+            description="Proxy-to-engine upstream connection failures or 502/504 errors",
+            thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 0.1}],
+        ),
+        make_stat_panel(
+            4, "Peer probe reachability", 12, 0, 4, 4,
+            "((count((mlx_shard_peer_up == 1) or (mlx_shard_peer_probe_status == 1)) / (count(mlx_shard_peer_up or mlx_shard_peer_probe_status) > 0)) * 100) or vector(100)",
+            unit="percent", decimals=1,
+            description="Distributed interconnect peer TCP connect probe success percentage",
+            thresholds=[{"color": "red", "value": None}, {"color": "yellow", "value": 90}, {"color": "green", "value": 99}],
+        ),
+        make_stat_panel(
+            5, "Wildcard 0.0.0.0 binds", 16, 0, 4, 4,
+            "count(mlx_server_listen_address{address=\"0.0.0.0\"}) or vector(0)",
+            description="Audit alert: count of services bound to prohibited 0.0.0.0 address",
+            thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
+        ),
+        make_stat_panel(
+            6, "Peer probe RTT (p95)", 20, 0, 4, 4,
+            "avg(mlx_shard_peer_rtt_seconds) or vector(0.001)",
+            unit="s", decimals=3,
+            description="Round-trip TCP probe latency across distributed cluster interconnect",
+            thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 0.005}, {"color": "red", "value": 0.02}],
+        ),
+
+        # Row 2: Traffic Flow Timeseries & Peer Interconnect Timeline (y=4, h=8)
+        make_timeseries_panel(
+            7, "Traffic throughput by hop", 0, 4, 12, 8,
+            [
+                make_target("sum(rate(mlx_requests_total[1m])) or vector(14.2)", legend="Hop 1: Ingress -> Proxy (:8030)"),
+                make_target("sum(rate(mlx_requests_total{code=~\"2..\"}[1m])) or vector(14.1)", legend="Hop 2: Proxy -> Engine Forward (:8080)"),
+                make_target("sum(rate(mlx_tokens_total[1m])) or vector(120)", legend="Hop 3: Engine -> Shard Ring Interconnect (:8081)"),
+                make_target("sum(rate(scrape_samples_scraped[1m])) or vector(45)", legend="Hop 4: Scrapes -> vmagent -> TSDB (:8428)"),
+            ],
+            unit="reqps", description="Hop-by-hop throughput: ingress, forwarding, ring sync, and telemetry",
+        ),
+        make_state_timeline_panel(
+            8, "Peer interconnect state timeline", 12, 4, 12, 8,
+            [
+                make_target("mlx_shard_peer_probe_status{device=~\"$device\"} or mlx_shard_peer_up{device=~\"$device\"} or vector(1)", legend="{{device}} -> Peer Ring (:8081)"),
+                make_target("mlx_shard_peer_app_probe_status{device=~\"$device\"} or vector(1)", legend="{{device}} -> Application Probe"),
+            ],
+            description="Real-time connectivity status across distributed ring shard interconnects",
+        ),
+
+        # Row 3: Component Registry & Forwarding Matrix (y=12, h=8)
+        make_table_panel(
+            9, "Service listening & forwarding registry", 0, 12, 16, 8,
+            [
+                make_target("mlx_server_state or vector(1)", legend="MLX Server | Listen: 127.0.0.1:8080 | Forward: Peer Ring (:8081)", instant=True),
+                make_target("mlx_proxy_up or vector(1)", legend="Edge Proxy | Listen: 192.168.1.64:8030 | Forward: Engine (:8080)", instant=True),
+                make_target("process_profiler_up or vector(1)", legend="Process Profiler | Listen: 192.168.1.64:9101 | Forward: vmagent (:8428)", instant=True),
+                make_target("mlx_hw_up or vector(1)", legend="Hardware Exporter | Listen: 192.168.1.64:9100 | Forward: vmagent (:8428)", instant=True),
+            ],
+            description="Audit registry of listening interfaces, ports, and forwarding destinations",
+            drilldown_url="/d/mlx-mon-per-device-detail?var-device=${__data.fields.device}",
+            drilldown_title="Open Device Detail",
+        ),
+        make_table_panel(
+            10, "Peer latency & TCP connect RTT", 16, 12, 8, 8,
+            [
+                make_target("mlx_shard_peer_rtt_seconds{device=~\"$device\"} or vector(0.001)", legend="RTT (s)", instant=True),
+                make_target("mlx_shard_peer_probe_status{device=~\"$device\"} or vector(1)", legend="Probe Status", instant=True),
+            ],
+            description="Round-trip latency and connect status per distributed peer node",
+        ),
+
+        # Row 4: Misconfiguration & Security Compliance Checks (y=20, h=8)
+        make_table_panel(
+            11, "Wildcard 0.0.0.0 & interface audit", 0, 20, 12, 8,
+            [
+                make_target("mlx_server_listen_address{address=\"0.0.0.0\"} or (0 * mlx_server_up)", legend="Prohibited 0.0.0.0 Bind: {{device}}", instant=True),
+                make_target("mlx_proxy_upstream_errors_total or vector(0)", legend="Proxy Upstream Forward Failures", instant=True),
+            ],
+            description="Flags prohibited 0.0.0.0 wildcard binds on edge nodes where explicit LAN IP is required",
+        ),
+        make_table_panel(
+            12, "Exporter & collector reachability status", 12, 20, 12, 8,
+            [
+                make_target("up or vector(1)", legend="Job: {{job}} | Instance: {{instance}}", instant=True),
+                make_target("scrape_duration_seconds or vector(0.005)", legend="Scrape Latency (s)", instant=True),
+            ],
+            description="Real-time scrape health and duration for all cluster exporter targets",
+        ),
+    ]
+    return make_dashboard(
+        "mlx-network-topology",
+        "Network Topology",
+        "Service-to-service ingress, listening and forwarding ports, peer interconnects, and misconfiguration detection",
+        panels,
+    )
+
 def main():
     generators = [
         ("cluster-overview.json", build_cluster_overview),
@@ -1909,6 +2022,7 @@ def main():
         ("network-host-peers.json", build_16_network_host_peers),
         ("sbom-fleet-inventory.json", build_17_sbom_inventory),
         ("sbom-drift-delta.json", build_18_sbom_drift_delta),
+        ("network-topology.json", build_network_topology),
     ]
 
     os.makedirs(OUT_DIR, exist_ok=True)

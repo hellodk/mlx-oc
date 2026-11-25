@@ -234,6 +234,18 @@
       "tooltip": "SBOM Drift & Delta \u2014 Version, hash, path and missing-package differences against baseline",
       "type": "link",
       "url": "/d/mlx-mon-sbom-drift-delta"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Network Topology",
+      "tooltip": "Network Topology \u2014 Service ingress, listening/forwarding ports, peer interconnects and port audit",
+      "type": "link",
+      "url": "/d/mlx-mon-network-topology"
     }
   ],
   "liveNow": false,
