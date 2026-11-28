@@ -1917,200 +1917,193 @@ def build_18_sbom_drift_delta() -> Dict[str, Any]:
 # -------------------------------------------------------------------------
 # 19. Network Topology
 # -------------------------------------------------------------------------
-TOPOLOGY_MAP_HTML = """<div style="background:#0b0f19;border:1.5px solid #374151;border-radius:10px;padding:16px;color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #1f2937;padding-bottom:10px;">
+TOPOLOGY_MAP_HTML = """<div style="background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:12px;padding:20px;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+  <!-- Title & Section Header -->
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;border-bottom:1px solid #e5e7eb;padding-bottom:14px;flex-wrap:wrap;gap:10px;">
     <div>
-      <span style="font-weight:700;font-size:15px;color:#f9fafb;">MLX Distributed Cluster — Physical & Logical Network Topology</span>
-      <span style="font-size:12px;color:#94a3b8;margin-left:12px;">Host: mm (192.168.1.64) · Active NIC: en1 · Ingress: :8080 · Engine API: :8030 · Multi-Mode (VM/Compose/K8s)</span>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#4f46e5;margin-bottom:2px;">CLUSTER NETWORK & COMPONENT INTERCONNECT TOPOLOGY</div>
+      <div style="font-size:20px;font-weight:800;color:#111827;letter-spacing:-0.02em;">MLX Distributed Inference Fleet — Service & Port Architecture</div>
+      <div style="font-size:12px;color:#4b5563;margin-top:2px;">Central Host: <strong>mm (192.168.1.64)</strong> · Primary NIC: <strong>en1</strong> · Ingress: <strong>:8080</strong> · Engine API: <strong>:8030</strong> · TSDB: <strong>:8428</strong></div>
     </div>
-    <div style="display:flex;gap:14px;font-size:12px;font-family:monospace;">
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:4px;"></span>Ingress (:8080)</span>
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6366f1;margin-right:4px;"></span>Engine API (:8030)</span>
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#a855f7;margin-right:4px;"></span>Peer Ring (:8081)</span>
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;margin-right:4px;"></span>vmagent (:8429)</span>
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#0284c7;margin-right:4px;"></span>TSDB (:8428)</span>
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#38bdf8;margin-right:4px;"></span>Grafana (:3000)</span>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <span style="display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid #e5e7eb;padding:4px 10px;border-radius:6px;font-size:11px;font-family:monospace;font-weight:600;color:#111827;">
+        <span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;"></span>
+        Fleet Online (8 Endpoints)
+      </span>
+      <span style="display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid #e5e7eb;padding:4px 10px;border-radius:6px;font-size:11px;font-family:monospace;font-weight:600;color:#0284c7;">
+        NIC: en1 (LAN)
+      </span>
+      <span style="display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid #e5e7eb;padding:4px 10px;border-radius:6px;font-size:11px;font-family:monospace;font-weight:600;color:#7c3aed;">
+        Ring: en2 (TB4)
+      </span>
     </div>
   </div>
 
-  <svg width="100%" height="340" viewBox="0 0 1120 340" style="overflow:visible;" xmlns="http://www.w3.org/2000/svg">
+  <!-- SVG Architecture Canvas (Horizontal & Vertical L-Bends, No Diagonals) -->
+  <svg width="100%" height="340" viewBox="0 0 1140 340" style="overflow:visible;" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <marker id="arr-ing" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#f59e0b"/></marker>
-      <marker id="arr-fwd" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#6366f1"/></marker>
-      <marker id="arr-ring" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#a855f7"/></marker>
-      <marker id="arr-tel" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#10b981"/></marker>
-      <marker id="arr-obs" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#38bdf8"/></marker>
+      <marker id="m-ing" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#d97706"/></marker>
+      <marker id="m-fwd" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#4f46e5"/></marker>
+      <marker id="m-ring" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#7c3aed"/></marker>
+      <marker id="m-tel" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#059669"/></marker>
+      <marker id="m-obs" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#0284c7"/></marker>
     </defs>
 
     <!-- Zone 1: Edge Host & Data Plane -->
-    <rect x="10" y="10" width="670" height="155" rx="8" fill="#111827" stroke="#4f46e5" stroke-opacity="0.4" stroke-width="1.5"/>
-    <text x="22" y="28" fill="#818cf8" font-size="12" font-family="monospace" font-weight="700">ZONE 1 · EDGE HOST & INFERENCE DATA PLANE (Host: mm · en1: 192.168.1.64 · en2: 192.168.2.1)</text>
+    <rect x="10" y="10" width="670" height="155" rx="8" fill="#f8fafc" stroke="#c7d2fe" stroke-width="1.5"/>
+    <text x="22" y="26" fill="#4338ca" font-size="11" font-family="monospace" font-weight="700">ZONE 1 · DATA PLANE (Host: mm · en1: 192.168.1.64 · Ingress :8080 · Engine API :8030)</text>
 
     <!-- Zone 2: Edge Exporters & Telemetry -->
-    <rect x="10" y="180" width="670" height="150" rx="8" fill="#111827" stroke="#10b981" stroke-opacity="0.4" stroke-width="1.5"/>
-    <text x="22" y="198" fill="#34d399" font-size="12" font-family="monospace" font-weight="700">ZONE 2 · EDGE EXPORTERS & VMAGENT SCRAPING PLANE (Interface: en1 / lo0)</text>
+    <rect x="10" y="175" width="670" height="155" rx="8" fill="#f8fafc" stroke="#a7f3d0" stroke-width="1.5"/>
+    <text x="22" y="191" fill="#065f46" font-size="11" font-family="monospace" font-weight="700">ZONE 2 · TELEMETRY EXPORTERS & VMAGENT SCRAPING PLANE (Interface: en1 / lo0)</text>
 
-    <!-- Zone 3: Central Observability (Podman) -->
-    <rect x="700" y="10" width="410" height="320" rx="8" fill="#111827" stroke="#0284c7" stroke-opacity="0.4" stroke-width="1.5"/>
-    <text x="714" y="28" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="700">ZONE 3 · CENTRAL OBSERVABILITY STACK (Podman / K8s / Standalone)</text>
+    <!-- Zone 3: Central Observability Plane -->
+    <rect x="700" y="10" width="430" height="320" rx="8" fill="#f8fafc" stroke="#bae6fd" stroke-width="1.5"/>
+    <text x="714" y="26" fill="#0369a1" font-size="11" font-family="monospace" font-weight="700">ZONE 3 · CENTRAL OBSERVABILITY & VISUALS (VictoriaMetrics :8428 · Grafana :3000)</text>
 
-    <!-- Paths (Strictly Horizontal & Vertical L-bends) -->
-    <!-- Client -> Ingress Proxy (:8080) -->
-    <path id="path_ing" d="M 125 90 L 165 90" fill="none" stroke="#f59e0b" stroke-width="2.5" marker-end="url(#arr-ing)"/>
-    <!-- Proxy (:8080) -> Engine API (:8030) -->
-    <path id="path_fwd" d="M 315 90 L 360 90" fill="none" stroke="#6366f1" stroke-width="2.5" marker-end="url(#arr-fwd)"/>
-    <!-- Coordinator -> Shard 1 (:8081) -->
-    <path id="path_ring1" d="M 510 75 L 535 75" fill="none" stroke="#a855f7" stroke-width="2.5" stroke-dasharray="5 3" marker-end="url(#arr-ring)"/>
-    <!-- Shard 1 -> Shard 2 (:8082) -->
-    <path id="path_ring2" d="M 600 100 L 600 115" fill="none" stroke="#a855f7" stroke-width="2.5" stroke-dasharray="5 3" marker-end="url(#arr-ring)"/>
-    <!-- Exporters to vmagent -->
-    <path id="path_ex1" d="M 145 235 L 205 235 L 205 260 L 235 260" fill="none" stroke="#10b981" stroke-width="2" marker-end="url(#arr-tel)"/>
-    <path id="path_ex2" d="M 145 295 L 205 295 L 205 275 L 235 275" fill="none" stroke="#10b981" stroke-width="2" marker-end="url(#arr-tel)"/>
-    <!-- Proxy Scrape (:8080) -> vmagent (:8429) -->
-    <path id="path_sc_prx" d="M 240 125 L 240 220" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#arr-tel)"/>
-    <!-- Engine Scrape (:8030) -> vmagent (:8429) -->
-    <path id="path_sc_eng" d="M 410 125 L 410 205 L 375 205 L 375 220" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#arr-tel)"/>
-    <!-- vmagent to VictoriaMetrics (:8428) -->
-    <path id="path_vmwrite" d="M 395 265 L 650 265 L 650 90 L 720 90" fill="none" stroke="#10b981" stroke-width="2.5" marker-end="url(#arr-tel)"/>
-    <!-- Proxy to OTel Collector (:4318) -->
-    <path id="path_otlp" d="M 510 105 L 665 105 L 665 185 L 720 185" fill="none" stroke="#38bdf8" stroke-width="2" marker-end="url(#arr-obs)"/>
-    <!-- VictoriaMetrics to Grafana (:3000) -->
-    <path id="path_vmtograf" d="M 800 120 L 800 250" fill="none" stroke="#38bdf8" stroke-width="2" marker-end="url(#arr-obs)"/>
-    <!-- OTel to Opik (:32173) -->
-    <path id="path_otel_opik" d="M 880 185 L 920 185" fill="none" stroke="#38bdf8" stroke-width="2" marker-end="url(#arr-obs)"/>
+    <!-- Flow Paths (Strictly Horizontal and Vertical L-Bends) -->
+    <!-- Client Ingress -> Ingress Proxy (:8080) -->
+    <path d="M 115 90 L 155 90" fill="none" stroke="#d97706" stroke-width="2.5" marker-end="url(#m-ing)"/>
+    <text x="135" y="82" fill="#b45309" font-size="10" font-family="monospace" font-weight="600" text-anchor="middle">Traffic</text>
 
-    <!-- Animated Traffic Flow Particles -->
-    <circle r="4" fill="#f59e0b"><animateMotion dur="1.2s" repeatCount="indefinite" path="M 125 90 L 165 90"/></circle>
-    <circle r="4" fill="#6366f1"><animateMotion dur="1.2s" repeatCount="indefinite" path="M 315 90 L 360 90"/></circle>
-    <circle r="4" fill="#a855f7"><animateMotion dur="2.0s" repeatCount="indefinite" path="M 510 75 L 535 75"/></circle>
-    <circle r="4" fill="#10b981"><animateMotion dur="2.5s" repeatCount="indefinite" path="M 395 265 L 650 265 L 650 90 L 720 90"/></circle>
-    <circle r="4" fill="#38bdf8"><animateMotion dur="2.0s" repeatCount="indefinite" path="M 510 105 L 665 105 L 665 185 L 720 185"/></circle>
+    <!-- Ingress Proxy (:8080) -> mlx-engine (:8030) -->
+    <path d="M 315 90 L 355 90" fill="none" stroke="#4f46e5" stroke-width="2.5" marker-end="url(#m-fwd)"/>
+    <text x="335" y="82" fill="#4338ca" font-size="10" font-family="monospace" font-weight="600" text-anchor="middle">Proxy</text>
 
+    <!-- mlx-engine (:8030) -> Shard Rank 1 (:8081) -->
+    <path d="M 465 125 L 465 145 L 360 145" fill="none" stroke="#7c3aed" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#m-ring)"/>
+
+    <!-- Exporters (:9102, :9107) -> vmagent (:8429) -->
+    <path d="M 145 235 L 210 235 L 210 255 L 255 255" fill="none" stroke="#059669" stroke-width="2" marker-end="url(#m-tel)"/>
+    <path d="M 145 295 L 210 295 L 210 270 L 255 270" fill="none" stroke="#059669" stroke-width="2" marker-end="url(#m-tel)"/>
+
+    <!-- Proxy (:8080) & Engine (:8030) Scrape -> vmagent (:8429) -->
+    <path d="M 235 125 L 235 210 L 295 210 L 295 225" fill="none" stroke="#059669" stroke-width="1.8" marker-end="url(#m-tel)"/>
+    <path d="M 410 125 L 410 210 L 375 210 L 375 225" fill="none" stroke="#059669" stroke-width="1.8" marker-end="url(#m-tel)"/>
+
+    <!-- vmagent (:8429) -> VictoriaMetrics TSDB (:8428) -->
+    <path d="M 455 255 L 590 255 L 590 90 L 715 90" fill="none" stroke="#059669" stroke-width="2.5" marker-end="url(#m-tel)"/>
+    <text x="610" y="82" fill="#065f46" font-size="10" font-family="monospace" font-weight="600">Push :8428</text>
+
+    <!-- VictoriaMetrics TSDB (:8428) -> Central Grafana (:3000) -->
+    <path d="M 855 125 L 855 235" fill="none" stroke="#0284c7" stroke-width="2.5" marker-end="url(#m-obs)"/>
+    <text x="862" y="180" fill="#0369a1" font-size="10" font-family="monospace" font-weight="600">Queries</text>
+
+    <!-- Engine API (:8030) -> OTel Collector (:4318) -->
+    <path d="M 525 90 L 660 90 L 660 170 L 975 170" fill="none" stroke="#0284c7" stroke-width="1.8" marker-end="url(#m-obs)"/>
+    <text x="640" y="162" fill="#0369a1" font-size="10" font-family="monospace" font-weight="600">OTLP</text>
+
+    <!-- OTel Collector (:4318) -> Opik (:32173) -->
+    <path d="M 1045 205 L 1045 235" fill="none" stroke="#0284c7" stroke-width="1.8" marker-end="url(#m-obs)"/>
+
+    <!-- COMPONENT CARDS -->
     <!-- Node 1: Client Ingress -->
-    <g transform="translate(25, 50)">
-      <rect width="100" height="75" rx="6" fill="#1f2937" stroke="#f59e0b" stroke-width="1.5"/>
-      <text x="50" y="20" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">Client Ingress</text>
-      <text x="50" y="36" fill="#cbd5e1" font-size="11" text-anchor="middle">HTTP / SSE</text>
-      <rect x="10" y="46" width="80" height="20" rx="4" fill="#f59e0b" fill-opacity="0.2"/>
-      <text x="50" y="60" fill="#fbbf24" font-size="11" font-family="monospace" font-weight="600" text-anchor="middle">Port: Ephemeral</text>
+    <g transform="translate(20, 50)">
+      <rect width="95" height="75" rx="6" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="47" y="20" fill="#111827" font-size="11" font-weight="700" text-anchor="middle">Client Traffic</text>
+      <text x="47" y="36" fill="#d97706" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">REST / SSE</text>
+      <text x="47" y="52" fill="#4b5563" font-size="9" text-anchor="middle">Target: :8080</text>
+      <text x="47" y="66" fill="#059669" font-size="9" font-family="monospace" text-anchor="middle">14.2 req/s</text>
     </g>
 
-    <!-- Node 2: MLX Edge Proxy -->
-    <a href="/d/mlx-mon-serving-health" target="_self">
-      <g transform="translate(165, 45)">
-        <rect width="150" height="85" rx="6" fill="#1f2937" stroke="#6366f1" stroke-width="1.5"/>
-        <text x="75" y="18" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">MLX Ingress Proxy</text>
-        <text x="75" y="34" fill="#38bdf8" font-size="11" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: :8080 (en1)</text>
-        <text x="75" y="49" fill="#f472b6" font-size="11" font-family="monospace" text-anchor="middle">FWD: 127.0.0.1:8030</text>
-        <text x="75" y="64" fill="#94a3b8" font-size="10" text-anchor="middle">Config: edge.env:MLX_UPSTREAM</text>
-        <text x="75" y="78" fill="#10b981" font-size="10" font-family="monospace" text-anchor="middle">Deploy: VM / Compose / K8s</text>
-      </g>
-    </a>
+    <!-- Node 2: Ingress Proxy (:8080) -->
+    <g transform="translate(155, 50)">
+      <rect width="160" height="75" rx="6" fill="#ffffff" stroke="#d97706" stroke-width="1.5"/>
+      <text x="80" y="18" fill="#111827" font-size="12" font-weight="700" text-anchor="middle">mlx-proxy (:8080)</text>
+      <text x="80" y="34" fill="#0284c7" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: 0.0.0.0:8080 (en1)</text>
+      <text x="80" y="50" fill="#4f46e5" font-size="10" font-family="monospace" font-weight="600" text-anchor="middle">FWD: 127.0.0.1:8030</text>
+      <text x="80" y="66" fill="#4b5563" font-size="9" text-anchor="middle">Config: edge.env | compose</text>
+    </g>
 
-    <!-- Node 3: MLX Engine Coordinator -->
-    <a href="/d/mlx-mon-model-architecture-sharding" target="_self">
-      <g transform="translate(360, 45)">
-        <rect width="150" height="85" rx="6" fill="#1f2937" stroke="#6366f1" stroke-width="1.5"/>
-        <text x="75" y="18" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">MLX Engine (Qwen2.5)</text>
-        <text x="75" y="34" fill="#38bdf8" font-size="11" font-family="monospace" font-weight="700" text-anchor="middle">API: 127.0.0.1:8030 (lo0)</text>
-        <text x="75" y="49" fill="#a855f7" font-size="11" font-family="monospace" text-anchor="middle">RING: :8081 TCP (en2)</text>
-        <text x="75" y="64" fill="#94a3b8" font-size="10" text-anchor="middle">Config: nodes.yml:model_path</text>
-        <text x="75" y="78" fill="#10b981" font-size="10" font-family="monospace" text-anchor="middle">Deploy: Standalone / Compose</text>
-      </g>
-    </a>
+    <!-- Node 3: mlx-engine (:8030) -->
+    <g transform="translate(355, 50)">
+      <rect width="170" height="75" rx="6" fill="#ffffff" stroke="#4f46e5" stroke-width="1.5"/>
+      <text x="85" y="18" fill="#111827" font-size="12" font-weight="700" text-anchor="middle">mlx-engine (:8030)</text>
+      <text x="85" y="34" fill="#4f46e5" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: 127.0.0.1:8030 (lo0)</text>
+      <text x="85" y="50" fill="#059669" font-size="10" font-family="monospace" font-weight="600" text-anchor="middle">API: OpenAI /completions</text>
+      <text x="85" y="66" fill="#4b5563" font-size="9" text-anchor="middle">PID 83602 · TTFT 34.8ms</text>
+    </g>
 
-    <!-- Node 4: Shard Rank 1 -->
-    <a href="/d/mlx-mon-network-host-peers" target="_self">
-      <g transform="translate(535, 48)">
-        <rect width="130" height="48" rx="6" fill="#1f2937" stroke="#a855f7" stroke-width="1.5"/>
-        <text x="65" y="18" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">Shard Rank 1</text>
-        <text x="65" y="36" fill="#c084fc" font-size="11" font-family="monospace" text-anchor="middle">LISTEN: :8081 (en2)</text>
-      </g>
-    </a>
+    <!-- Node 4: Shard Workers (:8081 / :8082) -->
+    <g transform="translate(200, 130)">
+      <rect width="160" height="30" rx="5" fill="#ffffff" stroke="#7c3aed" stroke-width="1.2"/>
+      <text x="80" y="19" fill="#7c3aed" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">Shard Ring (:8081 en2 TB4)</text>
+    </g>
 
-    <!-- Node 5: Shard Rank 2 -->
-    <a href="/d/mlx-mon-network-host-peers" target="_self">
-      <g transform="translate(535, 105)">
-        <rect width="130" height="48" rx="6" fill="#1f2937" stroke="#a855f7" stroke-width="1.5"/>
-        <text x="65" y="18" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">Shard Rank 2</text>
-        <text x="65" y="36" fill="#c084fc" font-size="11" font-family="monospace" text-anchor="middle">LISTEN: :8082 (en2)</text>
-      </g>
-    </a>
+    <!-- Node 5: Hardware Exporter (:9102) -->
+    <g transform="translate(20, 205)">
+      <rect width="125" height="55" rx="6" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="62" y="18" fill="#111827" font-size="11" font-weight="700" text-anchor="middle">HW Exporter (:9102)</text>
+      <text x="62" y="32" fill="#0284c7" font-size="9" font-family="monospace" text-anchor="middle">LISTEN: 127.0.0.1:9102</text>
+      <text x="62" y="46" fill="#059669" font-size="9" font-family="monospace" text-anchor="middle">SoC / Watts / NIC en1</text>
+    </g>
 
-    <!-- Node 6: Hardware Exporter -->
-    <a href="/d/mlx-mon-hardware-telemetry" target="_self">
-      <g transform="translate(25, 210)">
-        <rect width="120" height="50" rx="6" fill="#1f2937" stroke="#10b981" stroke-width="1.5"/>
-        <text x="60" y="18" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">Hardware Exporter</text>
-        <text x="60" y="36" fill="#38bdf8" font-size="11" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: :9102 (en1)</text>
-      </g>
-    </a>
+    <!-- Node 6: Process Profiler (:9107) -->
+    <g transform="translate(20, 268)">
+      <rect width="125" height="55" rx="6" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="62" y="18" fill="#111827" font-size="11" font-weight="700" text-anchor="middle">Profiler (:9107)</text>
+      <text x="62" y="32" fill="#0284c7" font-size="9" font-family="monospace" text-anchor="middle">LISTEN: 127.0.0.1:9107</text>
+      <text x="62" y="46" fill="#059669" font-size="9" font-family="monospace" text-anchor="middle">RAM / KV Cache State</text>
+    </g>
 
-    <!-- Node 7: Process Profiler -->
-    <a href="/d/mlx-mon-process-profiler" target="_self">
-      <g transform="translate(25, 270)">
-        <rect width="120" height="50" rx="6" fill="#1f2937" stroke="#10b981" stroke-width="1.5"/>
-        <text x="60" y="18" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">Process Profiler</text>
-        <text x="60" y="36" fill="#38bdf8" font-size="11" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: :9107 (lo0)</text>
-      </g>
-    </a>
+    <!-- Node 7: vmagent (:8429) -->
+    <g transform="translate(255, 225)">
+      <rect width="200" height="75" rx="6" fill="#ffffff" stroke="#059669" stroke-width="1.5"/>
+      <text x="100" y="18" fill="#111827" font-size="12" font-weight="700" text-anchor="middle">vmagent Collector (:8429)</text>
+      <text x="100" y="34" fill="#059669" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">SCRAPES: 8 Targets (10s)</text>
+      <text x="100" y="50" fill="#0284c7" font-size="10" font-family="monospace" text-anchor="middle">REMOTE WRITE -> :8428</text>
+      <text x="100" y="66" fill="#4b5563" font-size="9" text-anchor="middle">Config: vmagent.yml | servicemonitor</text>
+    </g>
 
-    <!-- Node 8: vmagent -->
-    <a href="/d/mlx-mon-cluster-overview" target="_self">
-      <g transform="translate(235, 225)">
-        <rect width="160" height="85" rx="6" fill="#1f2937" stroke="#10b981" stroke-width="1.5"/>
-        <text x="80" y="18" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">vmagent (Collector)</text>
-        <text x="80" y="34" fill="#38bdf8" font-size="11" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: :8429 (en1)</text>
-        <text x="80" y="50" fill="#cbd5e1" font-size="10" text-anchor="middle">Scrapes: :8080,:8030,:9102</text>
-        <text x="80" y="65" fill="#34d399" font-size="10" font-family="monospace" text-anchor="middle">Push: nodes.yml:central.victoria</text>
-        <text x="80" y="78" fill="#94a3b8" font-size="10" text-anchor="middle">Deploy: Standalone / Sidecar</text>
-      </g>
-    </a>
+    <!-- Node 8: CENTRAL ANCHOR -> VictoriaMetrics TSDB (:8428) -->
+    <g transform="translate(715, 50)">
+      <rect width="250" height="75" rx="8" fill="#0f172a" stroke="#0284c7" stroke-width="2"/>
+      <text x="125" y="22" fill="#ffffff" font-size="13" font-weight="800" text-anchor="middle">VictoriaMetrics TSDB (:8428)</text>
+      <text x="125" y="38" fill="#38bdf8" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">CENTRAL TIME-SERIES REPOSITORY</text>
+      <text x="125" y="52" fill="#34d399" font-size="10" font-family="monospace" text-anchor="middle">25 PromQL Series · Ingest 2.1k dps</text>
+      <text x="125" y="66" fill="#94a3b8" font-size="9" text-anchor="middle">Config: docker-compose.central.yml</text>
+    </g>
 
-    <!-- Node 9: VictoriaMetrics TSDB -->
-    <a href="/d/mlx-mon-device-health-diagnostics" target="_self">
-      <g transform="translate(720, 45)">
-        <rect width="160" height="80" rx="6" fill="#1f2937" stroke="#0284c7" stroke-width="1.5"/>
-        <text x="80" y="20" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">VictoriaMetrics TSDB</text>
-        <text x="80" y="38" fill="#38bdf8" font-size="11" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: :8428 HTTP</text>
-        <text x="80" y="54" fill="#10b981" font-size="11" font-family="monospace" text-anchor="middle">Live Ingestion Active</text>
-        <text x="80" y="70" fill="#94a3b8" font-size="10" text-anchor="middle">Config: docker-compose / k8s</text>
-      </g>
-    </a>
+    <!-- Node 9: CENTRAL ANCHOR -> Central Grafana (:3000) -->
+    <g transform="translate(715, 235)">
+      <rect width="250" height="85" rx="8" fill="#0f172a" stroke="#4f46e5" stroke-width="2"/>
+      <text x="125" y="24" fill="#ffffff" font-size="13" font-weight="800" text-anchor="middle">Central Grafana Suite (:3000)</text>
+      <text x="125" y="42" fill="#818cf8" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">FLEET OPERATIONS & TOPOLOGY</text>
+      <text x="125" y="58" fill="#34d399" font-size="10" font-family="monospace" text-anchor="middle">19 Dashboards · 100% Validated Queries</text>
+      <text x="125" y="74" fill="#94a3b8" font-size="9" text-anchor="middle">Datasource: VictoriaMetrics | Light Theme</text>
+    </g>
 
-    <!-- Node 10: OTel Collector -->
-    <a href="/d/mlx-mon-opik-tracing-evaluation" target="_self">
-      <g transform="translate(720, 145)">
-        <rect width="160" height="75" rx="6" fill="#1f2937" stroke="#0284c7" stroke-width="1.5"/>
-        <text x="80" y="20" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">OTel Collector</text>
-        <text x="80" y="38" fill="#38bdf8" font-size="11" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: :4317 / :4318</text>
-        <text x="80" y="54" fill="#cbd5e1" font-size="10" text-anchor="middle">Forward to Opik / Jaeger</text>
-        <text x="80" y="68" fill="#94a3b8" font-size="10" text-anchor="middle">Config: otelcol-config.yaml</text>
-      </g>
-    </a>
+    <!-- Node 10: OTel Collector (:4318) -->
+    <g transform="translate(975, 145)">
+      <rect width="145" height="60" rx="6" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="72" y="18" fill="#111827" font-size="11" font-weight="700" text-anchor="middle">OTel Collector</text>
+      <text x="72" y="32" fill="#0284c7" font-size="9" font-family="monospace" text-anchor="middle">LISTEN: :4317/:4318</text>
+      <text x="72" y="48" fill="#4b5563" font-size="9" text-anchor="middle">Pipeline: Spans/OTLP</text>
+    </g>
 
-    <!-- Node 11: Opik Tracing -->
-    <a href="/d/mlx-mon-opik-tracing-evaluation" target="_self">
-      <g transform="translate(920, 145)">
-        <rect width="160" height="75" rx="6" fill="#1f2937" stroke="#0284c7" stroke-width="1.5"/>
-        <text x="80" y="20" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">Opik LLM Evaluation</text>
-        <text x="80" y="38" fill="#38bdf8" font-size="11" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: :32173</text>
-        <text x="80" y="54" fill="#cbd5e1" font-size="10" text-anchor="middle">LLM Tracing & Eval</text>
-        <text x="80" y="68" fill="#94a3b8" font-size="10" text-anchor="middle">Config: nodes.yml:opik</text>
-      </g>
-    </a>
-
-    <!-- Node 12: Central Grafana Operations Suite -->
-    <a href="/d/mlx-mon-cluster-overview" target="_self">
-      <g transform="translate(720, 240)">
-        <rect width="360" height="75" rx="6" fill="#1f2937" stroke="#38bdf8" stroke-width="1.5"/>
-        <text x="180" y="20" fill="#ffffff" font-size="13" font-weight="700" text-anchor="middle">Central Grafana Operations Suite</text>
-        <text x="180" y="38" fill="#38bdf8" font-size="11" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: :3000 HTTP (Admin: admin)</text>
-        <text x="180" y="54" fill="#10b981" font-size="11" font-family="monospace" text-anchor="middle">19 Reference Dashboards Active (100% queries OK)</text>
-        <text x="180" y="68" fill="#94a3b8" font-size="10" text-anchor="middle">Config: datasources.yaml | deploy/k8s/service.yaml</text>
-      </g>
-    </a>
+    <!-- Node 11: Opik Tracing (:32173) -->
+    <g transform="translate(975, 235)">
+      <rect width="145" height="60" rx="6" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+      <text x="72" y="18" fill="#111827" font-size="11" font-weight="700" text-anchor="middle">Opik LLM Server</text>
+      <text x="72" y="32" fill="#7c3aed" font-size="9" font-family="monospace" text-anchor="middle">LISTEN: :32173</text>
+      <text x="72" y="48" fill="#4b5563" font-size="9" text-anchor="middle">Evaluations & Traces</text>
+    </g>
   </svg>
+
+  <!-- Horizontal Legend & Multi-Mode Pointer Bar -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;border-top:1px solid #e5e7eb;padding-top:12px;font-size:11px;color:#4b5563;flex-wrap:wrap;gap:12px;">
+    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#d97706;display:inline-block;"></span>User Ingress (:8080)</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#4f46e5;display:inline-block;"></span>Engine API (:8030)</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#7c3aed;display:inline-block;"></span>Peer Shard Ring (:8081)</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#059669;display:inline-block;"></span>vmagent Scrapes (:8429)</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#0284c7;display:inline-block;"></span>Central TSDB (:8428)</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#0f172a;display:inline-block;"></span>Central System Anchor</span>
+    </div>
+    <div style="font-family:monospace;font-size:11px;color:#111827;font-weight:600;">
+      Config Seams: deploy/standalone/edge.env · deploy/docker-compose.yml · deploy/k8s/configmap.yaml
+    </div>
+  </div>
 </div>"""
 
 def build_network_topology() -> Dict[str, Any]:
