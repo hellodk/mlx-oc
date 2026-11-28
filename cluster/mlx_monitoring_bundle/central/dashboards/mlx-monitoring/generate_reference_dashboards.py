@@ -2196,8 +2196,8 @@ def build_network_topology() -> Dict[str, Any]:
         # Row 2: Live Dynamic Node Graph Visualization (Hero Panel, y=4, h=14, w=24)
         make_nodegraph_panel(
             7, "Dynamic telemetry & component topology (Native Node Graph)", 0, 4, 24, 14,
-            make_target("mlx_topology_node_info{device=~\"$device|central|external\"} or (1 * mlx_server_state{device=~\"$device\"})", legend="Node: {{name}} ({{device}})"),
-            make_target("mlx_topology_edge_info{device=~\"$device|central|external\"} or (1 * mlx_shard_peer_up)", legend="Edge: {{source}} -> {{target}}"),
+            make_target("topk by (id) (1, mlx_topology_node_info{device=~\"$device|central|external|all\"}) or (1 * mlx_server_state{device=~\"$device\"})", legend="Node: {{name}} ({{device}})"),
+            make_target("topk by (id) (1, mlx_topology_edge_info{device=~\"$device|central|external|all\"}) or (1 * mlx_shard_peer_up)", legend="Edge: {{source}} -> {{target}}"),
             description="Native Grafana Node Graph rendering real-time nodes, listening sockets, forwarding hops, and telemetry pipelines with click-to-inspect drawers",
         ),
 
