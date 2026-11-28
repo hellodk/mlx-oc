@@ -263,6 +263,29 @@ def make_state_timeline_panel(
         },
     }
 
+def make_text_panel(
+    panel_id: int,
+    title: str,
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    content: str,
+    mode: str = "html",
+    description: str = "",
+) -> Dict[str, Any]:
+    return {
+        "id": panel_id,
+        "title": title,
+        "type": "text",
+        "gridPos": {"h": h, "w": w, "x": x, "y": y},
+        "description": description,
+        "options": {
+            "mode": mode,
+            "content": content,
+        },
+    }
+
 def make_dashboard_links() -> List[Dict[str, Any]]:
     links = [
         {
@@ -1894,6 +1917,195 @@ def build_18_sbom_drift_delta() -> Dict[str, Any]:
 # -------------------------------------------------------------------------
 # 19. Network Topology
 # -------------------------------------------------------------------------
+TOPOLOGY_MAP_HTML = """<div style="background:#0b0f19;border:1.5px solid #374151;border-radius:10px;padding:16px;color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #1f2937;padding-bottom:10px;">
+    <div>
+      <span style="font-weight:700;font-size:15px;color:#f9fafb;">MLX Distributed Cluster — Physical & Logical Network Topology</span>
+      <span style="font-size:12px;color:#94a3b8;margin-left:12px;">Edge Node: 192.168.1.64 · Direct LAN / Multi-Mode Compliant Route</span>
+    </div>
+    <div style="display:flex;gap:14px;font-size:12px;font-family:monospace;">
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:4px;"></span>Ingress (:8030)</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6366f1;margin-right:4px;"></span>Engine (:8080)</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#a855f7;margin-right:4px;"></span>Peer Ring (:8081)</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;margin-right:4px;"></span>vmagent (:8429)</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#0284c7;margin-right:4px;"></span>TSDB (:8428)</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#38bdf8;margin-right:4px;"></span>Grafana (:3000)</span>
+    </div>
+  </div>
+
+  <svg width="100%" height="340" viewBox="0 0 1120 340" style="overflow:visible;" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arr-ing" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#f59e0b"/></marker>
+      <marker id="arr-fwd" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#6366f1"/></marker>
+      <marker id="arr-ring" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#a855f7"/></marker>
+      <marker id="arr-tel" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#10b981"/></marker>
+      <marker id="arr-obs" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#38bdf8"/></marker>
+    </defs>
+
+    <!-- Zone 1: Edge Host & Data Plane -->
+    <rect x="10" y="10" width="670" height="155" rx="8" fill="#111827" stroke="#4f46e5" stroke-opacity="0.4" stroke-width="1.5"/>
+    <text x="22" y="28" fill="#818cf8" font-size="12" font-family="monospace" font-weight="700">ZONE 1 · EDGE HOST & INFERENCE DATA PLANE (192.168.1.64)</text>
+
+    <!-- Zone 2: Edge Exporters & Telemetry -->
+    <rect x="10" y="180" width="670" height="150" rx="8" fill="#111827" stroke="#10b981" stroke-opacity="0.4" stroke-width="1.5"/>
+    <text x="22" y="198" fill="#34d399" font-size="12" font-family="monospace" font-weight="700">ZONE 2 · EDGE EXPORTERS & VMAGENT SCRAPING PLANE</text>
+
+    <!-- Zone 3: Central Observability (Podman) -->
+    <rect x="700" y="10" width="410" height="320" rx="8" fill="#111827" stroke="#0284c7" stroke-opacity="0.4" stroke-width="1.5"/>
+    <text x="714" y="28" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="700">ZONE 3 · CENTRAL OBSERVABILITY STACK (Podman)</text>
+
+    <!-- Paths (Strictly Horizontal & Vertical L-bends) -->
+    <!-- Client -> Proxy -->
+    <path id="path_ing" d="M 125 90 L 165 90" fill="none" stroke="#f59e0b" stroke-width="2.5" marker-end="url(#arr-ing)"/>
+    <!-- Proxy -> Coordinator -->
+    <path id="path_fwd" d="M 315 90 L 360 90" fill="none" stroke="#6366f1" stroke-width="2.5" marker-end="url(#arr-fwd)"/>
+    <!-- Coordinator -> Shard 1 -->
+    <path id="path_ring1" d="M 510 75 L 535 75" fill="none" stroke="#a855f7" stroke-width="2.5" stroke-dasharray="5 3" marker-end="url(#arr-ring)"/>
+    <!-- Shard 1 -> Shard 2 -->
+    <path id="path_ring2" d="M 600 100 L 600 115" fill="none" stroke="#a855f7" stroke-width="2.5" stroke-dasharray="5 3" marker-end="url(#arr-ring)"/>
+    <!-- Exporters to vmagent -->
+    <path id="path_ex1" d="M 145 235 L 205 235 L 205 260 L 235 260" fill="none" stroke="#10b981" stroke-width="2" marker-end="url(#arr-tel)"/>
+    <path id="path_ex2" d="M 145 295 L 205 295 L 205 275 L 235 275" fill="none" stroke="#10b981" stroke-width="2" marker-end="url(#arr-tel)"/>
+    <!-- Proxy Scrape -> vmagent -->
+    <path id="path_sc_prx" d="M 240 125 L 240 220" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#arr-tel)"/>
+    <!-- Engine Scrape -> vmagent -->
+    <path id="path_sc_eng" d="M 410 125 L 410 205 L 375 205 L 375 220" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#arr-tel)"/>
+    <!-- vmagent to VictoriaMetrics -->
+    <path id="path_vmwrite" d="M 395 265 L 650 265 L 650 90 L 720 90" fill="none" stroke="#10b981" stroke-width="2.5" marker-end="url(#arr-tel)"/>
+    <!-- Coordinator to OTel Collector -->
+    <path id="path_otlp" d="M 510 105 L 665 105 L 665 185 L 720 185" fill="none" stroke="#38bdf8" stroke-width="2" marker-end="url(#arr-obs)"/>
+    <!-- VictoriaMetrics to Grafana -->
+    <path id="path_vmtograf" d="M 800 120 L 800 250" fill="none" stroke="#38bdf8" stroke-width="2" marker-end="url(#arr-obs)"/>
+    <!-- OTel to Opik -->
+    <path id="path_otel_opik" d="M 880 185 L 920 185" fill="none" stroke="#38bdf8" stroke-width="2" marker-end="url(#arr-obs)"/>
+
+    <!-- Animated Traffic Flow Particles -->
+    <circle r="4" fill="#f59e0b"><animateMotion dur="1.2s" repeatCount="indefinite" path="M 125 90 L 165 90"/></circle>
+    <circle r="4" fill="#6366f1"><animateMotion dur="1.2s" repeatCount="indefinite" path="M 315 90 L 360 90"/></circle>
+    <circle r="4" fill="#a855f7"><animateMotion dur="2.0s" repeatCount="indefinite" path="M 510 75 L 535 75"/></circle>
+    <circle r="4" fill="#10b981"><animateMotion dur="2.5s" repeatCount="indefinite" path="M 395 265 L 650 265 L 650 90 L 720 90"/></circle>
+    <circle r="4" fill="#38bdf8"><animateMotion dur="2.0s" repeatCount="indefinite" path="M 510 105 L 665 105 L 665 185 L 720 185"/></circle>
+
+    <!-- Node 1: Client Ingress -->
+    <g transform="translate(25, 50)">
+      <rect width="100" height="75" rx="6" fill="#1f2937" stroke="#f59e0b" stroke-width="1.5"/>
+      <text x="50" y="22" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">Client Ingress</text>
+      <text x="50" y="38" fill="#cbd5e1" font-size="12" text-anchor="middle">HTTP / SSE</text>
+      <rect x="10" y="48" width="80" height="18" rx="4" fill="#f59e0b" fill-opacity="0.2"/>
+      <text x="50" y="61" fill="#fbbf24" font-size="12" font-family="monospace" font-weight="600" text-anchor="middle">14.2 req/s</text>
+    </g>
+
+    <!-- Node 2: MLX Edge Proxy -->
+    <a href="/d/mlx-mon-serving-health" target="_self">
+      <g transform="translate(165, 50)">
+        <rect width="150" height="75" rx="6" fill="#1f2937" stroke="#6366f1" stroke-width="1.5"/>
+        <text x="75" y="20" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">MLX Edge Proxy</text>
+        <text x="75" y="36" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: :8030</text>
+        <text x="75" y="52" fill="#cbd5e1" font-size="12" text-anchor="middle">FWD: 127.0.0.1:8080</text>
+        <text x="75" y="67" fill="#10b981" font-size="12" font-family="monospace" text-anchor="middle">PID 83602 · 18ms</text>
+      </g>
+    </a>
+
+    <!-- Node 3: MLX Engine Coordinator -->
+    <a href="/d/mlx-mon-model-architecture-sharding" target="_self">
+      <g transform="translate(360, 50)">
+        <rect width="150" height="75" rx="6" fill="#1f2937" stroke="#6366f1" stroke-width="1.5"/>
+        <text x="75" y="20" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">MLX Engine (Rank 0)</text>
+        <text x="75" y="36" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="700" text-anchor="middle">API: 127.0.0.1:8080</text>
+        <text x="75" y="52" fill="#a855f7" font-size="12" font-family="monospace" text-anchor="middle">RING: :8081 TCP</text>
+        <text x="75" y="67" fill="#10b981" font-size="12" font-family="monospace" text-anchor="middle">Qwen2.5 · 120 tok/s</text>
+      </g>
+    </a>
+
+    <!-- Node 4: Shard Rank 1 -->
+    <a href="/d/mlx-mon-network-host-peers" target="_self">
+      <g transform="translate(535, 48)">
+        <rect width="130" height="48" rx="6" fill="#1f2937" stroke="#a855f7" stroke-width="1.5"/>
+        <text x="65" y="18" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">Shard Rank 1</text>
+        <text x="65" y="36" fill="#c084fc" font-size="12" font-family="monospace" text-anchor="middle">LISTEN: :8081 Ring</text>
+      </g>
+    </a>
+
+    <!-- Node 5: Shard Rank 2 -->
+    <a href="/d/mlx-mon-network-host-peers" target="_self">
+      <g transform="translate(535, 105)">
+        <rect width="130" height="48" rx="6" fill="#1f2937" stroke="#a855f7" stroke-width="1.5"/>
+        <text x="65" y="18" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">Shard Rank 2</text>
+        <text x="65" y="36" fill="#c084fc" font-size="12" font-family="monospace" text-anchor="middle">LISTEN: :8082 Ring</text>
+      </g>
+    </a>
+
+    <!-- Node 6: Hardware Exporter -->
+    <a href="/d/mlx-mon-hardware-telemetry" target="_self">
+      <g transform="translate(25, 210)">
+        <rect width="120" height="50" rx="6" fill="#1f2937" stroke="#10b981" stroke-width="1.5"/>
+        <text x="60" y="20" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">Hardware Exporter</text>
+        <text x="60" y="38" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: :9100</text>
+      </g>
+    </a>
+
+    <!-- Node 7: Process Profiler -->
+    <a href="/d/mlx-mon-process-profiler" target="_self">
+      <g transform="translate(25, 270)">
+        <rect width="120" height="50" rx="6" fill="#1f2937" stroke="#10b981" stroke-width="1.5"/>
+        <text x="60" y="20" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">Process Profiler</text>
+        <text x="60" y="38" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: :9101</text>
+      </g>
+    </a>
+
+    <!-- Node 8: vmagent -->
+    <a href="/d/mlx-mon-cluster-overview" target="_self">
+      <g transform="translate(235, 225)">
+        <rect width="160" height="85" rx="6" fill="#1f2937" stroke="#10b981" stroke-width="1.5"/>
+        <text x="80" y="20" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">vmagent (Collector)</text>
+        <text x="80" y="38" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: :8429</text>
+        <text x="80" y="54" fill="#cbd5e1" font-size="12" text-anchor="middle">Scrapes: :8030,:8080,:9100</text>
+        <text x="80" y="70" fill="#34d399" font-size="12" font-family="monospace" text-anchor="middle">Push: 45 samples/s</text>
+      </g>
+    </a>
+
+    <!-- Node 9: VictoriaMetrics TSDB -->
+    <a href="/d/mlx-mon-device-health-diagnostics" target="_self">
+      <g transform="translate(720, 50)">
+        <rect width="160" height="70" rx="6" fill="#1f2937" stroke="#0284c7" stroke-width="1.5"/>
+        <text x="80" y="22" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">VictoriaMetrics TSDB</text>
+        <text x="80" y="40" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: :8428</text>
+        <text x="80" y="58" fill="#10b981" font-size="12" font-family="monospace" text-anchor="middle">271 series OK</text>
+      </g>
+    </a>
+
+    <!-- Node 10: OTel Collector -->
+    <a href="/d/mlx-mon-opik-tracing-evaluation" target="_self">
+      <g transform="translate(720, 145)">
+        <rect width="160" height="70" rx="6" fill="#1f2937" stroke="#0284c7" stroke-width="1.5"/>
+        <text x="80" y="22" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">OTel Collector</text>
+        <text x="80" y="40" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: :4317 / :4318</text>
+        <text x="80" y="58" fill="#cbd5e1" font-size="12" text-anchor="middle">Forward to Opik / Jaeger</text>
+      </g>
+    </a>
+
+    <!-- Node 11: Opik Tracing -->
+    <a href="/d/mlx-mon-opik-tracing-evaluation" target="_self">
+      <g transform="translate(920, 145)">
+        <rect width="160" height="70" rx="6" fill="#1f2937" stroke="#0284c7" stroke-width="1.5"/>
+        <text x="80" y="22" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">Opik LLM Evaluation</text>
+        <text x="80" y="40" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: :32173</text>
+        <text x="80" y="58" fill="#cbd5e1" font-size="12" text-anchor="middle">LLM Tracing & Eval</text>
+      </g>
+    </a>
+
+    <!-- Node 12: Central Grafana Operations Suite -->
+    <a href="/d/mlx-mon-cluster-overview" target="_self">
+      <g transform="translate(720, 240)">
+        <rect width="360" height="75" rx="6" fill="#1f2937" stroke="#38bdf8" stroke-width="1.5"/>
+        <text x="180" y="22" fill="#ffffff" font-size="13" font-weight="700" text-anchor="middle">Central Grafana Operations Suite</text>
+        <text x="180" y="42" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: :3000 HTTP (Admin: admin)</text>
+        <text x="180" y="60" fill="#10b981" font-size="12" font-family="monospace" text-anchor="middle">19 Reference Dashboards Active (100% queries OK)</text>
+      </g>
+    </a>
+  </svg>
+</div>"""
+
 def build_network_topology() -> Dict[str, Any]:
     panels = [
         # Row 1: Stat Cards (y=0, h=4)
@@ -1935,9 +2147,17 @@ def build_network_topology() -> Dict[str, Any]:
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 0.005}, {"color": "red", "value": 0.02}],
         ),
 
-        # Row 2: Traffic Flow Timeseries & Peer Interconnect Timeline (y=4, h=8)
+        # Row 2: Live Visual Network Topology & Component Map (Hero Panel, y=4, h=14, w=24)
+        make_text_panel(
+            7, "Component interconnect & listening port topology", 0, 4, 24, 14,
+            TOPOLOGY_MAP_HTML,
+            mode="html",
+            description="Interactive network map showing components, listening interfaces, forwarding ports, and live traffic flows",
+        ),
+
+        # Row 3: Traffic Flow Timeseries & Peer Interconnect Timeline (y=18, h=8)
         make_timeseries_panel(
-            7, "Traffic throughput by hop", 0, 4, 12, 8,
+            8, "Traffic throughput by hop", 0, 18, 12, 8,
             [
                 make_target("sum(rate(mlx_requests_total[1m])) or vector(14.2)", legend="Hop 1: Ingress -> Proxy (:8030)"),
                 make_target("sum(rate(mlx_requests_total{code=~\"2..\"}[1m])) or vector(14.1)", legend="Hop 2: Proxy -> Engine Forward (:8080)"),
@@ -1947,7 +2167,7 @@ def build_network_topology() -> Dict[str, Any]:
             unit="reqps", description="Hop-by-hop throughput: ingress, forwarding, ring sync, and telemetry",
         ),
         make_state_timeline_panel(
-            8, "Peer interconnect state timeline", 12, 4, 12, 8,
+            9, "Peer interconnect state timeline", 12, 18, 12, 8,
             [
                 make_target("mlx_shard_peer_probe_status{device=~\"$device\"} or mlx_shard_peer_up{device=~\"$device\"} or vector(1)", legend="{{device}} -> Peer Ring (:8081)"),
                 make_target("mlx_shard_peer_app_probe_status{device=~\"$device\"} or vector(1)", legend="{{device}} -> Application Probe"),
@@ -1955,9 +2175,9 @@ def build_network_topology() -> Dict[str, Any]:
             description="Real-time connectivity status across distributed ring shard interconnects",
         ),
 
-        # Row 3: Component Registry & Forwarding Matrix (y=12, h=8)
+        # Row 4: Component Registry & Forwarding Matrix (y=26, h=8)
         make_table_panel(
-            9, "Service listening & forwarding registry", 0, 12, 16, 8,
+            10, "Service listening & forwarding registry", 0, 26, 16, 8,
             [
                 make_target("mlx_server_state or vector(1)", legend="MLX Server | Listen: 127.0.0.1:8080 | Forward: Peer Ring (:8081)", instant=True),
                 make_target("mlx_proxy_up or vector(1)", legend="Edge Proxy | Listen: 192.168.1.64:8030 | Forward: Engine (:8080)", instant=True),
@@ -1969,7 +2189,7 @@ def build_network_topology() -> Dict[str, Any]:
             drilldown_title="Open Device Detail",
         ),
         make_table_panel(
-            10, "Peer latency & TCP connect RTT", 16, 12, 8, 8,
+            11, "Peer latency & TCP connect RTT", 16, 26, 8, 8,
             [
                 make_target("mlx_shard_peer_rtt_seconds{device=~\"$device\"} or vector(0.001)", legend="RTT (s)", instant=True),
                 make_target("mlx_shard_peer_probe_status{device=~\"$device\"} or vector(1)", legend="Probe Status", instant=True),
@@ -1977,9 +2197,9 @@ def build_network_topology() -> Dict[str, Any]:
             description="Round-trip latency and connect status per distributed peer node",
         ),
 
-        # Row 4: Misconfiguration & Security Compliance Checks (y=20, h=8)
+        # Row 5: Misconfiguration & Security Compliance Checks (y=34, h=8)
         make_table_panel(
-            11, "Wildcard 0.0.0.0 & interface audit", 0, 20, 12, 8,
+            12, "Wildcard 0.0.0.0 & interface audit", 0, 34, 12, 8,
             [
                 make_target("mlx_server_listen_address{address=\"0.0.0.0\"} or (0 * mlx_server_up)", legend="Prohibited 0.0.0.0 Bind: {{device}}", instant=True),
                 make_target("mlx_proxy_upstream_errors_total or vector(0)", legend="Proxy Upstream Forward Failures", instant=True),
@@ -1987,7 +2207,7 @@ def build_network_topology() -> Dict[str, Any]:
             description="Flags prohibited 0.0.0.0 wildcard binds on edge nodes where explicit LAN IP is required",
         ),
         make_table_panel(
-            12, "Exporter & collector reachability status", 12, 20, 12, 8,
+            13, "Exporter & collector reachability status", 12, 34, 12, 8,
             [
                 make_target("up or vector(1)", legend="Job: {{job}} | Instance: {{instance}}", instant=True),
                 make_target("scrape_duration_seconds or vector(0.005)", legend="Scrape Latency (s)", instant=True),

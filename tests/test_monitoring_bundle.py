@@ -1276,6 +1276,15 @@ def test_reference_monitoring_suite_validity():
     slo_exprs = [t["expr"] for p in slo_data["panels"] for t in p.get("targets", [])]
     assert any('kind!="eval"' in expr for expr in slo_exprs), "Missing eligible traffic filter (kind!='eval') in SLO dashboard"
 
+    # 7. Network topology verifies components, listening ports, and hop-by-hop throughput
+    topo_data = json.loads((ref_dir / "network-topology.json").read_text(encoding="utf-8"))
+    topo_panel_titles = [p.get("title", "") for p in topo_data["panels"]]
+    assert any("listening port topology" in title.lower() for title in topo_panel_titles), "Missing visual topology panel in network-topology"
+    topo_exprs = [t["expr"] for p in topo_data["panels"] for t in p.get("targets", [])]
+    assert any("mlx_requests_total" in expr for expr in topo_exprs), "Missing request throughput in network topology"
+    assert any("mlx_server_listen_address" in expr for expr in topo_exprs), "Missing wildcard bind audit in network topology"
+
+
 
 
 def test_passive_server_observer_never_spawns_and_tracks_restarts(tmp_path, monkeypatch):
