@@ -197,11 +197,7 @@ services:
       - ../../../:/app:ro
       - topology-data:/data
     command: >
-      sh -c "pip install --no-cache-dir pydantic pyyaml &&
-             python3 -m cluster.mlx_monitoring_bundle.topology.service
-             --host 0.0.0.0 --port 8089
-             --db-path /data/topology.db
-             --vm-url http://victoria-metrics:8428"
+      sh -c "mkdir -p /data && pip install --no-cache-dir pydantic pyyaml && exec python3 -m cluster.mlx_monitoring_bundle.topology.service --host 0.0.0.0 --port 8089 --db-path /data/topology.db --vm-url http://victoria-metrics:8428"
     deploy:
       resources:
         limits:

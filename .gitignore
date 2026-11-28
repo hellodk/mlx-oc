@@ -17,6 +17,7 @@ opencode-session
 cluster/mlx_monitoring_bundle/central/.env
 cluster/mlx_monitoring_bundle/edge/config/nodes.yml
 cluster/mlx_monitoring_bundle/edge/config/edge.env
+cluster/mlx_monitoring_bundle/edge/config/sbom_base_reference.json
 logs/
 .champ/
 *.bak
