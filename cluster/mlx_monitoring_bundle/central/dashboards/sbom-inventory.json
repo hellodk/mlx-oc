@@ -328,7 +328,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"pip|python\"}) or vector(0)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"pip|python\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -390,7 +390,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"}) or vector(0)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -452,7 +452,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"system\"}) or vector(0)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"system\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -514,7 +514,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or count(count by (model) (mlx_model_info{device=~\"$device\"})) or vector(0)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or count(count by (model) (mlx_model_info{device=~\"$device\"}))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -666,7 +666,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"}) or vector(0)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"})",
           "legendFormat": "Homebrew",
           "range": true,
           "instant": false,
@@ -692,7 +692,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or vector(0)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"})",
           "legendFormat": "Model Artifacts",
           "range": true,
           "instant": false,

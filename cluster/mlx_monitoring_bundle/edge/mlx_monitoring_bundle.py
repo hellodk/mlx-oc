@@ -166,6 +166,7 @@ _SERVICE_MATCH_TOKENS: dict[str, tuple[str, ...]] = {
     "process": ("mlx_process_telemetry.py",),
     "sbom": ("mlx_sbom_collector.py",),
     "eval": ("mlx_accuracy_eval.py",),
+    "topology": ("mlx_topology_agent.py",),
     "vmagent": ("vmagent",),
 }
 MAX_BUNDLE_LOG_BYTES = 10 * 1024 * 1024
@@ -267,6 +268,7 @@ class Bundle:
         self.central_vm = central_value(config, "victoria_metrics")
         self.central_otel = central_value(config, "otel")
         self.central_opik = central_value(config, "opik")
+        self.central_topology = central_value(config, "topology")
 
         self.otlp_scheme = config.get("OTLP_SCHEME", "http")
         self.otlp_verify_tls = config.get("OTLP_VERIFY_TLS", "false").lower() == "true"
@@ -278,6 +280,11 @@ class Bundle:
             f"{self.otlp_scheme}://{self.central_opik}" if self.central_opik else ""
         )
         self.opik_otlp_endpoint = config.get("OPIK_OTLP_ENDPOINT", "")
+        self.topology_endpoint = (
+            config.get("CENTRAL_TOPOLOGY_URL")
+            or (f"{self.otlp_scheme}://{self.central_topology}" if self.central_topology else "")
+            or "http://127.0.0.1:8089"
+        )
 
         model_path = (
             config.get("MLX_MODEL_PATH")
@@ -321,6 +328,11 @@ class Bundle:
         self.enable_process = config.get("ENABLE_PROCESS_PROFILER", "true").lower() == "true"
         self.enable_sbom = config.get("ENABLE_SBOM_COLLECTOR", "true").lower() == "true"
         self.enable_eval = config.get("ENABLE_ACCURACY_EVAL", "true").lower() == "true"
+        self.enable_topology = config.get(
+            "ENABLE_TOPOLOGY_AGENT", config.get("ENABLE_TOPOLOGY_DISCOVERY", "true")
+        ).lower() == "true"
+        self.topology_interval = config.get("TOPOLOGY_INTERVAL", "30.0")
+        self.topology_listen = config.get("TOPOLOGY_LISTEN", "127.0.0.1:9110")
         self.enable_vmagent = config.get("ENABLE_VMAGENT", "true").lower() == "true"
         self.vmagent_binary = config.get("VMAGENT_BINARY", "vmagent")
         self.vmagent_config_template = BUNDLE_DIR / "vmagent-edge" / "vmagent.yml"
@@ -548,6 +560,19 @@ class Bundle:
             cmd.append("--verify-tls")
         self._spawn("eval", cmd)
 
+    def start_topology(self):
+        if not self.enable_topology:
+            return
+        cmd = [
+            self.venv_python, "mlx_topology_agent.py",
+            "--device-id", self.device,
+            "--central-url", self.topology_endpoint,
+            "--vmagent-url", f"{self.otlp_scheme}://127.0.0.1:8429",
+            "--interval", str(self.topology_interval),
+            "--listen", config_val(self.config, "TOPOLOGY_LISTEN", "127.0.0.1:9110"),
+        ]
+        self._spawn("topology", cmd)
+
     def _render_vmagent_config(self) -> bool:
         """Render vmagent.yml template with environment variables."""
         if not self.vmagent_config_template.exists():
@@ -582,6 +607,7 @@ class Bundle:
                 "PROCESS_LISTEN": _normalize_scrape_target(config_val(self.config, "PROCESS_LISTEN", "127.0.0.1:9107")),
                 "SBOM_LISTEN": _normalize_scrape_target(config_val(self.config, "SBOM_LISTEN", "127.0.0.1:9108")),
                 "EVAL_LISTEN": _normalize_scrape_target(config_val(self.config, "EVAL_LISTEN", "127.0.0.1:9109")),
+                "TOPOLOGY_LISTEN": _normalize_scrape_target(config_val(self.config, "TOPOLOGY_LISTEN", "127.0.0.1:9110")),
             }
             # Single-pass substitution: replace ${VAR} and ${VAR:-default}.
 
@@ -687,7 +713,7 @@ class Bundle:
     def status(self) -> dict:
         pids = {}
         for name in [
-            "supervisor", "logtailer", "kv", "hw", "proxy", "process", "sbom", "eval", "vmagent"
+            "supervisor", "logtailer", "kv", "hw", "proxy", "process", "sbom", "eval", "topology", "vmagent"
         ]:
             pfile = self.pid_dir / f"{name}.pid"
             pids[name] = read_pid(pfile)
@@ -702,6 +728,7 @@ class Bundle:
                 "victoria_metrics": self.central_vm,
                 "otel": self.central_otel,
                 "opik": self.central_opik,
+                "topology": self.topology_endpoint,
             },
         }
 
@@ -720,7 +747,7 @@ class Bundle:
         # in-process signal handler never kills itself mid-cleanup, and reused PIDs are safe.
         pending: list[tuple[str, int, tuple[str, ...]]] = []
         for name in [
-            "supervisor", "logtailer", "kv", "hw", "proxy", "process", "sbom", "eval", "vmagent"
+            "supervisor", "logtailer", "kv", "hw", "proxy", "process", "sbom", "eval", "topology", "vmagent"
         ]:
             pfile = self.pid_dir / f"{name}.pid"
             pid = read_pid(pfile)
@@ -806,6 +833,9 @@ class Bundle:
         if self.enable_eval:
             self.start_eval()
             started.append("eval:9109")
+        if self.enable_topology:
+            self.start_topology()
+            started.append("topology:9110")
         if self.enable_vmagent:
             self.start_vmagent()
             started.append("vmagent")

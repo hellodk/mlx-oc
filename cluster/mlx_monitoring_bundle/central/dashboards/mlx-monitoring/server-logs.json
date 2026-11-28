@@ -272,7 +272,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mlx_log_tailer_up == 1) or vector(1)",
+          "expr": "count(mlx_log_tailer_up == 1)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -334,7 +334,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_log_tailer_lines_total[1m])) or vector(128)",
+          "expr": "sum(rate(mlx_log_tailer_lines_total[1m]))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -397,7 +397,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mlx_log_tailer_queue_depth) or vector(0)",
+          "expr": "sum(mlx_log_tailer_queue_depth)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -467,7 +467,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_log_tailer_dropped_total[1m])) or vector(0)",
+          "expr": "sum(rate(mlx_log_tailer_dropped_total[1m]))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -534,7 +534,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_log_tailer_errors_total[5m])) or vector(0)",
+          "expr": "sum(rate(mlx_log_tailer_errors_total[5m]))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -657,7 +657,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)info\"}[1m])) or vector(0)",
+          "expr": "sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)info\"}[1m]))",
           "legendFormat": "INFO",
           "range": true,
           "instant": false,
@@ -670,7 +670,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)warn.*\"}[1m])) or vector(0)",
+          "expr": "sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)warn.*\"}[1m]))",
           "legendFormat": "WARN",
           "range": true,
           "instant": false,
@@ -683,7 +683,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)err.*\"}[1m])) or vector(0)",
+          "expr": "sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)err.*\"}[1m]))",
           "legendFormat": "ERROR",
           "range": true,
           "instant": false,
@@ -759,7 +759,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum by (category) (rate(mlx_log_tailer_lines_total{severity=~\"(?i)err.*\"}[5m])) or vector(0)",
+          "expr": "sum by (category) (rate(mlx_log_tailer_lines_total{severity=~\"(?i)err.*\"}[5m]))",
           "legendFormat": "Component: {{category}}",
           "range": true,
           "instant": false,
@@ -835,7 +835,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_log_tailer_up or vector(1)",
+          "expr": "mlx_log_tailer_up",
           "legendFormat": "State (1=Up, 0=Down)",
           "range": false,
           "instant": true,
@@ -848,7 +848,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_log_tailer_queue_depth or vector(0)",
+          "expr": "mlx_log_tailer_queue_depth",
           "legendFormat": "Queue Depth",
           "range": false,
           "instant": true,
@@ -861,7 +861,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_log_tailer_dropped_total or vector(0)",
+          "expr": "mlx_log_tailer_dropped_total",
           "legendFormat": "Dropped Lines",
           "range": false,
           "instant": true,

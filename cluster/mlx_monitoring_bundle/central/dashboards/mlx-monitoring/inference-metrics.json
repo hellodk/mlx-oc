@@ -272,7 +272,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m]))) or vector(0)",
+          "expr": "(sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m])))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -335,7 +335,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mlx_in_flight{device=~\"$device\"}) or vector(0)",
+          "expr": "sum(mlx_in_flight{device=~\"$device\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -397,7 +397,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or vector(0)",
+          "expr": "(histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le)))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -468,7 +468,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or vector(0)",
+          "expr": "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le)))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -539,7 +539,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\", model=~\"$model\"}[1m])) / (sum(rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\", model=~\"$model\"}[1m])) > 0)) or vector(0)",
+          "expr": "(sum(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\", model=~\"$model\"}[1m])) / (sum(rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\", model=~\"$model\"}[1m])) > 0))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -602,7 +602,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((sum(rate(mlx_requests_total{device=~\"$device\", code=~\"5..\"}[1m])) / (sum(rate(mlx_requests_total{device=~\"$device\"}[1m])) > 0)) * 100) or vector(0)",
+          "expr": "((sum(rate(mlx_error_total{device=~\"$device\", status=\"5xx\"}[1m])) / (sum(rate(mlx_requests_total{device=~\"$device\"}[1m])) > 0)) * 100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -953,7 +953,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum by (reason) (rate(mlx_finish_reasons_total{device=~\"$device\"}[5m])) or (0 * count by (device) (mlx_server_state{device=~\"$device\"}))",
+          "expr": "sum by (reason) (rate(mlx_finish_reason_total{device=~\"$device\"}[5m])) or (0 * count by (device) (mlx_server_state{device=~\"$device\"}))",
           "legendFormat": "{{reason}}",
           "range": false,
           "instant": true,

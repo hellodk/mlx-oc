@@ -1,0 +1,350 @@
+# ==============================================================================
+# MLX Distributed Inference Fleet — Component, Port & Telemetry Inventory
+# ==============================================================================
+# Deployment-neutral reference inventory defining all edge services, exporters,
+# collectors, central destinations, and interconnect hops.
+#
+# Schema:
+#   version: integer
+#   fleet: metadata
+#   edge_services: map of service name -> service specification
+#   collectors: map of collector name -> collector specification
+#   destinations: map of central destination -> destination specification
+#   network_hops: map of hop identifier -> flow specification
+# ==============================================================================
+
+version: 1
+
+fleet:
+  name: "mlx-distributed-inference-fleet"
+  description: "Unified deployment-neutral inventory for MLX edge nodes and central telemetry"
+  default_device_model: "Qwen3.5-4B-MLX-4bit"
+  telemetry_pipeline:
+    metrics: "Edge Exporters -> vmagent (:8429) -> VictoriaMetrics TSDB (:8428) -> Central Grafana (:3000)"
+    logs: "Edge Proxy & Engine -> OTLP (:4318) -> OTel Collector -> JSONL (/var/log/otelcol/mlx-server-logs.jsonl) & Debug"
+    traces: "Edge Proxy & Eval -> Direct Opik SDK/REST -> Opik Platform (:32173 / :8000)"
+
+edge_services:
+  mlx_metrics_proxy:
+    name: "MLX Ingress & Metrics Proxy"
+    component: "mlx_metrics_proxy.py"
+    layer: "data_plane"
+    ports:
+      ingress: 8080
+      metrics: 8080
+    protocols:
+      ingress: "HTTP/1.1 REST & Server-Sent Events (SSE)"
+      metrics: "Prometheus HTTP /metrics"
+    bind:
+      default: "0.0.0.0:8080"
+      recommended: "LAN IP (e.g. 192.168.1.64:8080)"
+      policy: "Exposed to client applications; forwards to loopback engine"
+    forwarding_target: "http://127.0.0.1:8030"
+    telemetry_paths:
+      metrics: "Scraped by local vmagent on 127.0.0.1:8080/metrics"
+      opik_tracing: "Direct Opik Python SDK (host: CENTRAL_OPIK e.g. 192.168.1.10:32173)"
+      otlp_logging: "OTLP HTTP to CENTRAL_OTEL (e.g. 192.168.1.10:4318/v1/logs)"
+    key_metrics:
+      - "mlx_requests_total"
+      - "mlx_error_total"
+      - "mlx_ttft_seconds"
+      - "mlx_tokens_prompt_total"
+      - "mlx_tokens_completion_total"
+
+  mlx_engine:
+    name: "MLX Model Inference Engine"
+    component: "mlx_server / vLLM runtime"
+    layer: "data_plane"
+    ports:
+      api: 8030
+    protocols:
+      api: "HTTP/1.1 OpenAI-compatible /v1/chat/completions"
+    bind:
+      default: "127.0.0.1:8030"
+      policy: "Loopback only; binding to 0.0.0.0 is an audit security violation"
+    interconnect:
+      role: "Primary inference engine and coordinator for distributed shard pipeline"
+
+  mlx_shard_topology:
+    name: "Distributed Shard Mesh Interconnect"
+    component: "mlx_shard_topology.py"
+    layer: "data_plane"
+    ports:
+      peer_interconnect: 8081
+    protocols:
+      peer_interconnect: "TCP / HTTP Peer Ring Mesh"
+    probe_health_policy:
+      up: "HTTP 200..399"
+      down: "HTTP >= 400 or TCP connection refused / timeout"
+    key_metrics:
+      - "mlx_shard_peer_up"
+      - "mlx_shard_peer_probe_status"
+      - "mlx_shard_peer_connect_seconds"
+      - "mlx_shard_peer_app_rtt_seconds"
+
+  mlx_server_supervisor:
+    name: "Server Process Supervisor & Listener Auditor"
+    component: "mlx_server_supervisor.py"
+    layer: "telemetry_exporter"
+    ports:
+      metrics: 9101
+    protocols:
+      metrics: "Prometheus HTTP /metrics"
+    bind:
+      default: "127.0.0.1:9101"
+    key_metrics:
+      - "mlx_server_up"
+      - "mlx_server_ready"
+      - "mlx_server_state"
+      - "mlx_server_listen_address"
+      - "mlx_server_crashes_total"
+      - "mlx_server_restarts_total"
+
+  mlx_hw_telemetry:
+    name: "Apple Silicon Hardware Telemetry Exporter"
+    component: "mlx_hw_telemetry.py"
+    layer: "telemetry_exporter"
+    ports:
+      metrics: 9102
+    protocols:
+      metrics: "Prometheus HTTP /metrics"
+    bind:
+      default: "127.0.0.1:9102"
+    key_metrics:
+      - "mlx_hw_up"
+      - "mlx_hw_soc_power_watts"
+      - "mlx_hw_temp_celsius"
+      - "mlx_net_rx_bytes_total"
+      - "mlx_net_tx_bytes_total"
+      - "mlx_hw_net_rx_bytes_per_sec"
+      - "mlx_hw_net_tx_bytes_per_sec"
+
+  mlx_process_profiler:
+    name: "Process Memory & KV Cache Profiler"
+    component: "mlx_process_profiler.py"
+    layer: "telemetry_exporter"
+    ports:
+      metrics: 9103
+    protocols:
+      metrics: "Prometheus HTTP /metrics"
+    bind:
+      default: "127.0.0.1:9103"
+    key_metrics:
+      - "process_profiler_up"
+      - "mlx_proc_rss_bytes"
+      - "mlx_proc_vms_bytes"
+      - "mlx_proc_swap_bytes"
+      - "mlx_proc_kv_cache_bytes"
+
+  mlx_server_log_tailer:
+    name: "Real-time Server Log Tailer Exporter"
+    component: "mlx_server_log_tailer.py"
+    layer: "telemetry_exporter"
+    ports:
+      metrics: 9104
+    protocols:
+      metrics: "Prometheus HTTP /metrics"
+    bind:
+      default: "127.0.0.1:9104"
+    key_metrics:
+      - "mlx_log_tailer_up"
+      - "mlx_log_tailer_lines_total"
+      - "mlx_log_tailer_dropped_total"
+      - "mlx_log_tailer_queue_depth"
+
+  mlx_accuracy_eval:
+    name: "Accuracy & Drift Evaluator Exporter"
+    component: "mlx_accuracy_eval.py"
+    layer: "telemetry_exporter"
+    ports:
+      metrics: 9105
+    protocols:
+      metrics: "Prometheus HTTP /metrics"
+    bind:
+      default: "127.0.0.1:9105"
+    key_metrics:
+      - "mlx_accuracy_eval_up"
+      - "mlx_accuracy_eval_perplexity"
+      - "mlx_accuracy_eval_similarity"
+      - "mlx_eval_quality_score"
+
+  mlx_sbom_tracker:
+    name: "SBOM & Package Drift Tracker Exporter"
+    component: "mlx_sbom_tracker.py"
+    layer: "telemetry_exporter"
+    ports:
+      metrics: 9106
+    protocols:
+      metrics: "Prometheus HTTP /metrics"
+    bind:
+      default: "127.0.0.1:9106"
+    key_metrics:
+      - "mac_sbom_collector_up"
+      - "mac_sbom_package_info"
+      - "mac_sbom_drift_detected"
+      - "mac_sbom_last_scan_timestamp_seconds"
+
+collectors:
+  vmagent:
+    name: "VictoriaMetrics Edge Agent (vmagent)"
+    component: "victoriametrics/vmagent"
+    role: "Local Prometheus scraper and buffer agent on edge host"
+    ports:
+      metrics: 8429
+    protocols:
+      metrics: "Prometheus HTTP /metrics & /targets"
+    scrape_targets:
+      - "127.0.0.1:8080" # mlx_metrics_proxy
+      - "127.0.0.1:9101" # mlx_server_supervisor
+      - "127.0.0.1:9102" # mlx_hw_telemetry
+      - "127.0.0.1:9103" # mlx_process_profiler
+      - "127.0.0.1:9104" # mlx_server_log_tailer
+      - "127.0.0.1:9105" # mlx_accuracy_eval
+      - "127.0.0.1:9106" # mlx_sbom_tracker
+    destination:
+      url: "http://<CENTRAL_VM_HOST>:8428/api/v1/write"
+      protocol: "Prometheus remote_write"
+
+  otel_collector:
+    name: "OpenTelemetry Collector"
+    component: "otel/opentelemetry-collector-contrib:0.114.0"
+    role: "Ingestion gateway for standard OTLP logs and traces"
+    ports:
+      otlp_grpc: 4317
+      otlp_http: 4318
+    protocols:
+      otlp_grpc: "gRPC OTLP"
+      otlp_http: "HTTP OTLP"
+    pipelines:
+      logs:
+        receivers: ["otlp"]
+        processors: ["batch"]
+        exporters: ["file", "debug"]
+        file_destination: "/var/log/otelcol/mlx-server-logs.jsonl"
+      traces:
+        receivers: ["otlp"]
+        processors: ["batch"]
+        exporters: ["debug"]
+    notes: "Decoupled pipeline: does not export to Opik or VictoriaMetrics; proxy communicates directly with Opik."
+
+destinations:
+  victoria_metrics:
+    name: "VictoriaMetrics TSDB"
+    component: "victoriametrics/victoria-metrics:v1.115.0"
+    role: "Central high-performance time-series repository for all cluster metrics"
+    ports:
+      http: 8428
+    protocols:
+      ingest: "Prometheus remote_write (/api/v1/write)"
+      query: "PromQL HTTP API (/api/v1/query, /api/v1/query_range)"
+    retention: "30d"
+
+  grafana:
+    name: "Central Grafana Operations Suite"
+    component: "grafana/grafana:13.3.0"
+    role: "Central monitoring dashboards and visual incident operations"
+    ports:
+      http: 3000
+    datasource:
+      name: "VictoriaMetrics"
+      type: "prometheus"
+      url: "http://victoria-metrics:8428"
+    dashboards_provisioned: 19
+
+  alertmanager:
+    name: "Prometheus Alertmanager"
+    component: "prom/alertmanager:v0.28.1"
+    role: "Alert deduplication, grouping, silencing, and webhook notification"
+    ports:
+      http: 9093
+
+  opik:
+    name: "Opik LLM Evaluation & Tracing Platform"
+    component: "ghcr.io/comet-ml/opik (backend & frontend)"
+    role: "LLM trace visualization, span waterfall, guardrail evaluation"
+    ports:
+      frontend: 32173
+      backend: 8000
+    ingestion: "Direct Opik Python SDK / REST client from edge proxy and evaluator"
+
+  central_topology:
+    name: "Central Topology API Service"
+    component: "cluster.mlx_monitoring_bundle.topology.service"
+    role: "Central persistent topology registry, snapshot ingestion, reconciliation, and Grafana Node Graph provider"
+    ports:
+      http: 8089
+    protocols:
+      ingest: "REST JSON (/api/v1/topology/snapshot)"
+      query: "REST JSON (/api/v1/topology/graph, /api/v1/topology/grafana/nodes, /api/v1/topology/grafana/edges)"
+      metrics: "Prometheus HTTP (/metrics)"
+
+network_hops:
+  hop_1_client_ingress:
+    source: "External Client Applications"
+    destination: "mlx_metrics_proxy"
+    target_port: 8080
+    protocol: "HTTP/1.1 REST & SSE"
+    flow_verification_metric: "sum(rate(mlx_requests_total[1m]))"
+
+  hop_2_proxy_forwarding:
+    source: "mlx_metrics_proxy"
+    destination: "mlx_engine"
+    target_port: 8030
+    protocol: "HTTP/1.1 Loopback"
+    flow_verification_metric: "sum(rate(mlx_requests_total{kind=~'chat|reasoning|eval'}[1m]))"
+
+  hop_3_shard_interconnect:
+    source: "mlx_engine (Rank N)"
+    destination: "mlx_engine (Rank N+1)"
+    target_port: 8081
+    protocol: "TCP Interconnect Ring"
+    flow_verification_metric: "avg(mlx_shard_peer_connect_seconds)"
+
+  hop_4_model_generation:
+    source: "mlx_engine"
+    destination: "Client Stream"
+    target_port: 8080
+    protocol: "Token Streaming"
+    flow_verification_metric: "sum(rate(mlx_tokens_prompt_total[1m]) + rate(mlx_tokens_completion_total[1m]))"
+
+  hop_5_telemetry_scraping:
+    source: "vmagent"
+    destination: "Edge Exporters (:8080, :9101..:9106)"
+    target_port: "Local Exporter Ports"
+    protocol: "Prometheus HTTP Scrape"
+    flow_verification_metric: "sum(rate(scrape_samples_scraped[1m]))"
+
+  hop_6_tsdb_remote_write:
+    source: "vmagent"
+    destination: "VictoriaMetrics TSDB"
+    target_port: 8428
+    protocol: "Prometheus remote_write"
+    flow_verification_metric: "sum(rate(vmagent_remotewrite_packets_sent_total[1m]))"
+
+  hop_7_dashboard_querying:
+    source: "Central Grafana"
+    destination: "VictoriaMetrics TSDB"
+    target_port: 8428
+    protocol: "PromQL HTTP API"
+    flow_verification_metric: "sum(rate(vm_http_requests_total{path=~'/api/v1/query.*'}[1m]))"
+
+  hop_8_direct_opik_tracing:
+    source: "mlx_metrics_proxy"
+    destination: "Opik Platform"
+    target_port: 32173
+    protocol: "Direct Opik Python SDK / REST"
+    flow_verification_metric: "mlx_accuracy_eval_similarity"
+
+  hop_9_otlp_logging:
+    source: "mlx_metrics_proxy & mlx_engine"
+    destination: "OTel Collector"
+    target_port: 4318
+    protocol: "OTLP HTTP"
+    flow_verification_metric: "sum(rate(mlx_log_tailer_lines_total[1m]))"
+
+  hop_10_topology_reporting:
+    source: "Edge Topology Discovery Agent"
+    destination: "Central Topology API Service"
+    target_port: 8089
+    protocol: "REST JSON"
+    flow_verification_metric: "sum(rate(mlx_topology_devices_total[5m]))"

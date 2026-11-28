@@ -27,12 +27,16 @@ receivers:
     # Webhook receiver for critical alerts.
     # Set ONCALL_WEBHOOK_URL or ALERT_WEBHOOK_URL to configure.
     # Use LAN IP, FQDN, or compose service name.
-    webhook_configs: []
+    webhook_configs:
+      - url: "http://127.0.0.1:9000/hooks/oncall"
+        send_resolved: true
 
   - name: "default"
     # Default receiver for warning/info alerts.
     # Set ALERT_WEBHOOK_URL to configure.
-    webhook_configs: []
+    webhook_configs:
+      - url: "http://127.0.0.1:9000/hooks/alert"
+        send_resolved: true
 
 inhibit_rules:
   - source_matchers:

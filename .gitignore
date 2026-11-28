@@ -17,3 +17,7 @@ opencode-session
 cluster/mlx_monitoring_bundle/central/.env
 cluster/mlx_monitoring_bundle/edge/config/nodes.yml
 cluster/mlx_monitoring_bundle/edge/config/edge.env
+logs/
+.champ/
+*.bak
+hello_world.rs

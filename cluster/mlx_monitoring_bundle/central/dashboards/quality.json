@@ -615,7 +615,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_eval_overall_accuracy_ratio{model=~\"$model\"} * 100) or vector(98.5)",
+          "expr": "(mlx_eval_overall_accuracy_ratio{model=~\"$model\"} * 100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -1011,7 +1011,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_eval_accuracy_ratio{model=~\"$model\"} or vector(1.0)",
+          "expr": "mlx_eval_accuracy_ratio{model=~\"$model\"}",
           "legendFormat": "Suite Accuracy",
           "range": false,
           "instant": true,
@@ -1024,7 +1024,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_eval_calibration_ece{model=~\"$model\"} or vector(0.02)",
+          "expr": "mlx_eval_calibration_ece{model=~\"$model\"}",
           "legendFormat": "ECE (Calibration Error)",
           "range": false,
           "instant": true,
@@ -1037,7 +1037,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_judge_score{model=~\"$model\"} or vector(0.92)",
+          "expr": "mlx_judge_score{model=~\"$model\"}",
           "legendFormat": "LLM Judge Score",
           "range": false,
           "instant": true,

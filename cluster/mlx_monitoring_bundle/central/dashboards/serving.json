@@ -452,7 +452,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(increase(mlx_server_restarts_total[15m])) or vector(0)",
+          "expr": "sum(increase(mlx_server_restarts_total[15m]))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -528,7 +528,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(rate(mlx_server_restarts_total[5m]) > 0.05) or vector(0)",
+          "expr": "count(rate(mlx_server_restarts_total[5m]) > 0.05)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -600,7 +600,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mlx_server_state == 3) or vector(0)",
+          "expr": "count(mlx_server_state == 3)",
           "legendFormat": "",
           "range": false,
           "instant": true,

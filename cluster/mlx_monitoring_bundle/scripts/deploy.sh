@@ -1019,7 +1019,10 @@ if datasources_file.is_file():
         pass
 
 dashboards = []
-if dashboards_dir.is_dir():
+ref_dir = dashboards_dir / 'mlx-monitoring'
+if ref_dir.is_dir():
+    dashboards = sorted([f.stem for f in ref_dir.glob('*.json')])
+elif dashboards_dir.is_dir():
     dashboards = sorted([f.stem for f in dashboards_dir.glob('*.json')])
 
 env_perms = 'missing'
@@ -1274,21 +1277,16 @@ render_alertmanager_config() {
     return 0
   fi
 
-  local oncall_url="${ONCALL_WEBHOOK_URL:-${ALERT_WEBHOOK_URL:-}}"
-  local default_url="${ALERT_WEBHOOK_URL:-}"
-  if [[ -f "${dst}" && -z "${oncall_url}" && -z "${default_url}" ]] && ! grep -q '{{' "${dst}" 2>/dev/null; then
+  local default_oncall="http://127.0.0.1:9000/hooks/oncall"
+  local default_alert="http://127.0.0.1:9000/hooks/alert"
+  local oncall_url="${ONCALL_WEBHOOK_URL:-${ALERT_WEBHOOK_URL:-${default_oncall}}}"
+  local default_url="${ALERT_WEBHOOK_URL:-${default_alert}}"
+  if [[ -f "${dst}" && -z "${ONCALL_WEBHOOK_URL:-}" && -z "${ALERT_WEBHOOK_URL:-}" ]] && ! grep -q '{{' "${dst}" 2>/dev/null; then
     return 0
   fi
 
-  local oncall_cfg="webhook_configs: []"
-  if [[ -n "${oncall_url}" ]]; then
-    oncall_cfg=$'webhook_configs:\n      - url: "'"${oncall_url}"$'"\n        send_resolved: true'
-  fi
-
-  local default_cfg="webhook_configs: []"
-  if [[ -n "${default_url}" ]]; then
-    default_cfg=$'webhook_configs:\n      - url: "'"${default_url}"$'"\n        send_resolved: true'
-  fi
+  local oncall_cfg=$'webhook_configs:\n      - url: "'"${oncall_url}"$'"\n        send_resolved: true'
+  local default_cfg=$'webhook_configs:\n      - url: "'"${default_url}"$'"\n        send_resolved: true'
 
   python3 -c "
 import sys
@@ -1507,7 +1505,7 @@ _check_central_host_ports() {
   local force="${3:-0}"
   command -v lsof >/dev/null 2>&1 || return 0
 
-  local ports=(8428 3000 4317 4318 8880 9093)
+  local ports=(8428 3000 4317 4318 8880 9093 8089)
   if [[ "${with_opik}" == "1" ]]; then
     ports+=(32173)
   fi
@@ -1812,6 +1810,7 @@ clean_central() {
       "central-vmalert" "vmalert"
       "central-alertmanager" "alertmanager"
       "central-otelcol" "central-otel-collector" "otel-collector"
+      "central-topology" "topology"
       "central-opik-backend" "opik-backend"
       "central-opik-frontend" "opik-frontend"
       "central-opik-mysql" "opik-mysql"

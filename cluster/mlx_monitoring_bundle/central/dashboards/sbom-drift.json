@@ -328,7 +328,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_drift_mismatch_count > 0 or mac_sbom_missing_package_count > 0) or vector(0)",
+          "expr": "count(mac_sbom_drift_mismatch_count > 0 or mac_sbom_missing_package_count > 0)",
           "legendFormat": "",
           "range": false,
           "instant": true,

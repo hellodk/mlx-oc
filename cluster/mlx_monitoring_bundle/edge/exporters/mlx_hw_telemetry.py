@@ -86,6 +86,16 @@ C_NET_TX = Counter(
     "Cumulative bytes sent on the ring interface",
     ["node", "iface"],
 )
+G_NET_RX_RATE = Gauge(
+    "mlx_hw_net_rx_bytes_per_sec",
+    "Current network receive throughput in bytes per second",
+    ["node", "iface"],
+)
+G_NET_TX_RATE = Gauge(
+    "mlx_hw_net_tx_bytes_per_sec",
+    "Current network transmit throughput in bytes per second",
+    ["node", "iface"],
+)
 C_NET_RX_ERR = Counter(
     "mlx_net_rx_errors_total",
     "Cumulative receive errors",
@@ -546,25 +556,35 @@ def _net_stats(iface: str | None):
 
 
 _NET_LAST = {}
+_NET_LAST_TIME = {}
 
 
 def _ring_net_since(iface, counters):
     rx, tx, rx_err, tx_err = counters
     node = NODE  # set at startup
+    now = time.time()
     prev = _NET_LAST.get(node, {}).get(iface)
+    last_time = _NET_LAST_TIME.get(node, {}).get(iface, now)
+    dt = max(0.001, now - last_time)
     if prev is None:
         _NET_LAST.setdefault(node, {})[iface] = (rx, tx, rx_err, tx_err)
+        _NET_LAST_TIME.setdefault(node, {})[iface] = now
         return
     prx, ptx, perr, oerr = prev
     if rx >= prx:
-        C_NET_RX.labels(node, iface).inc(rx - prx)
+        delta_rx = rx - prx
+        C_NET_RX.labels(node, iface).inc(delta_rx)
+        G_NET_RX_RATE.labels(node, iface).set(delta_rx / dt)
     if tx >= ptx:
-        C_NET_TX.labels(node, iface).inc(tx - ptx)
+        delta_tx = tx - ptx
+        C_NET_TX.labels(node, iface).inc(delta_tx)
+        G_NET_TX_RATE.labels(node, iface).set(delta_tx / dt)
     if rx_err >= perr:
         C_NET_RX_ERR.labels(node, iface).inc(rx_err - perr)
     if tx_err >= oerr:
         C_NET_TX_ERR.labels(node, iface).inc(tx_err - oerr)
     _NET_LAST[node][iface] = (rx, tx, rx_err, tx_err)
+    _NET_LAST_TIME[node][iface] = now
 
 
 def _host_uptime_seconds() -> float:

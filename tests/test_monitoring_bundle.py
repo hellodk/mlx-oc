@@ -10,6 +10,7 @@ BUNDLE_DIR = REPO_ROOT / "cluster" / "mlx_monitoring_bundle"
 EDGE_DIR = BUNDLE_DIR / "edge"
 EXPORTERS_DIR = EDGE_DIR / "exporters"
 
+sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(EDGE_DIR))
 sys.path.insert(0, str(EXPORTERS_DIR))
 
@@ -50,7 +51,7 @@ def test_vmagent_yaml_rendering():
     assert data["global"]["external_labels"]["device"] == "test-mac"
     assert data["global"]["external_labels"]["macbook"] == "test-mac"
     assert data["global"]["external_labels"]["serial"] == "SERIAL12345"
-    assert len(data["scrape_configs"]) == 8
+    assert len(data["scrape_configs"]) == 9
 
 
 def test_vmagent_yaml_rendering_with_defaults():
@@ -154,13 +155,14 @@ def test_central_compose_image_resolution_and_profiles():
         else:
             base_images.add(img)
 
-    # Base profile: 5 monitoring containers
+    # Base profile: 6 monitoring containers
     expected_base = {
         "victoriametrics/victoria-metrics:v1.155.0",
         "otel/opentelemetry-collector-contrib:0.139.0",
         "grafana/grafana:13.3.0",
         "victoriametrics/vmalert:v1.155.0",
         "prom/alertmanager:v0.34.2",
+        "python:3.12-slim",
     }
     assert base_images == expected_base
 
@@ -3538,6 +3540,449 @@ def test_attention_heads_monitoring_and_shard_allocation(tmp_path):
     kva_text = generate_latest().decode()
     assert 'mlx_kv_heads_assigned 2.0' in kva_text
     assert 'mlx_kv_head_dim 64.0' in kva_text
+
+
+def test_peer_app_probe_rejects_http_errors_and_accepts_success():
+    """Verify probe_peer_app strictly accepts 200-399 and rejects 4xx and 5xx errors."""
+    import http.server
+    import threading
+    import socket
+    import mlx_shard_topology as top
+
+    class DynamicHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/200":
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"OK")
+            elif self.path == "/204":
+                self.send_response(204)
+                self.end_headers()
+            elif self.path == "/404":
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"Not Found")
+            elif self.path == "/500":
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Internal Error")
+            elif self.path == "/502":
+                self.send_response(502)
+                self.end_headers()
+                self.wfile.write(b"Bad Gateway")
+            elif self.path == "/503":
+                self.send_response(503)
+                self.end_headers()
+                self.wfile.write(b"Service Unavailable")
+
+        def log_message(self, format, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), DynamicHandler)
+    port = server.server_address[1]
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+
+    try:
+        # Test HTTP 200 -> Must be UP
+        res200 = top.probe_peer_app(((1, "127.0.0.1"),), port=port, path="/200", timeout=1.0)
+        r200 = res200[(1, "127.0.0.1")]
+        assert r200.up is True
+        assert r200.reason == "ok"
+        assert r200.status_code == 200
+        assert r200.app_rtt_seconds > 0.0
+
+        # Test HTTP 204 -> Must be UP
+        res204 = top.probe_peer_app(((1, "127.0.0.1"),), port=port, path="/204", timeout=1.0)
+        r204 = res204[(1, "127.0.0.1")]
+        assert r204.up is True
+        assert r204.reason == "ok"
+        assert r204.status_code == 204
+
+        # Test HTTP 404 -> Must be DOWN (never up!)
+        res404 = top.probe_peer_app(((1, "127.0.0.1"),), port=port, path="/404", timeout=1.0)
+        r404 = res404[(1, "127.0.0.1")]
+        assert r404.up is False
+        assert r404.reason == "status_404"
+        assert r404.status_code == 404
+
+        # Test HTTP 500 -> Must be DOWN (proves fix for Finding 8)
+        res500 = top.probe_peer_app(((1, "127.0.0.1"),), port=port, path="/500", timeout=1.0)
+        r500 = res500[(1, "127.0.0.1")]
+        assert r500.up is False
+        assert r500.reason == "status_500"
+        assert r500.status_code == 500
+
+        # Test HTTP 502 -> Must be DOWN
+        res502 = top.probe_peer_app(((1, "127.0.0.1"),), port=port, path="/502", timeout=1.0)
+        r502 = res502[(1, "127.0.0.1")]
+        assert r502.up is False
+        assert r502.reason == "status_502"
+        assert r502.status_code == 502
+
+        # Test HTTP 503 -> Must be DOWN
+        res503 = top.probe_peer_app(((1, "127.0.0.1"),), port=port, path="/503", timeout=1.0)
+        r503 = res503[(1, "127.0.0.1")]
+        assert r503.up is False
+        assert r503.reason == "status_503"
+        assert r503.status_code == 503
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_metric_labels_correctness_proxy_and_error():
+    """Verify mlx_requests_total label schema and mlx_error_total status label."""
+    import mlx_metrics_proxy as proxy
+    import json
+    from pathlib import Path
+
+    # 1. mlx_requests_total must have ["model", "streaming", "kind"] and NEVER "code"
+    assert proxy.REQUESTS._labelnames == ("model", "streaming", "kind")
+    assert "code" not in proxy.REQUESTS._labelnames
+
+    # 2. mlx_error_total must have ("model", "status", "kind") and NEVER "code"
+    assert proxy.ERRORS._labelnames == ("model", "status", "kind")
+    assert "status" in proxy.ERRORS._labelnames
+    assert "code" not in proxy.ERRORS._labelnames
+
+    # 3. Reference dashboards must NOT query mlx_requests_total with code label
+    dash_path = Path("cluster/mlx_monitoring_bundle/central/dashboards/mlx-monitoring/network-topology.json")
+    with open(dash_path) as f:
+        data = json.load(f)
+    text = json.dumps(data)
+    assert 'mlx_requests_total{code=' not in text
+    assert 'mlx_requests_total{code=~' not in text
+
+
+def test_server_supervisor_listener_discovery_correctness():
+    """Verify supervisor exposes discover_server_listeners and registers mlx_server_listen_address."""
+    import os
+    import socket
+    import mlx_server_supervisor as sup
+
+    # 1. discover_server_listeners function exists
+    assert hasattr(sup, "discover_server_listeners")
+    assert callable(sup.discover_server_listeners)
+
+    # 2. Gauge is registered with address and port labels
+    assert hasattr(sup, "G_LISTEN_ADDRESS")
+    assert sup.G_LISTEN_ADDRESS._labelnames == ("address", "port")
+
+    # 3. Test discovery of active listening socket via psutil connections
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("127.0.0.1", 0))
+    s.listen(1)
+    port = s.getsockname()[1]
+    try:
+        listeners = sup.discover_server_listeners(pid=os.getpid())
+        assert ("127.0.0.1", port) in listeners
+    finally:
+        s.close()
+
+
+def test_component_inventory_schema_and_completeness():
+    """Verify cluster/mlx_monitoring_bundle/config/components.yml inventory completeness and validity."""
+    import yaml
+    from pathlib import Path
+
+    inv_path = Path("cluster/mlx_monitoring_bundle/config/components.yml")
+    assert inv_path.exists(), "components.yml must exist"
+
+    with open(inv_path) as f:
+        inv = yaml.safe_load(f)
+
+    assert inv["version"] == 1
+    assert "fleet" in inv
+    assert "edge_services" in inv
+    assert "collectors" in inv
+    assert "destinations" in inv
+    assert "network_hops" in inv
+
+    # Check all edge services are cataloged
+    expected_services = [
+        "mlx_metrics_proxy",
+        "mlx_engine",
+        "mlx_shard_topology",
+        "mlx_server_supervisor",
+        "mlx_hw_telemetry",
+        "mlx_process_profiler",
+        "mlx_server_log_tailer",
+        "mlx_accuracy_eval",
+        "mlx_sbom_tracker",
+    ]
+    for s in expected_services:
+        assert s in inv["edge_services"], f"Missing edge service in inventory: {s}"
+
+    # Check collectors
+    assert "vmagent" in inv["collectors"]
+    assert "otel_collector" in inv["collectors"]
+
+    # Check destinations
+    assert "victoria_metrics" in inv["destinations"]
+    assert "grafana" in inv["destinations"]
+    assert "alertmanager" in inv["destinations"]
+    assert "opik" in inv["destinations"]
+
+    # Check network hops
+    hops = inv["network_hops"]
+    assert len(hops) >= 8
+
+
+def test_network_topology_flow_queries_and_decoupled_pipelines():
+    """Verify network topology dashboard hop-by-hop queries and decoupled telemetry paths."""
+    import json
+    from pathlib import Path
+
+    dash_path = Path("cluster/mlx_monitoring_bundle/central/dashboards/mlx-monitoring/network-topology.json")
+    with open(dash_path) as f:
+        dash = json.load(f)
+
+    # Panel 11: Hop-by-hop throughput
+    p11 = [p for p in dash.get("panels", []) if p.get("id") == 11][0]
+    exprs = [t["expr"] for t in p11.get("targets", [])]
+
+    # Hop 1: Ingress rate
+    assert any("rate(mlx_requests_total[1m])" in e for e in exprs)
+    # Hop 2: Engine forwarding
+    assert any("rate(mlx_requests_total{kind=~" in e for e in exprs)
+    # Hop 3: Token generation
+    assert any("mlx_tokens_prompt_total" in e and "mlx_tokens_completion_total" in e for e in exprs)
+    # Hop 4: Scrapes
+    assert any("rate(scrape_samples_scraped[1m])" in e for e in exprs)
+
+    # Panel 7: Native Node Graph panel
+    p7 = [p for p in dash.get("panels", []) if p.get("id") == 7][0]
+    assert p7.get("type") == "nodeGraph"
+    targets7 = [t.get("expr", "") for t in p7.get("targets", [])]
+    assert any("mlx_topology_node_info" in e for e in targets7)
+    assert any("mlx_topology_edge_info" in e for e in targets7)
+
+    # Panel 15: Architecture Reference Map HTML decouples Opik and OTel Collector
+    p15 = [p for p in dash.get("panels", []) if p.get("id") == 15][0]
+    html = p15.get("options", {}).get("content", "")
+    assert "Direct Opik SDK" in html
+    assert "OTel Collector (:4318)" in html
+    assert "Push TSDB (:8428)" in html
+    # Ensure no arrow from OTel to Opik
+    assert "OTel Collector -> Opik" not in html
+
+
+def test_edge_bundle_topology_agent_configuration_and_lifecycle(tmp_path):
+    """Verify Bundle integrates EdgeTopologyAgentDaemon into its process lifecycle and vmagent rendering."""
+    import yaml as _yaml
+    from mlx_monitoring_bundle import Bundle
+
+    cfg = {
+        "MLX_DEVICE_ID": "node-test-01",
+        "CENTRAL_VICTORIA_METRICS": "10.0.0.1:8428",
+        "CENTRAL_OTEL": "10.0.0.1:4318",
+        "CENTRAL_TOPOLOGY_URL": "http://10.0.0.1:8089",
+        "ENABLE_TOPOLOGY_AGENT": "true",
+        "TOPOLOGY_INTERVAL": "10.0",
+        "TOPOLOGY_LISTEN": "127.0.0.1:19110",
+        "PID_DIR": str(tmp_path / "bin"),
+        "LOG_DIR": str(tmp_path / "logs"),
+        "EXPORTER_LOG_DIR": str(tmp_path / "logs"),
+    }
+    (tmp_path / "bin").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "logs").mkdir(parents=True, exist_ok=True)
+
+    bundle = Bundle(cfg)
+    assert bundle.enable_topology is True
+    assert bundle.topology_endpoint == "http://10.0.0.1:8089"
+    assert bundle.topology_listen == "127.0.0.1:19110"
+
+    # Status check includes topology PID and central endpoint
+    st = bundle.status()
+    assert "topology" in st["pids"]
+    assert st["central"]["topology"] == "http://10.0.0.1:8089"
+
+    # vmagent rendering includes topology scrape target
+    bundle.vmagent_config_rendered = tmp_path / "vmagent.yml"
+    assert bundle._render_vmagent_config() is True
+    rendered = _yaml.safe_load(bundle.vmagent_config_rendered.read_text(encoding="utf8"))
+    jobs = {sc["job_name"]: sc["static_configs"][0]["targets"][0] for sc in rendered["scrape_configs"]}
+    assert jobs["mlx-topology"] == "127.0.0.1:19110"
+
+
+def test_edge_topology_agent_daemon_execution_and_metrics(tmp_path):
+    """Verify EdgeTopologyAgentDaemon executes discovery, publishes snapshot, and serves Prometheus metrics."""
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    import threading
+    import urllib.request
+    from mlx_topology_agent import EdgeTopologyAgentDaemon
+
+    # Setup mock central topology service receiver
+    received_snapshots = []
+
+    class MockCentralHandler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_POST(self):
+            if self.path == "/api/v1/topology/snapshot":
+                content_len = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_len)
+                received_snapshots.append(json.loads(body.decode("utf-8")))
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"status":"ACCEPTED"}')
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+    mock_central = HTTPServer(("127.0.0.1", 0), MockCentralHandler)
+    central_port = mock_central.server_port
+    central_thread = threading.Thread(target=mock_central.serve_forever, daemon=True)
+    central_thread.start()
+
+    daemon = EdgeTopologyAgentDaemon(
+        device_id="node-test-daemon",
+        central_url=f"http://127.0.0.1:{central_port}",
+        vmagent_url="http://127.0.0.1:8429",
+        interval=5.0,
+        listen_addr="127.0.0.1:0",  # Test binding
+    )
+
+    try:
+        ok = daemon.run_once()
+        assert ok is True
+        assert len(received_snapshots) == 1
+        snap = received_snapshots[0]
+        assert snap["device_id"] == "node-test-daemon"
+        assert len(snap["nodes"]) > 0
+        assert len(snap["edges"]) > 0
+
+        # Start http server and test metrics / health
+        daemon.start_http_server()
+        agent_port = daemon.server.server_port
+        with urllib.request.urlopen(f"http://127.0.0.1:{agent_port}/health") as resp:
+            assert resp.status == 200
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "HEALTHY"
+
+        with urllib.request.urlopen(f"http://127.0.0.1:{agent_port}/metrics") as resp:
+            assert resp.status == 200
+            content = resp.read().decode("utf-8")
+            assert "mlx_topology_agent_up 1.0" in content
+            assert "mlx_topology_snapshots_total" in content
+    finally:
+        daemon.stop()
+        mock_central.shutdown()
+        mock_central.server_close()
+
+
+def test_central_topology_service_reconciliation_and_tsdb_export(tmp_path):
+    """Verify Central Topology Service background reconciliation, TSDB export, and Grafana Node Graph API."""
+    import datetime
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    import threading
+    import urllib.request
+    from cluster.mlx_monitoring_bundle.topology.service import TopologyAPIService
+    from cluster.mlx_monitoring_bundle.topology.models import TopologySnapshot, TopologyNode, TopologyEdge, NodeRole, SignalType, HealthStatus
+
+    # Setup mock VictoriaMetrics server receiving /api/v1/import/prometheus
+    vm_imports = []
+
+    class MockVMHandler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_POST(self):
+            if self.path == "/api/v1/import/prometheus":
+                content_len = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_len)
+                vm_imports.append(body.decode("utf-8"))
+                self.send_response(204)
+                self.end_headers()
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+        def do_GET(self):
+            # Query endpoint count(up{...})
+            if "/api/v1/query" in self.path:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"status":"success","data":{"resultType":"vector","result":[{"metric":{},"value":[1700000000,"5"]}]}}')
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+    mock_vm = HTTPServer(("127.0.0.1", 0), MockVMHandler)
+    vm_port = mock_vm.server_port
+    vm_thread = threading.Thread(target=mock_vm.serve_forever, daemon=True)
+    vm_thread.start()
+
+    db_path = str(tmp_path / "topology_test.db")
+    svc = TopologyAPIService(
+        host="127.0.0.1",
+        port=0,
+        db_path=db_path,
+        vm_url=f"http://127.0.0.1:{vm_port}",
+        reconcile_interval=1.0,
+    )
+
+    # Ingest test snapshot with current timestamp
+    now_ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    snap = TopologySnapshot(
+        device_id="node-reconcile-test",
+        timestamp=now_ts,
+        nodes=[
+            TopologyNode(id="node:proxy", name="Proxy", device_id="node-reconcile-test", role=NodeRole.DATA_PLANE),
+            TopologyNode(id="central:vm", name="TSDB", device_id="central", role=NodeRole.TSDB),
+        ],
+        edges=[
+            TopologyEdge(id="e1", source_id="node:proxy", target_id="central:vm", signal_type=SignalType.METRICS),
+        ],
+    )
+    svc.storage.save_snapshot(snap)
+
+    try:
+        # Export metrics to mock TSDB
+        ok = svc.export_metrics_to_tsdb()
+        assert ok is True
+        assert len(vm_imports) > 0
+        exported_text = vm_imports[-1]
+        assert "mlx_topology_devices_total" in exported_text
+        assert "mlx_topology_node_info" in exported_text
+        assert "mlx_topology_edge_info" in exported_text
+
+        # Test reconciliation execution
+        recon_result = svc.reconciler.reconcile_fleet()
+        assert recon_result["total_devices"] >= 1
+        assert recon_result["query_audits"]["node-reconcile-test"]["queryable"] is True
+    finally:
+        mock_vm.shutdown()
+        mock_vm.server_close()
+
+
+def test_components_inventory_and_deploy_ports_verification():
+    """Verify components.yml catalog completeness and deploy.sh port audits."""
+    import yaml as _yaml
+    from pathlib import Path
+
+    inv_path = Path("cluster/mlx_monitoring_bundle/config/components.yml")
+    assert inv_path.exists()
+    inv = _yaml.safe_load(inv_path.read_text(encoding="utf8"))
+
+    # Assert central_topology destination exists
+    assert "central_topology" in inv["destinations"]
+    top_dest = inv["destinations"]["central_topology"]
+    assert top_dest["ports"]["http"] == 8089
+
+    # Assert hop 10 exists
+    assert "hop_10_topology_reporting" in inv["network_hops"]
+    hop10 = inv["network_hops"]["hop_10_topology_reporting"]
+    assert hop10["target_port"] == 8089
+
+    # Assert deploy.sh audits port 8089
+    deploy_sh = Path("cluster/mlx_monitoring_bundle/scripts/deploy.sh").read_text(encoding="utf8")
+    assert "8089" in deploy_sh
+
+
 
 
 

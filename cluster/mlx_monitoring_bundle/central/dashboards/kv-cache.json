@@ -579,7 +579,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(time() - timestamp(mlx_kv_cache_utilization{device=~\"$device\"})) or vector(0)",
+          "expr": "(time() - timestamp(mlx_kv_cache_utilization{device=~\"$device\"}))",
           "legendFormat": "",
           "range": false,
           "instant": true,

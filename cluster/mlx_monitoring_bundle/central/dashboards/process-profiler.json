@@ -585,7 +585,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(rate(process_profiler_samples_total{device=~\"$device\"}[1m])) or vector(5)",
+          "expr": "avg(rate(process_profiler_samples_total{device=~\"$device\"}[1m]))",
           "legendFormat": "",
           "range": false,
           "instant": true,

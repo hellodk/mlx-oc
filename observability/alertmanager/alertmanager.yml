@@ -24,10 +24,14 @@ route:
 
 receivers:
   - name: "oncall"
-    webhook_configs: []
+    webhook_configs:
+      - url: "http://127.0.0.1:9000/hooks/oncall"
+        send_resolved: true
 
   - name: "default"
-    webhook_configs: []
+    webhook_configs:
+      - url: "http://127.0.0.1:9000/hooks/alert"
+        send_resolved: true
 
 inhibit_rules:
   - source_matchers:

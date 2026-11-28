@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Service-to-service ingress, listening and forwarding ports, peer interconnects, and misconfiguration detection",
+  "description": "Dynamic Node Graph visualization, listening and forwarding ports, peer interconnects, and automated reconciliation",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -272,7 +272,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(up == 1) or vector(8)",
+          "expr": "count(up == 1)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -334,7 +334,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_requests_total[1m])) or vector(14.2)",
+          "expr": "sum(rate(mlx_requests_total[1m]))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -397,7 +397,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_net_rx_bytes_total[1m])) or vector(1250000)",
+          "expr": "sum(rate(mlx_net_rx_bytes_total[1m]))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -460,7 +460,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_requests_total{code=~\"50[24]\"}[5m])) or vector(0)",
+          "expr": "sum(rate(mlx_error_total{status=\"5xx\"}[5m]))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -526,7 +526,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mlx_server_listen_address{address=\"0.0.0.0\"}) or vector(0)",
+          "expr": "count(mlx_server_listen_address{address=\"0.0.0.0\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -592,7 +592,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(mlx_shard_peer_rtt_seconds) or vector(0.001)",
+          "expr": "avg(mlx_shard_peer_connect_seconds)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -643,18 +643,56 @@
     },
     {
       "id": 7,
-      "title": "Component interconnect & listening port topology",
-      "type": "text",
+      "title": "Dynamic telemetry & component topology (Native Node Graph)",
+      "type": "nodeGraph",
       "gridPos": {
         "h": 14,
         "w": 24,
         "x": 0,
         "y": 4
       },
-      "description": "Interactive network map showing components, listening interfaces, forwarding ports, and live traffic flows",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Native Grafana Node Graph rendering real-time nodes, listening sockets, forwarding hops, and telemetry pipelines with click-to-inspect drawers",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_topology_node_info{device=~\"$device\"} or (1 * mlx_server_state{device=~\"$device\"})",
+          "legendFormat": "Node: {{name}} ({{device}})",
+          "range": true,
+          "instant": true,
+          "refId": "nodes",
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_topology_edge_info or (1 * mlx_shard_peer_up)",
+          "legendFormat": "Edge: {{source}} -> {{target}}",
+          "range": true,
+          "instant": true,
+          "refId": "edges",
+          "format": "table"
+        }
+      ],
       "options": {
-        "mode": "html",
-        "content": "<div style=\"background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:12px;padding:20px;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;box-shadow:0 1px 3px rgba(0,0,0,0.05);\">\n  <!-- Title & Section Header -->\n  <div style=\"display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;border-bottom:1px solid #e5e7eb;padding-bottom:14px;flex-wrap:wrap;gap:10px;\">\n    <div>\n      <div style=\"font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#4f46e5;margin-bottom:2px;\">CLUSTER NETWORK & COMPONENT INTERCONNECT TOPOLOGY</div>\n      <div style=\"font-size:20px;font-weight:800;color:#111827;letter-spacing:-0.02em;\">MLX Distributed Inference Fleet \u2014 Service & Port Architecture</div>\n      <div style=\"font-size:12px;color:#4b5563;margin-top:2px;\">Central Host: <strong>mm (192.168.1.64)</strong> \u00b7 Primary NIC: <strong>en1</strong> \u00b7 Ingress: <strong>:8080</strong> \u00b7 Engine API: <strong>:8030</strong> \u00b7 TSDB: <strong>:8428</strong></div>\n    </div>\n    <div style=\"display:flex;gap:8px;align-items:center;flex-wrap:wrap;\">\n      <span style=\"display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid #e5e7eb;padding:4px 10px;border-radius:6px;font-size:11px;font-family:monospace;font-weight:600;color:#111827;\">\n        <span style=\"width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;\"></span>\n        Fleet Online (8 Endpoints)\n      </span>\n      <span style=\"display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid #e5e7eb;padding:4px 10px;border-radius:6px;font-size:11px;font-family:monospace;font-weight:600;color:#0284c7;\">\n        NIC: en1 (LAN)\n      </span>\n      <span style=\"display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid #e5e7eb;padding:4px 10px;border-radius:6px;font-size:11px;font-family:monospace;font-weight:600;color:#7c3aed;\">\n        Ring: en2 (TB4)\n      </span>\n    </div>\n  </div>\n\n  <!-- SVG Architecture Canvas (Horizontal & Vertical L-Bends, No Diagonals) -->\n  <svg width=\"100%\" height=\"340\" viewBox=\"0 0 1140 340\" style=\"overflow:visible;\" xmlns=\"http://www.w3.org/2000/svg\">\n    <defs>\n      <marker id=\"m-ing\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#d97706\"/></marker>\n      <marker id=\"m-fwd\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#4f46e5\"/></marker>\n      <marker id=\"m-ring\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#7c3aed\"/></marker>\n      <marker id=\"m-tel\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#059669\"/></marker>\n      <marker id=\"m-obs\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#0284c7\"/></marker>\n    </defs>\n\n    <!-- Zone 1: Edge Host & Data Plane -->\n    <rect x=\"10\" y=\"10\" width=\"670\" height=\"155\" rx=\"8\" fill=\"#f8fafc\" stroke=\"#c7d2fe\" stroke-width=\"1.5\"/>\n    <text x=\"22\" y=\"26\" fill=\"#4338ca\" font-size=\"11\" font-family=\"monospace\" font-weight=\"700\">ZONE 1 \u00b7 DATA PLANE (Host: mm \u00b7 en1: 192.168.1.64 \u00b7 Ingress :8080 \u00b7 Engine API :8030)</text>\n\n    <!-- Zone 2: Edge Exporters & Telemetry -->\n    <rect x=\"10\" y=\"175\" width=\"670\" height=\"155\" rx=\"8\" fill=\"#f8fafc\" stroke=\"#a7f3d0\" stroke-width=\"1.5\"/>\n    <text x=\"22\" y=\"191\" fill=\"#065f46\" font-size=\"11\" font-family=\"monospace\" font-weight=\"700\">ZONE 2 \u00b7 TELEMETRY EXPORTERS & VMAGENT SCRAPING PLANE (Interface: en1 / lo0)</text>\n\n    <!-- Zone 3: Central Observability Plane -->\n    <rect x=\"700\" y=\"10\" width=\"430\" height=\"320\" rx=\"8\" fill=\"#f8fafc\" stroke=\"#bae6fd\" stroke-width=\"1.5\"/>\n    <text x=\"714\" y=\"26\" fill=\"#0369a1\" font-size=\"11\" font-family=\"monospace\" font-weight=\"700\">ZONE 3 \u00b7 CENTRAL OBSERVABILITY & VISUALS (VictoriaMetrics :8428 \u00b7 Grafana :3000)</text>\n\n    <!-- Flow Paths (Strictly Horizontal and Vertical L-Bends) -->\n    <!-- Client Ingress -> Ingress Proxy (:8080) -->\n    <path d=\"M 115 90 L 155 90\" fill=\"none\" stroke=\"#d97706\" stroke-width=\"2.5\" marker-end=\"url(#m-ing)\"/>\n    <text x=\"135\" y=\"82\" fill=\"#b45309\" font-size=\"10\" font-family=\"monospace\" font-weight=\"600\" text-anchor=\"middle\">Traffic</text>\n\n    <!-- Ingress Proxy (:8080) -> mlx-engine (:8030) -->\n    <path d=\"M 315 90 L 355 90\" fill=\"none\" stroke=\"#4f46e5\" stroke-width=\"2.5\" marker-end=\"url(#m-fwd)\"/>\n    <text x=\"335\" y=\"82\" fill=\"#4338ca\" font-size=\"10\" font-family=\"monospace\" font-weight=\"600\" text-anchor=\"middle\">Proxy</text>\n\n    <!-- mlx-engine (:8030) -> Shard Rank 1 (:8081) -->\n    <path d=\"M 465 125 L 465 145 L 360 145\" fill=\"none\" stroke=\"#7c3aed\" stroke-width=\"2\" stroke-dasharray=\"5 3\" marker-end=\"url(#m-ring)\"/>\n\n    <!-- Exporters (:9102, :9107) -> vmagent (:8429) -->\n    <path d=\"M 145 235 L 210 235 L 210 255 L 255 255\" fill=\"none\" stroke=\"#059669\" stroke-width=\"2\" marker-end=\"url(#m-tel)\"/>\n    <path d=\"M 145 295 L 210 295 L 210 270 L 255 270\" fill=\"none\" stroke=\"#059669\" stroke-width=\"2\" marker-end=\"url(#m-tel)\"/>\n\n    <!-- Proxy (:8080) & Engine (:8030) Scrape -> vmagent (:8429) -->\n    <path d=\"M 235 125 L 235 210 L 295 210 L 295 225\" fill=\"none\" stroke=\"#059669\" stroke-width=\"1.8\" marker-end=\"url(#m-tel)\"/>\n    <path d=\"M 410 125 L 410 210 L 375 210 L 375 225\" fill=\"none\" stroke=\"#059669\" stroke-width=\"1.8\" marker-end=\"url(#m-tel)\"/>\n\n    <!-- vmagent (:8429) -> VictoriaMetrics TSDB (:8428) -->\n    <path d=\"M 455 255 L 590 255 L 590 90 L 715 90\" fill=\"none\" stroke=\"#059669\" stroke-width=\"2.5\" marker-end=\"url(#m-tel)\"/>\n    <text x=\"610\" y=\"82\" fill=\"#065f46\" font-size=\"10\" font-family=\"monospace\" font-weight=\"600\">Push :8428</text>\n\n    <!-- VictoriaMetrics TSDB (:8428) -> Central Grafana (:3000) -->\n    <path d=\"M 855 125 L 855 235\" fill=\"none\" stroke=\"#0284c7\" stroke-width=\"2.5\" marker-end=\"url(#m-obs)\"/>\n    <text x=\"862\" y=\"180\" fill=\"#0369a1\" font-size=\"10\" font-family=\"monospace\" font-weight=\"600\">Queries</text>\n\n    <!-- Engine API (:8030) -> OTel Collector (:4318) -->\n    <path d=\"M 525 90 L 660 90 L 660 170 L 975 170\" fill=\"none\" stroke=\"#0284c7\" stroke-width=\"1.8\" marker-end=\"url(#m-obs)\"/>\n    <text x=\"640\" y=\"162\" fill=\"#0369a1\" font-size=\"10\" font-family=\"monospace\" font-weight=\"600\">OTLP</text>\n\n    <!-- OTel Collector (:4318) -> Opik (:32173) -->\n    <path d=\"M 1045 205 L 1045 235\" fill=\"none\" stroke=\"#0284c7\" stroke-width=\"1.8\" marker-end=\"url(#m-obs)\"/>\n\n    <!-- COMPONENT CARDS -->\n    <!-- Node 1: Client Ingress -->\n    <g transform=\"translate(20, 50)\">\n      <rect width=\"95\" height=\"75\" rx=\"6\" fill=\"#ffffff\" stroke=\"#e5e7eb\" stroke-width=\"1.5\"/>\n      <text x=\"47\" y=\"20\" fill=\"#111827\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\">Client Traffic</text>\n      <text x=\"47\" y=\"36\" fill=\"#d97706\" font-size=\"10\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">REST / SSE</text>\n      <text x=\"47\" y=\"52\" fill=\"#4b5563\" font-size=\"9\" text-anchor=\"middle\">Target: :8080</text>\n      <text x=\"47\" y=\"66\" fill=\"#059669\" font-size=\"9\" font-family=\"monospace\" text-anchor=\"middle\">14.2 req/s</text>\n    </g>\n\n    <!-- Node 2: Ingress Proxy (:8080) -->\n    <g transform=\"translate(155, 50)\">\n      <rect width=\"160\" height=\"75\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-width=\"1.5\"/>\n      <text x=\"80\" y=\"18\" fill=\"#111827\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">mlx-proxy (:8080)</text>\n      <text x=\"80\" y=\"34\" fill=\"#0284c7\" font-size=\"10\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: 0.0.0.0:8080 (en1)</text>\n      <text x=\"80\" y=\"50\" fill=\"#4f46e5\" font-size=\"10\" font-family=\"monospace\" font-weight=\"600\" text-anchor=\"middle\">FWD: 127.0.0.1:8030</text>\n      <text x=\"80\" y=\"66\" fill=\"#4b5563\" font-size=\"9\" text-anchor=\"middle\">Config: edge.env | compose</text>\n    </g>\n\n    <!-- Node 3: mlx-engine (:8030) -->\n    <g transform=\"translate(355, 50)\">\n      <rect width=\"170\" height=\"75\" rx=\"6\" fill=\"#ffffff\" stroke=\"#4f46e5\" stroke-width=\"1.5\"/>\n      <text x=\"85\" y=\"18\" fill=\"#111827\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">mlx-engine (:8030)</text>\n      <text x=\"85\" y=\"34\" fill=\"#4f46e5\" font-size=\"10\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: 127.0.0.1:8030 (lo0)</text>\n      <text x=\"85\" y=\"50\" fill=\"#059669\" font-size=\"10\" font-family=\"monospace\" font-weight=\"600\" text-anchor=\"middle\">API: OpenAI /completions</text>\n      <text x=\"85\" y=\"66\" fill=\"#4b5563\" font-size=\"9\" text-anchor=\"middle\">PID 83602 \u00b7 TTFT 34.8ms</text>\n    </g>\n\n    <!-- Node 4: Shard Workers (:8081 / :8082) -->\n    <g transform=\"translate(200, 130)\">\n      <rect width=\"160\" height=\"30\" rx=\"5\" fill=\"#ffffff\" stroke=\"#7c3aed\" stroke-width=\"1.2\"/>\n      <text x=\"80\" y=\"19\" fill=\"#7c3aed\" font-size=\"10\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">Shard Ring (:8081 en2 TB4)</text>\n    </g>\n\n    <!-- Node 5: Hardware Exporter (:9102) -->\n    <g transform=\"translate(20, 205)\">\n      <rect width=\"125\" height=\"55\" rx=\"6\" fill=\"#ffffff\" stroke=\"#e5e7eb\" stroke-width=\"1.5\"/>\n      <text x=\"62\" y=\"18\" fill=\"#111827\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\">HW Exporter (:9102)</text>\n      <text x=\"62\" y=\"32\" fill=\"#0284c7\" font-size=\"9\" font-family=\"monospace\" text-anchor=\"middle\">LISTEN: 127.0.0.1:9102</text>\n      <text x=\"62\" y=\"46\" fill=\"#059669\" font-size=\"9\" font-family=\"monospace\" text-anchor=\"middle\">SoC / Watts / NIC en1</text>\n    </g>\n\n    <!-- Node 6: Process Profiler (:9107) -->\n    <g transform=\"translate(20, 268)\">\n      <rect width=\"125\" height=\"55\" rx=\"6\" fill=\"#ffffff\" stroke=\"#e5e7eb\" stroke-width=\"1.5\"/>\n      <text x=\"62\" y=\"18\" fill=\"#111827\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\">Profiler (:9107)</text>\n      <text x=\"62\" y=\"32\" fill=\"#0284c7\" font-size=\"9\" font-family=\"monospace\" text-anchor=\"middle\">LISTEN: 127.0.0.1:9107</text>\n      <text x=\"62\" y=\"46\" fill=\"#059669\" font-size=\"9\" font-family=\"monospace\" text-anchor=\"middle\">RAM / KV Cache State</text>\n    </g>\n\n    <!-- Node 7: vmagent (:8429) -->\n    <g transform=\"translate(255, 225)\">\n      <rect width=\"200\" height=\"75\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-width=\"1.5\"/>\n      <text x=\"100\" y=\"18\" fill=\"#111827\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">vmagent Collector (:8429)</text>\n      <text x=\"100\" y=\"34\" fill=\"#059669\" font-size=\"10\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">SCRAPES: 8 Targets (10s)</text>\n      <text x=\"100\" y=\"50\" fill=\"#0284c7\" font-size=\"10\" font-family=\"monospace\" text-anchor=\"middle\">REMOTE WRITE -> :8428</text>\n      <text x=\"100\" y=\"66\" fill=\"#4b5563\" font-size=\"9\" text-anchor=\"middle\">Config: vmagent.yml | servicemonitor</text>\n    </g>\n\n    <!-- Node 8: CENTRAL ANCHOR -> VictoriaMetrics TSDB (:8428) -->\n    <g transform=\"translate(715, 50)\">\n      <rect width=\"250\" height=\"75\" rx=\"8\" fill=\"#0f172a\" stroke=\"#0284c7\" stroke-width=\"2\"/>\n      <text x=\"125\" y=\"22\" fill=\"#ffffff\" font-size=\"13\" font-weight=\"800\" text-anchor=\"middle\">VictoriaMetrics TSDB (:8428)</text>\n      <text x=\"125\" y=\"38\" fill=\"#38bdf8\" font-size=\"10\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">CENTRAL TIME-SERIES REPOSITORY</text>\n      <text x=\"125\" y=\"52\" fill=\"#34d399\" font-size=\"10\" font-family=\"monospace\" text-anchor=\"middle\">25 PromQL Series \u00b7 Ingest 2.1k dps</text>\n      <text x=\"125\" y=\"66\" fill=\"#94a3b8\" font-size=\"9\" text-anchor=\"middle\">Config: docker-compose.central.yml</text>\n    </g>\n\n    <!-- Node 9: CENTRAL ANCHOR -> Central Grafana (:3000) -->\n    <g transform=\"translate(715, 235)\">\n      <rect width=\"250\" height=\"85\" rx=\"8\" fill=\"#0f172a\" stroke=\"#4f46e5\" stroke-width=\"2\"/>\n      <text x=\"125\" y=\"24\" fill=\"#ffffff\" font-size=\"13\" font-weight=\"800\" text-anchor=\"middle\">Central Grafana Suite (:3000)</text>\n      <text x=\"125\" y=\"42\" fill=\"#818cf8\" font-size=\"10\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">FLEET OPERATIONS & TOPOLOGY</text>\n      <text x=\"125\" y=\"58\" fill=\"#34d399\" font-size=\"10\" font-family=\"monospace\" text-anchor=\"middle\">19 Dashboards \u00b7 100% Validated Queries</text>\n      <text x=\"125\" y=\"74\" fill=\"#94a3b8\" font-size=\"9\" text-anchor=\"middle\">Datasource: VictoriaMetrics | Light Theme</text>\n    </g>\n\n    <!-- Node 10: OTel Collector (:4318) -->\n    <g transform=\"translate(975, 145)\">\n      <rect width=\"145\" height=\"60\" rx=\"6\" fill=\"#ffffff\" stroke=\"#e5e7eb\" stroke-width=\"1.5\"/>\n      <text x=\"72\" y=\"18\" fill=\"#111827\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\">OTel Collector</text>\n      <text x=\"72\" y=\"32\" fill=\"#0284c7\" font-size=\"9\" font-family=\"monospace\" text-anchor=\"middle\">LISTEN: :4317/:4318</text>\n      <text x=\"72\" y=\"48\" fill=\"#4b5563\" font-size=\"9\" text-anchor=\"middle\">Pipeline: Spans/OTLP</text>\n    </g>\n\n    <!-- Node 11: Opik Tracing (:32173) -->\n    <g transform=\"translate(975, 235)\">\n      <rect width=\"145\" height=\"60\" rx=\"6\" fill=\"#ffffff\" stroke=\"#e5e7eb\" stroke-width=\"1.5\"/>\n      <text x=\"72\" y=\"18\" fill=\"#111827\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\">Opik LLM Server</text>\n      <text x=\"72\" y=\"32\" fill=\"#7c3aed\" font-size=\"9\" font-family=\"monospace\" text-anchor=\"middle\">LISTEN: :32173</text>\n      <text x=\"72\" y=\"48\" fill=\"#4b5563\" font-size=\"9\" text-anchor=\"middle\">Evaluations & Traces</text>\n    </g>\n  </svg>\n\n  <!-- Horizontal Legend & Multi-Mode Pointer Bar -->\n  <div style=\"display:flex;justify-content:space-between;align-items:center;margin-top:14px;border-top:1px solid #e5e7eb;padding-top:12px;font-size:11px;color:#4b5563;flex-wrap:wrap;gap:12px;\">\n    <div style=\"display:flex;gap:16px;align-items:center;flex-wrap:wrap;\">\n      <span style=\"display:inline-flex;align-items:center;gap:6px;\"><span style=\"width:10px;height:10px;border-radius:50%;background:#d97706;display:inline-block;\"></span>User Ingress (:8080)</span>\n      <span style=\"display:inline-flex;align-items:center;gap:6px;\"><span style=\"width:10px;height:10px;border-radius:50%;background:#4f46e5;display:inline-block;\"></span>Engine API (:8030)</span>\n      <span style=\"display:inline-flex;align-items:center;gap:6px;\"><span style=\"width:10px;height:10px;border-radius:50%;background:#7c3aed;display:inline-block;\"></span>Peer Shard Ring (:8081)</span>\n      <span style=\"display:inline-flex;align-items:center;gap:6px;\"><span style=\"width:10px;height:10px;border-radius:50%;background:#059669;display:inline-block;\"></span>vmagent Scrapes (:8429)</span>\n      <span style=\"display:inline-flex;align-items:center;gap:6px;\"><span style=\"width:10px;height:10px;border-radius:50%;background:#0284c7;display:inline-block;\"></span>Central TSDB (:8428)</span>\n      <span style=\"display:inline-flex;align-items:center;gap:6px;\"><span style=\"width:10px;height:10px;border-radius:50%;background:#0f172a;display:inline-block;\"></span>Central System Anchor</span>\n    </div>\n    <div style=\"font-family:monospace;font-size:11px;color:#111827;font-weight:600;\">\n      Config Seams: deploy/standalone/edge.env \u00b7 deploy/docker-compose.yml \u00b7 deploy/k8s/configmap.yaml\n    </div>\n  </div>\n</div>"
+        "nodes": {
+          "mainStatUnit": "none",
+          "secondaryStatUnit": "none"
+        },
+        "edges": {
+          "mainStatUnit": "none",
+          "secondaryStatUnit": "none"
+        }
       }
     },
     {
@@ -768,7 +806,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum by (iface, device) (rate(mlx_net_rx_errors_total{device=~\"$device\"}[1m])) or vector(0)",
+          "expr": "sum by (iface, device) (rate(mlx_net_rx_errors_total{device=~\"$device\"}[1m]))",
           "legendFormat": "{{device}} [{{iface}}] - RX Errors",
           "range": true,
           "instant": false,
@@ -781,7 +819,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum by (iface, device) (rate(mlx_net_tx_errors_total{device=~\"$device\"}[1m])) or vector(0)",
+          "expr": "sum by (iface, device) (rate(mlx_net_tx_errors_total{device=~\"$device\"}[1m]))",
           "legendFormat": "{{device}} [{{iface}}] - TX Errors",
           "range": true,
           "instant": false,
@@ -861,8 +899,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "up or vector(1)",
-          "legendFormat": "Active Scrape: {{service}} ({{instance}})",
+          "expr": "up",
+          "legendFormat": "Active Scrape: {{job}} ({{instance}})",
           "range": false,
           "instant": true,
           "refId": "A",
@@ -874,8 +912,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_server_state or vector(1)",
-          "legendFormat": "MLX Engine | Listen: 127.0.0.1:8030 (lo0) | Upstream: None | Config: edge.env:MLX_SERVER_PORT / deploy/k8s/configmap.yaml",
+          "expr": "mlx_server_state",
+          "legendFormat": "MLX Engine State ({{device}})",
           "range": false,
           "instant": true,
           "refId": "B",
@@ -887,24 +925,11 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum by (iface) (mlx_net_rx_bytes_total) or vector(1)",
-          "legendFormat": "Active Physical Interface: {{iface}} (192.168.1.64) | Config: edge.env:MLX_NET_IFACE",
+          "expr": "sum by (iface) (mlx_net_rx_bytes_total)",
+          "legendFormat": "Active Physical Interface: {{iface}} | Config: edge.env:MLX_NET_IFACE",
           "range": false,
           "instant": true,
           "refId": "C",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_server_listen_address or vector(1)",
-          "legendFormat": "Service Address Audit | Target: {{device}}",
-          "range": false,
-          "instant": true,
-          "refId": "D",
           "format": "time_series"
         }
       ],
@@ -963,7 +988,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_requests_total[1m])) or vector(14.2)",
+          "expr": "sum(rate(mlx_requests_total[1m]))",
           "legendFormat": "Hop 1: Ingress Client -> Proxy (:8080)",
           "range": true,
           "instant": false,
@@ -976,8 +1001,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_requests_total{kind=\"eval\"}[1m])) or vector(14.1)",
-          "legendFormat": "Hop 2: Proxy -> Upstream Engine (:8030)",
+          "expr": "sum(rate(mlx_requests_total{kind=~\"chat|reasoning|eval\"}[1m]))",
+          "legendFormat": "Hop 2: Proxy Forwarding -> Engine (:8030)",
           "range": true,
           "instant": false,
           "refId": "B",
@@ -989,8 +1014,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_tokens_prompt_total[1m]) + rate(mlx_tokens_generation_total[1m])) or vector(120)",
-          "legendFormat": "Hop 3: Model Engine Token Flow (:8030)",
+          "expr": "sum(rate(mlx_tokens_prompt_total[1m]) + rate(mlx_tokens_completion_total[1m]))",
+          "legendFormat": "Hop 3: Model Engine Token Flow (tokens/s)",
           "range": true,
           "instant": false,
           "refId": "C",
@@ -1002,8 +1027,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(scrape_samples_scraped[1m])) or count(up == 1) * 2",
-          "legendFormat": "Hop 4: Scrapes -> vmagent (:8429) -> TSDB (:8428)",
+          "expr": "sum(rate(scrape_samples_scraped[1m]))",
+          "legendFormat": "Hop 4: Exporter Scrapes -> vmagent -> TSDB",
           "range": true,
           "instant": false,
           "refId": "D",
@@ -1091,7 +1116,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_server_state{device=~\"$device\"} or vector(1)",
+          "expr": "mlx_server_state{device=~\"$device\"}",
           "legendFormat": "Engine State ({{device}})",
           "range": true,
           "instant": false,
@@ -1153,7 +1178,7 @@
     },
     {
       "id": 13,
-      "title": "Wildcard 0.0.0.0 & network path compliance audit",
+      "title": "Wildcard 0.0.0.0 & service error audit",
       "type": "table",
       "gridPos": {
         "h": 8,
@@ -1165,7 +1190,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Flags prohibited 0.0.0.0 wildcard binds, DERP Tailscale leaks, and upstream forwarding breaks with exact file remediation",
+      "description": "Flags prohibited 0.0.0.0 wildcard binds, upstream forwarding errors, unexpected server crashes, and frequent restart events across cluster nodes",
       "targets": [
         {
           "datasource": {
@@ -1173,7 +1198,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_server_listen_address{address=\"0.0.0.0\"} or (0 * mlx_server_up)",
+          "expr": "mlx_server_listen_address{address=\"0.0.0.0\"}",
           "legendFormat": "Prohibited 0.0.0.0 Bind: {{device}} | Fix in: edge.env / deploy/k8s/configmap.yaml",
           "range": false,
           "instant": true,
@@ -1186,8 +1211,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_server_listen_address{address=~\"100\\\\..*\"} or vector(0)",
-          "legendFormat": "Prohibited Tailscale Route Leak: {{device}} | Fix in: nodes.yml:devices[].ip",
+          "expr": "sum by (device) (rate(mlx_error_total{device=~\"$device\"}[1m]))",
+          "legendFormat": "Proxy Forwarding Errors (5xx): {{device}}",
           "range": false,
           "instant": true,
           "refId": "B",
@@ -1199,8 +1224,104 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_proxy_upstream_errors_total or vector(0)",
-          "legendFormat": "Proxy Upstream Forward Failures (502/504) | Fix in: edge.env:MLX_UPSTREAM",
+          "expr": "sum by (device) (mlx_server_crashes_total{device=~\"$device\"})",
+          "legendFormat": "Server Engine Crashes: {{device}}",
+          "range": false,
+          "instant": true,
+          "refId": "C",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum by (device) (rate(mlx_server_restarts_total{device=~\"$device\"}[5m]))",
+          "legendFormat": "Server Restarts Rate: {{device}}",
+          "range": false,
+          "instant": true,
+          "refId": "D",
+          "format": "time_series"
+        }
+      ],
+      "transformations": [],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "links": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": []
+      }
+    },
+    {
+      "id": 14,
+      "title": "Active topology discrepancies & scrape health",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 43
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Real-time scrape health and dynamic reconciliation discrepancies across all fleet nodes",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_topology_discrepancies_total or (0 * up)",
+          "legendFormat": "Active Discrepancy: {{device}} [{{issue}}]",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "up",
+          "legendFormat": "Job: {{job}} | Instance: {{instance}}",
+          "range": false,
+          "instant": true,
+          "refId": "B",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "scrape_duration_seconds",
+          "legendFormat": "Scrape Latency (s)",
           "range": false,
           "instant": true,
           "refId": "C",
@@ -1235,73 +1356,19 @@
       }
     },
     {
-      "id": 14,
-      "title": "Exporter & collector reachability status",
-      "type": "table",
+      "id": 15,
+      "title": "Architecture reference & listening port topology (Multi-Mode)",
+      "type": "text",
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 43
+        "h": 14,
+        "w": 24,
+        "x": 0,
+        "y": 51
       },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Real-time scrape health and duration for all cluster exporter targets",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "up or vector(1)",
-          "legendFormat": "Job: {{job}} | Instance: {{instance}}",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "scrape_duration_seconds or vector(0.005)",
-          "legendFormat": "Scrape Latency (s)",
-          "range": false,
-          "instant": true,
-          "refId": "B",
-          "format": "time_series"
-        }
-      ],
-      "transformations": [],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "displayMode": "auto",
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "links": []
-        },
-        "overrides": []
-      },
+      "description": "Reference architecture blueprint, listening port topology, and manifest inspector across Standalone VM, Compose, and Kubernetes",
       "options": {
-        "showHeader": true,
-        "sortBy": []
+        "mode": "html",
+        "content": "<div style=\"background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:12px;padding:20px;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;box-shadow:0 1px 3px rgba(0,0,0,0.05);\">\n  <!-- Title & Section Header -->\n  <div style=\"display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;border-bottom:1px solid #e5e7eb;padding-bottom:14px;flex-wrap:wrap;gap:10px;\">\n    <div>\n      <div style=\"font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#4f46e5;margin-bottom:2px;\">CLUSTER NETWORK & COMPONENT INTERCONNECT TOPOLOGY</div>\n      <div style=\"font-size:20px;font-weight:800;color:#111827;letter-spacing:-0.02em;\">MLX Distributed Inference Fleet \u2014 Service & Port Architecture</div>\n      <div style=\"font-size:12px;color:#4b5563;margin-top:2px;\">Fleet Topology: <strong>Dynamic Fleet Nodes</strong> \u00b7 Interfaces: <strong>Configurable (LAN / Peer Ring)</strong> \u00b7 Ingress, Engine, TSDB & LLM Tracing Pipelines</div>\n    </div>\n    <div style=\"display:flex;gap:8px;align-items:center;flex-wrap:wrap;\">\n      <span style=\"display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid #e5e7eb;padding:4px 10px;border-radius:6px;font-size:11px;font-family:monospace;font-weight:600;color:#111827;\">\n        <span style=\"width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;\"></span>\n        Fleet Services Active\n      </span>\n      <span style=\"display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid #e5e7eb;padding:4px 10px;border-radius:6px;font-size:11px;font-family:monospace;font-weight:600;color:#0284c7;\">\n        Primary LAN Interface\n      </span>\n      <span style=\"display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid #e5e7eb;padding:4px 10px;border-radius:6px;font-size:11px;font-family:monospace;font-weight:600;color:#7c3aed;\">\n        Interconnect Ring\n      </span>\n    </div>\n  </div>\n\n  <!-- SVG Architecture Canvas (Horizontal & Vertical L-Bends, No Diagonals) -->\n  <svg width=\"100%\" height=\"340\" viewBox=\"0 0 1140 340\" style=\"overflow:visible;\" xmlns=\"http://www.w3.org/2000/svg\">\n    <defs>\n      <marker id=\"m-ing\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#d97706\"/></marker>\n      <marker id=\"m-fwd\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#4f46e5\"/></marker>\n      <marker id=\"m-ring\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#7c3aed\"/></marker>\n      <marker id=\"m-tel\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#059669\"/></marker>\n      <marker id=\"m-obs\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#0284c7\"/></marker>\n      <marker id=\"m-opik\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#7c3aed\"/></marker>\n    </defs>\n\n    <!-- Zone 1: Edge Host & Data Plane -->\n    <rect x=\"10\" y=\"10\" width=\"670\" height=\"155\" rx=\"8\" fill=\"#f8fafc\" stroke=\"#c7d2fe\" stroke-width=\"1.5\"/>\n    <text x=\"22\" y=\"26\" fill=\"#4338ca\" font-size=\"11\" font-family=\"monospace\" font-weight=\"700\">ZONE 1 \u00b7 DATA PLANE (Ingress Proxy \u00b7 Model Engine API \u00b7 Distributed Shard Ring)</text>\n\n    <!-- Zone 2: Edge Exporters & Telemetry -->\n    <rect x=\"10\" y=\"175\" width=\"670\" height=\"155\" rx=\"8\" fill=\"#f8fafc\" stroke=\"#a7f3d0\" stroke-width=\"1.5\"/>\n    <text x=\"22\" y=\"191\" fill=\"#065f46\" font-size=\"11\" font-family=\"monospace\" font-weight=\"700\">ZONE 2 \u00b7 TELEMETRY EXPORTERS & VMAGENT SCRAPING PLANE (Interface: LAN / Loopback)</text>\n\n    <!-- Zone 3: Central Observability Plane -->\n    <rect x=\"700\" y=\"10\" width=\"430\" height=\"320\" rx=\"8\" fill=\"#f8fafc\" stroke=\"#bae6fd\" stroke-width=\"1.5\"/>\n    <text x=\"714\" y=\"26\" fill=\"#0369a1\" font-size=\"11\" font-family=\"monospace\" font-weight=\"700\">ZONE 3 \u00b7 CENTRAL OBSERVABILITY & TSDB (VictoriaMetrics \u00b7 Grafana \u00b7 OTel \u00b7 Opik)</text>\n\n    <!-- Flow Paths (Strictly Horizontal and Vertical L-Bends) -->\n    <!-- Client Ingress -> Ingress Proxy -->\n    <path d=\"M 115 90 L 155 90\" fill=\"none\" stroke=\"#d97706\" stroke-width=\"2.5\" marker-end=\"url(#m-ing)\"/>\n    <text x=\"135\" y=\"82\" fill=\"#b45309\" font-size=\"10\" font-family=\"monospace\" font-weight=\"600\" text-anchor=\"middle\">Traffic</text>\n\n    <!-- Ingress Proxy -> mlx-engine -->\n    <path d=\"M 315 90 L 355 90\" fill=\"none\" stroke=\"#4f46e5\" stroke-width=\"2.5\" marker-end=\"url(#m-fwd)\"/>\n    <text x=\"335\" y=\"82\" fill=\"#4338ca\" font-size=\"10\" font-family=\"monospace\" font-weight=\"600\" text-anchor=\"middle\">Proxy</text>\n\n    <!-- mlx-engine -> Shard Rank 1 -->\n    <path d=\"M 465 125 L 465 145 L 360 145\" fill=\"none\" stroke=\"#7c3aed\" stroke-width=\"2\" stroke-dasharray=\"5 3\" marker-end=\"url(#m-ring)\"/>\n\n    <!-- Exporters -> vmagent -->\n    <path d=\"M 145 235 L 210 235 L 210 255 L 255 255\" fill=\"none\" stroke=\"#059669\" stroke-width=\"2\" marker-end=\"url(#m-tel)\"/>\n    <path d=\"M 145 295 L 210 295 L 210 270 L 255 270\" fill=\"none\" stroke=\"#059669\" stroke-width=\"2\" marker-end=\"url(#m-tel)\"/>\n\n    <!-- Proxy & Engine Scrape -> vmagent -->\n    <path d=\"M 235 125 L 235 210 L 295 210 L 295 225\" fill=\"none\" stroke=\"#059669\" stroke-width=\"1.8\" marker-end=\"url(#m-tel)\"/>\n    <path d=\"M 410 125 L 410 210 L 375 210 L 375 225\" fill=\"none\" stroke=\"#059669\" stroke-width=\"1.8\" marker-end=\"url(#m-tel)\"/>\n\n    <!-- Path A: vmagent -> VictoriaMetrics TSDB (Remote Write) -->\n    <path d=\"M 455 255 L 590 255 L 590 85 L 715 85\" fill=\"none\" stroke=\"#059669\" stroke-width=\"2.5\" marker-end=\"url(#m-tel)\"/>\n    <text x=\"605\" y=\"77\" fill=\"#065f46\" font-size=\"10\" font-family=\"monospace\" font-weight=\"600\">Push TSDB (:8428)</text>\n\n    <!-- Path B: VictoriaMetrics TSDB -> Central Grafana (PromQL Queries) -->\n    <path d=\"M 820 125 L 820 235\" fill=\"none\" stroke=\"#0284c7\" stroke-width=\"2.5\" marker-end=\"url(#m-obs)\"/>\n    <text x=\"826\" y=\"180\" fill=\"#0369a1\" font-size=\"10\" font-family=\"monospace\" font-weight=\"600\">PromQL</text>\n\n    <!-- Path C: Proxy & Engine -> OTel Collector (OTLP Traces & Logs to JSONL/Debug) -->\n    <path d=\"M 525 75 L 660 75 L 660 75 L 975 75\" fill=\"none\" stroke=\"#0284c7\" stroke-width=\"1.8\" marker-end=\"url(#m-obs)\"/>\n    <text x=\"668\" y=\"67\" fill=\"#0369a1\" font-size=\"10\" font-family=\"monospace\" font-weight=\"600\">OTLP (:4318)</text>\n\n    <!-- Path D: Ingress Proxy -> Opik Server (Direct SDK / REST Tracing & Eval) -->\n    <path d=\"M 270 125 L 270 168 L 685 168 L 685 275 L 975 275\" fill=\"none\" stroke=\"#7c3aed\" stroke-width=\"1.8\" stroke-dasharray=\"4 3\" marker-end=\"url(#m-opik)\"/>\n    <text x=\"670\" y=\"160\" fill=\"#7c3aed\" font-size=\"10\" font-family=\"monospace\" font-weight=\"600\">Direct Opik SDK (:32173)</text>\n\n    <!-- COMPONENT CARDS -->\n    <!-- Node 1: Client Ingress -->\n    <g transform=\"translate(20, 50)\">\n      <rect width=\"95\" height=\"75\" rx=\"6\" fill=\"#ffffff\" stroke=\"#e5e7eb\" stroke-width=\"1.5\"/>\n      <text x=\"47\" y=\"20\" fill=\"#111827\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\">Client Traffic</text>\n      <text x=\"47\" y=\"36\" fill=\"#d97706\" font-size=\"10\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">REST / SSE</text>\n      <text x=\"47\" y=\"52\" fill=\"#4b5563\" font-size=\"9\" text-anchor=\"middle\">Target: Proxy</text>\n      <text x=\"47\" y=\"66\" fill=\"#059669\" font-size=\"9\" font-family=\"monospace\" text-anchor=\"middle\">Inference Traffic</text>\n    </g>\n\n    <!-- Node 2: Ingress Proxy -->\n    <g transform=\"translate(155, 50)\">\n      <rect width=\"160\" height=\"75\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-width=\"1.5\"/>\n      <text x=\"80\" y=\"18\" fill=\"#111827\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">mlx-proxy (Ingress)</text>\n      <text x=\"80\" y=\"34\" fill=\"#0284c7\" font-size=\"10\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: PROXY_PORT (LAN)</text>\n      <text x=\"80\" y=\"50\" fill=\"#4f46e5\" font-size=\"10\" font-family=\"monospace\" font-weight=\"600\" text-anchor=\"middle\">FWD: Engine API (:8030)</text>\n      <text x=\"80\" y=\"66\" fill=\"#7c3aed\" font-size=\"9\" font-family=\"monospace\" text-anchor=\"middle\">Direct Opik SDK + OTLP</text>\n    </g>\n\n    <!-- Node 3: mlx-engine -->\n    <g transform=\"translate(355, 50)\">\n      <rect width=\"170\" height=\"75\" rx=\"6\" fill=\"#ffffff\" stroke=\"#4f46e5\" stroke-width=\"1.5\"/>\n      <text x=\"85\" y=\"18\" fill=\"#111827\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">mlx-engine (API)</text>\n      <text x=\"85\" y=\"34\" fill=\"#4f46e5\" font-size=\"10\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: ENGINE_PORT (lo0)</text>\n      <text x=\"85\" y=\"50\" fill=\"#059669\" font-size=\"10\" font-family=\"monospace\" font-weight=\"600\" text-anchor=\"middle\">API: OpenAI /completions</text>\n      <text x=\"85\" y=\"66\" fill=\"#4b5563\" font-size=\"9\" text-anchor=\"middle\">Config: supervisor / engine</text>\n    </g>\n\n    <!-- Node 4: Shard Workers -->\n    <g transform=\"translate(200, 130)\">\n      <rect width=\"160\" height=\"30\" rx=\"5\" fill=\"#ffffff\" stroke=\"#7c3aed\" stroke-width=\"1.2\"/>\n      <text x=\"80\" y=\"19\" fill=\"#7c3aed\" font-size=\"10\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">Shard Ring (Peer Interconnect)</text>\n    </g>\n\n    <!-- Node 5: Hardware Exporter -->\n    <g transform=\"translate(20, 205)\">\n      <rect width=\"125\" height=\"55\" rx=\"6\" fill=\"#ffffff\" stroke=\"#e5e7eb\" stroke-width=\"1.5\"/>\n      <text x=\"62\" y=\"18\" fill=\"#111827\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\">HW Exporter</text>\n      <text x=\"62\" y=\"32\" fill=\"#0284c7\" font-size=\"9\" font-family=\"monospace\" text-anchor=\"middle\">LISTEN: HW_PORT (:9102)</text>\n      <text x=\"62\" y=\"46\" fill=\"#059669\" font-size=\"9\" font-family=\"monospace\" text-anchor=\"middle\">SoC / Power / Network</text>\n    </g>\n\n    <!-- Node 6: Process Profiler -->\n    <g transform=\"translate(20, 268)\">\n      <rect width=\"125\" height=\"55\" rx=\"6\" fill=\"#ffffff\" stroke=\"#e5e7eb\" stroke-width=\"1.5\"/>\n      <text x=\"62\" y=\"18\" fill=\"#111827\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\">Process Profiler</text>\n      <text x=\"62\" y=\"32\" fill=\"#0284c7\" font-size=\"9\" font-family=\"monospace\" text-anchor=\"middle\">LISTEN: PROFILER_PORT (:9103)</text>\n      <text x=\"62\" y=\"46\" fill=\"#059669\" font-size=\"9\" font-family=\"monospace\" text-anchor=\"middle\">RAM / KV Cache State</text>\n    </g>\n\n    <!-- Node 7: vmagent -->\n    <g transform=\"translate(255, 225)\">\n      <rect width=\"200\" height=\"75\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-width=\"1.5\"/>\n      <text x=\"100\" y=\"18\" fill=\"#111827\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">vmagent Collector</text>\n      <text x=\"100\" y=\"34\" fill=\"#059669\" font-size=\"10\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">SCRAPES: Fleet Exporters</text>\n      <text x=\"100\" y=\"50\" fill=\"#0284c7\" font-size=\"10\" font-family=\"monospace\" text-anchor=\"middle\">REMOTE WRITE -> TSDB (:8428)</text>\n      <text x=\"100\" y=\"66\" fill=\"#4b5563\" font-size=\"9\" text-anchor=\"middle\">Config: vmagent.yml | servicemonitor</text>\n    </g>\n\n    <!-- Node 8: CENTRAL ANCHOR -> VictoriaMetrics TSDB -->\n    <g transform=\"translate(715, 50)\">\n      <rect width=\"210\" height=\"75\" rx=\"8\" fill=\"#0f172a\" stroke=\"#0284c7\" stroke-width=\"2\"/>\n      <text x=\"105\" y=\"22\" fill=\"#ffffff\" font-size=\"13\" font-weight=\"800\" text-anchor=\"middle\">VictoriaMetrics TSDB</text>\n      <text x=\"105\" y=\"38\" fill=\"#38bdf8\" font-size=\"10\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">PORT :8428 (Remote Write / PromQL)</text>\n      <text x=\"105\" y=\"52\" fill=\"#34d399\" font-size=\"10\" font-family=\"monospace\" text-anchor=\"middle\">Central Time-Series Repository</text>\n      <text x=\"105\" y=\"66\" fill=\"#94a3b8\" font-size=\"9\" text-anchor=\"middle\">Retention: 30d | TSDB Storage</text>\n    </g>\n\n    <!-- Node 9: CENTRAL ANCHOR -> Central Grafana -->\n    <g transform=\"translate(715, 235)\">\n      <rect width=\"210\" height=\"85\" rx=\"8\" fill=\"#0f172a\" stroke=\"#4f46e5\" stroke-width=\"2\"/>\n      <text x=\"105\" y=\"24\" fill=\"#ffffff\" font-size=\"13\" font-weight=\"800\" text-anchor=\"middle\">Central Grafana Suite</text>\n      <text x=\"105\" y=\"42\" fill=\"#818cf8\" font-size=\"10\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">PORT :3000 (Operations UI)</text>\n      <text x=\"105\" y=\"58\" fill=\"#34d399\" font-size=\"10\" font-family=\"monospace\" text-anchor=\"middle\">19 Provisioned Dashboards</text>\n      <text x=\"105\" y=\"74\" fill=\"#94a3b8\" font-size=\"9\" text-anchor=\"middle\">Datasource: VictoriaMetrics TSDB</text>\n    </g>\n\n    <!-- Node 10: OTel Collector (Logs to JSONL, Traces to Debug) -->\n    <g transform=\"translate(945, 50)\">\n      <rect width=\"180\" height=\"75\" rx=\"6\" fill=\"#ffffff\" stroke=\"#0284c7\" stroke-width=\"1.5\"/>\n      <text x=\"90\" y=\"18\" fill=\"#111827\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\">OTel Collector (:4318)</text>\n      <text x=\"90\" y=\"32\" fill=\"#0284c7\" font-size=\"9\" font-family=\"monospace\" font-weight=\"600\" text-anchor=\"middle\">RECEIVES: OTLP HTTP/gRPC</text>\n      <text x=\"90\" y=\"48\" fill=\"#4b5563\" font-size=\"9\" font-family=\"monospace\" text-anchor=\"middle\">LOGS -> JSONL File</text>\n      <text x=\"90\" y=\"64\" fill=\"#4b5563\" font-size=\"9\" font-family=\"monospace\" text-anchor=\"middle\">TRACES -> Debug Stdout</text>\n    </g>\n\n    <!-- Node 11: Opik LLM Platform (Direct SDK / REST Tracing & Evaluation) -->\n    <g transform=\"translate(945, 235)\">\n      <rect width=\"180\" height=\"85\" rx=\"6\" fill=\"#ffffff\" stroke=\"#7c3aed\" stroke-width=\"1.5\"/>\n      <text x=\"90\" y=\"20\" fill=\"#111827\" font-size=\"11\" font-weight=\"700\" text-anchor=\"middle\">Opik Platform (:32173)</text>\n      <text x=\"90\" y=\"36\" fill=\"#7c3aed\" font-size=\"9\" font-family=\"monospace\" font-weight=\"600\" text-anchor=\"middle\">FEED: Direct Opik SDK / REST</text>\n      <text x=\"90\" y=\"52\" fill=\"#4b5563\" font-size=\"9\" text-anchor=\"middle\">LLM Spans & Trace UI</text>\n      <text x=\"90\" y=\"68\" fill=\"#059669\" font-size=\"9\" font-family=\"monospace\" text-anchor=\"middle\">Automated Eval Scoring</text>\n    </g>\n  </svg>\n\n  <!-- Horizontal Legend & Multi-Mode Pointer Bar -->\n  <div style=\"display:flex;justify-content:space-between;align-items:center;margin-top:14px;border-top:1px solid #e5e7eb;padding-top:12px;font-size:11px;color:#4b5563;flex-wrap:wrap;gap:12px;\">\n    <div style=\"display:flex;gap:16px;align-items:center;flex-wrap:wrap;\">\n      <span style=\"display:inline-flex;align-items:center;gap:6px;\"><span style=\"width:10px;height:10px;border-radius:50%;background:#d97706;display:inline-block;\"></span>User Ingress (:8080)</span>\n      <span style=\"display:inline-flex;align-items:center;gap:6px;\"><span style=\"width:10px;height:10px;border-radius:50%;background:#4f46e5;display:inline-block;\"></span>Engine API (:8030)</span>\n      <span style=\"display:inline-flex;align-items:center;gap:6px;\"><span style=\"width:10px;height:10px;border-radius:50%;background:#7c3aed;display:inline-block;\"></span>Direct Opik SDK (:32173)</span>\n      <span style=\"display:inline-flex;align-items:center;gap:6px;\"><span style=\"width:10px;height:10px;border-radius:50%;background:#0284c7;display:inline-block;\"></span>OTLP Collector (:4318)</span>\n      <span style=\"display:inline-flex;align-items:center;gap:6px;\"><span style=\"width:10px;height:10px;border-radius:50%;background:#059669;display:inline-block;\"></span>vmagent -> TSDB (:8428)</span>\n      <span style=\"display:inline-flex;align-items:center;gap:6px;\"><span style=\"width:10px;height:10px;border-radius:50%;background:#0f172a;display:inline-block;\"></span>Central Repository</span>\n    </div>\n    <div style=\"font-family:monospace;font-size:11px;color:#111827;font-weight:600;\">\n      Config Seams: cluster/mlx_monitoring_bundle/config/components.yml \u00b7 deploy/docker-compose.yml\n    </div>\n  </div>\n</div>"
       }
     }
   ],
@@ -1335,6 +1402,33 @@
         },
         "refresh": 1,
         "sort": 1
+      },
+      {
+        "name": "scope",
+        "label": "Navigation Level",
+        "type": "custom",
+        "options": [
+          {
+            "text": "Fleet Overview",
+            "value": "fleet",
+            "selected": true
+          },
+          {
+            "text": "Device Detail",
+            "value": "device",
+            "selected": false
+          },
+          {
+            "text": "Pipeline Investigation",
+            "value": "pipeline",
+            "selected": false
+          }
+        ],
+        "current": {
+          "text": "Fleet Overview",
+          "value": "fleet",
+          "selected": true
+        }
       },
       {
         "name": "model",

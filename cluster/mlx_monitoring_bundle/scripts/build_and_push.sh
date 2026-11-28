@@ -66,10 +66,15 @@ find "${STAGE_DIR}" -type f -name "*.bak*" -delete 2>/dev/null || true
 
 # Render clean non-secret defaults from templates for image reproducibility
 if [[ -f "${STAGE_DIR}/config/alertmanager.yml.template" ]]; then
-  sed \
-    -e 's|{{ONCALL_WEBHOOK_CONFIG}}|webhook_configs: []|g' \
-    -e 's|{{DEFAULT_WEBHOOK_CONFIG}}|webhook_configs: []|g' \
-    "${STAGE_DIR}/config/alertmanager.yml.template" > "${STAGE_DIR}/config/alertmanager.yml"
+  python3 -c "
+import sys
+tpl = open(sys.argv[1]).read()
+oncall_cfg = 'webhook_configs:\n      - url: \"http://127.0.0.1:9000/hooks/oncall\"\n        send_resolved: true'
+default_cfg = 'webhook_configs:\n      - url: \"http://127.0.0.1:9000/hooks/alert\"\n        send_resolved: true'
+tpl = tpl.replace('{{ONCALL_WEBHOOK_CONFIG}}', oncall_cfg)
+tpl = tpl.replace('{{DEFAULT_WEBHOOK_CONFIG}}', default_cfg)
+open(sys.argv[2], 'w').write(tpl)
+" "${STAGE_DIR}/config/alertmanager.yml.template" "${STAGE_DIR}/config/alertmanager.yml"
 fi
 if [[ -f "${STAGE_DIR}/config/grafana/datasources.yaml.template" ]]; then
   sed \

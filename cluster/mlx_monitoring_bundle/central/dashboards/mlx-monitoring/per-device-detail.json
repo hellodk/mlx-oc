@@ -432,7 +432,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_shard_rank{device=\"$device\"} or vector(0)",
+          "expr": "mlx_shard_rank{device=\"$device\"}",
           "legendFormat": "",
           "range": false,
           "instant": true,

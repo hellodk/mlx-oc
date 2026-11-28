@@ -748,7 +748,7 @@
         <span id="clusterStateText">Fleet Online (8 Endpoints)</span>
       </div>
       <div class="pill-kpi">
-        <span>Active NIC: <strong id="activeNicHeader" style="color:#0284c7;">en1 (192.168.1.64)</strong></span>
+        <span>Active NIC: <strong id="activeNicHeader" style="color:#0284c7;">Primary LAN</strong></span>
       </div>
       <div class="pill-kpi">
         <span id="istClock">28 Nov 2026, 13:20:00 IST</span>
@@ -762,18 +762,18 @@
   <div class="data-feed-bar">
     <div class="data-feed-input">
       <span style="color: var(--text-secondary); font-weight: 600;">TSDB Query API:</span>
-      <input type="text" id="tsdbEndpoint" value="http://192.168.1.64:8428" placeholder="http://<HOST>:8428">
+      <input type="text" id="tsdbEndpoint" value="http://127.0.0.1:8428" placeholder="http://<HOST>:8428">
       <button class="btn-action" onclick="fetchLiveTelemetry()" style="padding: 4px 12px;">⚡ Fetch Live Telemetry</button>
     </div>
-    <div id="dataFeedStatus" style="color: #059669; font-weight: 600;">
-      ● CONNECTED TO LIVE VICTORIAMETRICS (25/25 series verified)
+    <div id="dataFeedStatus" style="color: var(--text-secondary); font-weight: 600;">
+      ● TSDB OFFLINE (Click 'Fetch Live Telemetry' to query :8428)
     </div>
   </div>
 
   <!-- Multi-Mode Toolbar & Edge Case Simulators -->
   <div class="toolbar">
     <div class="mode-selector">
-      <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-right: 4px;">Deployment Mode:</span>
+      <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-right: 4px;">Architecture Mode (Predefined Templates):</span>
       <button class="btn-tab active" id="tabModeStandalone" onclick="setDeploymentMode('standalone')">Standalone / VM</button>
       <button class="btn-tab" id="tabModeCompose" onclick="setDeploymentMode('compose')">Docker Compose</button>
       <button class="btn-tab" id="tabModeK8s" onclick="setDeploymentMode('k8s')">Kubernetes (k8s)</button>
@@ -813,7 +813,7 @@
     <div class="kpi-card">
       <div class="kpi-title">Physical NIC RX Rate</div>
       <div class="kpi-value" id="kpiNicRx">1.25 <span class="kpi-unit">MB/s</span></div>
-      <div class="kpi-sub" id="kpiNicSub">Interface: en1 (Wi-Fi LAN)</div>
+      <div class="kpi-sub" id="kpiNicSub">Interface: Primary LAN</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-title">Proxy Ingress Rate</div>
@@ -833,7 +833,7 @@
     <div class="kpi-card">
       <div class="kpi-title">Peer Ring Probe (p95)</div>
       <div class="kpi-value" id="kpiRtt">1.1 <span class="kpi-unit">ms</span></div>
-      <div class="kpi-sub">Interconnect latency over en2</div>
+      <div class="kpi-sub">Interconnect latency over Peer Ring</div>
     </div>
   </div>
 
@@ -865,11 +865,11 @@
         <!-- Zone Group Boxes (Light Theme with adaptive fill) -->
         <!-- Zone 1: Edge Host & Data Plane -->
         <rect x="20" y="20" width="690" height="260" rx="10" fill="var(--svg-zone-bg)" stroke="#4f46e5" stroke-opacity="0.3" stroke-width="1.5" />
-        <text x="35" y="42" fill="#4338ca" font-size="12" font-family="var(--font-mono)" font-weight="700" id="zone1Title">ZONE 1 · DATA PLANE (Host: mm · en1: 192.168.1.64 · en2: 192.168.2.1)</text>
+        <text x="35" y="42" fill="#4338ca" font-size="12" font-family="var(--font-mono)" font-weight="700" id="zone1Title">ZONE 1 · DATA PLANE (Fleet Nodes · LAN & Peer Ring Interfaces)</text>
 
         <!-- Zone 2: Edge Exporters & Telemetry -->
         <rect x="20" y="300" width="690" height="265" rx="10" fill="var(--svg-zone-bg)" stroke="#059669" stroke-opacity="0.3" stroke-width="1.5" />
-        <text x="35" y="322" fill="#065f46" font-size="12" font-family="var(--font-mono)" font-weight="700" id="zone2Title">ZONE 2 · EXPORTERS & VMAGENT SCRAPING PLANE (Interface: en1 / lo0)</text>
+        <text x="35" y="322" fill="#065f46" font-size="12" font-family="var(--font-mono)" font-weight="700" id="zone2Title">ZONE 2 · EXPORTERS & VMAGENT SCRAPING PLANE (Interface: LAN / Loopback)</text>
 
         <!-- Zone 3: Central Observability Plane -->
         <rect x="730" y="20" width="390" height="545" rx="10" fill="var(--svg-zone-bg)" stroke="#0284c7" stroke-opacity="0.3" stroke-width="1.5" />
@@ -895,14 +895,14 @@
           <!-- vmagent -> VictoriaMetrics (:8428) -->
           <path id="pathVmagentToVm" d="M 520 420 L 670 420 L 670 120 L 750 120" class="flow-line flow-telemetry" marker-end="url(#arr-tel)" />
 
-          <!-- Proxy -> OTel Collector (:4318) -->
+          <!-- Proxy & Engine -> OTel Collector (:4318) -->
           <path id="pathOtlpToCol" d="M 640 120 L 690 120 L 690 240 L 750 240" class="flow-line flow-observe" marker-end="url(#arr-obs)" />
 
           <!-- VictoriaMetrics -> Grafana (:3000) -->
           <path id="pathVmToGrafana" d="M 840 165 L 840 450 L 880 450" class="flow-line flow-observe" marker-end="url(#arr-obs)" />
 
-          <!-- OTel Collector -> Opik (:32173) -->
-          <path id="pathOtelToOpik" d="M 930 240 L 980 240" class="flow-line flow-observe" marker-end="url(#arr-obs)" />
+          <!-- Ingress Proxy -> Opik (:32173) (Direct SDK / REST Tracing & Eval) -->
+          <path id="pathProxyToOpik" d="M 370 100 L 410 100 L 410 60 L 955 60 L 955 240 L 980 240" class="flow-line flow-ring" marker-end="url(#arr-ring)" />
         </g>
 
         <!-- Live Traffic Particles (Smooth, gentle transit) -->
@@ -943,7 +943,7 @@
               <div class="port-item"><span class="port-label">FORWARD:</span><span class="port-value port-forward" id="proxyForwardPort">127.0.0.1:8030</span></div>
             </div>
             <div class="node-meta">
-              <span id="proxyIfaceBadge">NIC: en1</span><span class="node-metric" id="cardProxyLatency">18.4ms p95</span>
+              <span id="proxyIfaceBadge">NIC: LAN</span><span class="node-metric" id="cardProxyLatency">18.4ms p95</span>
             </div>
           </div>
         </foreignObject>
@@ -973,7 +973,7 @@
               <span class="node-badge badge-engine">TP</span>
             </div>
             <div class="node-ports">
-              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:8081 (en2)</span></div>
+              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:8081 (Ring)</span></div>
               <div class="port-item"><span class="port-label">FORWARD:</span><span class="port-value port-forward">:8082 Ring</span></div>
             </div>
             <div class="node-meta">
@@ -990,7 +990,7 @@
               <span class="node-badge badge-engine">TP</span>
             </div>
             <div class="node-ports">
-              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:8082 (en2)</span></div>
+              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:8082 (Ring)</span></div>
               <div class="port-item"><span class="port-label">FORWARD:</span><span class="port-value port-forward">:8081 Loop</span></div>
             </div>
             <div class="node-meta">
@@ -1007,7 +1007,7 @@
               <span class="node-badge badge-telemetry">Met</span>
             </div>
             <div class="node-ports">
-              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:9102 (en1)</span></div>
+              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:9102 (LAN)</span></div>
               <div class="port-item"><span class="port-label">METRICS:</span><span class="port-value">SoC / Watts / NIC</span></div>
             </div>
             <div class="node-meta">
@@ -1028,7 +1028,7 @@
               <div class="port-item"><span class="port-label">TARGET:</span><span class="port-value">RAM / KV</span></div>
             </div>
             <div class="node-meta">
-              <span>PID 13122</span><span class="node-metric">587 MB</span>
+              <span>Active</span><span class="node-metric">587 MB</span>
             </div>
           </div>
         </foreignObject>
@@ -1077,27 +1077,27 @@
             </div>
             <div class="node-ports">
               <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:4317 / :4318</span></div>
-              <div class="port-item"><span class="port-label">EXPORTS:</span><span class="port-value port-forward">VictoriaMetrics / Opik</span></div>
+              <div class="port-item"><span class="port-label">EXPORTS:</span><span class="port-value port-forward">Logs JSONL & Debug</span></div>
             </div>
             <div class="node-meta">
-              <span>Pipeline: Traces</span><span class="node-metric">0 Drops</span>
+              <span>Pipeline: Logs/Traces</span><span class="node-metric" id="cardOtelMetric">0 Drops</span>
             </div>
           </div>
         </foreignObject>
 
         <!-- Node 11: Opik LLM Tracing (:32173) -->
         <foreignObject x="980" y="195" width="130" height="85" id="foOpik">
-          <div class="node-card" onclick="selectNode('opik')">
+          <div class="node-card" id="cardOpik" onclick="selectNode('opik')">
             <div class="node-header">
               <span class="node-name">Opik Server</span>
               <span class="node-badge badge-observe">Eval</span>
             </div>
             <div class="node-ports">
               <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:32173</span></div>
-              <div class="port-item"><span class="port-label">FEED:</span><span class="port-value">OTel OTLP</span></div>
+              <div class="port-item"><span class="port-label">FEED:</span><span class="port-value" style="color:#7c3aed;">Direct Opik SDK</span></div>
             </div>
             <div class="node-meta">
-              <span>Span Traces</span><span class="node-metric">Active</span>
+              <span>LLM Traces</span><span class="node-metric" id="cardOpikMetric">Ready</span>
             </div>
           </div>
         </foreignObject>
@@ -1139,7 +1139,7 @@
           <tr><td>Component:</td><td id="inspComponent">mlx_metrics_proxy.py</td></tr>
           <tr><td>Listen Socket:</td><td id="inspListen">0.0.0.0:8080</td></tr>
           <tr><td>Forwarding Target:</td><td id="inspForward">127.0.0.1:8030</td></tr>
-          <tr><td>Interface (NIC):</td><td id="inspIface">en1 (192.168.1.64)</td></tr>
+          <tr><td>Interface (NIC):</td><td id="inspIface">Primary LAN</td></tr>
           <tr><td>Security Audit:</td><td id="inspAudit" style="color: #059669;">COMPLIANT (Direct LAN Route)</td></tr>
         </table>
       </div>
@@ -1154,12 +1154,12 @@
         <div class="config-box" id="inspConfigSnippet"># Standalone / VM Environment
 MLX_SERVER_PORT=8080
 MLX_UPSTREAM=http://127.0.0.1:8030
-MLX_NET_IFACE=en1</div>
+MLX_NET_IFACE=eth0</div>
       </div>
 
       <!-- Actions & Documentation -->
       <div class="detail-section" style="margin-top: auto;">
-        <a href="http://192.168.1.64:3000/d/mlx-mon-network-topology" target="_blank" class="btn-link">
+        <a href="http://127.0.0.1:3000/d/mlx-mon-network-topology" target="_blank" class="btn-link">
           Open Live Grafana Dashboard ↗
         </a>
       </div>
@@ -1209,16 +1209,16 @@ MLX_NET_IFACE=en1</div>
       <div class="detail-section">
         <div class="section-title">1. Host Network & Interface Counters</div>
         <table class="detail-table">
-          <tr><td>Source Process:</td><td><code>mlx-hw</code> Hardware Exporter (PID 13121) on <code>127.0.0.1:9102</code></td></tr>
+          <tr><td>Source Process:</td><td><code>mlx-hw</code> Hardware Exporter on <code>127.0.0.1:9102</code></td></tr>
           <tr><td>Active Metrics:</td><td><code>mlx_net_rx_bytes_total{iface}</code>, <code>mlx_net_tx_bytes_total{iface}</code>, <code>mlx_net_rx_errors_total</code></td></tr>
-          <tr><td>Physical Interfaces:</td><td><strong><code>en1</code></strong> (192.168.1.64 LAN), <strong><code>en2</code></strong> (192.168.2.1 Thunderbolt Peer Ring), <strong><code>lo0</code></strong> (127.0.0.1)</td></tr>
+          <tr><td>Physical Interfaces:</td><td><strong><code>Primary LAN</code></strong> (Direct Traffic), <strong><code>Peer Ring</code></strong> (Interconnect), <strong><code>lo0</code></strong> (127.0.0.1)</td></tr>
         </table>
       </div>
 
       <div class="detail-section">
         <div class="section-title">2. Ingress Proxy & Upstream Forwarding</div>
         <table class="detail-table">
-          <tr><td>Source Process:</td><td><code>mlx_metrics_proxy.py</code> (PID 13120) on <code>0.0.0.0:8080</code></td></tr>
+          <tr><td>Source Process:</td><td><code>mlx_metrics_proxy.py</code> on <code>0.0.0.0:8080</code></td></tr>
           <tr><td>Active Metrics:</td><td><code>mlx_requests_total</code>, <code>mlx_proxy_active_connections</code>, <code>mlx_proxy_forward_errors_total</code></td></tr>
           <tr><td>Upstream Target:</td><td><code>http://127.0.0.1:8030</code> (Configured via <code>MLX_UPSTREAM</code>)</td></tr>
         </table>
@@ -1227,7 +1227,7 @@ MLX_NET_IFACE=en1</div>
       <div class="detail-section">
         <div class="section-title">3. Model Inference Engine API</div>
         <table class="detail-table">
-          <tr><td>Source Process:</td><td><code>mlx_lm.server</code> (PID 83602) on <code>0.0.0.0:8030</code></td></tr>
+          <tr><td>Source Process:</td><td><code>mlx_lm.server</code> on <code>0.0.0.0:8030</code></td></tr>
           <tr><td>Active Metrics:</td><td><code>mlx_server_listen_address</code>, <code>mlx_engine_active_requests</code>, TTFT & Latency percentiles</td></tr>
           <tr><td>Security Constraint:</td><td>In Standalone VM, must bind <code>127.0.0.1:8030</code> or direct LAN; prohibited on public wildcards</td></tr>
         </table>
@@ -1236,9 +1236,9 @@ MLX_NET_IFACE=en1</div>
       <div class="detail-section">
         <div class="section-title">4. Scraping & TSDB Storage Plane</div>
         <table class="detail-table">
-          <tr><td>Collector Agent:</td><td><code>vmagent</code> (PID 13125) on <code>0.0.0.0:8429</code> scraping 8 local targets every 10s</td></tr>
-          <tr><td>Storage Target:</td><td>VictoriaMetrics TSDB on <code>http://192.168.1.64:8428</code> via Prometheus Remote Write</td></tr>
-          <tr><td>UI Dashboards:</td><td>Central Grafana on <code>http://192.168.1.64:3000</code> querying VictoriaMetrics datasource</td></tr>
+          <tr><td>Collector Agent:</td><td><code>vmagent</code> on <code>0.0.0.0:8429</code> scraping 8 local targets every 10s</td></tr>
+          <tr><td>Storage Target:</td><td>VictoriaMetrics TSDB on <code>http://127.0.0.1:8428</code> via Prometheus Remote Write</td></tr>
+          <tr><td>UI Dashboards:</td><td>Central Grafana on <code>http://127.0.0.1:3000</code> querying VictoriaMetrics datasource</td></tr>
         </table>
       </div>
 
@@ -1269,15 +1269,15 @@ MLX_NET_IFACE=en1</div>
         modes: {
           standalone: {
             listen: "Ephemeral Source Ports",
-            forward: "192.168.1.64:8080 (Direct LAN)",
-            iface: "en1 (Wi-Fi LAN)",
+            forward: "<NODE_IP>:8080 (Direct LAN)",
+            iface: "Primary LAN",
             audit: "COMPLIANT (Direct LAN)",
             auditColor: "#059669",
             configFile: "cluster/mlx_monitoring_bundle/edge/config/nodes.yml",
             configSnippet: `# nodes.yml Client Discovery
 devices:
-  - id: mm
-    ip: 192.168.1.64
+  - id: node-01
+    ip: <NODE_IP>
     role: primary`
           },
           compose: {
@@ -1315,19 +1315,19 @@ spec:
         subtitle: "Edge HTTP & SSE Inbound Proxy",
         badge: "Proxy",
         badgeClass: "badge-ingress",
-        component: "mlx_metrics_proxy.py (PID 13120)",
+        component: "mlx_metrics_proxy.py",
         modes: {
           standalone: {
             listen: "0.0.0.0:8080",
             forward: "http://127.0.0.1:8030",
-            iface: "en1 (192.168.1.64)",
+            iface: "Primary LAN",
             audit: "COMPLIANT (Direct LAN Route)",
             auditColor: "#059669",
             configFile: "cluster/mlx_monitoring_bundle/edge/config/edge.env",
             configSnippet: `# Standalone VM Environment
 MLX_SERVER_PORT=8080
 MLX_UPSTREAM=http://127.0.0.1:8030
-MLX_NET_IFACE=en1`
+MLX_NET_IFACE=eth0`
           },
           compose: {
             listen: "0.0.0.0:8080 (container eth0)",
@@ -1365,19 +1365,19 @@ data:
         subtitle: "OpenAI-compatible LLM Generation Backend",
         badge: "Engine",
         badgeClass: "badge-engine",
-        component: "mlx_lm.server (PID 83602)",
+        component: "mlx_lm.server",
         modes: {
           standalone: {
             listen: "127.0.0.1:8030 (lo0)",
             forward: "Shard Workers (:8081, :8082)",
-            iface: "lo0 (Loopback) & en2 (Thunderbolt)",
+            iface: "lo0 (Loopback) & Peer Ring",
             audit: "COMPLIANT (Loopback API & LAN Ring)",
             auditColor: "#059669",
             configFile: "cluster/mlx_monitoring_bundle/edge/config/edge.env",
             configSnippet: `# Backend Engine Server
 MLX_BACKEND_PORT=8030
 MLX_LISTEN_HOST=127.0.0.1
-MLX_PEER_RING_IFACE=en2`
+MLX_PEER_RING_IFACE=peer0`
           },
           compose: {
             listen: "0.0.0.0:8030 (mlx-engine container)",
@@ -1413,17 +1413,17 @@ MLX_PEER_RING_IFACE=en2`
         subtitle: "SoC, Watts, NIC, Thermal Telemetry",
         badge: "Exporter",
         badgeClass: "badge-telemetry",
-        component: "hardware_collector.py (PID 13121)",
+        component: "hardware_collector.py",
         modes: {
           standalone: {
             listen: "127.0.0.1:9102",
             forward: "Scraped by vmagent (:8429)",
-            iface: "en1 & lo0",
+            iface: "LAN & lo0",
             audit: "COMPLIANT (Local Exporter)",
             auditColor: "#059669",
             configFile: "cluster/mlx_monitoring_bundle/edge/config/edge.env",
             configSnippet: `HW_EXPORTER_PORT=9102
-HW_EXPORTER_IFACE=en1`
+HW_EXPORTER_IFACE=eth0`
           },
           compose: {
             listen: "0.0.0.0:9102",
@@ -1459,17 +1459,17 @@ spec:
         subtitle: "Scrapes 8 Edge Exporters & Pushes to TSDB",
         badge: "Collector",
         badgeClass: "badge-telemetry",
-        component: "vmagent-darwin-arm64 (PID 13125)",
+        component: "vmagent",
         modes: {
           standalone: {
             listen: "0.0.0.0:8429",
-            forward: "http://192.168.1.64:8428/api/v1/write",
-            iface: "en1 (Wi-Fi Direct Route)",
+            forward: "http://127.0.0.1:8428/api/v1/write",
+            iface: "Primary Direct Route",
             audit: "COMPLIANT (Direct LAN Write)",
             auditColor: "#059669",
             configFile: "cluster/mlx_monitoring_bundle/edge/config/vmagent.yml",
             configSnippet: `remoteWrite:
-  - url: "http://192.168.1.64:8428/api/v1/write"
+  - url: "http://127.0.0.1:8428/api/v1/write"
 scrapeConfigs:
   - job_name: "mlx-hw"
     static_configs:
@@ -1513,7 +1513,7 @@ spec:
           standalone: {
             listen: "0.0.0.0:8428 (Central Host)",
             forward: "Queried by Grafana (:3000)",
-            iface: "en1 (192.168.1.64:8428)",
+            iface: "Primary LAN (:8428)",
             audit: "COMPLIANT (Central Aggregator)",
             auditColor: "#059669",
             configFile: "cluster/mlx_monitoring_bundle/central/docker-compose.central.yml",
@@ -1562,7 +1562,7 @@ spec:
           standalone: {
             listen: "0.0.0.0:3000 (Central Node)",
             forward: "Web Browser Clients",
-            iface: "en1 (192.168.1.64:3000)",
+            iface: "Primary LAN (:3000)",
             audit: "COMPLIANT (19 Reference Dashboards Active)",
             auditColor: "#059669",
             configFile: "cluster/mlx_monitoring_bundle/central/config/grafana/dashboards.yaml",
@@ -1587,7 +1587,7 @@ providers:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin123
-      - GF_PANELS_DISABLE_SANITIZE_HTML=true`
+      - GF_USERS_DEFAULT_THEME=light`
           },
           k8s: {
             listen: "3000 (ClusterIP / Ingress)",
@@ -1603,6 +1603,121 @@ metadata:
 spec:
   ports:
     - port: 3000`
+          }
+        }
+      },
+      otel: {
+        title: "OpenTelemetry Collector (:4318)",
+        subtitle: "Gateway for OTLP Logs and Traces",
+        badge: "Collector",
+        badgeClass: "badge-observe",
+        component: "otelcol (otel/opentelemetry-collector-contrib:0.114.0)",
+        modes: {
+          standalone: {
+            listen: "0.0.0.0:4317 (gRPC) / 0.0.0.0:4318 (HTTP)",
+            forward: "Logs -> /var/log/otelcol/mlx-server-logs.jsonl | Traces -> debug stdout",
+            iface: "Primary LAN",
+            audit: "COMPLIANT (Decoupled Log/Trace Pipeline)",
+            auditColor: "#059669",
+            configFile: "cluster/mlx_monitoring_bundle/central/config/otelcol-config.yaml",
+            configSnippet: `# OTel Collector Pipeline
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [file, debug]`
+          },
+          compose: {
+            listen: "0.0.0.0:4317, 0.0.0.0:4318",
+            forward: "File Exporter (JSONL) & Debug Exporter",
+            iface: "eth0 (mlx-net bridge)",
+            audit: "COMPLIANT (Volume-mounted Log Destination)",
+            auditColor: "#059669",
+            configFile: "cluster/mlx_monitoring_bundle/central/docker-compose.central.yml",
+            configSnippet: `services:
+  otelcol:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./config/otelcol-config.yaml:/etc/otelcol/config.yaml:ro
+      - otelcol-logs:/var/log/otelcol`
+          },
+          k8s: {
+            listen: "4317 (gRPC) / 4318 (HTTP)",
+            forward: "File / Debug Exporters",
+            iface: "cni0",
+            audit: "COMPLIANT (K8s DaemonSet/Deployment)",
+            auditColor: "#059669",
+            configFile: "deploy/k8s/otelcol-daemonset.yaml",
+            configSnippet: `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+spec:
+  template:
+    spec:
+      containers:
+        - name: otelcol
+          image: otel/opentelemetry-collector-contrib:0.114.0`
+          }
+        }
+      },
+      opik: {
+        title: "Opik LLM Platform (:32173)",
+        subtitle: "LLM Spans, Guardrails & Evaluation Platform",
+        badge: "Opik Eval",
+        badgeClass: "badge-observe",
+        component: "ghcr.io/comet-ml/opik (Opik Frontend & Backend)",
+        modes: {
+          standalone: {
+            listen: "0.0.0.0:32173 (Frontend) / 0.0.0.0:8000 (Backend API)",
+            forward: "Direct SDK Ingestion from mlx_metrics_proxy",
+            iface: "Primary LAN",
+            audit: "COMPLIANT (Direct Opik SDK Tracing)",
+            auditColor: "#059669",
+            configFile: "cluster/mlx_monitoring_bundle/edge/config/edge.env",
+            configSnippet: `# Edge Bundle Opik Config
+OPIK_ENDPOINT=http://192.168.1.10:32173
+ENABLE_OPIK_JUDGE=true
+OPIK_PROJECT=mlx`
+          },
+          compose: {
+            listen: "0.0.0.0:32173",
+            forward: "ClickHouse & MySQL Backend",
+            iface: "eth0 (mlx-net)",
+            audit: "COMPLIANT (Central Compose Stack)",
+            auditColor: "#059669",
+            configFile: "cluster/mlx_monitoring_bundle/central/docker-compose.central.yml",
+            configSnippet: `services:
+  opik-frontend:
+    image: ghcr.io/comet-ml/opik/opik-frontend:2.2.13
+    ports:
+      - "32173:5173"
+  opik-backend:
+    image: ghcr.io/comet-ml/opik/opik-backend:2.2.13`
+          },
+          k8s: {
+            listen: "32173 (NodePort / Ingress)",
+            forward: "Opik Service Pods",
+            iface: "cni0",
+            audit: "COMPLIANT (K8s Service Opik)",
+            auditColor: "#059669",
+            configFile: "deploy/k8s/opik-service.yaml",
+            configSnippet: `apiVersion: v1
+kind: Service
+metadata:
+  name: opik-service
+spec:
+  ports:
+    - port: 32173
+      targetPort: 5173`
           }
         }
       }
@@ -1643,11 +1758,11 @@ spec:
 
       // Update Zone Titles & NIC indicators
       if (mode === 'standalone') {
-        document.getElementById('zone1Title').textContent = "ZONE 1 · DATA PLANE (Host: mm · en1: 192.168.1.64 · en2: 192.168.2.1)";
-        document.getElementById('zone2Title').textContent = "ZONE 2 · EXPORTERS & VMAGENT SCRAPING PLANE (Interface: en1 / lo0)";
-        document.getElementById('activeNicHeader').textContent = "en1 (192.168.1.64)";
-        document.getElementById('kpiNicSub').textContent = "Interface: en1 (Wi-Fi LAN)";
-        document.getElementById('proxyIfaceBadge').textContent = "NIC: en1";
+        document.getElementById('zone1Title').textContent = "ZONE 1 · DATA PLANE (Fleet Nodes · LAN & Peer Ring Interfaces)";
+        document.getElementById('zone2Title').textContent = "ZONE 2 · EXPORTERS & VMAGENT SCRAPING PLANE (Interface: LAN / Loopback)";
+        document.getElementById('activeNicHeader').textContent = "Primary LAN";
+        document.getElementById('kpiNicSub').textContent = "Interface: Primary LAN";
+        document.getElementById('proxyIfaceBadge').textContent = "NIC: LAN";
       } else if (mode === 'compose') {
         document.getElementById('zone1Title').textContent = "ZONE 1 · DATA PLANE (Docker Compose · Bridge: mlx-net 172.28.0.0/16)";
         document.getElementById('zone2Title').textContent = "ZONE 2 · EXPORTERS & VMAGENT SCRAPING PLANE (Container eth0)";
@@ -1669,12 +1784,15 @@ spec:
     async function fetchLiveTelemetry() {
       const endpoint = document.getElementById('tsdbEndpoint').value.trim();
       const statusEl = document.getElementById('dataFeedStatus');
+      const clusterState = document.getElementById('clusterStateText');
+      const liveDot = document.getElementById('liveDot');
+
       statusEl.textContent = '⏳ QUERYING VICTORIAMETRICS API...';
       statusEl.style.color = '#d97706';
 
       try {
-        const url = `${endpoint}/api/v1/query?query=count(up%20%3D%3D%201)`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+        const queryUrl = (expr) => `${endpoint}/api/v1/query?query=${encodeURIComponent(expr)}`;
+        const res = await fetch(queryUrl('count(up == 1)'), { signal: AbortSignal.timeout(3000) });
         if (res.ok) {
           const json = await res.json();
           if (json.status === 'success' && json.data.result.length > 0) {
@@ -1682,15 +1800,94 @@ spec:
             document.getElementById('kpiEndpoints').innerHTML = `${count} <span class="kpi-unit">up</span>`;
             statusEl.textContent = `● LIVE VICTORIAMETRICS CONNECTED (${count} endpoints online)`;
             statusEl.style.color = '#059669';
+            if (clusterState) clusterState.textContent = `Fleet Online (${count} Endpoints)`;
+            if (liveDot) {
+              liveDot.className = 'status-dot pulsing';
+              liveDot.style.background = '#10b981';
+            }
+
+            // Fetch secondary live metrics if available
+            try {
+              const resRx = await fetch(queryUrl('sum(rate(mlx_net_rx_bytes_total[1m]))'), { signal: AbortSignal.timeout(1500) });
+              if (resRx.ok) {
+                const jRx = await resRx.json();
+                if (jRx.status === 'success' && jRx.data.result.length > 0) {
+                  const bytesPerSec = parseFloat(jRx.data.result[0].value[1]) || 0;
+                  const mbSec = (bytesPerSec / (1024 * 1024)).toFixed(2);
+                  document.getElementById('kpiNicRx').innerHTML = `${mbSec} <span class="kpi-unit">MB/s</span>`;
+                }
+              }
+            } catch (_) {}
+
+            try {
+              const resReq = await fetch(queryUrl('sum(rate(mlx_requests_total[1m]))'), { signal: AbortSignal.timeout(1500) });
+              if (resReq.ok) {
+                const jReq = await resReq.json();
+                if (jReq.status === 'success' && jReq.data.result.length > 0) {
+                  const reqSec = parseFloat(jReq.data.result[0].value[1]).toFixed(1);
+                  document.getElementById('kpiIngress').innerHTML = `${reqSec} <span class="kpi-unit">req/s</span>`;
+                }
+              }
+            } catch (_) {}
+
+            try {
+              const resErr = await fetch(queryUrl('sum(rate(mlx_error_total{status="5xx"}[5m]))'), { signal: AbortSignal.timeout(1500) });
+              if (resErr.ok) {
+                const jErr = await resErr.json();
+                if (jErr.status === 'success' && jErr.data.result.length > 0) {
+                  const errSec = parseFloat(jErr.data.result[0].value[1]).toFixed(2);
+                  document.getElementById('kpiErrors').innerHTML = `${errSec} <span class="kpi-unit">err/s</span>`;
+                  document.getElementById('kpiErrors').style.color = parseFloat(errSec) > 0 ? '#dc2626' : '#059669';
+                }
+              }
+            } catch (_) {}
+
+            try {
+              const resW = await fetch(queryUrl('count(mlx_server_listen_address{address="0.0.0.0"})'), { signal: AbortSignal.timeout(1500) });
+              if (resW.ok) {
+                const jW = await resW.json();
+                const wCount = (jW.status === 'success' && jW.data.result.length > 0) ? parseInt(jW.data.result[0].value[1]) : 0;
+                document.getElementById('kpiWildcard').innerHTML = `${wCount} <span class="kpi-unit">alerts</span>`;
+                document.getElementById('kpiWildcard').style.color = wCount > 0 ? '#dc2626' : '#059669';
+              }
+            } catch (_) {}
+
+            try {
+              const resRtt = await fetch(queryUrl('avg(mlx_shard_peer_connect_seconds)'), { signal: AbortSignal.timeout(1500) });
+              if (resRtt.ok) {
+                const jRtt = await resRtt.json();
+                if (jRtt.status === 'success' && jRtt.data.result.length > 0) {
+                  const ms = (parseFloat(jRtt.data.result[0].value[1]) * 1000).toFixed(1);
+                  document.getElementById('kpiRtt').innerHTML = `${ms} <span class="kpi-unit">ms</span>`;
+                }
+              }
+            } catch (_) {}
+
             return;
           }
         }
       } catch (e) {
-        // Fallback to verified baseline
+        // Query failed or server offline
       }
 
-      statusEl.textContent = '● LIVE CLUSTER TELEMETRY VERIFIED (Host: mm · 192.168.1.64 · en1)';
-      statusEl.style.color = '#059669';
+      // DO NOT report verified if query failed!
+      statusEl.textContent = '● TSDB UNREACHABLE / QUERY FAILED (Offline Reference Architecture Mode)';
+      statusEl.style.color = '#dc2626';
+      if (clusterState) clusterState.textContent = 'TSDB Offline (Reference Mode)';
+      if (liveDot) {
+        liveDot.className = 'status-dot';
+        liveDot.style.background = '#9ca3af';
+      }
+
+      // Reset KPIs to clear offline state, avoiding fabricated live numbers
+      document.getElementById('kpiEndpoints').innerHTML = `— <span class="kpi-unit">offline</span>`;
+      document.getElementById('kpiNicRx').innerHTML = `— <span class="kpi-unit">offline</span>`;
+      document.getElementById('kpiIngress').innerHTML = `— <span class="kpi-unit">offline</span>`;
+      document.getElementById('kpiErrors').innerHTML = `— <span class="kpi-unit">offline</span>`;
+      document.getElementById('kpiErrors').style.color = 'var(--text-secondary)';
+      document.getElementById('kpiWildcard').innerHTML = `— <span class="kpi-unit">offline</span>`;
+      document.getElementById('kpiWildcard').style.color = 'var(--text-secondary)';
+      document.getElementById('kpiRtt').innerHTML = `— <span class="kpi-unit">offline</span>`;
     }
 
     // Edge Case Simulators
@@ -1738,7 +1935,7 @@ spec:
     function simulateTailscaleLeak() {
       const banner = document.getElementById('alertBanner');
       banner.style.display = 'flex';
-      document.getElementById('alertBannerText').innerHTML = `🔒 <strong>NETWORK ROUTING RISK</strong>: Tailscale CGNAT address detected (<code>100.64.0.0/10</code>). Traffic must use direct LAN IP (<code>192.168.1.64</code>), never Tailscale DERP relays. Check <code>cluster/mlx_monitoring_bundle/edge/config/nodes.yml</code>.`;
+      document.getElementById('alertBannerText').innerHTML = `🔒 <strong>NETWORK ROUTING RISK</strong>: Tailscale CGNAT address detected (<code>100.64.0.0/10</code>). Traffic must use direct LAN IP (configured in nodes.yml), never Tailscale DERP relays. Check <code>cluster/mlx_monitoring_bundle/edge/config/nodes.yml</code>.`;
     }
 
     function resetSimulation() {

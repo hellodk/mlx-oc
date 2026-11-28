@@ -272,7 +272,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(process_profiler_up == 1) or vector(1)",
+          "expr": "count(process_profiler_up == 1)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -326,7 +326,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Time elapsed since last collected process snapshot",
+      "description": "Process profiler status (1=Up, 0=Down)",
       "targets": [
         {
           "datasource": {
@@ -334,7 +334,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(time() - max(process_profiler_last_sample_seconds{device=~\"$device\"})) or vector(5)",
+          "expr": "process_profiler_up{device=~\"$device\"}",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -358,7 +358,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
+          "unit": "none",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -397,7 +397,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(increase(process_profiler_samples_total{device=~\"$device\"}[24h])) or vector(72400)",
+          "expr": "sum(increase(process_profiler_samples_total{device=~\"$device\"}[24h]))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -439,7 +439,7 @@
     },
     {
       "id": 4,
-      "title": "Sample interval",
+      "title": "Sample rate",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -451,7 +451,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Configured background process sampling interval",
+      "description": "Process telemetry sampling rate (samples/sec)",
       "targets": [
         {
           "datasource": {
@@ -459,7 +459,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(process_profiler_interval_seconds{device=~\"$device\"}) or vector(5)",
+          "expr": "rate(process_profiler_samples_total{device=~\"$device\"}[5m])",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -483,7 +483,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
+          "unit": "ops",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -495,7 +495,7 @@
           },
           "mappings": [],
           "links": [],
-          "decimals": 0
+          "decimals": 2
         },
         "overrides": []
       }
@@ -522,7 +522,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "topk(1, process_cpu_percent{device=~\"$device\"}) or vector(42.1)",
+          "expr": "topk(1, process_cpu_percent{device=~\"$device\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -585,7 +585,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_gpu_utilization_percent{device=~\"$device\"} or vector(67)",
+          "expr": "mlx_hw_gpu_utilization_percent{device=~\"$device\"}",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -807,8 +807,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "process_disk_read_bytes_sec{device=~\"$device\"} or vector(0.8)",
-          "legendFormat": "Read MB/s",
+          "expr": "process_disk_io_bytes_sec{device=~\"$device\", direction=\"read\"}",
+          "legendFormat": "Read B/s",
           "range": false,
           "instant": true,
           "refId": "A",
@@ -820,8 +820,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "process_disk_write_bytes_sec{device=~\"$device\"} or vector(0.4)",
-          "legendFormat": "Write MB/s",
+          "expr": "process_disk_io_bytes_sec{device=~\"$device\", direction=\"write\"}",
+          "legendFormat": "Write B/s",
           "range": false,
           "instant": true,
           "refId": "B",
@@ -877,7 +877,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "process_ranking_info{device=~\"$device\"} or vector(1)",
+          "expr": "process_ranking_info{device=~\"$device\"}",
           "legendFormat": "Method",
           "range": false,
           "instant": true,
@@ -890,7 +890,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_gpu_utilization_percent{device=~\"$device\"} or vector(67)",
+          "expr": "mlx_hw_gpu_utilization_percent{device=~\"$device\"}",
           "legendFormat": "Host GPU (Measured)",
           "range": false,
           "instant": true,
@@ -903,7 +903,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "process_gpu_utilization_percent{device=~\"$device\"} or vector(67)",
+          "expr": "process_gpu_utilization_percent{device=~\"$device\"}",
           "legendFormat": "Process GPU (Estimated)",
           "range": false,
           "instant": true,

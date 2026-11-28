@@ -272,7 +272,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_token_confidence_mean{device=~\"$device\", model=~\"$model\"} or vector(0.92)",
+          "expr": "mlx_token_confidence_mean{device=~\"$device\", model=~\"$model\"}",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -343,7 +343,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_low_confidence_token_ratio{device=~\"$device\", model=~\"$model\"} * 100) or vector(1.8)",
+          "expr": "(mlx_low_confidence_token_ratio{device=~\"$device\", model=~\"$model\"} * 100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -414,7 +414,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_output_perplexity{device=~\"$device\", model=~\"$model\"} or vector(12.4)",
+          "expr": "mlx_output_perplexity{device=~\"$device\", model=~\"$model\"}",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -485,7 +485,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_hallucination_risk{device=~\"$device\", model=~\"$model\"} * 100) or vector(0.7)",
+          "expr": "(mlx_hallucination_risk{device=~\"$device\", model=~\"$model\"} * 100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -556,7 +556,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_eval_overall_accuracy_ratio{model=~\"$model\"} * 100) or vector(96.2)",
+          "expr": "(mlx_eval_overall_accuracy_ratio{model=~\"$model\"} * 100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -633,7 +633,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(time() - max(mlx_eval_last_run_timestamp_seconds{model=~\"$model\"})) or vector(360)",
+          "expr": "(time() - max(mlx_eval_last_run_timestamp_seconds{model=~\"$model\"}))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -704,7 +704,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(histogram_quantile(0.95, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))) or (0 * mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"}) or vector(1.8)",
+          "expr": "(histogram_quantile(0.95, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))) or (0 * mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"})",
           "legendFormat": "Entropy p95 (nats)",
           "range": true,
           "instant": false,
@@ -717,7 +717,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(histogram_quantile(0.50, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))) or (0 * mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"}) or vector(1.2)",
+          "expr": "(histogram_quantile(0.50, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))) or (0 * mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"})",
           "legendFormat": "Entropy p50 (nats)",
           "range": true,
           "instant": false,
@@ -730,7 +730,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_token_entropy_tail_nats{device=~\"$device\", model=~\"$model\"} or vector(1.8)",
+          "expr": "mlx_token_entropy_tail_nats{device=~\"$device\", model=~\"$model\"}",
           "legendFormat": "Tail-Corrected Bound (nats)",
           "range": true,
           "instant": false,
@@ -743,7 +743,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"} or vector(1.5)",
+          "expr": "mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"}",
           "legendFormat": "Shannon Entropy (nats)",
           "range": true,
           "instant": false,
@@ -819,7 +819,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_output_perplexity{device=~\"$device\", model=~\"$model\"} or vector(12.4)",
+          "expr": "mlx_output_perplexity{device=~\"$device\", model=~\"$model\"}",
           "legendFormat": "Perplexity p95",
           "range": true,
           "instant": false,
@@ -832,7 +832,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "exp(mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"}) or vector(4.5)",
+          "expr": "exp(mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"})",
           "legendFormat": "Perplexity p50",
           "range": true,
           "instant": false,
@@ -908,7 +908,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "rate(mlx_hallucination_flag_total{device=~\"$device\", model=~\"$model\"}[5m]) or vector(0)",
+          "expr": "rate(mlx_hallucination_flag_total{device=~\"$device\", model=~\"$model\"}[5m])",
           "legendFormat": "Hallucination Flags/s",
           "range": true,
           "instant": false,
@@ -921,7 +921,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "rate(mlx_heuristic_repetition{device=~\"$device\", model=~\"$model\"}[5m]) or vector(0)",
+          "expr": "rate(mlx_heuristic_repetition{device=~\"$device\", model=~\"$model\"}[5m])",
           "legendFormat": "Repetition Flags/s",
           "range": true,
           "instant": false,
@@ -934,7 +934,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "rate(mlx_heuristic_refusal{device=~\"$device\", model=~\"$model\"}[5m]) or vector(0)",
+          "expr": "rate(mlx_heuristic_refusal{device=~\"$device\", model=~\"$model\"}[5m])",
           "legendFormat": "Refusal Responses/s",
           "range": true,
           "instant": false,
@@ -1010,7 +1010,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_eval_accuracy_ratio{model=~\"$model\"} or vector(0.962)",
+          "expr": "mlx_eval_accuracy_ratio{model=~\"$model\"}",
           "legendFormat": "Suite Accuracy",
           "range": false,
           "instant": true,
@@ -1023,7 +1023,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_eval_calibration_ece{model=~\"$model\"} or vector(0.021)",
+          "expr": "mlx_eval_calibration_ece{model=~\"$model\"}",
           "legendFormat": "ECE (Calibration Error)",
           "range": false,
           "instant": true,
@@ -1036,7 +1036,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_judge_score{model=~\"$model\"} or vector(0.94)",
+          "expr": "mlx_judge_score{model=~\"$model\"}",
           "legendFormat": "LLM Judge Score",
           "range": false,
           "instant": true,

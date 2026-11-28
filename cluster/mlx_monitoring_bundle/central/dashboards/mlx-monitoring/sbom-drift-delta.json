@@ -272,7 +272,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_drift_status == 1) or vector(37)",
+          "expr": "count(mac_sbom_drift_status == 1)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -340,7 +340,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_drift_mismatch_count > 0 or mac_sbom_missing_package_count > 0) or vector(3)",
+          "expr": "count(mac_sbom_drift_mismatch_count > 0 or mac_sbom_missing_package_count > 0)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -410,7 +410,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_drift_status == -1) or vector(1)",
+          "expr": "count(mac_sbom_drift_status == -1)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -480,7 +480,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mac_sbom_drift_mismatch_count) or vector(2)",
+          "expr": "sum(mac_sbom_drift_mismatch_count)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -550,7 +550,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mac_sbom_drift_hash_mismatch_count) or vector(5)",
+          "expr": "sum(mac_sbom_drift_mismatch_count)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -620,7 +620,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mac_sbom_drift_mismatch_count{device=~\"$device\"} or vector(0)",
+          "expr": "mac_sbom_drift_mismatch_count{device=~\"$device\"}",
           "legendFormat": "{{device}} Version Diffs",
           "range": true,
           "instant": false,
@@ -633,7 +633,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mac_sbom_missing_package_count{device=~\"$device\"} or vector(0)",
+          "expr": "mac_sbom_missing_package_count{device=~\"$device\"}",
           "legendFormat": "{{device}} Missing Pkgs",
           "range": true,
           "instant": false,
@@ -772,7 +772,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum by (ecosystem) (mac_sbom_drift_mismatch_count{device=~\"$device\"}) or vector(0)",
+          "expr": "sum by (ecosystem) (mac_sbom_drift_mismatch_count{device=~\"$device\"})",
           "legendFormat": "{{ecosystem}} Diffs",
           "range": true,
           "instant": false,

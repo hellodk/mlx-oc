@@ -408,7 +408,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count((mlx_hw_up == 0) or (mlx_kv_agent_up == 0) or (mlx_up == 0) or (process_profiler_up == 0) or (mac_sbom_collector_up == 0) or (mlx_accuracy_eval_up == 0) or (mlx_log_tailer_up == 0)) or vector(0)",
+          "expr": "count((mlx_hw_up == 0) or (mlx_kv_agent_up == 0) or (mlx_up == 0) or (process_profiler_up == 0) or (mac_sbom_collector_up == 0) or (mlx_accuracy_eval_up == 0) or (mlx_log_tailer_up == 0))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -474,7 +474,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(count by (device) (ALERTS{alertstate=\"firing\"})) or vector(0)",
+          "expr": "count(count by (device) (ALERTS{alertstate=\"firing\"}))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -550,7 +550,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(count by (device) (absent(mlx_hw_up{device=~\"$device\"}))) or vector(0)",
+          "expr": "count(count by (device) (absent(mlx_hw_up{device=~\"$device\"})))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -947,7 +947,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_shard_peer_up{device=~\"$device\"} or mlx_shard_peer_probe_status{device=~\"$device\"}) or vector(1)",
+          "expr": "(mlx_shard_peer_up{device=~\"$device\"} or mlx_shard_peer_app_up{device=~\"$device\"})",
           "legendFormat": "Peer TCP",
           "range": false,
           "instant": true,
@@ -986,7 +986,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_shard_peer_connect_seconds{device=~\"$device\"} or mlx_shard_peer_rtt_seconds{device=~\"$device\"}) or vector(0.001)",
+          "expr": "(mlx_shard_peer_connect_seconds{device=~\"$device\"} or mlx_shard_peer_connect_seconds{device=~\"$device\"})",
           "legendFormat": "Latency",
           "range": false,
           "instant": true,

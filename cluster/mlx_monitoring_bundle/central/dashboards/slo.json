@@ -260,7 +260,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "clamp_max((1 - (sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0))) * 100, 100) or vector(100)",
+          "expr": "clamp_max((1 - (sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0))) * 100, 100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -331,7 +331,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(mlx_ttft_seconds_bucket{le=\"2.0\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_ttft_seconds_count{kind!=\"eval\"}[1h])) > 0)) * 100 or vector(100)",
+          "expr": "(sum(rate(mlx_ttft_seconds_bucket{le=\"2.0\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_ttft_seconds_count{kind!=\"eval\"}[1h])) > 0)) * 100",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -408,7 +408,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "clamp_max((1 - ((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005)) * 100, 100) or vector(100)",
+          "expr": "clamp_max((1 - ((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005)) * 100, 100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -479,7 +479,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "clamp_max((1 - ((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[30d])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[30d])) > 0)) / 0.005)) * 100, 100) or vector(100)",
+          "expr": "clamp_max((1 - ((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[30d])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[30d])) > 0)) / 0.005)) * 100, 100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -550,7 +550,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005) or vector(0)",
+          "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005)",
           "legendFormat": "1h Burn Rate (Alert > 14.4x)",
           "range": true,
           "instant": false,
@@ -563,7 +563,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[6h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[6h])) > 0)) / 0.005) or vector(0)",
+          "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[6h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[6h])) > 0)) / 0.005)",
           "legendFormat": "6h Burn Rate (Alert > 6x)",
           "range": true,
           "instant": false,
@@ -576,7 +576,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[24h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[24h])) > 0)) / 0.005) or vector(0)",
+          "expr": "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[24h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[24h])) > 0)) / 0.005)",
           "legendFormat": "24h Burn Rate (Alert > 1x)",
           "range": true,
           "instant": false,

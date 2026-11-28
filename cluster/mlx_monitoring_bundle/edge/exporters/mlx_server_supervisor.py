@@ -138,6 +138,11 @@ G_CHECKS = Counter(
     "mlx_server_health_checks_total", "health probe outcomes", ["result"]
 )
 G_BACKOFF = Gauge("mlx_server_backoff_seconds", "backoff delay (0 in passive mode)")
+G_LISTEN_ADDRESS = Gauge(
+    "mlx_server_listen_address",
+    "1 if mlx_lm.server is bound to listening address/port",
+    ["address", "port"],
+)
 
 G_SHARD_INFO = Gauge(
     "mlx_model_shard_info",
@@ -239,9 +244,19 @@ G_SHARD_PEER_UP = Gauge(
     "1 if peer shard node is reachable over TCP transport IP",
     ["rank", "peer_rank", "peer_ip"],
 )
+G_SHARD_PEER_PROBE_STATUS = Gauge(
+    "mlx_shard_peer_probe_status",
+    "Reachability status of peer rank probe (1=reachable, 0=unreachable)",
+    ["rank", "peer_rank", "peer_ip"],
+)
 G_SHARD_PEER_APP_UP = Gauge(
     "mlx_shard_peer_app_up",
     "1 if peer application service endpoint is healthy and responding to HTTP probes",
+    ["rank", "peer_rank", "peer_ip"],
+)
+G_SHARD_PEER_APP_PROBE_STATUS = Gauge(
+    "mlx_shard_peer_app_probe_status",
+    "Health status of peer rank application HTTP probe (1=healthy, 0=unhealthy)",
     ["rank", "peer_rank", "peer_ip"],
 )
 G_SHARD_PEER_CONNECT_SECONDS = Histogram(
@@ -398,6 +413,50 @@ def find_server_process(pattern: str) -> tuple[int, float] | None:
     except Exception as exc:
         debug(f"ps fallback failed: {exc!r}", component="supervisor")
     return None
+
+
+def discover_server_listeners(
+    pid: int | None, pattern: str = ""
+) -> list[tuple[str, int]]:
+    """Discover actual TCP listening addresses and ports for the monitored server process.
+
+    Inspects active OS network connections for the target PID. If socket inspection
+    is restricted or unavailable, parses process command-line arguments (--host, --port).
+    """
+    listeners: list[tuple[str, int]] = []
+    if pid is not None:
+        try:
+            import psutil  # type: ignore
+
+            proc = psutil.Process(pid)
+            # 1. Inspect kernel-level active listening sockets
+            conn_fn = getattr(proc, "net_connections", getattr(proc, "connections", None))
+            if conn_fn is not None:
+                for conn in conn_fn(kind="inet"):
+                    status = getattr(conn, "status", None)
+                    if status in ("LISTEN", getattr(psutil, "CONN_LISTEN", "LISTEN")):
+                        if conn.laddr:
+                            listeners.append((str(conn.laddr.ip), int(conn.laddr.port)))
+            # 2. If no sockets found via connections, parse process command line flags
+            if not listeners:
+                tokens = proc.cmdline()
+                host_val = None
+                port_val = None
+                for i, tok in enumerate(tokens):
+                    if tok in ("--host", "-h") and i + 1 < len(tokens):
+                        host_val = tokens[i + 1]
+                    elif (
+                        tok in ("--port", "-p")
+                        and i + 1 < len(tokens)
+                        and tokens[i + 1].isdigit()
+                    ):
+                        port_val = int(tokens[i + 1])
+                if host_val or port_val:
+                    listeners.append((host_val or "127.0.0.1", port_val or 8030))
+        except Exception as exc:
+            debug(f"listener discovery failed for PID {pid}: {exc!r}", component="supervisor")
+
+    return listeners
 
 
 def query_external_supervisor_status(
@@ -684,23 +743,22 @@ class PassiveServerObserver:
         self._set_gauge_series(
             G_SHARD_FILES_EXPECTED, {(mid, rk): float(placement.shard_files_expected)}
         )
-        self._set_gauge_series(
-            G_SHARD_PEER_UP,
-            {
-                (rk, str(pr), pip): 1.0 if (res.up if hasattr(res, "up") else bool(res)) else 0.0
-                for (pr, pip), res in peers_up.items()
-            },
-        )
+        peer_up_dict = {
+            (rk, str(pr), pip): 1.0 if (res.up if hasattr(res, "up") else bool(res)) else 0.0
+            for (pr, pip), res in peers_up.items()
+        }
+        self._set_gauge_series(G_SHARD_PEER_UP, peer_up_dict)
+        self._set_gauge_series(G_SHARD_PEER_PROBE_STATUS, peer_up_dict)
         if app_port > 0:
-            self._set_gauge_series(
-                G_SHARD_PEER_APP_UP,
-                {
-                    (rk, str(pr), pip): 1.0 if getattr(res, "app_up", False) else 0.0
-                    for (pr, pip), res in peers_up.items()
-                },
-            )
+            peer_app_up_dict = {
+                (rk, str(pr), pip): 1.0 if getattr(res, "app_up", False) else 0.0
+                for (pr, pip), res in peers_up.items()
+            }
+            self._set_gauge_series(G_SHARD_PEER_APP_UP, peer_app_up_dict)
+            self._set_gauge_series(G_SHARD_PEER_APP_PROBE_STATUS, peer_app_up_dict)
         else:
             self._set_gauge_series(G_SHARD_PEER_APP_UP, {})
+            self._set_gauge_series(G_SHARD_PEER_APP_PROBE_STATUS, {})
         for (pr, pip), res in peers_up.items():
             conn_sec = getattr(res, "connect_seconds", 0.0)
             app_rtt = getattr(res, "app_rtt_seconds", 0.0)
@@ -833,6 +891,18 @@ class PassiveServerObserver:
             G_UP.set(1 if is_up else 0)
             G_READY.set(1 if ok else 0)
             G_BACKOFF.set(0)
+            discovered = discover_server_listeners(pid, self.args.process_pattern)
+            if not discovered:
+                parsed_health = urllib.parse.urlparse(self.args.health)
+                discovered = [
+                    (parsed_health.hostname or "127.0.0.1", parsed_health.port or 8030)
+                ]
+
+            G_LISTEN_ADDRESS.clear()
+            for srv_host, srv_port in discovered:
+                G_LISTEN_ADDRESS.labels(
+                    address=str(srv_host), port=str(srv_port)
+                ).set(1 if is_up else 0)
 
             if in_backoff and not is_up:
                 G_STATE.set(3)

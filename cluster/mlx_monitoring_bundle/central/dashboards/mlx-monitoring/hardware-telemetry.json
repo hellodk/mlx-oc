@@ -272,7 +272,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(mlx_hw_load1{device=~\"$device\"}) or vector(42)",
+          "expr": "avg(mlx_hw_load1{device=~\"$device\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -335,7 +335,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mlx_hw_mem_available_bytes{device=~\"$device\"}) or vector(18897856102)",
+          "expr": "sum(mlx_hw_mem_available_bytes{device=~\"$device\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -397,7 +397,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((sum(mlx_hw_gpu_mem_used_bytes{device=~\"$device\"}) / sum(mlx_hw_mem_total_bytes{device=~\"$device\"})) * 100) or vector(67)",
+          "expr": "((sum(mlx_hw_gpu_mem_used_bytes{device=~\"$device\"}) / sum(mlx_hw_mem_total_bytes{device=~\"$device\"})) * 100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -460,7 +460,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg((mlx_hw_disk_used_bytes{device=~\"$device\"} / mlx_hw_disk_total_bytes{device=~\"$device\"}) * 100) or vector(48)",
+          "expr": "avg((mlx_hw_disk_used_bytes{device=~\"$device\"} / mlx_hw_disk_total_bytes{device=~\"$device\"}) * 100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -523,7 +523,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "max(mlx_hw_uptime_seconds{device=~\"$device\"}) or vector(86400)",
+          "expr": "max(mlx_hw_uptime_seconds{device=~\"$device\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -586,7 +586,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "max(mlx_hw_cpu_temp_celsius{device=~\"$device\"}) or vector(72)",
+          "expr": "max(mlx_hw_cpu_temp_celsius{device=~\"$device\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -657,7 +657,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_load1{device=~\"$device\"} or vector(1.5)",
+          "expr": "mlx_hw_load1{device=~\"$device\"}",
           "legendFormat": "{{device}} CPU Load1",
           "range": true,
           "instant": false,
@@ -670,7 +670,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_mem_used_bytes{device=~\"$device\"} or vector(14000000000)",
+          "expr": "mlx_hw_mem_used_bytes{device=~\"$device\"}",
           "legendFormat": "{{device}} RAM Used",
           "range": true,
           "instant": false,
@@ -759,7 +759,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_mem_total_bytes{device=~\"$device\"} or vector(34359738368)",
+          "expr": "mlx_hw_mem_total_bytes{device=~\"$device\"}",
           "legendFormat": "{{device}} Total Unified Memory",
           "range": true,
           "instant": false,
@@ -835,7 +835,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_hw_disk_used_bytes{device=~\"$device\"} / mlx_hw_disk_total_bytes{device=~\"$device\"}) * 100 or vector(48)",
+          "expr": "(mlx_hw_disk_used_bytes{device=~\"$device\"} / mlx_hw_disk_total_bytes{device=~\"$device\"}) * 100",
           "legendFormat": "{{device}} Disk Used %",
           "range": true,
           "instant": false,
@@ -911,7 +911,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_cpu_temp_celsius{device=~\"$device\"} or vector(72)",
+          "expr": "mlx_hw_cpu_temp_celsius{device=~\"$device\"}",
           "legendFormat": "CPU Temp (\u00b0C)",
           "range": false,
           "instant": true,
@@ -924,7 +924,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_gpu_temp_celsius{device=~\"$device\"} or vector(74)",
+          "expr": "mlx_hw_cpu_temp_celsius{device=~\"$device\"}",
           "legendFormat": "GPU Temp (\u00b0C)",
           "range": false,
           "instant": true,
@@ -937,7 +937,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_thermal_pressure{device=~\"$device\"} or vector(0)",
+          "expr": "mlx_hw_thermal_pressure{device=~\"$device\"}",
           "legendFormat": "Thermal State",
           "range": false,
           "instant": true,
@@ -950,7 +950,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_ane_power_milliwatts{device=~\"$device\"} / 1000 or vector(6.4)",
+          "expr": "mlx_hw_ane_power_milliwatts{device=~\"$device\"} / 1000",
           "legendFormat": "ANE Power (W)",
           "range": false,
           "instant": true,

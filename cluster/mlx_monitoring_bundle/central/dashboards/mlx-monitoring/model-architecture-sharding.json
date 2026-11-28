@@ -272,7 +272,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_shard_world_size or vector(1)",
+          "expr": "mlx_shard_world_size",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -400,7 +400,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "max(mlx_shard_world_size - count(count by (rank) (mlx_shard_rank))) or vector(0)",
+          "expr": "max(mlx_shard_world_size - count(count by (rank) (mlx_shard_rank)))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -466,7 +466,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(count by (rank) (mlx_shard_rank) > 1) or vector(0)",
+          "expr": "count(count by (rank) (mlx_shard_rank) > 1)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -532,7 +532,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_model_info{attr=\"shard_file_count\"} or vector(1)",
+          "expr": "mlx_model_info{attr=\"shard_file_count\"}",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -594,7 +594,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mlx_shard_peer_probe_status == 1 or mlx_shard_peer_up == 1) or vector(1)",
+          "expr": "count(mlx_shard_peer_up == 1 or mlx_shard_peer_up == 1)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -922,7 +922,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_shard_peer_probe_status{device=~\"$device\"} or mlx_shard_peer_up{device=~\"$device\"}) or (1 + 0 * count by (device) (mlx_hw_up{device=~\"$device\"}))",
+          "expr": "(mlx_shard_peer_up{device=~\"$device\"} or mlx_shard_peer_probe_status{device=~\"$device\"}) or (1 + 0 * count by (device) (mlx_hw_up{device=~\"$device\"}))",
           "legendFormat": "{{device}} Peer TCP",
           "range": true,
           "instant": false,
@@ -935,7 +935,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_shard_peer_app_probe_status{device=~\"$device\"} or mlx_server_ready{device=~\"$device\"}) or (1 + 0 * count by (device) (mlx_hw_up{device=~\"$device\"}))",
+          "expr": "(mlx_shard_peer_app_up{device=~\"$device\"} or mlx_shard_peer_app_probe_status{device=~\"$device\"} or mlx_server_ready{device=~\"$device\"}) or (1 + 0 * count by (device) (mlx_hw_up{device=~\"$device\"}))",
           "legendFormat": "{{device}} App Probe",
           "range": true,
           "instant": false,

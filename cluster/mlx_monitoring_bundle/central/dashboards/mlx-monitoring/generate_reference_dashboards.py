@@ -286,6 +286,47 @@ def make_text_panel(
         },
     }
 
+def make_nodegraph_panel(
+    panel_id: int,
+    title: str,
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    nodes_target: Dict[str, Any],
+    edges_target: Dict[str, Any],
+    description: str = "",
+) -> Dict[str, Any]:
+    n_t = dict(nodes_target)
+    n_t["refId"] = "nodes"
+    n_t["format"] = "table"
+    n_t["instant"] = True
+
+    e_t = dict(edges_target)
+    e_t["refId"] = "edges"
+    e_t["format"] = "table"
+    e_t["instant"] = True
+
+    return {
+        "id": panel_id,
+        "title": title,
+        "type": "nodeGraph",
+        "gridPos": {"h": h, "w": w, "x": x, "y": y},
+        "datasource": DS_VM,
+        "description": description,
+        "targets": [n_t, e_t],
+        "options": {
+            "nodes": {
+                "mainStatUnit": "none",
+                "secondaryStatUnit": "none",
+            },
+            "edges": {
+                "mainStatUnit": "none",
+                "secondaryStatUnit": "none",
+            },
+        },
+    }
+
 def make_dashboard_links() -> List[Dict[str, Any]]:
     links = [
         {
@@ -401,14 +442,14 @@ def build_cluster_overview() -> Dict[str, Any]:
         ),
         make_stat_panel(
             3, "Requests / s", 8, 0, 4, 4,
-            "(sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[5m]))) or vector(0)",
+            "(sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[5m])))",
             unit="reqps", decimals=1,
             description="Cluster-wide client inference request throughput observed at proxy layer",
             drilldown_url="/d/mlx-mon-inference-metrics?${__all_variables}",
         ),
         make_stat_panel(
             4, "TTFT p95", 12, 0, 4, 4,
-            "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or vector(0)",
+            "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le)))",
             unit="s", decimals=2,
             description="95th percentile Time to First Token observed at the proxy HTTP edge",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1.5}, {"color": "red", "value": 3.0}],
@@ -416,14 +457,14 @@ def build_cluster_overview() -> Dict[str, Any]:
         ),
         make_stat_panel(
             5, "Decode tok/s", 16, 0, 4, 4,
-            "(sum(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\", model=~\"$model\"}[5m])) / (sum(rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\", model=~\"$model\"}[5m])) > 0)) or vector(0)",
+            "(sum(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\", model=~\"$model\"}[5m])) / (sum(rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\", model=~\"$model\"}[5m])) > 0))",
             unit="tok/s", decimals=1,
             description="Cluster average token generation throughput for active completions",
             drilldown_url="/d/mlx-mon-inference-metrics?${__all_variables}",
         ),
         make_stat_panel(
             6, "Active alerts", 20, 0, 4, 4,
-            "count(ALERTS{alertstate=\"firing\", severity=~\"critical|warning\"}) or vector(0)",
+            "count(ALERTS{alertstate=\"firing\", severity=~\"critical|warning\"})",
             description="Total critical and warning alerts actively firing in VictoriaMetrics alert manager",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}],
             drilldown_url="/d/mlx-mon-alerts-incidents",
@@ -487,20 +528,20 @@ def build_device_health() -> Dict[str, Any]:
         ),
         make_stat_panel(
             3, "Failed exporters", 10, 0, 5, 4,
-            "count((mlx_hw_up == 0) or (mlx_kv_agent_up == 0) or (mlx_up == 0) or (process_profiler_up == 0) or (mac_sbom_collector_up == 0) or (mlx_accuracy_eval_up == 0) or (mlx_log_tailer_up == 0)) or vector(0)",
+            "count((mlx_hw_up == 0) or (mlx_kv_agent_up == 0) or (mlx_up == 0) or (process_profiler_up == 0) or (mac_sbom_collector_up == 0) or (mlx_accuracy_eval_up == 0) or (mlx_log_tailer_up == 0))",
             description="Needs investigation",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
         ),
         make_stat_panel(
             4, "Affected devices", 15, 0, 5, 4,
-            "count(count by (device) (ALERTS{alertstate=\"firing\"})) or vector(0)",
+            "count(count by (device) (ALERTS{alertstate=\"firing\"}))",
             description="Alerting devices",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 2}],
             drilldown_url="/d/mlx-mon-alerts-incidents",
         ),
         make_stat_panel(
             5, "Unknown status", 20, 0, 4, 4,
-            "count(count by (device) (absent(mlx_hw_up{device=~\"$device\"}))) or vector(0)",
+            "count(count by (device) (absent(mlx_hw_up{device=~\"$device\"})))",
             description="Missing telemetry",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
         ),
@@ -536,10 +577,10 @@ def build_device_health() -> Dict[str, Any]:
         make_table_panel(
             9, "Connectivity checks", 12, 12, 12, 8,
             [
-                make_target("(mlx_shard_peer_up{device=~\"$device\"} or mlx_shard_peer_probe_status{device=~\"$device\"}) or vector(1)", legend="Peer TCP", instant=True),
+                make_target("(mlx_shard_peer_up{device=~\"$device\"} or mlx_shard_peer_app_up{device=~\"$device\"})", legend="Peer TCP", instant=True),
                 make_target("mlx_server_ready{device=~\"$device\"}", legend="HTTP Health", instant=True, ref_id="B"),
                 make_target("mlx_hw_up{device=~\"$device\"}", legend="SSH / Host", instant=True, ref_id="C"),
-                make_target("(mlx_shard_peer_connect_seconds{device=~\"$device\"} or mlx_shard_peer_rtt_seconds{device=~\"$device\"}) or vector(0.001)", legend="Latency", instant=True, ref_id="D"),
+                make_target("(mlx_shard_peer_connect_seconds{device=~\"$device\"} or mlx_shard_peer_connect_seconds{device=~\"$device\"})", legend="Latency", instant=True, ref_id="D"),
             ],
             description="Local SSH, HTTP health, peer TCP connectivity verification",
             drilldown_url="/d/mlx-mon-network-host-peers?var-device=${__data.fields.device}&${__all_variables}",
@@ -599,7 +640,7 @@ def build_per_device_detail() -> Dict[str, Any]:
         ),
         make_stat_panel(
             3, "Rank", 8, 0, 4, 4,
-            "mlx_shard_rank{device=\"$device\"} or vector(0)",
+            "mlx_shard_rank{device=\"$device\"}",
             description="Distributed world rank",
             drilldown_url="/d/mlx-mon-model-sharding?var-device=$device",
         ),
@@ -677,34 +718,34 @@ def build_alerts_incidents() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
             1, "Critical", 0, 0, 5, 4,
-            "count(ALERTS{alertstate=\"firing\", severity=\"critical\"}) or vector(0)",
+            "count(ALERTS{alertstate=\"firing\", severity=\"critical\"})",
             description="Needs immediate action",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
             drilldown_url="/d/mlx-mon-device-health",
         ),
         make_stat_panel(
             2, "Warning", 5, 0, 5, 4,
-            "count(ALERTS{alertstate=\"firing\", severity=\"warning\"}) or vector(0)",
+            "count(ALERTS{alertstate=\"firing\", severity=\"warning\"})",
             description="Investigate",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}],
             drilldown_url="/d/mlx-mon-device-health",
         ),
         make_stat_panel(
             3, "Firing total", 10, 0, 5, 4,
-            "count(ALERTS{alertstate=\"firing\"}) or vector(0)",
+            "count(ALERTS{alertstate=\"firing\"})",
             description="Current alerts",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}],
         ),
         make_stat_panel(
             4, "Affected devices", 15, 0, 5, 4,
-            "count(count by (device) (ALERTS{alertstate=\"firing\"})) or vector(0)",
+            "count(count by (device) (ALERTS{alertstate=\"firing\"}))",
             description="Unique devices",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 2}],
             drilldown_url="/d/mlx-mon-device-health",
         ),
         make_stat_panel(
             5, "Resolved (24h)", 20, 0, 4, 4,
-            "(sum(changes(ALERTS{alertstate=\"firing\"}[24h])) - count(ALERTS{alertstate=\"firing\"})) or vector(0)",
+            "(sum(changes(ALERTS{alertstate=\"firing\"}[24h])) - count(ALERTS{alertstate=\"firing\"}))",
             description="Historical alerts",
             thresholds=[{"color": "green", "value": None}],
         ),
@@ -733,9 +774,9 @@ def build_alerts_incidents() -> Dict[str, Any]:
         make_timeseries_panel(
             8, "Alert counts over time", 0, 12, 12, 8,
             [
-                make_target("count(ALERTS{alertstate=\"firing\", severity=\"critical\"}) or vector(0)", legend="Critical"),
-                make_target("count(ALERTS{alertstate=\"firing\", severity=\"warning\"}) or vector(0)", legend="Warning"),
-                make_target("count(ALERTS{alertstate=\"firing\", severity=~\"info|none\"}) or vector(0)", legend="Info"),
+                make_target("count(ALERTS{alertstate=\"firing\", severity=\"critical\"})", legend="Critical"),
+                make_target("count(ALERTS{alertstate=\"firing\", severity=\"warning\"})", legend="Warning"),
+                make_target("count(ALERTS{alertstate=\"firing\", severity=~\"info|none\"})", legend="Info"),
             ],
             draw_style="bars",
             stack=True,
@@ -782,14 +823,14 @@ def build_serving_health() -> Dict[str, Any]:
         ),
         make_stat_panel(
             4, "Restarts (15m)", 15, 0, 5, 4,
-            "sum(increase(mlx_server_restarts_total[15m])) or vector(0)",
+            "sum(increase(mlx_server_restarts_total[15m]))",
             description="Recent restart events",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}],
             drilldown_url="/d/mlx-mon-server-logs?${__all_variables}",
         ),
         make_stat_panel(
             5, "Crash loops", 20, 0, 4, 4,
-            "count(rate(mlx_server_restarts_total[5m]) > 0.05) or vector(0)",
+            "count(rate(mlx_server_restarts_total[5m]) > 0.05)",
             description="No repeated failures",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
             drilldown_url="/d/mlx-mon-server-logs?${__all_variables}",
@@ -840,38 +881,38 @@ def build_inference_metrics() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
             1, "Requests / s", 0, 0, 4, 4,
-            "(sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m]))) or vector(0)",
+            "(sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m])))",
             unit="reqps", decimals=1,
             description="Chat completion requests",
         ),
         make_stat_panel(
             2, "In-flight", 4, 0, 4, 4,
-            "sum(mlx_in_flight{device=~\"$device\"}) or vector(0)",
+            "sum(mlx_in_flight{device=~\"$device\"})",
             description="Active requests",
         ),
         make_stat_panel(
             3, "TTFT p50", 8, 0, 4, 4,
-            "(histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or vector(0)",
+            "(histogram_quantile(0.50, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le)))",
             unit="s", decimals=2,
             description="Observed first token",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1.0}, {"color": "red", "value": 2.5}],
         ),
         make_stat_panel(
             4, "TTFT p95", 12, 0, 4, 4,
-            "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le))) or vector(0)",
+            "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le)))",
             unit="s", decimals=2,
             description="Observed first token",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1.5}, {"color": "red", "value": 3.0}],
         ),
         make_stat_panel(
             5, "Decode tok/s", 16, 0, 4, 4,
-            "(sum(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\", model=~\"$model\"}[1m])) / (sum(rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\", model=~\"$model\"}[1m])) > 0)) or vector(0)",
+            "(sum(rate(mlx_token_rate_tokens_per_second_sum{device=~\"$device\", model=~\"$model\"}[1m])) / (sum(rate(mlx_token_rate_tokens_per_second_count{device=~\"$device\", model=~\"$model\"}[1m])) > 0))",
             unit="tok/s", decimals=1,
             description="Completion throughput",
         ),
         make_stat_panel(
             6, "5xx rate", 20, 0, 4, 4,
-            "((sum(rate(mlx_requests_total{device=~\"$device\", code=~\"5..\"}[1m])) / (sum(rate(mlx_requests_total{device=~\"$device\"}[1m])) > 0)) * 100) or vector(0)",
+            "((sum(rate(mlx_error_total{device=~\"$device\", status=\"5xx\"}[1m])) / (sum(rate(mlx_requests_total{device=~\"$device\"}[1m])) > 0)) * 100)",
             unit="percent", decimals=2,
             description="Server error rate",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1.0}, {"color": "red", "value": 5.0}],
@@ -904,7 +945,7 @@ def build_inference_metrics() -> Dict[str, Any]:
         make_table_panel(
             10, "Finish reasons and tools", 12, 12, 12, 8,
             [
-                make_target("sum by (reason) (rate(mlx_finish_reasons_total{device=~\"$device\"}[5m])) or (0 * count by (device) (mlx_server_state{device=~\"$device\"}))", legend="{{reason}}", instant=True, ref_id="A"),
+                make_target("sum by (reason) (rate(mlx_finish_reason_total{device=~\"$device\"}[5m])) or (0 * count by (device) (mlx_server_state{device=~\"$device\"}))", legend="{{reason}}", instant=True, ref_id="A"),
                 make_target("rate(mlx_tool_calls_total{device=~\"$device\"}[5m]) or (0 * count by (device) (mlx_server_state{device=~\"$device\"}))", legend="Tool Calls", instant=True, ref_id="B"),
             ],
             description="Stop / length / tool calls",
@@ -926,7 +967,7 @@ def build_model_sharding() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
             1, "World size", 0, 0, 4, 4,
-            "mlx_shard_world_size or vector(1)",
+            "mlx_shard_world_size",
             description="Configured ranks",
         ),
         make_stat_panel(
@@ -937,24 +978,24 @@ def build_model_sharding() -> Dict[str, Any]:
         ),
         make_stat_panel(
             3, "Missing ranks", 8, 0, 4, 4,
-            "max(mlx_shard_world_size - count(count by (rank) (mlx_shard_rank))) or vector(0)",
+            "max(mlx_shard_world_size - count(count by (rank) (mlx_shard_rank)))",
             description="Expected vs observed",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
         ),
         make_stat_panel(
             4, "Duplicate ranks", 12, 0, 4, 4,
-            "count(count by (rank) (mlx_shard_rank) > 1) or vector(0)",
+            "count(count by (rank) (mlx_shard_rank) > 1)",
             description="Rank uniqueness",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
         ),
         make_stat_panel(
             5, "Shard files", 16, 0, 4, 4,
-            "mlx_model_info{attr=\"shard_file_count\"} or vector(1)",
+            "mlx_model_info{attr=\"shard_file_count\"}",
             description="Expected files present",
         ),
         make_stat_panel(
             6, "Peers reachable", 20, 0, 4, 4,
-            "count(mlx_shard_peer_probe_status == 1 or mlx_shard_peer_up == 1) or vector(1)",
+            "count(mlx_shard_peer_up == 1 or mlx_shard_peer_up == 1)",
             description="TCP probe status",
             thresholds=[{"color": "red", "value": None}, {"color": "green", "value": 1}],
             drilldown_url="/d/mlx-mon-network-host-peers?${__all_variables}",
@@ -990,8 +1031,8 @@ def build_model_sharding() -> Dict[str, Any]:
         make_state_timeline_panel(
             9, "Peer TCP / HTTP probes", 0, 12, 12, 8,
             [
-                make_target("(mlx_shard_peer_probe_status{device=~\"$device\"} or mlx_shard_peer_up{device=~\"$device\"}) or (1 + 0 * count by (device) (mlx_hw_up{device=~\"$device\"}))", legend="{{device}} Peer TCP", ref_id="A"),
-                make_target("(mlx_shard_peer_app_probe_status{device=~\"$device\"} or mlx_server_ready{device=~\"$device\"}) or (1 + 0 * count by (device) (mlx_hw_up{device=~\"$device\"}))", legend="{{device}} App Probe", ref_id="B"),
+                make_target("(mlx_shard_peer_up{device=~\"$device\"} or mlx_shard_peer_probe_status{device=~\"$device\"}) or (1 + 0 * count by (device) (mlx_hw_up{device=~\"$device\"}))", legend="{{device}} Peer TCP", ref_id="A"),
+                make_target("(mlx_shard_peer_app_up{device=~\"$device\"} or mlx_shard_peer_app_probe_status{device=~\"$device\"} or mlx_server_ready{device=~\"$device\"}) or (1 + 0 * count by (device) (mlx_hw_up{device=~\"$device\"}))", legend="{{device}} App Probe", ref_id="B"),
             ],
             description="Connect latency and app RTT",
             mappings=[
@@ -1031,36 +1072,36 @@ def build_kv_cache() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
             1, "Utilization", 0, 0, 4, 4,
-            "(mlx_kv_cache_utilization{device=~\"$device\"} * 100) or vector(0)",
+            "(mlx_kv_cache_utilization{device=~\"$device\"} * 100)",
             unit="percent", decimals=1,
             description="Cache bytes / capacity",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 75}, {"color": "red", "value": 90}],
         ),
         make_stat_panel(
             2, "Cached sequences", 4, 0, 4, 4,
-            "sum(mlx_kv_cache_sequences{device=~\"$device\"}) or vector(0)",
+            "sum(mlx_kv_cache_sequences{device=~\"$device\"})",
             description="Last parsed cache stats",
         ),
         make_stat_panel(
             3, "Max depth", 8, 0, 4, 4,
-            "max(mlx_context_length_max_tokens{device=~\"$device\"}) or mlx_model_info{attr=\"sliding_window\", device=~\"$device\"} or vector(32768)",
+            "max(mlx_context_length_max_tokens{device=~\"$device\"}) or mlx_model_info{attr=\"sliding_window\", device=~\"$device\"}",
             description="Configured / discovered",
         ),
         make_stat_panel(
             4, "Cache bytes", 12, 0, 4, 4,
-            "sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"}) or sum(mlx_kv_cache_used_bytes{device=~\"$device\"}) or vector(0)",
+            "sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"})",
             unit="bytes",
             description="Last parsed cache stats",
         ),
         make_stat_panel(
             5, "Context utilization", 16, 0, 4, 4,
-            "((sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"} or mlx_kv_cache_used_bytes{device=~\"$device\"}) / (max(mlx_kv_bytes_per_head{device=~\"$device\"} or mlx_model_info{attr=\"max_context_tokens\", device=~\"$device\"}) > 0)) * 100) or vector(0)",
+            "((sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"}) / (max(mlx_kv_bytes_per_head{device=~\"$device\"} or mlx_model_info{attr=\"max_context_tokens\", device=~\"$device\"}) > 0)) * 100)",
             unit="percent", decimals=1,
             description="Model context estimate",
         ),
         make_stat_panel(
             6, "Capacity exactness", 20, 0, 4, 4,
-            "mlx_kv_cache_exactness{device=~\"$device\"} or vector(1)",
+            "mlx_kv_cache_shard_exact{device=~\"$device\"}",
             description="Shard allocation provenance",
             mappings=[
                 {
@@ -1075,7 +1116,7 @@ def build_kv_cache() -> Dict[str, Any]:
         make_timeseries_panel(
             7, "KV utilization trend", 0, 4, 12, 8,
             [
-                make_target("((mlx_kv_cache_utilization{device=~\"$device\"} * 100)) or (0 * count by (device) (mlx_hw_up{device=~\"$device\"}))", legend="Utilization %", ref_id="A"),
+                make_target("(mlx_kv_cache_utilization{device=~\"$device\"} * 100) or (0 * count by (device) (mlx_hw_up{device=~\"$device\"}))", legend="Utilization %", ref_id="A"),
             ],
             unit="percent", description="Observed cache utilization",
         ),
@@ -1091,9 +1132,9 @@ def build_kv_cache() -> Dict[str, Any]:
         make_table_panel(
             9, "Per-rank capacity", 0, 12, 12, 8,
             [
-                make_target("mlx_kv_cache_capacity_bytes{device=~\"$device\"} or vector(34359738368)", legend="Capacity Bytes", instant=True, ref_id="A"),
-                make_target("mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"} or mlx_kv_cache_used_bytes{device=~\"$device\"}", legend="Used Bytes", instant=True, ref_id="B"),
-                make_target("(mlx_kv_cache_utilization{device=~\"$device\"} * 100) or vector(0)", legend="Util %", instant=True, ref_id="C"),
+                make_target("mlx_kv_cache_capacity_bytes_shard{device=~\"$device\"}", legend="Capacity Bytes", instant=True, ref_id="A"),
+                make_target("mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"}", legend="Used Bytes", instant=True, ref_id="B"),
+                make_target("(mlx_kv_cache_utilization{device=~\"$device\"} * 100)", legend="Util %", instant=True, ref_id="C"),
                 make_target("mlx_kv_heads_assigned{device=~\"$device\"} or mlx_shard_dim_kv_heads{device=~\"$device\"}", legend="KV Heads", instant=True, ref_id="D"),
             ],
             description="Capacity, used bytes, utilization",
@@ -1104,7 +1145,7 @@ def build_kv_cache() -> Dict[str, Any]:
             10, "Source freshness and exactness", 12, 12, 12, 8,
             [
                 make_target("mlx_kv_agent_up{device=~\"$device\"}", legend="Agent Up", instant=True, ref_id="A"),
-                make_target("mlx_kv_cache_exactness{device=~\"$device\"} or vector(1)", legend="Exactness", instant=True, ref_id="B"),
+                make_target("mlx_kv_cache_shard_exact{device=~\"$device\"}", legend="Exactness", instant=True, ref_id="B"),
                 make_target("mlx_kv_bytes_per_head{device=~\"$device\"} or mlx_model_info{attr=\"bytes_per_kv_head\", device=~\"$device\"}", legend="Bytes/Head", instant=True, ref_id="C"),
                 make_target("mlx_kv_head_dim{device=~\"$device\"} or mlx_shard_dim_head_dim{device=~\"$device\"}", legend="Head Dim", instant=True, ref_id="D"),
             ],
@@ -1130,35 +1171,35 @@ def build_09_quality_confidence() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
             1, "Mean confidence", 0, 0, 4, 4,
-            "mlx_token_confidence_mean{device=~\"$device\", model=~\"$model\"} or vector(0.92)",
+            "mlx_token_confidence_mean{device=~\"$device\", model=~\"$model\"}",
             decimals=3,
             description="Average token probability computed from proxy-extracted logprobs",
             thresholds=[{"color": "red", "value": None}, {"color": "yellow", "value": 0.7}, {"color": "green", "value": 0.85}],
         ),
         make_stat_panel(
             2, "Low-confidence ratio", 4, 0, 4, 4,
-            "(mlx_low_confidence_token_ratio{device=~\"$device\", model=~\"$model\"} * 100) or vector(1.8)",
+            "(mlx_low_confidence_token_ratio{device=~\"$device\", model=~\"$model\"} * 100)",
             unit="percent", decimals=1,
             description="Ratio of tokens below confidence threshold",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 2.0}, {"color": "red", "value": 5.0}],
         ),
         make_stat_panel(
             3, "Perplexity p95", 8, 0, 4, 4,
-            "mlx_output_perplexity{device=~\"$device\", model=~\"$model\"} or vector(12.4)",
+            "mlx_output_perplexity{device=~\"$device\", model=~\"$model\"}",
             decimals=2,
             description="95th percentile exponential negative log-likelihood per token",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 15}, {"color": "red", "value": 30}],
         ),
         make_stat_panel(
             4, "Hallucination heuristic", 12, 0, 4, 4,
-            "(mlx_hallucination_risk{device=~\"$device\", model=~\"$model\"} * 100) or vector(0.7)",
+            "(mlx_hallucination_risk{device=~\"$device\", model=~\"$model\"} * 100)",
             unit="percent", decimals=2,
             description="Heuristic flag rate based on repetition, refusal, and low confidence",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1.0}, {"color": "red", "value": 3.0}],
         ),
         make_stat_panel(
             5, "Canary accuracy", 16, 0, 4, 4,
-            "(mlx_eval_overall_accuracy_ratio{model=~\"$model\"} * 100) or vector(96.2)",
+            "(mlx_eval_overall_accuracy_ratio{model=~\"$model\"} * 100)",
             unit="percent", decimals=1,
             description="Overall accuracy on deterministic canary evaluation test suite",
             thresholds=[{"color": "red", "value": None}, {"color": "yellow", "value": 85}, {"color": "green", "value": 95}],
@@ -1166,7 +1207,7 @@ def build_09_quality_confidence() -> Dict[str, Any]:
         ),
         make_stat_panel(
             6, "Eval freshness", 20, 0, 4, 4,
-            "(time() - max(mlx_eval_last_run_timestamp_seconds{model=~\"$model\"})) or vector(360)",
+            "(time() - max(mlx_eval_last_run_timestamp_seconds{model=~\"$model\"}))",
             unit="s", decimals=0,
             description="Age of last completed canary evaluation cycle",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 600}, {"color": "red", "value": 1800}],
@@ -1174,36 +1215,36 @@ def build_09_quality_confidence() -> Dict[str, Any]:
         make_timeseries_panel(
             7, "Confidence distribution", 0, 4, 12, 8,
             [
-                make_target("(histogram_quantile(0.95, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))) or (0 * mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"}) or vector(1.8)", legend="Entropy p95 (nats)"),
-                make_target("(histogram_quantile(0.50, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))) or (0 * mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"}) or vector(1.2)", legend="Entropy p50 (nats)"),
-                make_target("mlx_token_entropy_tail_nats{device=~\"$device\", model=~\"$model\"} or vector(1.8)", legend="Tail-Corrected Bound (nats)"),
-                make_target("mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"} or vector(1.5)", legend="Shannon Entropy (nats)"),
+                make_target("(histogram_quantile(0.95, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))) or (0 * mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"})", legend="Entropy p95 (nats)"),
+                make_target("(histogram_quantile(0.50, sum(rate(mlx_token_entropy_histogram_bucket{device=~\"$device\", model=~\"$model\"}[5m])) by (le, device, model))) or (0 * mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"})", legend="Entropy p50 (nats)"),
+                make_target("mlx_token_entropy_tail_nats{device=~\"$device\", model=~\"$model\"}", legend="Tail-Corrected Bound (nats)"),
+                make_target("mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"}", legend="Shannon Entropy (nats)"),
             ],
             unit="none", description="Token confidence and Shannon entropy distribution tracking model certainty",
         ),
         make_timeseries_panel(
             8, "Perplexity p50 / p95", 12, 4, 12, 8,
             [
-                make_target("mlx_output_perplexity{device=~\"$device\", model=~\"$model\"} or vector(12.4)", legend="Perplexity p95"),
-                make_target("exp(mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"}) or vector(4.5)", legend="Perplexity p50"),
+                make_target("mlx_output_perplexity{device=~\"$device\", model=~\"$model\"}", legend="Perplexity p95"),
+                make_target("exp(mlx_token_entropy_nats{device=~\"$device\", model=~\"$model\"})", legend="Perplexity p50"),
             ],
             description="Output perplexity tracking generation coherence over time",
         ),
         make_timeseries_panel(
             9, "Quality heuristic signals", 0, 12, 12, 8,
             [
-                make_target("rate(mlx_hallucination_flag_total{device=~\"$device\", model=~\"$model\"}[5m]) or vector(0)", legend="Hallucination Flags/s"),
-                make_target("rate(mlx_heuristic_repetition{device=~\"$device\", model=~\"$model\"}[5m]) or vector(0)", legend="Repetition Flags/s"),
-                make_target("rate(mlx_heuristic_refusal{device=~\"$device\", model=~\"$model\"}[5m]) or vector(0)", legend="Refusal Responses/s"),
+                make_target("rate(mlx_hallucination_flag_total{device=~\"$device\", model=~\"$model\"}[5m])", legend="Hallucination Flags/s"),
+                make_target("rate(mlx_heuristic_repetition{device=~\"$device\", model=~\"$model\"}[5m])", legend="Repetition Flags/s"),
+                make_target("rate(mlx_heuristic_refusal{device=~\"$device\", model=~\"$model\"}[5m])", legend="Refusal Responses/s"),
             ],
             description="Heuristic signals detected in proxy response body streams",
         ),
         make_table_panel(
             10, "Canary evaluation results", 12, 12, 12, 8,
             [
-                make_target("mlx_eval_accuracy_ratio{model=~\"$model\"} or vector(0.962)", legend="Suite Accuracy", instant=True),
-                make_target("mlx_eval_calibration_ece{model=~\"$model\"} or vector(0.021)", legend="ECE (Calibration Error)", instant=True),
-                make_target("mlx_judge_score{model=~\"$model\"} or vector(0.94)", legend="LLM Judge Score", instant=True),
+                make_target("mlx_eval_accuracy_ratio{model=~\"$model\"}", legend="Suite Accuracy", instant=True),
+                make_target("mlx_eval_calibration_ece{model=~\"$model\"}", legend="ECE (Calibration Error)", instant=True),
+                make_target("mlx_judge_score{model=~\"$model\"}", legend="LLM Judge Score", instant=True),
             ],
             description="Accuracy, ECE, samples, and freshness across deterministic canary test suites",
             drilldown_url="/d/mlx-mon-opik-tracing?var-model=${__data.fields.model}",
@@ -1224,30 +1265,30 @@ def build_10_opik_tracing() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
             1, "Traced requests", 0, 0, 5, 4,
-            "sum(increase(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1h])) or vector(12400)",
+            "sum(increase(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1h]))",
             description="Total LLM chat completion requests instrumented with Opik distributed traces",
         ),
         make_stat_panel(
             2, "Scored traces", 5, 0, 5, 4,
-            "sum(increase(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[1h])) or vector(12100)",
+            "sum(increase(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[1h]))",
             description="Requests with complete logprob scoring and feedback evaluation",
         ),
         make_stat_panel(
             3, "Coverage", 10, 0, 5, 4,
-            "((sum(rate(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[5m])) / (sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[5m])) > 0)) * 100) or vector(97.6)",
+            "((sum(rate(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[5m])) / (sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[5m])) > 0)) * 100)",
             unit="percent", decimals=1,
             description="Percentage of production requests scored for quality metrics",
         ),
         make_stat_panel(
             4, "Average judge", 15, 0, 5, 4,
-            "avg(mlx_judge_score{model=~\"$model\"}) or vector(0.943)",
+            "avg(mlx_judge_score{model=~\"$model\"})",
             decimals=3,
             description="Composite score across correctness, helpfulness, and hallucination-free evaluations",
             thresholds=[{"color": "red", "value": None}, {"color": "yellow", "value": 0.8}, {"color": "green", "value": 0.9}],
         ),
         make_stat_panel(
             5, "Eval freshness", 20, 0, 4, 4,
-            "(time() - max(mlx_eval_last_run_timestamp_seconds{model=~\"$model\"})) or vector(120)",
+            "(time() - max(mlx_eval_last_run_timestamp_seconds{model=~\"$model\"}))",
             unit="s", decimals=0,
             description="Age of last completed LLM-as-judge evaluation cycle",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 300}, {"color": "red", "value": 1800}],
@@ -1255,24 +1296,24 @@ def build_10_opik_tracing() -> Dict[str, Any]:
         make_timeseries_panel(
             6, "Trace and score volume", 0, 4, 12, 8,
             [
-                make_target("rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m]) or vector(0)", legend="Requests/s"),
-                make_target("rate(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[1m]) or vector(0)", legend="Scored traces/s"),
+                make_target("rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m])", legend="Requests/s"),
+                make_target("rate(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[1m])", legend="Scored traces/s"),
             ],
             unit="reqps", description="Trace ingestion rate compared against logprob scoring throughput",
         ),
         make_timeseries_panel(
             7, "Confidence vs judge score", 12, 4, 12, 8,
             [
-                make_target("mlx_token_confidence_mean{device=~\"$device\", model=~\"$model\"} or vector(0.92)", legend="Logprob Mean Confidence"),
-                make_target("avg(mlx_judge_score{model=~\"$model\"}) or vector(0.943)", legend="LLM Judge Average Score"),
+                make_target("mlx_token_confidence_mean{device=~\"$device\", model=~\"$model\"}", legend="Logprob Mean Confidence"),
+                make_target("avg(mlx_judge_score{model=~\"$model\"})", legend="LLM Judge Average Score"),
             ],
             description="Correlation between statistical token confidence and semantic judge scoring",
         ),
         make_table_panel(
             8, "Recent traces", 0, 12, 12, 8,
             [
-                make_target("mlx_judge_score{model=~\"$model\"} or vector(0.95)", legend="Criteria: {{criteria}}", instant=True),
-                make_target("mlx_confidence_scored_total{model=~\"$model\"} or vector(12100)", legend="Scored Total", instant=True),
+                make_target("mlx_judge_score{model=~\"$model\"}", legend="Criteria: {{criteria}}", instant=True),
+                make_target("mlx_confidence_scored_total{model=~\"$model\"}", legend="Scored Total", instant=True),
             ],
             description="Trace ID, device, model, score and navigation linking directly into Opik trace inspector",
             drilldown_url="/d/mlx-mon-quality-confidence?var-model=${__data.fields.model}",
@@ -1281,8 +1322,8 @@ def build_10_opik_tracing() -> Dict[str, Any]:
         make_table_panel(
             9, "Evaluation freshness", 12, 12, 12, 8,
             [
-                make_target("mlx_eval_last_run_timestamp_seconds{model=~\"$model\"} or vector(1795629000)", legend="Last Run", instant=True),
-                make_target("mlx_eval_interval_seconds{model=~\"$model\"} or vector(60)", legend="Interval (s)", instant=True),
+                make_target("mlx_eval_last_run_timestamp_seconds{model=~\"$model\"}", legend="Last Run", instant=True),
+                make_target("mlx_accuracy_eval_up", legend="Evaluator Running", instant=True),
             ],
             description="Canary and online judge last-run timestamps and state",
         ),
@@ -1301,14 +1342,14 @@ def build_11_slo_error_budget() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
             1, "Availability (30d)", 0, 0, 5, 4,
-            "clamp_max((1 - (sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[30d])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[30d])) > 0))) * 100, 100) or vector(99.72)",
+            "clamp_max((1 - (sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[30d])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[30d])) > 0))) * 100, 100)",
             unit="percent", decimals=2,
             description="Customer-facing 30d rolling availability excluding synthetic evaluation probes",
             thresholds=[{"color": "red", "value": None}, {"color": "yellow", "value": 99.0}, {"color": "green", "value": 99.5}],
         ),
         make_stat_panel(
             2, "Latency p95", 5, 0, 5, 4,
-            "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{kind!=\"eval\"}[1h])) by (le))) or vector(1.42)",
+            "(histogram_quantile(0.95, sum(rate(mlx_ttft_seconds_bucket{kind!=\"eval\"}[1h])) by (le)))",
             unit="s", decimals=2,
             description="95th percentile TTFT against target < 2.0s",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1.5}, {"color": "red", "value": 2.0}],
@@ -1316,27 +1357,27 @@ def build_11_slo_error_budget() -> Dict[str, Any]:
         ),
         make_stat_panel(
             3, "Error budget", 10, 0, 5, 4,
-            "clamp_max((1 - ((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005)) * 100, 100) or vector(56.0)",
+            "clamp_max((1 - ((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[30d])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[30d])) > 0)) / 0.005)) * 100, 100)",
             unit="percent", decimals=1,
             description="Remaining error budget for current window against 0.5% unreliability allowance",
             thresholds=[{"color": "red", "value": None}, {"color": "yellow", "value": 20.0}, {"color": "green", "value": 50.0}],
         ),
         make_stat_panel(
             4, "Burn rate (1h)", 15, 0, 5, 4,
-            "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005) or vector(0.38)",
+            "((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005)",
             decimals=2,
             description="Budget consumption rate: values > 1.0 indicate unsustainable error budget burn",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1.0}, {"color": "red", "value": 2.0}],
         ),
         make_stat_panel(
             5, "Eligible requests", 20, 0, 4, 4,
-            "sum(increase(mlx_requests_total{kind!=\"eval\"}[30d])) or vector(3280000)",
+            "sum(increase(mlx_requests_total{kind!=\"eval\"}[30d]))",
             description="Customer requests eligible for SLO accounting (synthetic evals excluded)",
         ),
         make_timeseries_panel(
             6, "Availability and target", 0, 4, 12, 8,
             [
-                make_target("clamp_max((1 - (sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0))) * 100, 100) or vector(99.72)", legend="Observed SLI (%)"),
+                make_target("clamp_max((1 - (sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[30d])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[30d])) > 0))) * 100, 100)", legend="Observed SLI (%)"),
                 make_target("vector(99.5)", legend="SLO Objective (99.5%)"),
             ],
             unit="percent", description="Rolling 30-day SLI versus objective threshold",
@@ -1344,16 +1385,16 @@ def build_11_slo_error_budget() -> Dict[str, Any]:
         make_timeseries_panel(
             7, "Error budget consumption", 12, 4, 12, 8,
             [
-                make_target("clamp_max((1 - ((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005)) * 100, 100) or vector(56.0)", legend="Budget Remaining (%)"),
+                make_target("clamp_max((1 - ((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[30d])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[30d])) > 0)) / 0.005)) * 100, 100)", legend="Budget Remaining (%)"),
             ],
             unit="percent", description="Budget consumed vs remaining over rolling window",
         ),
         make_timeseries_panel(
             8, "Multi-window burn rates", 0, 12, 12, 8,
             [
-                make_target("((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005) or vector(0.38)", legend="1h Burn Rate (Alert > 14.4x)"),
-                make_target("((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[6h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[6h])) > 0)) / 0.005) or vector(0.12)", legend="6h Burn Rate (Alert > 6x)"),
-                make_target("((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[24h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[24h])) > 0)) / 0.005) or vector(0.05)", legend="24h Burn Rate (Alert > 1x)"),
+                make_target("((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[1h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[1h])) > 0)) / 0.005)", legend="1h Burn Rate (Alert > 14.4x)"),
+                make_target("((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[6h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[6h])) > 0)) / 0.005)", legend="6h Burn Rate (Alert > 6x)"),
+                make_target("((sum(rate(mlx_error_total{status=~\"5..\", kind!=\"eval\"}[24h])) / (sum(rate(mlx_requests_total{kind!=\"eval\"}[24h])) > 0)) / 0.005)", legend="24h Burn Rate (Alert > 1x)"),
             ],
             description="Multi-window multi-burn-rate tracking according to Google SRE principles",
         ),
@@ -1382,31 +1423,31 @@ def build_12_server_logs() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
             1, "Tailer status", 0, 0, 5, 4,
-            "count(mlx_log_tailer_up == 1) or vector(1)",
+            "count(mlx_log_tailer_up == 1)",
             description="Devices with active log tailer daemons",
         ),
         make_stat_panel(
             2, "Lines / s", 5, 0, 5, 4,
-            "sum(rate(mlx_log_tailer_lines_total[1m])) or vector(128)",
+            "sum(rate(mlx_log_tailer_lines_total[1m]))",
             unit="ops", decimals=0,
             description="Rate of server log lines parsed and shipped into pipeline",
         ),
         make_stat_panel(
             3, "Queue depth", 10, 0, 5, 4,
-            "sum(mlx_log_tailer_queue_depth) or vector(0)",
+            "sum(mlx_log_tailer_queue_depth)",
             description="Current backlog in OTel exporter memory buffer queue",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 50}, {"color": "red", "value": 200}],
         ),
         make_stat_panel(
             4, "Dropped lines", 15, 0, 5, 4,
-            "sum(rate(mlx_log_tailer_dropped_total[1m])) or vector(0)",
+            "sum(rate(mlx_log_tailer_dropped_total[1m]))",
             unit="ops", decimals=1,
             description="Log lines dropped due to rate-limiting or export failures",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 0.1}],
         ),
         make_stat_panel(
             5, "Exporter errors", 20, 0, 4, 4,
-            "sum(rate(mlx_log_tailer_errors_total[5m])) or vector(0)",
+            "sum(rate(mlx_log_tailer_errors_total[5m]))",
             description="Current count of OTLP delivery error events",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 0.1}],
         ),
@@ -1418,25 +1459,25 @@ def build_12_server_logs() -> Dict[str, Any]:
         make_timeseries_panel(
             7, "Log volume by severity", 12, 4, 12, 8,
             [
-                make_target("sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)info\"}[1m])) or vector(0)", legend="INFO"),
-                make_target("sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)warn.*\"}[1m])) or vector(0)", legend="WARN"),
-                make_target("sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)err.*\"}[1m])) or vector(0)", legend="ERROR"),
+                make_target("sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)info\"}[1m]))", legend="INFO"),
+                make_target("sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)warn.*\"}[1m]))", legend="WARN"),
+                make_target("sum(rate(mlx_log_tailer_lines_total{severity=~\"(?i)err.*\"}[1m]))", legend="ERROR"),
             ],
             unit="ops", stack=True, description="Structured log event ingestion throughput grouped by severity",
         ),
         make_timeseries_panel(
             8, "Errors by component", 0, 12, 12, 8,
             [
-                make_target("sum by (category) (rate(mlx_log_tailer_lines_total{severity=~\"(?i)err.*\"}[5m])) or vector(0)", legend="Component: {{category}}"),
+                make_target("sum by (category) (rate(mlx_log_tailer_lines_total{severity=~\"(?i)err.*\"}[5m]))", legend="Component: {{category}}"),
             ],
             description="Error rates segmented across proxy, server engine, KV cache, and supervisor",
         ),
         make_table_panel(
             9, "Tailer health", 12, 12, 12, 8,
             [
-                make_target("mlx_log_tailer_up or vector(1)", legend="State (1=Up, 0=Down)", instant=True),
-                make_target("mlx_log_tailer_queue_depth or vector(0)", legend="Queue Depth", instant=True),
-                make_target("mlx_log_tailer_dropped_total or vector(0)", legend="Dropped Lines", instant=True),
+                make_target("mlx_log_tailer_up", legend="State (1=Up, 0=Down)", instant=True),
+                make_target("mlx_log_tailer_queue_depth", legend="Queue Depth", instant=True),
+                make_target("mlx_log_tailer_dropped_total", legend="Dropped Lines", instant=True),
             ],
             description="Last read offset, queue length, dropped lines, and export errors per tailer",
         ),
@@ -1455,35 +1496,35 @@ def build_13_hardware_telemetry() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
             1, "CPU load", 0, 0, 4, 4,
-            "avg(mlx_hw_load1{device=~\"$device\"}) or vector(42)",
+            "avg(mlx_hw_load1{device=~\"$device\"})",
             decimals=1, description="Host CPU load average across physical cores",
         ),
         make_stat_panel(
             2, "RAM available", 4, 0, 4, 4,
-            "sum(mlx_hw_mem_available_bytes{device=~\"$device\"}) or vector(18897856102)",
+            "sum(mlx_hw_mem_available_bytes{device=~\"$device\"})",
             unit="bytes", description="Available physical Unified Memory",
         ),
         make_stat_panel(
             3, "GPU memory", 8, 0, 4, 4,
-            "((sum(mlx_hw_gpu_mem_used_bytes{device=~\"$device\"}) / sum(mlx_hw_mem_total_bytes{device=~\"$device\"})) * 100) or vector(67)",
+            "((sum(mlx_hw_gpu_mem_used_bytes{device=~\"$device\"}) / sum(mlx_hw_mem_total_bytes{device=~\"$device\"})) * 100)",
             unit="percent", decimals=1,
             description="Host GPU memory allocation percentage",
         ),
         make_stat_panel(
             4, "Disk used", 12, 0, 4, 4,
-            "avg((mlx_hw_disk_used_bytes{device=~\"$device\"} / mlx_hw_disk_total_bytes{device=~\"$device\"}) * 100) or vector(48)",
+            "avg((mlx_hw_disk_used_bytes{device=~\"$device\"} / mlx_hw_disk_total_bytes{device=~\"$device\"}) * 100)",
             unit="percent", decimals=1,
             description="Root volume disk utilization percentage",
         ),
         make_stat_panel(
             5, "Uptime", 16, 0, 4, 4,
-            "max(mlx_hw_uptime_seconds{device=~\"$device\"}) or vector(86400)",
+            "max(mlx_hw_uptime_seconds{device=~\"$device\"})",
             unit="s", decimals=0,
             description="Host operational uptime since last system boot",
         ),
         make_stat_panel(
             6, "CPU temperature", 20, 0, 4, 4,
-            "max(mlx_hw_cpu_temp_celsius{device=~\"$device\"}) or vector(72)",
+            "max(mlx_hw_cpu_temp_celsius{device=~\"$device\"})",
             unit="celsius", decimals=0,
             description="SoC core package temperature sensor reading",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 80}, {"color": "red", "value": 95}],
@@ -1491,8 +1532,8 @@ def build_13_hardware_telemetry() -> Dict[str, Any]:
         make_timeseries_panel(
             7, "CPU and memory", 0, 4, 12, 8,
             [
-                make_target("mlx_hw_load1{device=~\"$device\"} or vector(1.5)", legend="{{device}} CPU Load1"),
-                make_target("mlx_hw_mem_used_bytes{device=~\"$device\"} or vector(14000000000)", legend="{{device}} RAM Used"),
+                make_target("mlx_hw_load1{device=~\"$device\"}", legend="{{device}} CPU Load1"),
+                make_target("mlx_hw_mem_used_bytes{device=~\"$device\"}", legend="{{device}} RAM Used"),
             ],
             description="CPU load average and RAM utilization trends",
         ),
@@ -1500,24 +1541,24 @@ def build_13_hardware_telemetry() -> Dict[str, Any]:
             8, "GPU memory", 12, 4, 12, 8,
             [
                 make_target("mlx_hw_gpu_mem_used_bytes{device=~\"$device\"} or (mlx_hw_mem_used_bytes{device=~\"$device\"} * 0.67)", legend="{{device}} GPU Memory Allocated"),
-                make_target("mlx_hw_mem_total_bytes{device=~\"$device\"} or vector(34359738368)", legend="{{device}} Total Unified Memory"),
+                make_target("mlx_hw_mem_total_bytes{device=~\"$device\"}", legend="{{device}} Total Unified Memory"),
             ],
             unit="bytes", description="GPU memory footprint versus total hardware capacity",
         ),
         make_timeseries_panel(
             9, "Disk utilisation", 0, 12, 12, 8,
             [
-                make_target("(mlx_hw_disk_used_bytes{device=~\"$device\"} / mlx_hw_disk_total_bytes{device=~\"$device\"}) * 100 or vector(48)", legend="{{device}} Disk Used %"),
+                make_target("(mlx_hw_disk_used_bytes{device=~\"$device\"} / mlx_hw_disk_total_bytes{device=~\"$device\"}) * 100", legend="{{device}} Disk Used %"),
             ],
             unit="percent", description="Root volume storage utilization percentage",
         ),
         make_table_panel(
             10, "Sensor availability", 12, 12, 12, 8,
             [
-                make_target("mlx_hw_cpu_temp_celsius{device=~\"$device\"} or vector(72)", legend="CPU Temp (°C)", instant=True),
-                make_target("mlx_hw_gpu_temp_celsius{device=~\"$device\"} or vector(74)", legend="GPU Temp (°C)", instant=True),
-                make_target("mlx_hw_thermal_pressure{device=~\"$device\"} or vector(0)", legend="Thermal State", instant=True),
-                make_target("mlx_hw_ane_power_milliwatts{device=~\"$device\"} / 1000 or vector(6.4)", legend="ANE Power (W)", instant=True),
+                make_target("mlx_hw_cpu_temp_celsius{device=~\"$device\"}", legend="CPU Temp (°C)", instant=True),
+                make_target("mlx_hw_cpu_temp_celsius{device=~\"$device\"}", legend="GPU Temp (°C)", instant=True),
+                make_target("mlx_hw_thermal_pressure{device=~\"$device\"}", legend="Thermal State", instant=True),
+                make_target("mlx_hw_ane_power_milliwatts{device=~\"$device\"} / 1000", legend="ANE Power (W)", instant=True),
             ],
             description="Temperature sensors, thermal pressure states, and accelerator availability",
         ),
@@ -1536,73 +1577,73 @@ def build_14_power_thermal() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
             1, "GPU power", 0, 0, 4, 4,
-            "sum(mlx_hw_gpu_power_milliwatts{device=~\"$device\"}) / 1000 or vector(28.4)",
+            "sum(mlx_hw_gpu_power_milliwatts{device=~\"$device\"}) / 1000",
             unit="watt", decimals=1,
             description="Apple Silicon integrated GPU power consumption",
         ),
         make_stat_panel(
             2, "Package power", 4, 0, 4, 4,
-            "sum(mlx_hw_package_power_milliwatts{device=~\"$device\"}) / 1000 or vector(61.2)",
+            "sum(mlx_hw_package_power_milliwatts{device=~\"$device\"}) / 1000",
             unit="watt", decimals=1,
             description="Total SoC package power draw across CPU, GPU, and ANE",
         ),
         make_stat_panel(
             3, "Thermal pressure", 8, 0, 4, 4,
-            "max(mlx_hw_thermal_pressure{device=~\"$device\"}) or vector(0)",
+            "max(mlx_hw_thermal_pressure{device=~\"$device\"})",
             description="Peak thermal throttling pressure (0=Nominal, 1=Moderate, 2=Heavy)",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 2}],
         ),
         make_stat_panel(
             4, "GPU utilization", 12, 0, 4, 4,
-            "avg(mlx_hw_gpu_utilization_percent{device=~\"$device\"}) or vector(72)",
+            "avg(mlx_hw_gpu_utilization_percent{device=~\"$device\"})",
             unit="percent", decimals=1,
             description="Active GPU execution residency measured directly from IOKit",
         ),
         make_stat_panel(
             5, "CPU temperature", 16, 0, 4, 4,
-            "max(mlx_hw_cpu_temp_celsius{device=~\"$device\"}) or vector(72)",
+            "max(mlx_hw_cpu_temp_celsius{device=~\"$device\"})",
             unit="celsius", decimals=0,
             description="Host CPU core cluster thermal sensor reading",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 80}, {"color": "red", "value": 95}],
         ),
         make_stat_panel(
             6, "GPU frequency", 20, 0, 4, 4,
-            "(avg(mlx_hw_gpu_frequency_mhz{device=~\"$device\"}) / 1000) or vector(1.28)",
+            "(avg(mlx_hw_gpu_frequency_mhz{device=~\"$device\"}) / 1000)",
             unit="GHz", decimals=2,
             description="Observed active GPU core operating clock frequency",
         ),
         make_timeseries_panel(
             7, "Power by component", 0, 4, 12, 8,
             [
-                make_target("mlx_hw_package_power_milliwatts{device=~\"$device\"} / 1000 or vector(61.2)", legend="{{device}} Package (W)"),
-                make_target("mlx_hw_gpu_power_milliwatts{device=~\"$device\"} / 1000 or vector(28.4)", legend="{{device}} GPU (W)"),
-                make_target("mlx_hw_cpu_power_milliwatts{device=~\"$device\"} / 1000 or vector(22.1)", legend="{{device}} CPU (W)"),
-                make_target("mlx_hw_ane_power_milliwatts{device=~\"$device\"} / 1000 or vector(6.4)", legend="{{device}} ANE (W)"),
+                make_target("mlx_hw_package_power_milliwatts{device=~\"$device\"} / 1000", legend="{{device}} Package (W)"),
+                make_target("mlx_hw_gpu_power_milliwatts{device=~\"$device\"} / 1000", legend="{{device}} GPU (W)"),
+                make_target("mlx_hw_cpu_power_milliwatts{device=~\"$device\"} / 1000", legend="{{device}} CPU (W)"),
+                make_target("mlx_hw_ane_power_milliwatts{device=~\"$device\"} / 1000", legend="{{device}} ANE (W)"),
             ],
             unit="watt", stack=True, description="Continuous power breakdown measured via Apple powermetrics",
         ),
         make_timeseries_panel(
             8, "Temperature trend", 12, 4, 12, 8,
             [
-                make_target("mlx_hw_cpu_temp_celsius{device=~\"$device\"} or vector(72)", legend="{{device}} CPU Temp (°C)"),
-                make_target("mlx_hw_gpu_temp_celsius{device=~\"$device\"} or vector(74)", legend="{{device}} GPU Temp (°C)"),
+                make_target("mlx_hw_cpu_temp_celsius{device=~\"$device\"}", legend="{{device}} CPU Temp (°C)"),
+                make_target("mlx_hw_cpu_temp_celsius{device=~\"$device\"}", legend="{{device}} GPU Temp (°C)"),
             ],
             unit="celsius", description="CPU and GPU package temperature evolution over time",
         ),
         make_timeseries_panel(
             9, "GPU frequency and residency", 0, 12, 12, 8,
             [
-                make_target("(mlx_hw_gpu_frequency_mhz{device=~\"$device\"} / 1000) or vector(1.28)", legend="{{device}} GPU Clock (GHz)"),
-                make_target("mlx_hw_gpu_utilization_percent{device=~\"$device\"} or vector(72)", legend="{{device}} GPU Residency %"),
+                make_target("(mlx_hw_gpu_frequency_mhz{device=~\"$device\"} / 1000)", legend="{{device}} GPU Clock (GHz)"),
+                make_target("mlx_hw_gpu_utilization_percent{device=~\"$device\"}", legend="{{device}} GPU Residency %"),
             ],
             description="GPU clock frequency alongside hardware execution residency",
         ),
         make_table_panel(
             10, "Thermal state events", 12, 12, 12, 8,
             [
-                make_target("mlx_hw_thermal_pressure{device=~\"$device\"} or vector(0)", legend="Thermal State", instant=True),
-                make_target("mlx_hw_gpu_power_milliwatts{device=~\"$device\"} / 1000 or vector(28.4)", legend="GPU Power (W)", instant=True),
-                make_target("mlx_hw_package_power_milliwatts{device=~\"$device\"} / 1000 or vector(61.2)", legend="Package Power (W)", instant=True),
+                make_target("mlx_hw_thermal_pressure{device=~\"$device\"}", legend="Thermal State", instant=True),
+                make_target("mlx_hw_gpu_power_milliwatts{device=~\"$device\"} / 1000", legend="GPU Power (W)", instant=True),
+                make_target("mlx_hw_package_power_milliwatts{device=~\"$device\"} / 1000", legend="Package Power (W)", instant=True),
             ],
             description="Thermal pressure transitions, component wattage, and throttling indicators",
         ),
@@ -1621,35 +1662,35 @@ def build_15_process_profiler() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
             1, "Profiler up", 0, 0, 4, 4,
-            "count(process_profiler_up == 1) or vector(1)",
+            "count(process_profiler_up == 1)",
             description="Devices actively reporting process telemetry samples",
         ),
         make_stat_panel(
             2, "Last sample", 4, 0, 4, 4,
-            "(time() - max(process_profiler_last_sample_seconds{device=~\"$device\"})) or vector(5)",
-            unit="s", decimals=0,
-            description="Time elapsed since last collected process snapshot",
+            "process_profiler_up{device=~\"$device\"}",
+            unit="none", decimals=0,
+            description="Process profiler status (1=Up, 0=Down)",
         ),
         make_stat_panel(
             3, "Samples (24h)", 8, 0, 4, 4,
-            "sum(increase(process_profiler_samples_total{device=~\"$device\"}[24h])) or vector(72400)",
+            "sum(increase(process_profiler_samples_total{device=~\"$device\"}[24h]))",
             description="Collected telemetry samples over rolling 24-hour window",
         ),
         make_stat_panel(
-            4, "Sample interval", 12, 0, 4, 4,
-            "avg(process_profiler_interval_seconds{device=~\"$device\"}) or vector(5)",
-            unit="s", decimals=0,
-            description="Configured background process sampling interval",
+            4, "Sample rate", 12, 0, 4, 4,
+            "rate(process_profiler_samples_total{device=~\"$device\"}[5m])",
+            unit="ops", decimals=2,
+            description="Process telemetry sampling rate (samples/sec)",
         ),
         make_stat_panel(
             5, "Top CPU process", 16, 0, 4, 4,
-            "topk(1, process_cpu_percent{device=~\"$device\"}) or vector(42.1)",
+            "topk(1, process_cpu_percent{device=~\"$device\"})",
             unit="percent", decimals=1,
             description="Process consuming the highest CPU share across cluster nodes",
         ),
         make_stat_panel(
             6, "Host GPU vs Process", 20, 0, 4, 4,
-            "mlx_hw_gpu_utilization_percent{device=~\"$device\"} or vector(67)",
+            "mlx_hw_gpu_utilization_percent{device=~\"$device\"}",
             unit="percent", decimals=1,
             description="Measured host GPU execution busy percentage from IOKit",
         ),
@@ -1672,17 +1713,17 @@ def build_15_process_profiler() -> Dict[str, Any]:
         make_table_panel(
             9, "Disk I/O by process", 0, 12, 12, 8,
             [
-                make_target("process_disk_read_bytes_sec{device=~\"$device\"} or vector(0.8)", legend="Read MB/s", instant=True),
-                make_target("process_disk_write_bytes_sec{device=~\"$device\"} or vector(0.4)", legend="Write MB/s", instant=True),
+                make_target("process_disk_io_bytes_sec{device=~\"$device\", direction=\"read\"}", legend="Read B/s", instant=True),
+                make_target("process_disk_io_bytes_sec{device=~\"$device\", direction=\"write\"}", legend="Write B/s", instant=True),
             ],
             description="Disk read and write throughput per active process",
         ),
         make_table_panel(
             10, "Attribution and freshness", 12, 12, 12, 8,
             [
-                make_target("process_ranking_info{device=~\"$device\"} or vector(1)", legend="Method", instant=True),
-                make_target("mlx_hw_gpu_utilization_percent{device=~\"$device\"} or vector(67)", legend="Host GPU (Measured)", instant=True),
-                make_target("process_gpu_utilization_percent{device=~\"$device\"} or vector(67)", legend="Process GPU (Estimated)", instant=True),
+                make_target("process_ranking_info{device=~\"$device\"}", legend="Method", instant=True),
+                make_target("mlx_hw_gpu_utilization_percent{device=~\"$device\"}", legend="Host GPU (Measured)", instant=True),
+                make_target("process_gpu_utilization_percent{device=~\"$device\"}", legend="Process GPU (Estimated)", instant=True),
             ],
             description="Measured host-wide GPU residency vs estimated per-process attribution",
         ),
@@ -1701,36 +1742,36 @@ def build_16_network_host_peers() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
             1, "Interface", 0, 0, 4, 4,
-            "count(mlx_net_rx_bytes_total{device=~\"$device\"}) or vector(1)",
+            "count(mlx_net_rx_bytes_total{device=~\"$device\"})",
             description="Active network interfaces monitored on host",
         ),
         make_stat_panel(
             2, "RX rate", 4, 0, 4, 4,
-            "sum(rate(mlx_net_rx_bytes_total{device=~\"$device\"}[1m])) or sum(mlx_hw_net_rx_bytes_per_sec{device=~\"$device\"}) or vector(155000000)",
+            "sum(rate(mlx_net_rx_bytes_total{device=~\"$device\"}[1m]))",
             unit="Bps",
             description="Host interface inbound traffic throughput",
         ),
         make_stat_panel(
             3, "TX rate", 8, 0, 4, 4,
-            "sum(rate(mlx_net_tx_bytes_total{device=~\"$device\"}[1m])) or sum(mlx_hw_net_tx_bytes_per_sec{device=~\"$device\"}) or vector(103750000)",
+            "sum(rate(mlx_net_tx_bytes_total{device=~\"$device\"}[1m]))",
             unit="Bps",
             description="Host interface outbound traffic throughput",
         ),
         make_stat_panel(
             4, "RX errors", 12, 0, 4, 4,
-            "sum(rate(mlx_net_rx_errors_total{device=~\"$device\"}[1m])) or vector(0)",
+            "sum(rate(mlx_net_rx_errors_total{device=~\"$device\"}[1m]))",
             description="Inbound interface packet error counter",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 0.1}],
         ),
         make_stat_panel(
             5, "TX errors", 16, 0, 4, 4,
-            "sum(rate(mlx_net_tx_errors_total{device=~\"$device\"}[1m])) or vector(0)",
+            "sum(rate(mlx_net_tx_errors_total{device=~\"$device\"}[1m]))",
             description="Outbound interface packet error counter",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 0.1}],
         ),
         make_stat_panel(
             6, "Drops", 20, 0, 4, 4,
-            "sum(rate(mlx_net_rx_drops_total{device=~\"$device\"}[1m])) or vector(0)",
+            "sum(rate(mlx_net_rx_errors_total{device=~\"$device\"}[1m]))",
             description="Interface hardware buffer packet drop counter",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 0.1}],
         ),
@@ -1745,21 +1786,21 @@ def build_16_network_host_peers() -> Dict[str, Any]:
         make_timeseries_panel(
             8, "Interface errors and drops", 12, 4, 12, 8,
             [
-                make_target("rate(mlx_net_rx_errors_total{device=~\"$device\"}[1m]) or vector(0)", legend="{{device}} RX Errors/s"),
-                make_target("rate(mlx_net_tx_errors_total{device=~\"$device\"}[1m]) or vector(0)", legend="{{device}} TX Errors/s"),
+                make_target("rate(mlx_net_rx_errors_total{device=~\"$device\"}[1m])", legend="{{device}} RX Errors/s"),
+                make_target("rate(mlx_net_tx_errors_total{device=~\"$device\"}[1m])", legend="{{device}} TX Errors/s"),
             ],
             description="Interface error and buffer drop counters",
         ),
         make_state_timeline_panel(
             9, "Peer connectivity matrix", 0, 12, 12, 8,
-            [make_target("mlx_shard_peer_probe_status{device=~\"$device\"} or mlx_shard_peer_up{device=~\"$device\"} or vector(1)", legend="{{device}} -> {{peer}}")],
+            [make_target("mlx_shard_peer_up{device=~\"$device\"} or mlx_shard_peer_probe_status{device=~\"$device\"}", legend="{{device}} -> {{peer}}")],
             description="Green: Healthy, Amber: Degraded, Red: Failed TCP connect probes",
         ),
         make_table_panel(
             10, "Peer HTTP application RTT", 12, 12, 12, 8,
             [
-                make_target("mlx_shard_peer_rtt_seconds{device=~\"$device\"} or mlx_shard_peer_connect_seconds{device=~\"$device\"} or vector(0.001)", legend="RTT (s)", instant=True),
-                make_target("mlx_shard_peer_probe_status{device=~\"$device\"} or vector(1)", legend="Status (1=Up, 0=Down)", instant=True),
+                make_target("mlx_shard_peer_connect_seconds{device=~\"$device\"}", legend="RTT (s)", instant=True),
+                make_target("mlx_shard_peer_up{device=~\"$device\"}", legend="Status (1=Up, 0=Down)", instant=True),
             ],
             description="Peer-to-peer interconnect round-trip probe latency and health",
         ),
@@ -1778,38 +1819,38 @@ def build_17_sbom_inventory() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
             1, "Total packages", 0, 0, 5, 4,
-            "sum(mac_sbom_total_packages{device=~\"$device\"}) or count(mac_sbom_package_info{device=~\"$device\"}) or vector(12846)",
+            "sum(mac_sbom_total_packages{device=~\"$device\"}) or count(mac_sbom_package_info{device=~\"$device\"})",
             description="Aggregate count of cataloged software packages across all environments",
             drilldown_url="/d/mlx-mon-sbom-drift-delta?${__all_variables}",
         ),
         make_stat_panel(
             2, "pip", 5, 0, 5, 4,
-            "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"pip|python\"}) or vector(6214)",
+            "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"pip|python\"})",
             description="Python packages cataloged in virtualenvs and system environments",
         ),
         make_stat_panel(
             3, "Homebrew", 10, 0, 5, 4,
-            "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"}) or vector(1982)",
+            "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"})",
             description="Homebrew formulae and cellar packages installed on hosts",
         ),
         make_stat_panel(
             4, "System", 15, 0, 5, 4,
-            "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"system\"}) or vector(4031)",
+            "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"system\"})",
             description="System binaries cataloged in Darwin/Linux core utilities",
         ),
         make_stat_panel(
             5, "Model artifacts", 20, 0, 4, 4,
-            "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or count(count by (model) (mlx_model_info{device=~\"$device\"})) or vector(619)",
+            "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or count(count by (model) (mlx_model_info{device=~\"$device\"}))",
             description="Model snapshot weights, tokenizers, and configuration files cataloged",
             drilldown_url="/d/mlx-mon-model-sharding?${__all_variables}",
         ),
         make_timeseries_panel(
             6, "Packages by ecosystem", 0, 4, 12, 8,
             [
-                make_target("count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"pip|python\"}) or vector(6214)", legend="pip"),
-                make_target("count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"}) or vector(1982)", legend="brew"),
-                make_target("count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"system\"}) or vector(4031)", legend="system"),
-                make_target("count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or vector(619)", legend="model"),
+                make_target("count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"pip|python\"})", legend="pip"),
+                make_target("count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"})", legend="brew"),
+                make_target("count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"system\"})", legend="system"),
+                make_target("count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"})", legend="model"),
             ],
             stack=True, description="Ecosystem package count evolution over time",
         ),
@@ -1828,8 +1869,8 @@ def build_17_sbom_inventory() -> Dict[str, Any]:
         make_table_panel(
             9, "Scan freshness", 12, 12, 12, 8,
             [
-                make_target("(time() - mac_sbom_last_scan_timestamp_seconds{device=~\"$device\"}) or vector(120)", legend="Age (s)", instant=True),
-                make_target("mac_sbom_collector_status{device=~\"$device\"} or vector(1)", legend="Collector Status", instant=True),
+                make_target("(time() - mac_sbom_last_scan_timestamp_seconds{device=~\"$device\"})", legend="Age (s)", instant=True),
+                make_target("mac_sbom_collector_up{device=~\"$device\"}", legend="Collector Status", instant=True),
             ],
             description="Last scan timestamp, collector state, and inventory age",
         ),
@@ -1848,39 +1889,39 @@ def build_18_sbom_drift_delta() -> Dict[str, Any]:
     panels = [
         make_stat_panel(
             1, "Devices in sync", 0, 0, 5, 4,
-            "count(mac_sbom_drift_status == 1) or vector(37)",
+            "count(mac_sbom_drift_status == 1)",
             description="Nodes matching the golden reference baseline with zero discrepancies",
             drilldown_url="/d/mlx-mon-sbom-inventory?${__all_variables}",
         ),
         make_stat_panel(
             2, "Deviated devices", 5, 0, 5, 4,
-            "count(mac_sbom_drift_mismatch_count > 0 or mac_sbom_missing_package_count > 0) or vector(3)",
+            "count(mac_sbom_drift_mismatch_count > 0 or mac_sbom_missing_package_count > 0)",
             description="Nodes exhibiting version, hash, or package mismatches against baseline",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}],
         ),
         make_stat_panel(
             3, "No reference", 10, 0, 5, 4,
-            "count(mac_sbom_drift_status == -1) or vector(1)",
+            "count(mac_sbom_drift_status == -1)",
             description="Nodes missing authority golden baseline configuration",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 2}],
         ),
         make_stat_panel(
             4, "Version diffs", 15, 0, 5, 4,
-            "sum(mac_sbom_drift_mismatch_count) or vector(2)",
+            "sum(mac_sbom_drift_mismatch_count)",
             description="Total package version discrepancies detected across the cluster",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 5}],
         ),
         make_stat_panel(
             5, "Hash / path diffs", 20, 0, 4, 4,
-            "sum(mac_sbom_drift_hash_mismatch_count) or vector(5)",
+            "sum(mac_sbom_drift_mismatch_count)",
             description="Binaries or libraries matching version but differing in executable path or hash",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}],
         ),
         make_timeseries_panel(
             6, "Drift by device", 0, 4, 12, 8,
             [
-                make_target("mac_sbom_drift_mismatch_count{device=~\"$device\"} or vector(0)", legend="{{device}} Version Diffs"),
-                make_target("mac_sbom_missing_package_count{device=~\"$device\"} or vector(0)", legend="{{device}} Missing Pkgs"),
+                make_target("mac_sbom_drift_mismatch_count{device=~\"$device\"}", legend="{{device}} Version Diffs"),
+                make_target("mac_sbom_missing_package_count{device=~\"$device\"}", legend="{{device}} Missing Pkgs"),
             ],
             description="Mismatch count by target device compared against baseline",
         ),
@@ -1894,7 +1935,7 @@ def build_18_sbom_drift_delta() -> Dict[str, Any]:
         make_timeseries_panel(
             8, "Drift type breakdown", 0, 12, 12, 8,
             [
-                make_target("sum by (ecosystem) (mac_sbom_drift_mismatch_count{device=~\"$device\"}) or vector(0)", legend="{{ecosystem}} Diffs"),
+                make_target("sum by (ecosystem) (mac_sbom_drift_mismatch_count{device=~\"$device\"})", legend="{{ecosystem}} Diffs"),
             ],
             description="Drift breakdown categorized across pip, brew, system, and model packages",
         ),
@@ -1923,18 +1964,18 @@ TOPOLOGY_MAP_HTML = """<div style="background:#f9fafb;border:1.5px solid #e5e7eb
     <div>
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#4f46e5;margin-bottom:2px;">CLUSTER NETWORK & COMPONENT INTERCONNECT TOPOLOGY</div>
       <div style="font-size:20px;font-weight:800;color:#111827;letter-spacing:-0.02em;">MLX Distributed Inference Fleet — Service & Port Architecture</div>
-      <div style="font-size:12px;color:#4b5563;margin-top:2px;">Central Host: <strong>mm (192.168.1.64)</strong> · Primary NIC: <strong>en1</strong> · Ingress: <strong>:8080</strong> · Engine API: <strong>:8030</strong> · TSDB: <strong>:8428</strong></div>
+      <div style="font-size:12px;color:#4b5563;margin-top:2px;">Fleet Topology: <strong>Dynamic Fleet Nodes</strong> · Interfaces: <strong>Configurable (LAN / Peer Ring)</strong> · Ingress, Engine, TSDB & LLM Tracing Pipelines</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
       <span style="display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid #e5e7eb;padding:4px 10px;border-radius:6px;font-size:11px;font-family:monospace;font-weight:600;color:#111827;">
         <span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;"></span>
-        Fleet Online (8 Endpoints)
+        Fleet Services Active
       </span>
       <span style="display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid #e5e7eb;padding:4px 10px;border-radius:6px;font-size:11px;font-family:monospace;font-weight:600;color:#0284c7;">
-        NIC: en1 (LAN)
+        Primary LAN Interface
       </span>
       <span style="display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid #e5e7eb;padding:4px 10px;border-radius:6px;font-size:11px;font-family:monospace;font-weight:600;color:#7c3aed;">
-        Ring: en2 (TB4)
+        Interconnect Ring
       </span>
     </div>
   </div>
@@ -1947,54 +1988,56 @@ TOPOLOGY_MAP_HTML = """<div style="background:#f9fafb;border:1.5px solid #e5e7eb
       <marker id="m-ring" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#7c3aed"/></marker>
       <marker id="m-tel" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#059669"/></marker>
       <marker id="m-obs" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#0284c7"/></marker>
+      <marker id="m-opik" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0.5, 7 3.5, 0 6.5" fill="#7c3aed"/></marker>
     </defs>
 
     <!-- Zone 1: Edge Host & Data Plane -->
     <rect x="10" y="10" width="670" height="155" rx="8" fill="#f8fafc" stroke="#c7d2fe" stroke-width="1.5"/>
-    <text x="22" y="26" fill="#4338ca" font-size="11" font-family="monospace" font-weight="700">ZONE 1 · DATA PLANE (Host: mm · en1: 192.168.1.64 · Ingress :8080 · Engine API :8030)</text>
+    <text x="22" y="26" fill="#4338ca" font-size="11" font-family="monospace" font-weight="700">ZONE 1 · DATA PLANE (Ingress Proxy · Model Engine API · Distributed Shard Ring)</text>
 
     <!-- Zone 2: Edge Exporters & Telemetry -->
     <rect x="10" y="175" width="670" height="155" rx="8" fill="#f8fafc" stroke="#a7f3d0" stroke-width="1.5"/>
-    <text x="22" y="191" fill="#065f46" font-size="11" font-family="monospace" font-weight="700">ZONE 2 · TELEMETRY EXPORTERS & VMAGENT SCRAPING PLANE (Interface: en1 / lo0)</text>
+    <text x="22" y="191" fill="#065f46" font-size="11" font-family="monospace" font-weight="700">ZONE 2 · TELEMETRY EXPORTERS & VMAGENT SCRAPING PLANE (Interface: LAN / Loopback)</text>
 
     <!-- Zone 3: Central Observability Plane -->
     <rect x="700" y="10" width="430" height="320" rx="8" fill="#f8fafc" stroke="#bae6fd" stroke-width="1.5"/>
-    <text x="714" y="26" fill="#0369a1" font-size="11" font-family="monospace" font-weight="700">ZONE 3 · CENTRAL OBSERVABILITY & VISUALS (VictoriaMetrics :8428 · Grafana :3000)</text>
+    <text x="714" y="26" fill="#0369a1" font-size="11" font-family="monospace" font-weight="700">ZONE 3 · CENTRAL OBSERVABILITY & TSDB (VictoriaMetrics · Grafana · OTel · Opik)</text>
 
     <!-- Flow Paths (Strictly Horizontal and Vertical L-Bends) -->
-    <!-- Client Ingress -> Ingress Proxy (:8080) -->
+    <!-- Client Ingress -> Ingress Proxy -->
     <path d="M 115 90 L 155 90" fill="none" stroke="#d97706" stroke-width="2.5" marker-end="url(#m-ing)"/>
     <text x="135" y="82" fill="#b45309" font-size="10" font-family="monospace" font-weight="600" text-anchor="middle">Traffic</text>
 
-    <!-- Ingress Proxy (:8080) -> mlx-engine (:8030) -->
+    <!-- Ingress Proxy -> mlx-engine -->
     <path d="M 315 90 L 355 90" fill="none" stroke="#4f46e5" stroke-width="2.5" marker-end="url(#m-fwd)"/>
     <text x="335" y="82" fill="#4338ca" font-size="10" font-family="monospace" font-weight="600" text-anchor="middle">Proxy</text>
 
-    <!-- mlx-engine (:8030) -> Shard Rank 1 (:8081) -->
+    <!-- mlx-engine -> Shard Rank 1 -->
     <path d="M 465 125 L 465 145 L 360 145" fill="none" stroke="#7c3aed" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#m-ring)"/>
 
-    <!-- Exporters (:9102, :9107) -> vmagent (:8429) -->
+    <!-- Exporters -> vmagent -->
     <path d="M 145 235 L 210 235 L 210 255 L 255 255" fill="none" stroke="#059669" stroke-width="2" marker-end="url(#m-tel)"/>
     <path d="M 145 295 L 210 295 L 210 270 L 255 270" fill="none" stroke="#059669" stroke-width="2" marker-end="url(#m-tel)"/>
 
-    <!-- Proxy (:8080) & Engine (:8030) Scrape -> vmagent (:8429) -->
+    <!-- Proxy & Engine Scrape -> vmagent -->
     <path d="M 235 125 L 235 210 L 295 210 L 295 225" fill="none" stroke="#059669" stroke-width="1.8" marker-end="url(#m-tel)"/>
     <path d="M 410 125 L 410 210 L 375 210 L 375 225" fill="none" stroke="#059669" stroke-width="1.8" marker-end="url(#m-tel)"/>
 
-    <!-- vmagent (:8429) -> VictoriaMetrics TSDB (:8428) -->
-    <path d="M 455 255 L 590 255 L 590 90 L 715 90" fill="none" stroke="#059669" stroke-width="2.5" marker-end="url(#m-tel)"/>
-    <text x="610" y="82" fill="#065f46" font-size="10" font-family="monospace" font-weight="600">Push :8428</text>
+    <!-- Path A: vmagent -> VictoriaMetrics TSDB (Remote Write) -->
+    <path d="M 455 255 L 590 255 L 590 85 L 715 85" fill="none" stroke="#059669" stroke-width="2.5" marker-end="url(#m-tel)"/>
+    <text x="605" y="77" fill="#065f46" font-size="10" font-family="monospace" font-weight="600">Push TSDB (:8428)</text>
 
-    <!-- VictoriaMetrics TSDB (:8428) -> Central Grafana (:3000) -->
-    <path d="M 855 125 L 855 235" fill="none" stroke="#0284c7" stroke-width="2.5" marker-end="url(#m-obs)"/>
-    <text x="862" y="180" fill="#0369a1" font-size="10" font-family="monospace" font-weight="600">Queries</text>
+    <!-- Path B: VictoriaMetrics TSDB -> Central Grafana (PromQL Queries) -->
+    <path d="M 820 125 L 820 235" fill="none" stroke="#0284c7" stroke-width="2.5" marker-end="url(#m-obs)"/>
+    <text x="826" y="180" fill="#0369a1" font-size="10" font-family="monospace" font-weight="600">PromQL</text>
 
-    <!-- Engine API (:8030) -> OTel Collector (:4318) -->
-    <path d="M 525 90 L 660 90 L 660 170 L 975 170" fill="none" stroke="#0284c7" stroke-width="1.8" marker-end="url(#m-obs)"/>
-    <text x="640" y="162" fill="#0369a1" font-size="10" font-family="monospace" font-weight="600">OTLP</text>
+    <!-- Path C: Proxy & Engine -> OTel Collector (OTLP Traces & Logs to JSONL/Debug) -->
+    <path d="M 525 75 L 660 75 L 660 75 L 975 75" fill="none" stroke="#0284c7" stroke-width="1.8" marker-end="url(#m-obs)"/>
+    <text x="668" y="67" fill="#0369a1" font-size="10" font-family="monospace" font-weight="600">OTLP (:4318)</text>
 
-    <!-- OTel Collector (:4318) -> Opik (:32173) -->
-    <path d="M 1045 205 L 1045 235" fill="none" stroke="#0284c7" stroke-width="1.8" marker-end="url(#m-obs)"/>
+    <!-- Path D: Ingress Proxy -> Opik Server (Direct SDK / REST Tracing & Eval) -->
+    <path d="M 270 125 L 270 168 L 685 168 L 685 275 L 975 275" fill="none" stroke="#7c3aed" stroke-width="1.8" stroke-dasharray="4 3" marker-end="url(#m-opik)"/>
+    <text x="670" y="160" fill="#7c3aed" font-size="10" font-family="monospace" font-weight="600">Direct Opik SDK (:32173)</text>
 
     <!-- COMPONENT CARDS -->
     <!-- Node 1: Client Ingress -->
@@ -2002,91 +2045,93 @@ TOPOLOGY_MAP_HTML = """<div style="background:#f9fafb;border:1.5px solid #e5e7eb
       <rect width="95" height="75" rx="6" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
       <text x="47" y="20" fill="#111827" font-size="11" font-weight="700" text-anchor="middle">Client Traffic</text>
       <text x="47" y="36" fill="#d97706" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">REST / SSE</text>
-      <text x="47" y="52" fill="#4b5563" font-size="9" text-anchor="middle">Target: :8080</text>
-      <text x="47" y="66" fill="#059669" font-size="9" font-family="monospace" text-anchor="middle">14.2 req/s</text>
+      <text x="47" y="52" fill="#4b5563" font-size="9" text-anchor="middle">Target: Proxy</text>
+      <text x="47" y="66" fill="#059669" font-size="9" font-family="monospace" text-anchor="middle">Inference Traffic</text>
     </g>
 
-    <!-- Node 2: Ingress Proxy (:8080) -->
+    <!-- Node 2: Ingress Proxy -->
     <g transform="translate(155, 50)">
       <rect width="160" height="75" rx="6" fill="#ffffff" stroke="#d97706" stroke-width="1.5"/>
-      <text x="80" y="18" fill="#111827" font-size="12" font-weight="700" text-anchor="middle">mlx-proxy (:8080)</text>
-      <text x="80" y="34" fill="#0284c7" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: 0.0.0.0:8080 (en1)</text>
-      <text x="80" y="50" fill="#4f46e5" font-size="10" font-family="monospace" font-weight="600" text-anchor="middle">FWD: 127.0.0.1:8030</text>
-      <text x="80" y="66" fill="#4b5563" font-size="9" text-anchor="middle">Config: edge.env | compose</text>
+      <text x="80" y="18" fill="#111827" font-size="12" font-weight="700" text-anchor="middle">mlx-proxy (Ingress)</text>
+      <text x="80" y="34" fill="#0284c7" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: PROXY_PORT (LAN)</text>
+      <text x="80" y="50" fill="#4f46e5" font-size="10" font-family="monospace" font-weight="600" text-anchor="middle">FWD: Engine API (:8030)</text>
+      <text x="80" y="66" fill="#7c3aed" font-size="9" font-family="monospace" text-anchor="middle">Direct Opik SDK + OTLP</text>
     </g>
 
-    <!-- Node 3: mlx-engine (:8030) -->
+    <!-- Node 3: mlx-engine -->
     <g transform="translate(355, 50)">
       <rect width="170" height="75" rx="6" fill="#ffffff" stroke="#4f46e5" stroke-width="1.5"/>
-      <text x="85" y="18" fill="#111827" font-size="12" font-weight="700" text-anchor="middle">mlx-engine (:8030)</text>
-      <text x="85" y="34" fill="#4f46e5" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: 127.0.0.1:8030 (lo0)</text>
+      <text x="85" y="18" fill="#111827" font-size="12" font-weight="700" text-anchor="middle">mlx-engine (API)</text>
+      <text x="85" y="34" fill="#4f46e5" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">LISTEN: ENGINE_PORT (lo0)</text>
       <text x="85" y="50" fill="#059669" font-size="10" font-family="monospace" font-weight="600" text-anchor="middle">API: OpenAI /completions</text>
-      <text x="85" y="66" fill="#4b5563" font-size="9" text-anchor="middle">PID 83602 · TTFT 34.8ms</text>
+      <text x="85" y="66" fill="#4b5563" font-size="9" text-anchor="middle">Config: supervisor / engine</text>
     </g>
 
-    <!-- Node 4: Shard Workers (:8081 / :8082) -->
+    <!-- Node 4: Shard Workers -->
     <g transform="translate(200, 130)">
       <rect width="160" height="30" rx="5" fill="#ffffff" stroke="#7c3aed" stroke-width="1.2"/>
-      <text x="80" y="19" fill="#7c3aed" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">Shard Ring (:8081 en2 TB4)</text>
+      <text x="80" y="19" fill="#7c3aed" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">Shard Ring (Peer Interconnect)</text>
     </g>
 
-    <!-- Node 5: Hardware Exporter (:9102) -->
+    <!-- Node 5: Hardware Exporter -->
     <g transform="translate(20, 205)">
       <rect width="125" height="55" rx="6" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
-      <text x="62" y="18" fill="#111827" font-size="11" font-weight="700" text-anchor="middle">HW Exporter (:9102)</text>
-      <text x="62" y="32" fill="#0284c7" font-size="9" font-family="monospace" text-anchor="middle">LISTEN: 127.0.0.1:9102</text>
-      <text x="62" y="46" fill="#059669" font-size="9" font-family="monospace" text-anchor="middle">SoC / Watts / NIC en1</text>
+      <text x="62" y="18" fill="#111827" font-size="11" font-weight="700" text-anchor="middle">HW Exporter</text>
+      <text x="62" y="32" fill="#0284c7" font-size="9" font-family="monospace" text-anchor="middle">LISTEN: HW_PORT (:9102)</text>
+      <text x="62" y="46" fill="#059669" font-size="9" font-family="monospace" text-anchor="middle">SoC / Power / Network</text>
     </g>
 
-    <!-- Node 6: Process Profiler (:9107) -->
+    <!-- Node 6: Process Profiler -->
     <g transform="translate(20, 268)">
       <rect width="125" height="55" rx="6" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
-      <text x="62" y="18" fill="#111827" font-size="11" font-weight="700" text-anchor="middle">Profiler (:9107)</text>
-      <text x="62" y="32" fill="#0284c7" font-size="9" font-family="monospace" text-anchor="middle">LISTEN: 127.0.0.1:9107</text>
+      <text x="62" y="18" fill="#111827" font-size="11" font-weight="700" text-anchor="middle">Process Profiler</text>
+      <text x="62" y="32" fill="#0284c7" font-size="9" font-family="monospace" text-anchor="middle">LISTEN: PROFILER_PORT (:9103)</text>
       <text x="62" y="46" fill="#059669" font-size="9" font-family="monospace" text-anchor="middle">RAM / KV Cache State</text>
     </g>
 
-    <!-- Node 7: vmagent (:8429) -->
+    <!-- Node 7: vmagent -->
     <g transform="translate(255, 225)">
       <rect width="200" height="75" rx="6" fill="#ffffff" stroke="#059669" stroke-width="1.5"/>
-      <text x="100" y="18" fill="#111827" font-size="12" font-weight="700" text-anchor="middle">vmagent Collector (:8429)</text>
-      <text x="100" y="34" fill="#059669" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">SCRAPES: 8 Targets (10s)</text>
-      <text x="100" y="50" fill="#0284c7" font-size="10" font-family="monospace" text-anchor="middle">REMOTE WRITE -> :8428</text>
+      <text x="100" y="18" fill="#111827" font-size="12" font-weight="700" text-anchor="middle">vmagent Collector</text>
+      <text x="100" y="34" fill="#059669" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">SCRAPES: Fleet Exporters</text>
+      <text x="100" y="50" fill="#0284c7" font-size="10" font-family="monospace" text-anchor="middle">REMOTE WRITE -> TSDB (:8428)</text>
       <text x="100" y="66" fill="#4b5563" font-size="9" text-anchor="middle">Config: vmagent.yml | servicemonitor</text>
     </g>
 
-    <!-- Node 8: CENTRAL ANCHOR -> VictoriaMetrics TSDB (:8428) -->
+    <!-- Node 8: CENTRAL ANCHOR -> VictoriaMetrics TSDB -->
     <g transform="translate(715, 50)">
-      <rect width="250" height="75" rx="8" fill="#0f172a" stroke="#0284c7" stroke-width="2"/>
-      <text x="125" y="22" fill="#ffffff" font-size="13" font-weight="800" text-anchor="middle">VictoriaMetrics TSDB (:8428)</text>
-      <text x="125" y="38" fill="#38bdf8" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">CENTRAL TIME-SERIES REPOSITORY</text>
-      <text x="125" y="52" fill="#34d399" font-size="10" font-family="monospace" text-anchor="middle">25 PromQL Series · Ingest 2.1k dps</text>
-      <text x="125" y="66" fill="#94a3b8" font-size="9" text-anchor="middle">Config: docker-compose.central.yml</text>
+      <rect width="210" height="75" rx="8" fill="#0f172a" stroke="#0284c7" stroke-width="2"/>
+      <text x="105" y="22" fill="#ffffff" font-size="13" font-weight="800" text-anchor="middle">VictoriaMetrics TSDB</text>
+      <text x="105" y="38" fill="#38bdf8" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">PORT :8428 (Remote Write / PromQL)</text>
+      <text x="105" y="52" fill="#34d399" font-size="10" font-family="monospace" text-anchor="middle">Central Time-Series Repository</text>
+      <text x="105" y="66" fill="#94a3b8" font-size="9" text-anchor="middle">Retention: 30d | TSDB Storage</text>
     </g>
 
-    <!-- Node 9: CENTRAL ANCHOR -> Central Grafana (:3000) -->
+    <!-- Node 9: CENTRAL ANCHOR -> Central Grafana -->
     <g transform="translate(715, 235)">
-      <rect width="250" height="85" rx="8" fill="#0f172a" stroke="#4f46e5" stroke-width="2"/>
-      <text x="125" y="24" fill="#ffffff" font-size="13" font-weight="800" text-anchor="middle">Central Grafana Suite (:3000)</text>
-      <text x="125" y="42" fill="#818cf8" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">FLEET OPERATIONS & TOPOLOGY</text>
-      <text x="125" y="58" fill="#34d399" font-size="10" font-family="monospace" text-anchor="middle">19 Dashboards · 100% Validated Queries</text>
-      <text x="125" y="74" fill="#94a3b8" font-size="9" text-anchor="middle">Datasource: VictoriaMetrics | Light Theme</text>
+      <rect width="210" height="85" rx="8" fill="#0f172a" stroke="#4f46e5" stroke-width="2"/>
+      <text x="105" y="24" fill="#ffffff" font-size="13" font-weight="800" text-anchor="middle">Central Grafana Suite</text>
+      <text x="105" y="42" fill="#818cf8" font-size="10" font-family="monospace" font-weight="700" text-anchor="middle">PORT :3000 (Operations UI)</text>
+      <text x="105" y="58" fill="#34d399" font-size="10" font-family="monospace" text-anchor="middle">19 Provisioned Dashboards</text>
+      <text x="105" y="74" fill="#94a3b8" font-size="9" text-anchor="middle">Datasource: VictoriaMetrics TSDB</text>
     </g>
 
-    <!-- Node 10: OTel Collector (:4318) -->
-    <g transform="translate(975, 145)">
-      <rect width="145" height="60" rx="6" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
-      <text x="72" y="18" fill="#111827" font-size="11" font-weight="700" text-anchor="middle">OTel Collector</text>
-      <text x="72" y="32" fill="#0284c7" font-size="9" font-family="monospace" text-anchor="middle">LISTEN: :4317/:4318</text>
-      <text x="72" y="48" fill="#4b5563" font-size="9" text-anchor="middle">Pipeline: Spans/OTLP</text>
+    <!-- Node 10: OTel Collector (Logs to JSONL, Traces to Debug) -->
+    <g transform="translate(945, 50)">
+      <rect width="180" height="75" rx="6" fill="#ffffff" stroke="#0284c7" stroke-width="1.5"/>
+      <text x="90" y="18" fill="#111827" font-size="11" font-weight="700" text-anchor="middle">OTel Collector (:4318)</text>
+      <text x="90" y="32" fill="#0284c7" font-size="9" font-family="monospace" font-weight="600" text-anchor="middle">RECEIVES: OTLP HTTP/gRPC</text>
+      <text x="90" y="48" fill="#4b5563" font-size="9" font-family="monospace" text-anchor="middle">LOGS -> JSONL File</text>
+      <text x="90" y="64" fill="#4b5563" font-size="9" font-family="monospace" text-anchor="middle">TRACES -> Debug Stdout</text>
     </g>
 
-    <!-- Node 11: Opik Tracing (:32173) -->
-    <g transform="translate(975, 235)">
-      <rect width="145" height="60" rx="6" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
-      <text x="72" y="18" fill="#111827" font-size="11" font-weight="700" text-anchor="middle">Opik LLM Server</text>
-      <text x="72" y="32" fill="#7c3aed" font-size="9" font-family="monospace" text-anchor="middle">LISTEN: :32173</text>
-      <text x="72" y="48" fill="#4b5563" font-size="9" text-anchor="middle">Evaluations & Traces</text>
+    <!-- Node 11: Opik LLM Platform (Direct SDK / REST Tracing & Evaluation) -->
+    <g transform="translate(945, 235)">
+      <rect width="180" height="85" rx="6" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="90" y="20" fill="#111827" font-size="11" font-weight="700" text-anchor="middle">Opik Platform (:32173)</text>
+      <text x="90" y="36" fill="#7c3aed" font-size="9" font-family="monospace" font-weight="600" text-anchor="middle">FEED: Direct Opik SDK / REST</text>
+      <text x="90" y="52" fill="#4b5563" font-size="9" text-anchor="middle">LLM Spans & Trace UI</text>
+      <text x="90" y="68" fill="#059669" font-size="9" font-family="monospace" text-anchor="middle">Automated Eval Scoring</text>
     </g>
   </svg>
 
@@ -2095,13 +2140,13 @@ TOPOLOGY_MAP_HTML = """<div style="background:#f9fafb;border:1.5px solid #e5e7eb
     <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
       <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#d97706;display:inline-block;"></span>User Ingress (:8080)</span>
       <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#4f46e5;display:inline-block;"></span>Engine API (:8030)</span>
-      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#7c3aed;display:inline-block;"></span>Peer Shard Ring (:8081)</span>
-      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#059669;display:inline-block;"></span>vmagent Scrapes (:8429)</span>
-      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#0284c7;display:inline-block;"></span>Central TSDB (:8428)</span>
-      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#0f172a;display:inline-block;"></span>Central System Anchor</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#7c3aed;display:inline-block;"></span>Direct Opik SDK (:32173)</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#0284c7;display:inline-block;"></span>OTLP Collector (:4318)</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#059669;display:inline-block;"></span>vmagent -> TSDB (:8428)</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#0f172a;display:inline-block;"></span>Central Repository</span>
     </div>
     <div style="font-family:monospace;font-size:11px;color:#111827;font-weight:600;">
-      Config Seams: deploy/standalone/edge.env · deploy/docker-compose.yml · deploy/k8s/configmap.yaml
+      Config Seams: cluster/mlx_monitoring_bundle/config/components.yml · deploy/docker-compose.yml
     </div>
   </div>
 </div>"""
@@ -2111,47 +2156,47 @@ def build_network_topology() -> Dict[str, Any]:
         # Row 1: Stat Cards (y=0, h=4)
         make_stat_panel(
             1, "Monitored endpoints", 0, 0, 4, 4,
-            "count(up == 1) or vector(8)",
+            "count(up == 1)",
             description="Active Prometheus/VictoriaMetrics scrape endpoints across cluster",
         ),
         make_stat_panel(
             2, "Proxy ingress rate", 4, 0, 4, 4,
-            "sum(rate(mlx_requests_total[1m])) or vector(14.2)",
+            "sum(rate(mlx_requests_total[1m]))",
             unit="reqps", decimals=1,
             description="Inbound user request rate on edge proxy port (:8080)",
         ),
         make_stat_panel(
             3, "Physical NIC throughput", 8, 0, 4, 4,
-            "sum(rate(mlx_net_rx_bytes_total[1m])) or vector(1250000)",
+            "sum(rate(mlx_net_rx_bytes_total[1m]))",
             unit="Bps", decimals=1,
             description="Real-time RX byte rate over primary network interface (en1 / eth0)",
         ),
         make_stat_panel(
             4, "Forwarding errors", 12, 0, 4, 4,
-            "sum(rate(mlx_requests_total{code=~\"50[24]\"}[5m])) or vector(0)",
+            "sum(rate(mlx_error_total{status=\"5xx\"}[5m]))",
             description="Proxy-to-engine upstream connection failures or 502/504 errors",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 0.1}],
         ),
         make_stat_panel(
             5, "Wildcard 0.0.0.0 binds", 16, 0, 4, 4,
-            "count(mlx_server_listen_address{address=\"0.0.0.0\"}) or vector(0)",
+            "count(mlx_server_listen_address{address=\"0.0.0.0\"})",
             description="Audit alert: count of services bound to prohibited 0.0.0.0 address",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 1}],
         ),
         make_stat_panel(
             6, "Peer probe RTT (p95)", 20, 0, 4, 4,
-            "avg(mlx_shard_peer_rtt_seconds) or vector(0.001)",
+            "avg(mlx_shard_peer_connect_seconds)",
             unit="s", decimals=3,
             description="Round-trip TCP probe latency across distributed cluster interconnect",
             thresholds=[{"color": "green", "value": None}, {"color": "yellow", "value": 0.005}, {"color": "red", "value": 0.02}],
         ),
 
-        # Row 2: Live Visual Network Topology & Component Map (Hero Panel, y=4, h=14, w=24)
-        make_text_panel(
-            7, "Component interconnect & listening port topology", 0, 4, 24, 14,
-            TOPOLOGY_MAP_HTML,
-            mode="html",
-            description="Interactive network map showing components, listening interfaces, forwarding ports, and live traffic flows",
+        # Row 2: Live Dynamic Node Graph Visualization (Hero Panel, y=4, h=14, w=24)
+        make_nodegraph_panel(
+            7, "Dynamic telemetry & component topology (Native Node Graph)", 0, 4, 24, 14,
+            make_target("mlx_topology_node_info{device=~\"$device\"} or (1 * mlx_server_state{device=~\"$device\"})", legend="Node: {{name}} ({{device}})"),
+            make_target("mlx_topology_edge_info or (1 * mlx_shard_peer_up)", legend="Edge: {{source}} -> {{target}}"),
+            description="Native Grafana Node Graph rendering real-time nodes, listening sockets, forwarding hops, and telemetry pipelines with click-to-inspect drawers",
         ),
 
         # Row 3: Physical Interface Throughput & Error Rate (y=18, h=8)
@@ -2166,8 +2211,8 @@ def build_network_topology() -> Dict[str, Any]:
         make_timeseries_panel(
             9, "Interface packet errors & drops by interface", 12, 18, 12, 8,
             [
-                make_target("sum by (iface, device) (rate(mlx_net_rx_errors_total{device=~\"$device\"}[1m])) or vector(0)", legend="{{device}} [{{iface}}] - RX Errors"),
-                make_target("sum by (iface, device) (rate(mlx_net_tx_errors_total{device=~\"$device\"}[1m])) or vector(0)", legend="{{device}} [{{iface}}] - TX Errors"),
+                make_target("sum by (iface, device) (rate(mlx_net_rx_errors_total{device=~\"$device\"}[1m]))", legend="{{device}} [{{iface}}] - RX Errors"),
+                make_target("sum by (iface, device) (rate(mlx_net_tx_errors_total{device=~\"$device\"}[1m]))", legend="{{device}} [{{iface}}] - TX Errors"),
             ],
             unit="pps", description="Hardware interface drop and error rates; flags faulty cables, Wi-Fi interference, or saturated links",
             thresholds=[{"color": "green", "value": None}, {"color": "red", "value": 0.01}],
@@ -2177,10 +2222,9 @@ def build_network_topology() -> Dict[str, Any]:
         make_table_panel(
             10, "Service listening & forwarding registry (Multi-Mode)", 0, 26, 24, 9,
             [
-                make_target("up or vector(1)", legend="Active Scrape: {{service}} ({{instance}})", instant=True),
-                make_target("mlx_server_state or vector(1)", legend="MLX Engine | Listen: 127.0.0.1:8030 (lo0) | Upstream: None | Config: edge.env:MLX_SERVER_PORT / deploy/k8s/configmap.yaml", instant=True),
-                make_target("sum by (iface) (mlx_net_rx_bytes_total) or vector(1)", legend="Active Physical Interface: {{iface}} (192.168.1.64) | Config: edge.env:MLX_NET_IFACE", instant=True),
-                make_target("mlx_server_listen_address or vector(1)", legend="Service Address Audit | Target: {{device}}", instant=True),
+                make_target("up", legend="Active Scrape: {{job}} ({{instance}})", instant=True),
+                make_target("mlx_server_state", legend="MLX Engine State ({{device}})", instant=True),
+                make_target("sum by (iface) (mlx_net_rx_bytes_total)", legend="Active Physical Interface: {{iface}} | Config: edge.env:MLX_NET_IFACE", instant=True),
             ],
             description="Audit registry of listening interfaces, ports, forwarding destinations, and configuration sources",
             drilldown_url="/d/mlx-mon-per-device-detail?var-device=${__data.fields.device}",
@@ -2191,10 +2235,10 @@ def build_network_topology() -> Dict[str, Any]:
         make_timeseries_panel(
             11, "Traffic throughput by hop", 0, 35, 12, 8,
             [
-                make_target("sum(rate(mlx_requests_total[1m])) or vector(14.2)", legend="Hop 1: Ingress Client -> Proxy (:8080)"),
-                make_target("sum(rate(mlx_requests_total{kind=\"eval\"}[1m])) or vector(14.1)", legend="Hop 2: Proxy -> Upstream Engine (:8030)"),
-                make_target("sum(rate(mlx_tokens_prompt_total[1m]) + rate(mlx_tokens_generation_total[1m])) or vector(120)", legend="Hop 3: Model Engine Token Flow (:8030)"),
-                make_target("sum(rate(scrape_samples_scraped[1m])) or count(up == 1) * 2", legend="Hop 4: Scrapes -> vmagent (:8429) -> TSDB (:8428)"),
+                make_target("sum(rate(mlx_requests_total[1m]))", legend="Hop 1: Ingress Client -> Proxy (:8080)"),
+                make_target("sum(rate(mlx_requests_total{kind=~\"chat|reasoning|eval\"}[1m]))", legend="Hop 2: Proxy Forwarding -> Engine (:8030)"),
+                make_target("sum(rate(mlx_tokens_prompt_total[1m]) + rate(mlx_tokens_completion_total[1m]))", legend="Hop 3: Model Engine Token Flow (tokens/s)"),
+                make_target("sum(rate(scrape_samples_scraped[1m]))", legend="Hop 4: Exporter Scrapes -> vmagent -> TSDB"),
             ],
             unit="reqps", description="Hop-by-hop throughput: ingress, forwarding, model generation, and telemetry",
         ),
@@ -2202,35 +2246,90 @@ def build_network_topology() -> Dict[str, Any]:
             12, "Service reachability & interconnect timeline", 12, 35, 12, 8,
             [
                 make_target("up{device=~\"$device\"}", legend="{{job}} ({{instance}})"),
-                make_target("mlx_server_state{device=~\"$device\"} or vector(1)", legend="Engine State ({{device}})"),
+                make_target("mlx_server_state{device=~\"$device\"}", legend="Engine State ({{device}})"),
             ],
             description="Real-time connectivity and status across all cluster services and exporters",
         ),
 
         # Row 6: Security Audit & Multi-Mode Config Reference (y=43, h=8)
         make_table_panel(
-            13, "Wildcard 0.0.0.0 & network path compliance audit", 0, 43, 12, 8,
+            13, "Wildcard 0.0.0.0 & service error audit", 0, 43, 12, 8,
             [
-                make_target("mlx_server_listen_address{address=\"0.0.0.0\"} or (0 * mlx_server_up)", legend="Prohibited 0.0.0.0 Bind: {{device}} | Fix in: edge.env / deploy/k8s/configmap.yaml", instant=True),
-                make_target("mlx_server_listen_address{address=~\"100\\\\..*\"} or vector(0)", legend="Prohibited Tailscale Route Leak: {{device}} | Fix in: nodes.yml:devices[].ip", instant=True),
-                make_target("mlx_proxy_upstream_errors_total or vector(0)", legend="Proxy Upstream Forward Failures (502/504) | Fix in: edge.env:MLX_UPSTREAM", instant=True),
+                make_target("mlx_server_listen_address{address=\"0.0.0.0\"}", legend="Prohibited 0.0.0.0 Bind: {{device}} | Fix in: edge.env / deploy/k8s/configmap.yaml", instant=True),
+                make_target("sum by (device) (rate(mlx_error_total{device=~\"$device\"}[1m]))", legend="Proxy Forwarding Errors (5xx): {{device}}", instant=True),
+                make_target("sum by (device) (mlx_server_crashes_total{device=~\"$device\"})", legend="Server Engine Crashes: {{device}}", instant=True),
+                make_target("sum by (device) (rate(mlx_server_restarts_total{device=~\"$device\"}[5m]))", legend="Server Restarts Rate: {{device}}", instant=True),
             ],
-            description="Flags prohibited 0.0.0.0 wildcard binds, DERP Tailscale leaks, and upstream forwarding breaks with exact file remediation",
+            description="Flags prohibited 0.0.0.0 wildcard binds, upstream forwarding errors, unexpected server crashes, and frequent restart events across cluster nodes",
         ),
         make_table_panel(
-            14, "Exporter & collector reachability status", 12, 43, 12, 8,
+            14, "Active topology discrepancies & scrape health", 12, 43, 12, 8,
             [
-                make_target("up or vector(1)", legend="Job: {{job}} | Instance: {{instance}}", instant=True),
-                make_target("scrape_duration_seconds or vector(0.005)", legend="Scrape Latency (s)", instant=True),
+                make_target("mlx_topology_discrepancies_total or (0 * up)", legend="Active Discrepancy: {{device}} [{{issue}}]", instant=True),
+                make_target("up", legend="Job: {{job}} | Instance: {{instance}}", instant=True),
+                make_target("scrape_duration_seconds", legend="Scrape Latency (s)", instant=True),
             ],
-            description="Real-time scrape health and duration for all cluster exporter targets",
+            description="Real-time scrape health and dynamic reconciliation discrepancies across all fleet nodes",
         ),
+
+        # Row 7: Architecture Reference & Multi-Mode Manifest Inspector (y=51, h=14, w=24)
+        make_text_panel(
+            15, "Architecture reference & listening port topology (Multi-Mode)", 0, 51, 24, 14,
+            TOPOLOGY_MAP_HTML,
+            mode="html",
+            description="Reference architecture blueprint, listening port topology, and manifest inspector across Standalone VM, Compose, and Kubernetes",
+        ),
+    ]
+    scope_var = {
+        "name": "scope",
+        "label": "Navigation Level",
+        "type": "custom",
+        "options": [
+            {"text": "Fleet Overview", "value": "fleet", "selected": True},
+            {"text": "Device Detail", "value": "device", "selected": False},
+            {"text": "Pipeline Investigation", "value": "pipeline", "selected": False},
+        ],
+        "current": {"text": "Fleet Overview", "value": "fleet", "selected": True},
+    }
+    custom_vars = [
+        {
+            "name": "device",
+            "label": "Device",
+            "type": "query",
+            "datasource": DS_VM,
+            "definition": "label_values(mlx_hw_up, device)",
+            "query": "label_values(mlx_hw_up, device)",
+            "regex": "",
+            "includeAll": True,
+            "multi": True,
+            "allValue": ".*",
+            "current": {"selected": True, "text": "All", "value": "$__all"},
+            "refresh": 1,
+            "sort": 1,
+        },
+        scope_var,
+        {
+            "name": "model",
+            "label": "Model",
+            "type": "query",
+            "datasource": DS_VM,
+            "definition": "label_values(mlx_requests_total, model)",
+            "query": "label_values(mlx_requests_total, model)",
+            "regex": "",
+            "includeAll": True,
+            "multi": True,
+            "allValue": ".*",
+            "current": {"selected": True, "text": "All", "value": "$__all"},
+            "refresh": 1,
+            "sort": 1,
+        },
     ]
     return make_dashboard(
         "mlx-network-topology",
         "Network Topology",
-        "Service-to-service ingress, listening and forwarding ports, peer interconnects, and misconfiguration detection",
+        "Dynamic Node Graph visualization, listening and forwarding ports, peer interconnects, and automated reconciliation",
         panels,
+        variables=custom_vars,
     )
 
 def main():

@@ -272,7 +272,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_kv_cache_utilization{device=~\"$device\"} * 100) or vector(0)",
+          "expr": "(mlx_kv_cache_utilization{device=~\"$device\"} * 100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -343,7 +343,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mlx_kv_cache_sequences{device=~\"$device\"}) or vector(0)",
+          "expr": "sum(mlx_kv_cache_sequences{device=~\"$device\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -405,7 +405,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "max(mlx_context_length_max_tokens{device=~\"$device\"}) or mlx_model_info{attr=\"sliding_window\", device=~\"$device\"} or vector(32768)",
+          "expr": "max(mlx_context_length_max_tokens{device=~\"$device\"}) or mlx_model_info{attr=\"sliding_window\", device=~\"$device\"}",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -467,7 +467,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"}) or sum(mlx_kv_cache_used_bytes{device=~\"$device\"}) or vector(0)",
+          "expr": "sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -529,7 +529,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"} or mlx_kv_cache_used_bytes{device=~\"$device\"}) / (max(mlx_kv_bytes_per_head{device=~\"$device\"} or mlx_model_info{attr=\"max_context_tokens\", device=~\"$device\"}) > 0)) * 100) or vector(0)",
+          "expr": "((sum(mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"}) / (max(mlx_kv_bytes_per_head{device=~\"$device\"} or mlx_model_info{attr=\"max_context_tokens\", device=~\"$device\"}) > 0)) * 100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -592,7 +592,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_kv_cache_exactness{device=~\"$device\"} or vector(1)",
+          "expr": "mlx_kv_cache_shard_exact{device=~\"$device\"}",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -668,7 +668,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((mlx_kv_cache_utilization{device=~\"$device\"} * 100)) or (0 * count by (device) (mlx_hw_up{device=~\"$device\"}))",
+          "expr": "(mlx_kv_cache_utilization{device=~\"$device\"} * 100) or (0 * count by (device) (mlx_hw_up{device=~\"$device\"}))",
           "legendFormat": "Utilization %",
           "range": true,
           "instant": false,
@@ -846,7 +846,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_kv_cache_capacity_bytes{device=~\"$device\"} or vector(34359738368)",
+          "expr": "mlx_kv_cache_capacity_bytes_shard{device=~\"$device\"}",
           "legendFormat": "Capacity Bytes",
           "range": false,
           "instant": true,
@@ -859,7 +859,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"} or mlx_kv_cache_used_bytes{device=~\"$device\"}",
+          "expr": "mlx_kv_cache_bytes{device=~\"$device\", type=\"total\"}",
           "legendFormat": "Used Bytes",
           "range": false,
           "instant": true,
@@ -872,7 +872,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_kv_cache_utilization{device=~\"$device\"} * 100) or vector(0)",
+          "expr": "(mlx_kv_cache_utilization{device=~\"$device\"} * 100)",
           "legendFormat": "Util %",
           "range": false,
           "instant": true,
@@ -961,7 +961,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_kv_cache_exactness{device=~\"$device\"} or vector(1)",
+          "expr": "mlx_kv_cache_shard_exact{device=~\"$device\"}",
           "legendFormat": "Exactness",
           "range": false,
           "instant": true,

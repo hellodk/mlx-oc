@@ -272,7 +272,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mac_sbom_total_packages{device=~\"$device\"}) or count(mac_sbom_package_info{device=~\"$device\"}) or vector(12846)",
+          "expr": "sum(mac_sbom_total_packages{device=~\"$device\"}) or count(mac_sbom_package_info{device=~\"$device\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -340,7 +340,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"pip|python\"}) or vector(6214)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"pip|python\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -402,7 +402,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"}) or vector(1982)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -464,7 +464,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"system\"}) or vector(4031)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"system\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -526,7 +526,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or count(count by (model) (mlx_model_info{device=~\"$device\"})) or vector(619)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or count(count by (model) (mlx_model_info{device=~\"$device\"}))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -594,7 +594,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"pip|python\"}) or vector(6214)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"pip|python\"})",
           "legendFormat": "pip",
           "range": true,
           "instant": false,
@@ -607,7 +607,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"}) or vector(1982)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=~\"homebrew|brew\"})",
           "legendFormat": "brew",
           "range": true,
           "instant": false,
@@ -620,7 +620,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"system\"}) or vector(4031)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"system\"})",
           "legendFormat": "system",
           "range": true,
           "instant": false,
@@ -633,7 +633,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"}) or vector(619)",
+          "expr": "count(mac_sbom_package_info{device=~\"$device\", ecosystem=\"model\"})",
           "legendFormat": "model",
           "range": true,
           "instant": false,
@@ -848,7 +848,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(time() - mac_sbom_last_scan_timestamp_seconds{device=~\"$device\"}) or vector(120)",
+          "expr": "(time() - mac_sbom_last_scan_timestamp_seconds{device=~\"$device\"})",
           "legendFormat": "Age (s)",
           "range": false,
           "instant": true,
@@ -861,7 +861,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mac_sbom_collector_status{device=~\"$device\"} or vector(1)",
+          "expr": "mac_sbom_collector_up{device=~\"$device\"}",
           "legendFormat": "Collector Status",
           "range": false,
           "instant": true,

@@ -272,7 +272,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mlx_hw_gpu_power_milliwatts{device=~\"$device\"}) / 1000 or vector(28.4)",
+          "expr": "sum(mlx_hw_gpu_power_milliwatts{device=~\"$device\"}) / 1000",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -335,7 +335,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(mlx_hw_package_power_milliwatts{device=~\"$device\"}) / 1000 or vector(61.2)",
+          "expr": "sum(mlx_hw_package_power_milliwatts{device=~\"$device\"}) / 1000",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -398,7 +398,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "max(mlx_hw_thermal_pressure{device=~\"$device\"}) or vector(0)",
+          "expr": "max(mlx_hw_thermal_pressure{device=~\"$device\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -468,7 +468,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(mlx_hw_gpu_utilization_percent{device=~\"$device\"}) or vector(72)",
+          "expr": "avg(mlx_hw_gpu_utilization_percent{device=~\"$device\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -531,7 +531,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "max(mlx_hw_cpu_temp_celsius{device=~\"$device\"}) or vector(72)",
+          "expr": "max(mlx_hw_cpu_temp_celsius{device=~\"$device\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -602,7 +602,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(avg(mlx_hw_gpu_frequency_mhz{device=~\"$device\"}) / 1000) or vector(1.28)",
+          "expr": "(avg(mlx_hw_gpu_frequency_mhz{device=~\"$device\"}) / 1000)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -665,7 +665,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_package_power_milliwatts{device=~\"$device\"} / 1000 or vector(61.2)",
+          "expr": "mlx_hw_package_power_milliwatts{device=~\"$device\"} / 1000",
           "legendFormat": "{{device}} Package (W)",
           "range": true,
           "instant": false,
@@ -678,7 +678,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_gpu_power_milliwatts{device=~\"$device\"} / 1000 or vector(28.4)",
+          "expr": "mlx_hw_gpu_power_milliwatts{device=~\"$device\"} / 1000",
           "legendFormat": "{{device}} GPU (W)",
           "range": true,
           "instant": false,
@@ -691,7 +691,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_cpu_power_milliwatts{device=~\"$device\"} / 1000 or vector(22.1)",
+          "expr": "mlx_hw_cpu_power_milliwatts{device=~\"$device\"} / 1000",
           "legendFormat": "{{device}} CPU (W)",
           "range": true,
           "instant": false,
@@ -704,7 +704,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_ane_power_milliwatts{device=~\"$device\"} / 1000 or vector(6.4)",
+          "expr": "mlx_hw_ane_power_milliwatts{device=~\"$device\"} / 1000",
           "legendFormat": "{{device}} ANE (W)",
           "range": true,
           "instant": false,
@@ -780,7 +780,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_cpu_temp_celsius{device=~\"$device\"} or vector(72)",
+          "expr": "mlx_hw_cpu_temp_celsius{device=~\"$device\"}",
           "legendFormat": "{{device}} CPU Temp (\u00b0C)",
           "range": true,
           "instant": false,
@@ -793,7 +793,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_gpu_temp_celsius{device=~\"$device\"} or vector(74)",
+          "expr": "mlx_hw_cpu_temp_celsius{device=~\"$device\"}",
           "legendFormat": "{{device}} GPU Temp (\u00b0C)",
           "range": true,
           "instant": false,
@@ -869,7 +869,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_hw_gpu_frequency_mhz{device=~\"$device\"} / 1000) or vector(1.28)",
+          "expr": "(mlx_hw_gpu_frequency_mhz{device=~\"$device\"} / 1000)",
           "legendFormat": "{{device}} GPU Clock (GHz)",
           "range": true,
           "instant": false,
@@ -882,7 +882,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_gpu_utilization_percent{device=~\"$device\"} or vector(72)",
+          "expr": "mlx_hw_gpu_utilization_percent{device=~\"$device\"}",
           "legendFormat": "{{device}} GPU Residency %",
           "range": true,
           "instant": false,
@@ -958,7 +958,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_thermal_pressure{device=~\"$device\"} or vector(0)",
+          "expr": "mlx_hw_thermal_pressure{device=~\"$device\"}",
           "legendFormat": "Thermal State",
           "range": false,
           "instant": true,
@@ -971,7 +971,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_gpu_power_milliwatts{device=~\"$device\"} / 1000 or vector(28.4)",
+          "expr": "mlx_hw_gpu_power_milliwatts{device=~\"$device\"} / 1000",
           "legendFormat": "GPU Power (W)",
           "range": false,
           "instant": true,
@@ -984,7 +984,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_hw_package_power_milliwatts{device=~\"$device\"} / 1000 or vector(61.2)",
+          "expr": "mlx_hw_package_power_milliwatts{device=~\"$device\"} / 1000",
           "legendFormat": "Package Power (W)",
           "range": false,
           "instant": true,

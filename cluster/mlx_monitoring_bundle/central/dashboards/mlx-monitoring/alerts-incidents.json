@@ -272,7 +272,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(ALERTS{alertstate=\"firing\", severity=\"critical\"}) or vector(0)",
+          "expr": "count(ALERTS{alertstate=\"firing\", severity=\"critical\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -344,7 +344,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(ALERTS{alertstate=\"firing\", severity=\"warning\"}) or vector(0)",
+          "expr": "count(ALERTS{alertstate=\"firing\", severity=\"warning\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -416,7 +416,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(ALERTS{alertstate=\"firing\"}) or vector(0)",
+          "expr": "count(ALERTS{alertstate=\"firing\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -486,7 +486,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(count by (device) (ALERTS{alertstate=\"firing\"})) or vector(0)",
+          "expr": "count(count by (device) (ALERTS{alertstate=\"firing\"}))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -562,7 +562,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(sum(changes(ALERTS{alertstate=\"firing\"}[24h])) - count(ALERTS{alertstate=\"firing\"})) or vector(0)",
+          "expr": "(sum(changes(ALERTS{alertstate=\"firing\"}[24h])) - count(ALERTS{alertstate=\"firing\"}))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -765,7 +765,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(ALERTS{alertstate=\"firing\", severity=\"critical\"}) or vector(0)",
+          "expr": "count(ALERTS{alertstate=\"firing\", severity=\"critical\"})",
           "legendFormat": "Critical",
           "range": true,
           "instant": false,
@@ -778,7 +778,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(ALERTS{alertstate=\"firing\", severity=\"warning\"}) or vector(0)",
+          "expr": "count(ALERTS{alertstate=\"firing\", severity=\"warning\"})",
           "legendFormat": "Warning",
           "range": true,
           "instant": false,
@@ -791,7 +791,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(ALERTS{alertstate=\"firing\", severity=~\"info|none\"}) or vector(0)",
+          "expr": "count(ALERTS{alertstate=\"firing\", severity=~\"info|none\"})",
           "legendFormat": "Info",
           "range": true,
           "instant": false,

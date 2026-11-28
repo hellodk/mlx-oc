@@ -65,7 +65,6 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin123
-      - GF_PANELS_DISABLE_SANITIZE_HTML=true
       - GF_USERS_DEFAULT_THEME=light
       - GF_USERS_DEFAULT_TIMEZONE=Asia/Kolkata
     volumes:

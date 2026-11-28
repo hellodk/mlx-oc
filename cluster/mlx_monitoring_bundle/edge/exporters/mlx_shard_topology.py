@@ -894,7 +894,7 @@ def probe_peer_app(
                     if len(parts) >= 2 and parts[0].startswith("HTTP/") and parts[1].isdigit():
                         status_code = int(parts[1])
                         is_http = True
-                is_up = is_http and (100 <= status_code < 600)
+                is_up = is_http and (200 <= status_code < 400)
                 status[(pr, pip)] = PeerAppResult(
                     up=is_up,
                     app_rtt_seconds=elapsed if is_up else 0.0,

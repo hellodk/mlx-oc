@@ -272,7 +272,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(increase(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1h])) or vector(12400)",
+          "expr": "sum(increase(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1h]))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -334,7 +334,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(increase(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[1h])) or vector(12100)",
+          "expr": "sum(increase(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[1h]))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -396,7 +396,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((sum(rate(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[5m])) / (sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[5m])) > 0)) * 100) or vector(97.6)",
+          "expr": "((sum(rate(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[5m])) / (sum(rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[5m])) > 0)) * 100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -459,7 +459,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(mlx_judge_score{model=~\"$model\"}) or vector(0.943)",
+          "expr": "avg(mlx_judge_score{model=~\"$model\"})",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -530,7 +530,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(time() - max(mlx_eval_last_run_timestamp_seconds{model=~\"$model\"})) or vector(120)",
+          "expr": "(time() - max(mlx_eval_last_run_timestamp_seconds{model=~\"$model\"}))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -601,7 +601,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m]) or vector(0)",
+          "expr": "rate(mlx_requests_total{device=~\"$device\", model=~\"$model\"}[1m])",
           "legendFormat": "Requests/s",
           "range": true,
           "instant": false,
@@ -614,7 +614,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "rate(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[1m]) or vector(0)",
+          "expr": "rate(mlx_confidence_scored_total{device=~\"$device\", model=~\"$model\"}[1m])",
           "legendFormat": "Scored traces/s",
           "range": true,
           "instant": false,
@@ -690,7 +690,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_token_confidence_mean{device=~\"$device\", model=~\"$model\"} or vector(0.92)",
+          "expr": "mlx_token_confidence_mean{device=~\"$device\", model=~\"$model\"}",
           "legendFormat": "Logprob Mean Confidence",
           "range": true,
           "instant": false,
@@ -703,7 +703,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "avg(mlx_judge_score{model=~\"$model\"}) or vector(0.943)",
+          "expr": "avg(mlx_judge_score{model=~\"$model\"})",
           "legendFormat": "LLM Judge Average Score",
           "range": true,
           "instant": false,
@@ -779,7 +779,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_judge_score{model=~\"$model\"} or vector(0.95)",
+          "expr": "mlx_judge_score{model=~\"$model\"}",
           "legendFormat": "Criteria: {{criteria}}",
           "range": false,
           "instant": true,
@@ -792,7 +792,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_confidence_scored_total{model=~\"$model\"} or vector(12100)",
+          "expr": "mlx_confidence_scored_total{model=~\"$model\"}",
           "legendFormat": "Scored Total",
           "range": false,
           "instant": true,
@@ -855,7 +855,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_eval_last_run_timestamp_seconds{model=~\"$model\"} or vector(1795629000)",
+          "expr": "mlx_eval_last_run_timestamp_seconds{model=~\"$model\"}",
           "legendFormat": "Last Run",
           "range": false,
           "instant": true,
@@ -868,8 +868,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_eval_interval_seconds{model=~\"$model\"} or vector(60)",
-          "legendFormat": "Interval (s)",
+          "expr": "mlx_accuracy_eval_up",
+          "legendFormat": "Evaluator Running",
           "range": false,
           "instant": true,
           "refId": "B",

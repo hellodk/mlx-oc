@@ -384,7 +384,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_net_rx_errors_total{device=~\"$device\"}[1m])) or vector(0)",
+          "expr": "sum(rate(mlx_net_rx_errors_total{device=~\"$device\"}[1m]))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -450,7 +450,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_net_tx_errors_total{device=~\"$device\"}[1m])) or vector(0)",
+          "expr": "sum(rate(mlx_net_tx_errors_total{device=~\"$device\"}[1m]))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -516,7 +516,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "((count((mlx_shard_peer_up == 1) or (mlx_shard_peer_probe_status == 1)) / (count(mlx_shard_peer_up or mlx_shard_peer_probe_status) > 0)) * 100) or vector(100)",
+          "expr": "((count((mlx_shard_peer_up == 1) or (mlx_shard_peer_probe_status == 1)) / (count(mlx_shard_peer_up or mlx_shard_peer_probe_status) > 0)) * 100)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -593,7 +593,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(mlx_shard_peer_connect_seconds_bucket[5m])) by (le)) or histogram_quantile(0.95, sum(rate(mlx_shard_peer_rtt_seconds_bucket[5m])) by (le)) or vector(0.001)",
+          "expr": "histogram_quantile(0.95, sum(rate(mlx_shard_peer_connect_seconds_bucket[5m])) by (le)) or histogram_quantile(0.95, sum(rate(mlx_shard_peer_app_rtt_seconds_bucket[5m])) by (le))",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -842,7 +842,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_shard_peer_up{device=~\"$device\"} or mlx_shard_peer_probe_status{device=~\"$device\"}) or vector(1)",
+          "expr": "(mlx_shard_peer_up{device=~\"$device\"} or mlx_shard_peer_probe_status{device=~\"$device\"})",
           "legendFormat": "Status (1=Up, 0=Down)",
           "range": false,
           "instant": true,
@@ -855,7 +855,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "(mlx_shard_peer_connect_seconds{device=~\"$device\"} or mlx_shard_peer_rtt_seconds{device=~\"$device\"}) or vector(0.001)",
+          "expr": "(mlx_shard_peer_connect_seconds{device=~\"$device\"} or mlx_shard_peer_app_rtt_seconds{device=~\"$device\"})",
           "legendFormat": "RTT (s)",
           "range": false,
           "instant": true,
