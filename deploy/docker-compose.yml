@@ -1,0 +1,79 @@
+version: "3.8"
+
+services:
+  mlx-engine:
+    image: ghcr.io/hellodk/mlx-engine:latest
+    container_name: mlx-engine
+    restart: unless-stopped
+    environment:
+      - MLX_MODEL=${MLX_MODEL:-mlx-community/Qwen2.5-0.5B-Instruct-4bit}
+      - MLX_LISTEN_HOST=0.0.0.0
+      - MLX_SERVER_PORT=8030
+    ports:
+      - "${MLX_ENGINE_PORT:-8030}:8030"
+    networks:
+      - mlx-net
+
+  mlx-proxy:
+    image: ghcr.io/hellodk/mlx-proxy:latest
+    container_name: mlx-proxy
+    restart: unless-stopped
+    depends_on:
+      - mlx-engine
+    environment:
+      - MLX_LISTEN_HOST=0.0.0.0
+      - MLX_PROXY_PORT=8080
+      - MLX_UPSTREAM=http://mlx-engine:8030
+      - MLX_OTLP_ENDPOINT=http://central-otelcol:4318
+      - MLX_OPIK_ENDPOINT=http://central-opik:32173
+    ports:
+      - "${MLX_PROXY_PORT:-8080}:8080"
+    networks:
+      - mlx-net
+
+  vmagent:
+    image: victoriametrics/vmagent:v1.155.0
+    container_name: mlx-vmagent
+    restart: unless-stopped
+    volumes:
+      - ./vmagent.yml:/etc/vmagent/vmagent.yml:ro
+    command:
+      - -promscrape.config=/etc/vmagent/vmagent.yml
+      - -remoteWrite.url=${VICTORIA_METRICS_URL:-http://central-victoriametrics:8428/api/v1/write}
+    ports:
+      - "8429:8429"
+    networks:
+      - mlx-net
+
+  central-victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.155.0
+    container_name: central-victoriametrics
+    restart: unless-stopped
+    ports:
+      - "8428:8428"
+    volumes:
+      - vm-data:/victoria-metrics-data
+    networks:
+      - mlx-net
+
+  central-grafana:
+    image: grafana/grafana:13.3.0
+    container_name: central-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - ../cluster/mlx_monitoring_bundle/central/config/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - ../cluster/mlx_monitoring_bundle/central/dashboards/mlx-monitoring:/etc/grafana/provisioning/dashboards/mlx-monitoring:ro
+    networks:
+      - mlx-net
+
+volumes:
+  vm-data:
+
+networks:
+  mlx-net:
+    driver: bridge

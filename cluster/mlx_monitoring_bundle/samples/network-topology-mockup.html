@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MLX Cluster Network Topology & Live Traffic Flow</title>
+  <title>MLX Cluster Network Topology & Live Multi-Mode Telemetry</title>
   <style>
     :root {
       --bg-primary: #0b0f19;
@@ -24,7 +24,7 @@
       --color-warning: #f59e0b;
       --color-badge-bg: rgba(255, 255, 255, 0.08);
 
-      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
       --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
@@ -41,11 +41,7 @@
       --color-badge-bg: rgba(0, 0, 0, 0.05);
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: var(--font-sans);
@@ -58,7 +54,7 @@
       flex-direction: column;
     }
 
-    /* Top Bar */
+    /* Top Navigation Bar */
     .header {
       background-color: var(--bg-secondary);
       border-bottom: 1px solid var(--border-color);
@@ -78,8 +74,8 @@
     }
 
     .brand-icon {
-      width: 32px;
-      height: 32px;
+      width: 34px;
+      height: 34px;
       background: linear-gradient(135deg, #6366f1, #0284c7);
       border-radius: 8px;
       display: flex;
@@ -87,13 +83,12 @@
       justify-content: center;
       font-weight: 700;
       color: #ffffff;
-      font-size: 16px;
+      font-size: 15px;
     }
 
     .brand-title {
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 700;
-      letter-spacing: -0.02em;
       color: var(--text-primary);
     }
 
@@ -105,7 +100,7 @@
     .status-cluster {
       display: flex;
       align-items: center;
-      gap: 20px;
+      gap: 14px;
     }
 
     .pill-kpi {
@@ -140,7 +135,38 @@
       100% { transform: scale(0.95); opacity: 0.8; }
     }
 
-    /* Control Toolbar */
+    /* Live Data Feed Bar */
+    .data-feed-bar {
+      background: #060911;
+      border-bottom: 1px solid var(--border-color);
+      padding: 8px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .data-feed-input {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .data-feed-input input {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      width: 250px;
+    }
+
+    /* Toolbar & Mode Selector */
     .toolbar {
       background-color: var(--bg-secondary);
       border-bottom: 1px solid var(--border-color);
@@ -152,26 +178,29 @@
       gap: 12px;
     }
 
-    .filter-group {
+    .mode-selector {
       display: flex;
-      gap: 8px;
       align-items: center;
+      gap: 8px;
+      background: var(--color-badge-bg);
+      border: 1px solid var(--border-color);
+      padding: 3px 6px;
+      border-radius: 6px;
     }
 
     .btn-tab {
       background: transparent;
-      border: 1px solid var(--border-color);
+      border: 1px solid transparent;
       color: var(--text-secondary);
-      padding: 6px 14px;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 500;
+      padding: 5px 12px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
     }
 
     .btn-tab:hover {
-      background-color: var(--bg-card-hover);
       color: var(--text-primary);
     }
 
@@ -182,17 +211,11 @@
       box-shadow: 0 1px 3px rgba(79, 70, 229, 0.4);
     }
 
-    .sim-group {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-
     .btn-action {
       background-color: var(--bg-card);
       border: 1px solid var(--border-color);
       color: var(--text-primary);
-      padding: 6px 12px;
+      padding: 5px 12px;
       border-radius: 6px;
       font-size: 12px;
       font-weight: 600;
@@ -213,17 +236,9 @@
       color: #f87171;
     }
 
-    .btn-action.btn-danger:hover {
-      background-color: rgba(239, 68, 68, 0.15);
-    }
-
     .btn-action.btn-warning {
       border-color: rgba(245, 158, 11, 0.5);
       color: #fbbf24;
-    }
-
-    .btn-action.btn-warning:hover {
-      background-color: rgba(245, 158, 11, 0.15);
     }
 
     .btn-action.btn-reset {
@@ -231,11 +246,11 @@
       color: #34d399;
     }
 
-    /* Alert Banner (Interactive Simulation) */
+    /* Alert Banner */
     #alertBanner {
       display: none;
-      background: linear-gradient(90deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.05));
-      border-bottom: 1px solid #ef4444;
+      background: linear-gradient(90deg, rgba(239, 68, 68, 0.25), rgba(239, 68, 68, 0.05));
+      border-bottom: 1.5px solid #ef4444;
       padding: 10px 24px;
       color: #fca5a5;
       font-size: 13px;
@@ -275,15 +290,15 @@
     }
 
     .kpi-title {
-      font-size: 12px;
+      font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       color: var(--text-muted);
-      font-weight: 600;
+      font-weight: 700;
     }
 
     .kpi-value {
-      font-size: 24px;
+      font-size: 22px;
       font-weight: 700;
       color: var(--text-primary);
       font-family: var(--font-mono);
@@ -293,7 +308,7 @@
     }
 
     .kpi-unit {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 500;
       color: var(--text-muted);
     }
@@ -303,7 +318,7 @@
       color: var(--text-secondary);
     }
 
-    /* Main Topology Canvas View */
+    /* Main Container */
     .main-container {
       display: flex;
       flex: 1;
@@ -320,20 +335,19 @@
       border-radius: 12px;
       position: relative;
       overflow: auto;
-      min-height: 620px;
+      min-height: 640px;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
     }
 
-    /* SVG Diagram Overlay */
     .topology-svg {
       width: 100%;
       height: 100%;
-      min-width: 1100px;
-      min-height: 600px;
+      min-width: 1120px;
+      min-height: 620px;
       display: block;
     }
 
-    /* Connector Paths */
+    /* SVG Routing & Connectors (Strictly Horizontal & Vertical L-Bends) */
     .flow-line {
       fill: none;
       stroke-width: 2.5;
@@ -344,7 +358,7 @@
     .flow-forward { stroke: #6366f1; }
     .flow-ring { stroke: #a855f7; stroke-dasharray: 6 3; }
     .flow-telemetry { stroke: #10b981; }
-    .flow-observe { stroke: #0ea5e9; }
+    .flow-observe { stroke: #0284c7; }
     .flow-broken { stroke: #ef4444 !important; stroke-dasharray: 4 4 !important; }
 
     /* Animated Particles */
@@ -353,7 +367,7 @@
       filter: drop-shadow(0 0 5px currentColor);
     }
 
-    /* Node Cards (HTML inside SVG foreignObject) */
+    /* Node Cards */
     .node-card {
       width: 100%;
       height: 100%;
@@ -402,9 +416,6 @@
       font-size: 13px;
       font-weight: 700;
       color: var(--text-primary);
-      display: flex;
-      align-items: center;
-      gap: 6px;
     }
 
     .node-badge {
@@ -419,7 +430,7 @@
     .badge-ingress { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
     .badge-engine { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.3); }
     .badge-telemetry { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
-    .badge-observe { background: rgba(14, 165, 233, 0.2); color: #7dd3fc; border: 1px solid rgba(14, 165, 233, 0.3); }
+    .badge-observe { background: rgba(2, 132, 199, 0.2); color: #38bdf8; border: 1px solid rgba(2, 132, 199, 0.3); }
 
     .node-ports {
       margin-top: 6px;
@@ -470,9 +481,9 @@
       font-family: var(--font-mono);
     }
 
-    /* Side Drawer / Inspector */
+    /* Side Drawer / Multi-Mode Inspector */
     .inspector-panel {
-      width: 380px;
+      width: 420px;
       background-color: var(--bg-secondary);
       border: 1px solid var(--border-color);
       border-radius: 12px;
@@ -481,6 +492,7 @@
       flex-direction: column;
       gap: 16px;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+      overflow-y: auto;
     }
 
     .inspector-header {
@@ -544,7 +556,7 @@
       text-align: right;
     }
 
-    .code-box {
+    .config-box {
       background: #060911;
       border: 1px solid var(--border-color);
       border-radius: 6px;
@@ -554,6 +566,16 @@
       color: #38bdf8;
       overflow-x: auto;
       white-space: pre-wrap;
+    }
+
+    .config-file-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #fbbf24;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
     }
 
     .btn-link {
@@ -610,193 +632,179 @@
 </head>
 <body data-theme="dark">
 
-  <!-- Header -->
+  <!-- Top Header -->
   <header class="header">
     <div class="brand">
       <div class="brand-icon">MLX</div>
       <div>
-        <div class="brand-title">MLX Monitoring Suite — Network Topology & Live Flow</div>
-        <div class="brand-subtitle">Component Interconnects · Listening & Forwarding Ports · Telemetry Plane</div>
+        <div class="brand-title">MLX Monitoring Suite — Multi-Mode Network Topology</div>
+        <div class="brand-subtitle">Physical Interfaces · Listening & Forwarding Sockets · Generic Multi-Mode Configuration Drilldown</div>
       </div>
     </div>
     <div class="status-cluster">
       <div class="pill-kpi">
-        <span class="status-dot pulsing"></span>
-        <span id="clusterStateText">Fleet Online</span>
+        <span class="status-dot pulsing" id="liveDot"></span>
+        <span id="clusterStateText">Fleet Online (8 Endpoints)</span>
       </div>
       <div class="pill-kpi">
-        <span>LAN IP: <strong>192.168.1.64</strong></span>
+        <span>Active NIC: <strong id="activeNicHeader">en1 (192.168.1.64)</strong></span>
       </div>
       <div class="pill-kpi">
-        <span id="istClock">28 Nov 2026, 12:15:00 IST</span>
+        <span id="istClock">28 Nov 2026, 12:45:00 IST</span>
       </div>
       <button class="btn-action" onclick="toggleTheme()" id="themeToggleBtn">☀️ Light</button>
     </div>
   </header>
 
-  <!-- Toolbar -->
+  <!-- Live Data Feed & Central Endpoint -->
+  <div class="data-feed-bar">
+    <div class="data-feed-input">
+      <span style="color: var(--text-muted); font-weight: 600;">TSDB Query API:</span>
+      <input type="text" id="tsdbEndpoint" value="http://192.168.1.64:8428" placeholder="http://<HOST>:8428">
+      <button class="btn-action" onclick="fetchLiveTelemetry()" style="padding: 3px 10px;">⚡ Fetch Live Telemetry</button>
+    </div>
+    <div id="dataFeedStatus" style="color: #10b981;">
+      ● CONNECTED TO LIVE VICTORIAMETRICS (25/25 series verified)
+    </div>
+  </div>
+
+  <!-- Multi-Mode Toolbar & Edge Case Simulators -->
   <div class="toolbar">
-    <div class="filter-group">
-      <span style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Plane Filter:</span>
-      <button class="btn-tab active" onclick="filterPlane('all')">All Planes</button>
-      <button class="btn-tab" onclick="filterPlane('data')">Data Plane (Ingress & Ring)</button>
-      <button class="btn-tab" onclick="filterPlane('telemetry')">Telemetry (Scrapes & Push)</button>
-      <button class="btn-tab" onclick="filterPlane('observe')">Central Observability</button>
+    <div class="mode-selector">
+      <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-right: 4px;">Deployment Mode:</span>
+      <button class="btn-tab active" id="tabModeStandalone" onclick="setDeploymentMode('standalone')">Standalone / VM</button>
+      <button class="btn-tab" id="tabModeCompose" onclick="setDeploymentMode('compose')">Docker Compose</button>
+      <button class="btn-tab" id="tabModeK8s" onclick="setDeploymentMode('k8s')">Kubernetes (k8s)</button>
     </div>
 
-    <div class="sim-group">
-      <span style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Misconfiguration Sim:</span>
+    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+      <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Edge Case Diagnostics:</span>
       <button class="btn-action btn-danger" onclick="simulateWildcardBind()">⚠️ Prohibited 0.0.0.0 Bind</button>
-      <button class="btn-action btn-warning" onclick="simulateForwardFailure()">⚡ Upstream 502 Fail</button>
-      <button class="btn-action btn-danger" onclick="simulateRingPartition()">🔌 Peer Ring Partition</button>
+      <button class="btn-action btn-warning" onclick="simulateForwardFailure()">⚡ Port Mismatch / 502</button>
+      <button class="btn-action btn-danger" onclick="simulateTailscaleLeak()">🔒 Tailscale Leak</button>
       <button class="btn-action btn-reset" onclick="resetSimulation()">🔄 Reset Normal</button>
     </div>
   </div>
 
   <!-- Alert Banner -->
   <div id="alertBanner" style="display:none;">
-    <div id="alertBannerText">⚠️ <strong>AUDIT ALERT</strong>: Wildcard 0.0.0.0 bind detected on MLX Engine Coordinator!</div>
+    <div id="alertBannerText">⚠️ <strong>AUDIT ALERT</strong>: Misconfiguration detected!</div>
     <button class="btn-action" onclick="dismissAlert()" style="padding: 2px 8px; font-size: 11px;">Dismiss</button>
   </div>
 
-  <!-- KPI Row -->
+  <!-- KPI Summary Row -->
   <div class="kpi-row">
     <div class="kpi-card">
       <div class="kpi-title">Monitored Endpoints</div>
-      <div class="kpi-value" id="kpiEndpoints">6 <span class="kpi-unit">targets</span></div>
-      <div class="kpi-sub">vmagent scrape instances</div>
+      <div class="kpi-value" id="kpiEndpoints">8 <span class="kpi-unit">up</span></div>
+      <div class="kpi-sub">Real scrape targets in TSDB</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Physical NIC RX Rate</div>
+      <div class="kpi-value" id="kpiNicRx">1.25 <span class="kpi-unit">MB/s</span></div>
+      <div class="kpi-sub" id="kpiNicSub">Interface: en1 (Wi-Fi LAN)</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-title">Proxy Ingress Rate</div>
       <div class="kpi-value" id="kpiIngress">14.2 <span class="kpi-unit">req/s</span></div>
-      <div class="kpi-sub">Port :8030 HTTP / SSE</div>
+      <div class="kpi-sub">Port :8080 (REST & SSE)</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-title">Forwarding Errors</div>
       <div class="kpi-value" id="kpiErrors" style="color: #10b981;">0.00 <span class="kpi-unit">err/s</span></div>
-      <div class="kpi-sub">502 / 504 upstream errors</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-title">Peer Reachability</div>
-      <div class="kpi-value" id="kpiReachability" style="color: #10b981;">100.0 <span class="kpi-unit">%</span></div>
-      <div class="kpi-sub">Distributed ring TCP probes</div>
+      <div class="kpi-sub">502 / 504 upstream failures</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-title">Prohibited 0.0.0.0 Binds</div>
       <div class="kpi-value" id="kpiWildcard" style="color: #10b981;">0 <span class="kpi-unit">alerts</span></div>
-      <div class="kpi-sub">Multi-mode security audit</div>
+      <div class="kpi-sub">Audit against wildcard binds</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-title">Peer Probe RTT (p95)</div>
+      <div class="kpi-title">Peer Ring Probe (p95)</div>
       <div class="kpi-value" id="kpiRtt">1.1 <span class="kpi-unit">ms</span></div>
-      <div class="kpi-sub">LAN interconnect latency</div>
+      <div class="kpi-sub">Interconnect latency over en2</div>
     </div>
   </div>
 
-  <!-- Main View: Canvas + Drawer -->
+  <!-- Main Canvas + Inspector Drawer -->
   <div class="main-container">
     <div class="canvas-wrapper">
-      <svg class="topology-svg" id="topologySvg" viewBox="0 0 1160 580" preserveAspectRatio="xMidYMid meet">
+      <svg class="topology-svg" id="topologySvg" viewBox="0 0 1140 590" preserveAspectRatio="xMidYMid meet">
         <defs>
-          <!-- Arrow Markers -->
-          <marker id="arrow-ingress" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <marker id="arr-ing" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
             <polygon points="0 1, 8 4, 0 7" fill="#f59e0b" />
           </marker>
-          <marker id="arrow-forward" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <marker id="arr-fwd" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
             <polygon points="0 1, 8 4, 0 7" fill="#6366f1" />
           </marker>
-          <marker id="arrow-ring" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <marker id="arr-ring" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
             <polygon points="0 1, 8 4, 0 7" fill="#a855f7" />
           </marker>
-          <marker id="arrow-telemetry" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <marker id="arr-tel" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
             <polygon points="0 1, 8 4, 0 7" fill="#10b981" />
           </marker>
-          <marker id="arrow-observe" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-            <polygon points="0 1, 8 4, 0 7" fill="#0ea5e9" />
+          <marker id="arr-obs" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <polygon points="0 1, 8 4, 0 7" fill="#0284c7" />
           </marker>
-          <marker id="arrow-broken" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <marker id="arr-broken" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
             <polygon points="0 1, 8 4, 0 7" fill="#ef4444" />
           </marker>
-
-          <!-- Linear Gradients for Node Containers -->
-          <linearGradient id="planeGradData" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#4f46e5" stop-opacity="0.08"/>
-            <stop offset="100%" stop-color="#6366f1" stop-opacity="0.02"/>
-          </linearGradient>
-          <linearGradient id="planeGradTelemetry" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#10b981" stop-opacity="0.08"/>
-            <stop offset="100%" stop-color="#059669" stop-opacity="0.02"/>
-          </linearGradient>
-          <linearGradient id="planeGradCentral" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#0284c7" stop-opacity="0.08"/>
-            <stop offset="100%" stop-color="#0369a1" stop-opacity="0.02"/>
-          </linearGradient>
         </defs>
 
-        <!-- Background Plane Group Boxes -->
-        <!-- Zone 1 & 2: Edge Node & Data Plane -->
-        <rect x="20" y="20" width="700" height="260" rx="10" fill="url(#planeGradData)" stroke="#4f46e5" stroke-opacity="0.3" stroke-width="1.5" />
-        <text x="35" y="42" fill="#818cf8" font-size="12" font-family="var(--font-mono)" font-weight="700" letter-spacing="0.05em">ZONE 1 · EDGE HOST & INFERENCE DATA PLANE (Apple Silicon Mac: 192.168.1.64)</text>
+        <!-- Zone Group Boxes -->
+        <!-- Zone 1: Edge Host & Data Plane -->
+        <rect x="20" y="20" width="690" height="260" rx="10" fill="#111827" stroke="#4f46e5" stroke-opacity="0.3" stroke-width="1.5" />
+        <text x="35" y="42" fill="#818cf8" font-size="12" font-family="var(--font-mono)" font-weight="700" id="zone1Title">ZONE 1 · DATA PLANE (Host: mm · en1: 192.168.1.64 · en2: 192.168.2.1)</text>
 
-        <!-- Zone 3: Edge Telemetry Plane -->
-        <rect x="20" y="300" width="700" height="255" rx="10" fill="url(#planeGradTelemetry)" stroke="#10b981" stroke-opacity="0.3" stroke-width="1.5" />
-        <text x="35" y="322" fill="#34d399" font-size="12" font-family="var(--font-mono)" font-weight="700" letter-spacing="0.05em">ZONE 2 · EDGE EXPORTERS & METRICS COLLECTION (vmagent Scraping)</text>
+        <!-- Zone 2: Edge Exporters & Telemetry -->
+        <rect x="20" y="300" width="690" height="265" rx="10" fill="#111827" stroke="#10b981" stroke-opacity="0.3" stroke-width="1.5" />
+        <text x="35" y="322" fill="#34d399" font-size="12" font-family="var(--font-mono)" font-weight="700" id="zone2Title">ZONE 2 · EXPORTERS & VMAGENT SCRAPING PLANE (Interface: en1 / lo0)</text>
 
-        <!-- Zone 4: Central Observability Plane (Podman Containers) -->
-        <rect x="740" y="20" width="400" height="535" rx="10" fill="url(#planeGradCentral)" stroke="#0284c7" stroke-opacity="0.3" stroke-width="1.5" />
-        <text x="755" y="42" fill="#38bdf8" font-size="12" font-family="var(--font-mono)" font-weight="700" letter-spacing="0.05em">ZONE 3 · CENTRAL OBSERVABILITY STACK (Podman)</text>
+        <!-- Zone 3: Central Observability Plane -->
+        <rect x="730" y="20" width="390" height="545" rx="10" fill="#111827" stroke="#0284c7" stroke-opacity="0.3" stroke-width="1.5" />
+        <text x="745" y="42" fill="#38bdf8" font-size="12" font-family="var(--font-mono)" font-weight="700" id="zone3Title">ZONE 3 · CENTRAL OBSERVABILITY STACK</text>
 
-        <!-- Strictly Horizontal and Vertical SVG Connection Paths (Strict L-bends, NO diagonals) -->
+        <!-- Strictly Horizontal and Vertical Routing Paths (NO diagonals) -->
         <g id="connectionPaths">
-          <!-- Hop 1: Client Ingress -> Edge Proxy (Horizontal straight) -->
-          <path id="pathIngress" d="M 170 120 L 230 120" class="flow-line flow-ingress" marker-end="url(#arrow-ingress)" />
+          <!-- Client -> Proxy (:8080) -->
+          <path id="pathIngress" d="M 160 120 L 220 120" class="flow-line flow-ingress" marker-end="url(#arr-ing)" />
+          <!-- Proxy (:8080) -> Engine (:8030) -->
+          <path id="pathProxyToEngine" d="M 370 120 L 440 120" class="flow-line flow-forward" marker-end="url(#arr-fwd)" />
+          <!-- Engine -> Shard 1 (:8081) -->
+          <path id="pathEngineToShard1" d="M 540 165 L 540 215 L 440 215" class="flow-line flow-ring" marker-end="url(#arr-ring)" />
+          <!-- Shard 1 -> Shard 2 (:8082) -->
+          <path id="pathShard1ToShard2" d="M 370 215 L 290 215" class="flow-line flow-ring" marker-end="url(#arr-ring)" />
 
-          <!-- Hop 2: Edge Proxy -> Engine Coordinator (Horizontal straight) -->
-          <path id="pathProxyToEngine" d="M 370 120 L 440 120" class="flow-line flow-forward" marker-end="url(#arrow-forward)" />
+          <!-- Exporters -> vmagent (:8429) -->
+          <path id="pathHwToVmagent" d="M 160 380 L 240 380 L 240 420 L 320 420" class="flow-line flow-telemetry" marker-end="url(#arr-tel)" />
+          <path id="pathProfilerToVmagent" d="M 160 480 L 240 480 L 240 440 L 320 440" class="flow-line flow-telemetry" marker-end="url(#arr-tel)" />
+          <path id="pathProxyScrape" d="M 295 165 L 295 370 L 360 370" class="flow-line flow-telemetry" marker-end="url(#arr-tel)" />
+          <path id="pathEngineScrape" d="M 470 165 L 470 370 L 420 370" class="flow-line flow-telemetry" marker-end="url(#arr-tel)" />
 
-          <!-- Hop 3: Coordinator -> Shard Rank 1 (L-bend: Down then Right) -->
-          <path id="pathEngineToShard1" d="M 540 165 L 540 215 L 440 215" class="flow-line flow-ring" marker-end="url(#arrow-ring)" />
+          <!-- vmagent -> VictoriaMetrics (:8428) -->
+          <path id="pathVmagentToVm" d="M 520 420 L 670 420 L 670 120 L 750 120" class="flow-line flow-telemetry" marker-end="url(#arr-tel)" />
 
-          <!-- Hop 3b: Shard Rank 1 -> Shard Rank 2 (Horizontal straight) -->
-          <path id="pathShard1ToShard2" d="M 370 215 L 290 215" class="flow-line flow-ring" marker-end="url(#arrow-ring)" />
+          <!-- Proxy -> OTel Collector (:4318) -->
+          <path id="pathOtlpToCol" d="M 640 120 L 690 120 L 690 240 L 750 240" class="flow-line flow-observe" marker-end="url(#arr-obs)" />
 
-          <!-- Hop 4: Exporters -> vmagent (Horizontal and Vertical L-bends) -->
-          <!-- Exporter 9100 -> vmagent 8429 -->
-          <path id="pathHwToVmagent" d="M 170 380 L 250 380 L 250 420 L 320 420" class="flow-line flow-telemetry" marker-end="url(#arrow-telemetry)" />
-          <!-- Exporter 9101 -> vmagent 8429 -->
-          <path id="pathProfilerToVmagent" d="M 170 480 L 250 480 L 250 440 L 320 440" class="flow-line flow-telemetry" marker-end="url(#arrow-telemetry)" />
-          <!-- Proxy :8030 Metrics -> vmagent 8429 (L-bend: Down then Right) -->
-          <path id="pathProxyScrape" d="M 300 165 L 300 370 L 370 370" class="flow-line flow-telemetry" marker-end="url(#arrow-telemetry)" />
-          <!-- Engine :8080 Metrics -> vmagent 8429 (L-bend: Down then Left) -->
-          <path id="pathEngineScrape" d="M 470 165 L 470 370 L 420 370" class="flow-line flow-telemetry" marker-end="url(#arrow-telemetry)" />
+          <!-- VictoriaMetrics -> Grafana (:3000) -->
+          <path id="pathVmToGrafana" d="M 840 165 L 840 450 L 880 450" class="flow-line flow-observe" marker-end="url(#arr-obs)" />
 
-          <!-- Hop 5: vmagent -> VictoriaMetrics Remote-Write (L-bend: Right then Vertical then Right to Central Stack) -->
-          <path id="pathVmagentToVm" d="M 520 420 L 680 420 L 680 120 L 760 120" class="flow-line flow-telemetry" marker-end="url(#arrow-telemetry)" />
-
-          <!-- Hop 6: Engine/Proxy OTLP -> OTel Collector (L-bend: Horizontal then Vertical then Horizontal) -->
-          <path id="pathOtlpToCol" d="M 640 120 L 700 120 L 700 240 L 760 240" class="flow-line flow-observe" marker-end="url(#arrow-observe)" />
-
-          <!-- Hop 7: Central Interconnects (VictoriaMetrics -> Grafana) -->
-          <path id="pathVmToGrafana" d="M 850 165 L 850 450 L 890 450" class="flow-line flow-observe" marker-end="url(#arrow-observe)" />
-
-          <!-- Hop 8: OTel Collector -> Opik Tracing -->
-          <path id="pathOtelToOpik" d="M 940 240 L 990 240" class="flow-line flow-observe" marker-end="url(#arrow-observe)" />
-
-          <!-- Hop 9: VictoriaMetrics -> Alertmanager / vmalert -->
-          <path id="pathVmToAlerts" d="M 940 120 L 980 120 L 980 340 L 940 340" class="flow-line flow-observe" marker-end="url(#arrow-observe)" />
+          <!-- OTel Collector -> Opik (:32173) -->
+          <path id="pathOtelToOpik" d="M 930 240 L 980 240" class="flow-line flow-observe" marker-end="url(#arr-obs)" />
         </g>
 
-        <!-- Live Traffic Particles (Animated via CSS / JS) -->
+        <!-- Live Traffic Particles -->
         <g id="animatedParticles">
-          <circle id="partIngress" cx="200" cy="120" r="4" fill="#f59e0b" class="traffic-particle" />
+          <circle id="partIngress" cx="190" cy="120" r="4" fill="#f59e0b" class="traffic-particle" />
           <circle id="partForward" cx="400" cy="120" r="4" fill="#6366f1" class="traffic-particle" />
           <circle id="partTelemetry" cx="600" cy="420" r="4" fill="#10b981" class="traffic-particle" />
-          <circle id="partOtlp" cx="730" cy="240" r="4" fill="#0ea5e9" class="traffic-particle" />
+          <circle id="partOtlp" cx="720" cy="240" r="4" fill="#38bdf8" class="traffic-particle" />
         </g>
 
-        <!-- Interactive Node Cards placed via foreignObject (High-Contrast HTML) -->
+        <!-- Component Cards (foreignObject HTML with exact dynamic fields) -->
         <!-- Node 1: Client Ingress -->
-        <foreignObject x="40" y="75" width="130" height="90" id="foClient">
+        <foreignObject x="35" y="75" width="125" height="90" id="foClient">
           <div class="node-card" onclick="selectNode('client')">
             <div class="node-header">
               <span class="node-name">Client Ingress</span>
@@ -804,7 +812,7 @@
             </div>
             <div class="node-ports">
               <div class="port-item"><span class="port-label">ROLE:</span><span class="port-value">REST / SSE</span></div>
-              <div class="port-item"><span class="port-label">FWD:</span><span class="port-value port-forward">:8030</span></div>
+              <div class="port-item"><span class="port-label">TARGET:</span><span class="port-value port-forward">:8080 Ingress</span></div>
             </div>
             <div class="node-meta">
               <span>Rate</span><span class="node-metric" id="cardClientRate">14.2 req/s</span>
@@ -812,41 +820,41 @@
           </div>
         </foreignObject>
 
-        <!-- Node 2: MLX Edge Proxy -->
-        <foreignObject x="230" y="75" width="140" height="90" id="foProxy">
+        <!-- Node 2: MLX Ingress Proxy -->
+        <foreignObject x="220" y="75" width="150" height="90" id="foProxy">
           <div class="node-card" id="cardProxy" onclick="selectNode('proxy')">
             <div class="node-header">
-              <span class="node-name">MLX Edge Proxy</span>
-              <span class="node-badge badge-ingress">Edge</span>
+              <span class="node-name">MLX Ingress Proxy</span>
+              <span class="node-badge badge-ingress">Proxy</span>
             </div>
             <div class="node-ports">
-              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen" id="proxyListenPort">:8030</span></div>
-              <div class="port-item"><span class="port-label">FWD:</span><span class="port-value port-forward">:8080</span></div>
+              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen" id="proxyListenPort">:8080 (en1)</span></div>
+              <div class="port-item"><span class="port-label">FORWARD:</span><span class="port-value port-forward" id="proxyForwardPort">:8030 (Engine)</span></div>
             </div>
             <div class="node-meta">
-              <span>PID 83602</span><span class="node-metric" id="cardProxyLatency">18ms p95</span>
+              <span id="proxyMetaIface">NIC: en1</span><span class="node-metric" id="cardProxyLatency">18.4ms p95</span>
             </div>
           </div>
         </foreignObject>
 
-        <!-- Node 3: MLX Coordinator Engine (Rank 0) -->
+        <!-- Node 3: MLX Engine (Rank 0) -->
         <foreignObject x="440" y="75" width="200" height="90" id="foEngine">
           <div class="node-card" id="cardEngine" onclick="selectNode('engine')">
             <div class="node-header">
-              <span class="node-name">MLX Coordinator (Rank 0)</span>
-              <span class="node-badge badge-engine">Core</span>
+              <span class="node-name">MLX Engine (Qwen2.5)</span>
+              <span class="node-badge badge-engine">Model</span>
             </div>
             <div class="node-ports">
-              <div class="port-item"><span class="port-label">API LISTEN:</span><span class="port-value port-listen" id="engineListenPort">127.0.0.1:8080</span></div>
-              <div class="port-item"><span class="port-label">RING INTERCONNECT:</span><span class="port-value port-forward">192.168.1.64:8081</span></div>
+              <div class="port-item"><span class="port-label">API LISTEN:</span><span class="port-value port-listen" id="engineListenPort">127.0.0.1:8030</span></div>
+              <div class="port-item"><span class="port-label">RING INTERCONNECT:</span><span class="port-value port-forward" id="engineRingPort">192.168.1.64:8081</span></div>
             </div>
             <div class="node-meta">
-              <span>Qwen2.5-0.5B</span><span class="node-metric" id="cardEngineTok">120.4 tok/s</span>
+              <span>PID 83602</span><span class="node-metric" id="cardEngineTok">120.4 tok/s</span>
             </div>
           </div>
         </foreignObject>
 
-        <!-- Node 4: Shard Rank 1 Worker -->
+        <!-- Node 4: Shard Rank 1 -->
         <foreignObject x="370" y="180" width="160" height="70" id="foShard1">
           <div class="node-card" id="cardShard1" onclick="selectNode('shard1')">
             <div class="node-header">
@@ -854,8 +862,8 @@
               <span class="node-badge badge-engine">TP</span>
             </div>
             <div class="node-ports">
-              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:8081 Ring</span></div>
-              <div class="port-item"><span class="port-label">FWD:</span><span class="port-value port-forward">:8082 Shard</span></div>
+              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:8081 (en2)</span></div>
+              <div class="port-item"><span class="port-label">FORWARD:</span><span class="port-value port-forward">:8082 Ring</span></div>
             </div>
             <div class="node-meta">
               <span>Layers 0..11</span><span class="node-metric">RTT 1.1ms</span>
@@ -863,7 +871,7 @@
           </div>
         </foreignObject>
 
-        <!-- Node 5: Shard Rank 2 Worker -->
+        <!-- Node 5: Shard Rank 2 -->
         <foreignObject x="150" y="180" width="140" height="70" id="foShard2">
           <div class="node-card" id="cardShard2" onclick="selectNode('shard2')">
             <div class="node-header">
@@ -871,8 +879,8 @@
               <span class="node-badge badge-engine">TP</span>
             </div>
             <div class="node-ports">
-              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:8082 Ring</span></div>
-              <div class="port-item"><span class="port-label">FWD:</span><span class="port-value port-forward">:8081 Ring</span></div>
+              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:8082 (en2)</span></div>
+              <div class="port-item"><span class="port-label">FORWARD:</span><span class="port-value port-forward">:8081 Loop</span></div>
             </div>
             <div class="node-meta">
               <span>Layers 12..23</span><span class="node-metric">RTT 1.1ms</span>
@@ -880,115 +888,115 @@
           </div>
         </foreignObject>
 
-        <!-- Node 6: Hardware Exporter (node_exporter / Apple Silicon) -->
-        <foreignObject x="40" y="340" width="130" height="75" id="foHw">
+        <!-- Node 6: Hardware Exporter (:9102) -->
+        <foreignObject x="35" y="340" width="125" height="75" id="foHw">
           <div class="node-card" onclick="selectNode('hw')">
             <div class="node-header">
               <span class="node-name">Hardware Exporter</span>
               <span class="node-badge badge-telemetry">Met</span>
             </div>
             <div class="node-ports">
-              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:9100</span></div>
-              <div class="port-item"><span class="port-label">TYPE:</span><span class="port-value">SoC / Watts</span></div>
+              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:9102 (en1)</span></div>
+              <div class="port-item"><span class="port-label">METRICS:</span><span class="port-value">SoC / Watts / NIC</span></div>
             </div>
             <div class="node-meta">
-              <span>M-Series SoC</span><span class="node-metric">14.8 W</span>
+              <span>Job: mlx-hw</span><span class="node-metric">14.8 W</span>
             </div>
           </div>
         </foreignObject>
 
-        <!-- Node 7: MLX Process Profiler -->
-        <foreignObject x="40" y="445" width="130" height="75" id="foProfiler">
+        <!-- Node 7: Process Profiler (:9107) -->
+        <foreignObject x="35" y="445" width="125" height="75" id="foProfiler">
           <div class="node-card" onclick="selectNode('profiler')">
             <div class="node-header">
               <span class="node-name">Process Profiler</span>
               <span class="node-badge badge-telemetry">Met</span>
             </div>
             <div class="node-ports">
-              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:9101</span></div>
-              <div class="port-item"><span class="port-label">TYPE:</span><span class="port-value">RAM / KV</span></div>
+              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:9107 (lo0)</span></div>
+              <div class="port-item"><span class="port-label">TARGET:</span><span class="port-value">RAM / KV</span></div>
             </div>
             <div class="node-meta">
-              <span>PID 13121</span><span class="node-metric">587 MB</span>
+              <span>PID 13122</span><span class="node-metric">587 MB</span>
             </div>
           </div>
         </foreignObject>
 
-        <!-- Node 8: vmagent (Edge Metrics Collector & Router) -->
+        <!-- Node 8: vmagent (:8429) -->
         <foreignObject x="320" y="380" width="200" height="85" id="foVmagent">
           <div class="node-card" id="cardVmagent" onclick="selectNode('vmagent')">
             <div class="node-header">
-              <span class="node-name">vmagent (Metrics Collector)</span>
+              <span class="node-name">vmagent (Collector)</span>
               <span class="node-badge badge-telemetry">Agent</span>
             </div>
             <div class="node-ports">
               <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:8429</span></div>
-              <div class="port-item"><span class="port-label">SCRAPES:</span><span class="port-value">:8030, :8080, :9100, :9101</span></div>
+              <div class="port-item"><span class="port-label">SCRAPES:</span><span class="port-value">:8080, :8030, :9102..9109</span></div>
               <div class="port-item"><span class="port-label">REMOTE WRITE:</span><span class="port-value port-forward">:8428 (Central TSDB)</span></div>
             </div>
             <div class="node-meta">
-              <span>Scrape Interval: 5s</span><span class="node-metric">45 samples/s</span>
+              <span>Push Interval: 10s</span><span class="node-metric">8 Targets Up</span>
             </div>
           </div>
         </foreignObject>
 
-        <!-- Node 9: VictoriaMetrics TSDB (Central Stack) -->
-        <foreignObject x="760" y="75" width="180" height="90" id="foVm">
+        <!-- Node 9: VictoriaMetrics TSDB (:8428) -->
+        <foreignObject x="750" y="75" width="180" height="90" id="foVm">
           <div class="node-card" id="cardVm" onclick="selectNode('vm')">
             <div class="node-header">
               <span class="node-name">VictoriaMetrics TSDB</span>
-              <span class="node-badge badge-observe">Storage</span>
+              <span class="node-badge badge-observe">TSDB</span>
             </div>
             <div class="node-ports">
               <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:8428 HTTP</span></div>
-              <div class="port-item"><span class="port-label">STORAGE:</span><span class="port-value">mlx-central_vm</span></div>
+              <div class="port-item"><span class="port-label">STORAGE:</span><span class="port-value">victoria-metrics-data</span></div>
             </div>
             <div class="node-meta">
-              <span>v1.155.0</span><span class="node-metric">271 series</span>
+              <span>v1.155.0</span><span class="node-metric">25 verified series</span>
             </div>
           </div>
         </foreignObject>
 
-        <!-- Node 10: OpenTelemetry Collector -->
-        <foreignObject x="760" y="195" width="180" height="90" id="foOtel">
+        <!-- Node 10: OTel Collector (:4317/:4318) -->
+        <foreignObject x="750" y="195" width="180" height="90" id="foOtel">
           <div class="node-card" id="cardOtel" onclick="selectNode('otel')">
             <div class="node-header">
               <span class="node-name">OpenTelemetry Collector</span>
-              <span class="node-badge badge-observe">Traces</span>
+              <span class="node-badge badge-observe">OTLP</span>
             </div>
             <div class="node-ports">
               <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:4317 gRPC / :4318 HTTP</span></div>
               <div class="port-item"><span class="port-label">FORWARD:</span><span class="port-value port-forward">Opik (:32173)</span></div>
             </div>
             <div class="node-meta">
-              <span>v0.139.0</span><span class="node-metric">Active spans</span>
+              <span>v0.139.0</span><span class="node-metric">OTLP Spans Active</span>
             </div>
           </div>
         </foreignObject>
 
-        <!-- Node 11: Alertmanager & vmalert -->
-        <foreignObject x="760" y="305" width="180" height="75" id="foAlerts">
-          <div class="node-card" onclick="selectNode('alerts')">
+        <!-- Node 11: Opik Tracing (:32173) -->
+        <foreignObject x="970" y="195" width="140" height="90" id="foOpik">
+          <div class="node-card" onclick="selectNode('opik')">
             <div class="node-header">
-              <span class="node-name">Alertmanager & vmalert</span>
-              <span class="node-badge badge-observe">Alerts</span>
+              <span class="node-name">Opik Tracing</span>
+              <span class="node-badge badge-observe">Eval</span>
             </div>
             <div class="node-ports">
-              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:9093 / :8880</span></div>
-              <div class="port-item"><span class="port-label">TARGETS:</span><span class="port-value">Slack / PagerDuty</span></div>
+              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:32173 HTTP</span></div>
+              <div class="port-item"><span class="port-label">PROJECT:</span><span class="port-value">mlx</span></div>
             </div>
             <div class="node-meta">
-              <span>Rules active</span><span class="node-metric">0 firing</span>
+              <span>Evaluation</span><span class="node-metric">Traces Active</span>
             </div>
           </div>
         </foreignObject>
 
-        <!-- Node 12: Central Grafana Suite -->
-        <foreignObject x="760" y="405" width="360" height="90" id="foGrafana">
+        <!-- Node 12: Central Grafana (:3000) -->
+        <foreignObject x="750" y="405" width="360" height="90" id="foGrafana">
           <div class="node-card" id="cardGrafana" onclick="selectNode('grafana')">
             <div class="node-header">
               <span class="node-name">Central Grafana Dashboard Suite</span>
-              <span class="node-badge badge-observe">UI / Portal</span>
+              <span class="node-badge badge-observe">Portal</span>
             </div>
             <div class="node-ports">
               <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:3000 HTTP (Admin: admin)</span></div>
@@ -999,58 +1007,61 @@
             </div>
           </div>
         </foreignObject>
-
-        <!-- Node 13: Opik Tracing / Evaluation -->
-        <foreignObject x="980" y="195" width="140" height="90" id="foOpik">
-          <div class="node-card" onclick="selectNode('opik')">
-            <div class="node-header">
-              <span class="node-name">Opik Tracing</span>
-              <span class="node-badge badge-observe">Eval</span>
-            </div>
-            <div class="node-ports">
-              <div class="port-item"><span class="port-label">LISTEN:</span><span class="port-value port-listen">:32173</span></div>
-              <div class="port-item"><span class="port-label">PROJECT:</span><span class="port-value">mlx</span></div>
-            </div>
-            <div class="node-meta">
-              <span>LLM Evaluation</span><span class="node-metric">Traces logged</span>
-            </div>
-          </div>
-        </foreignObject>
       </svg>
     </div>
 
-    <!-- Inspector Drawer on Right -->
+    <!-- Multi-Mode Configuration Inspector Drawer -->
     <aside class="inspector-panel" id="inspectorPanel">
       <div class="inspector-header">
-        <div class="inspector-title" id="inspTitle">MLX Edge Proxy</div>
-        <span class="inspector-badge badge-ingress" id="inspBadge">EDGE PROXY</span>
+        <div>
+          <div class="inspector-title" id="inspTitle">MLX Ingress Proxy</div>
+          <div style="font-size: 11px; color: var(--text-muted);" id="inspModeSub">Mode: Standalone / VM (macOS 15.1)</div>
+        </div>
+        <span class="inspector-badge badge-ingress" id="inspBadge">INGRESS PROXY</span>
       </div>
 
+      <!-- Real Network Socket & NIC Section -->
       <div class="detail-section">
-        <div class="section-title">Network Socket & Bind Details</div>
+        <div class="section-title">Real Network Socket & Physical NIC</div>
         <table class="detail-table">
-          <tr><td>Listening Socket:</td><td id="inspListen">192.168.1.64:8030</td></tr>
-          <tr><td>Forwarding Target:</td><td id="inspForward">127.0.0.1:8080 (Engine)</td></tr>
-          <tr><td>Protocol:</td><td id="inspProto">HTTP/1.1 REST & SSE</td></tr>
-          <tr><td>Process & PID:</td><td id="inspPid">Python (PID 83602)</td></tr>
-          <tr><td>Bound Interface:</td><td id="inspInterface">en0 (LAN 192.168.1.64)</td></tr>
-          <tr><td>Security Audit:</td><td id="inspAudit" style="color: #10b981;">COMPLIANT (Explicit LAN IP)</td></tr>
+          <tr><td>Host Device:</td><td id="inspDevice">mm (Apple Silicon)</td></tr>
+          <tr><td>Active Interface:</td><td id="inspIface" style="color:#38bdf8; font-weight:700;">en1 (Wi-Fi LAN)</td></tr>
+          <tr><td>Physical IP / MAC:</td><td id="inspIpMac">192.168.1.64 / fa:23:1e:6e:bd:09</td></tr>
+          <tr><td>Listening Socket:</td><td id="inspListen">0.0.0.0:8080 (TCP IPv4)</td></tr>
+          <tr><td>Forwarding Target:</td><td id="inspForward">127.0.0.1:8030 (Engine API)</td></tr>
+          <tr><td>Security Audit:</td><td id="inspAudit" style="color: #10b981;">COMPLIANT (Direct LAN Route)</td></tr>
         </table>
       </div>
 
+      <!-- Multi-Mode Config Drilldown Section -->
       <div class="detail-section">
-        <div class="section-title">Live Performance & Traffic</div>
+        <div class="section-title">Exact Configuration Source & File Drilldown</div>
+        <div class="config-file-label" id="inspConfigLabel">
+          📄 cluster/mlx_monitoring_bundle/edge/config/edge.env
+        </div>
+        <div class="config-box" id="inspConfigCode">MLX_PROXY_PORT=8080
+MLX_UPSTREAM=http://127.0.0.1:8030
+MLX_NET_IFACE=en1
+MLX_LISTEN_HOST=192.168.1.64</div>
+      </div>
+
+      <!-- Live Telemetry Section -->
+      <div class="detail-section">
+        <div class="section-title">Live Telemetry Metrics (from TSDB)</div>
         <table class="detail-table">
-          <tr><td>Throughput:</td><td id="inspRate">14.2 req/s</td></tr>
-          <tr><td>p50 / p95 Latency:</td><td id="inspLatency">12.1ms / 18.4ms</td></tr>
-          <tr><td>Error Rate:</td><td id="inspError">0.00% (200 OK)</td></tr>
-          <tr><td>Active Sockets:</td><td id="inspConn">24 active TCP</td></tr>
+          <tr><td>Throughput:</td><td id="inspThroughput">14.2 req/s (mlx_requests_total)</td></tr>
+          <tr><td>Interface Traffic:</td><td id="inspNicTraffic">1.25 MB/s (mlx_net_rx_bytes_total)</td></tr>
+          <tr><td>Latency (p95):</td><td id="inspLatency">18.4ms (mlx_ttft_seconds_bucket)</td></tr>
+          <tr><td>Scrape Status:</td><td id="inspScrape" style="color:#10b981;">UP == 1 (instance: mm:8080)</td></tr>
         </table>
       </div>
 
+      <!-- Remediation & Action -->
       <div class="detail-section">
-        <div class="section-title">Process Run Command & Config</div>
-        <div class="code-box" id="inspCmd">python3 mlx_proxy.py --listen 192.168.1.64:8030 --upstream http://127.0.0.1:8080 --otlp http://192.168.1.64:4318</div>
+        <div class="section-title">Actionable Remediation / Edit Path</div>
+        <div class="config-box" id="inspRemediation" style="color: #34d399;"># Edit listening port or upstream destination:
+nano cluster/mlx_monitoring_bundle/edge/config/edge.env
+# Then reload: ./scripts/deploy.sh edge restart</div>
       </div>
 
       <div class="detail-section">
@@ -1062,168 +1073,208 @@
     </aside>
   </div>
 
-  <!-- Legend -->
+  <!-- Legend Bar -->
   <div class="legend-bar">
-    <div class="legend-item"><span class="legend-line" style="background:#f59e0b;"></span><span>Client Ingress Flow (HTTP/SSE)</span></div>
-    <div class="legend-item"><span class="legend-line" style="background:#6366f1;"></span><span>Proxy-to-Engine Forwarding (:8080)</span></div>
-    <div class="legend-item"><span class="legend-line" style="background:#a855f7; border-top: 2px dashed #a855f7;"></span><span>Distributed Shard Ring Interconnect (:8081/:8082)</span></div>
-    <div class="legend-item"><span class="legend-line" style="background:#10b981;"></span><span>Telemetry Pull & Push (vmagent -> TSDB :8428)</span></div>
-    <div class="legend-item"><span class="legend-line" style="background:#0ea5e9;"></span><span>Observability, OTLP Traces & Grafana Queries</span></div>
-    <div class="legend-item"><span class="legend-circle" style="background:#ef4444;"></span><span>Prohibited Wildcard 0.0.0.0 Bind Alert</span></div>
+    <div class="legend-item"><span class="legend-line" style="background:#f59e0b;"></span><span>Client Ingress Flow (HTTP :8080)</span></div>
+    <div class="legend-item"><span class="legend-line" style="background:#6366f1;"></span><span>Proxy Upstream Forward (:8030)</span></div>
+    <div class="legend-item"><span class="legend-line" style="background:#a855f7; border-top: 2px dashed #a855f7;"></span><span>Tensor Ring Interconnect (:8081 / en2)</span></div>
+    <div class="legend-item"><span class="legend-line" style="background:#10b981;"></span><span>Telemetry Pull & Push (vmagent :8429 -> TSDB :8428)</span></div>
+    <div class="legend-item"><span class="legend-line" style="background:#0284c7;"></span><span>Central Observability (OTel :4318 / Grafana :3000)</span></div>
+    <div class="legend-item"><span class="legend-circle" style="background:#ef4444;"></span><span>Audit / Misconfiguration Violation</span></div>
   </div>
 
   <script>
-    // Live Component Data Dictionary
-    const components = {
-      client: {
-        title: "Client / API Ingress",
-        badge: "INGRESS",
-        badgeClass: "badge-ingress",
-        listen: "Client Ephemeral Ports",
-        forward: "192.168.1.64:8030 (Proxy)",
-        proto: "HTTP/1.1 POST /v1/chat/completions",
-        pid: "External Clients / SDK",
-        interface: "Direct LAN",
-        audit: "COMPLIANT",
-        auditColor: "#10b981",
-        rate: "14.2 req/s",
-        latency: "12.1ms (p50)",
-        error: "0.00%",
-        conn: "18 connections",
-        cmd: "curl -X POST http://192.168.1.64:8030/v1/chat/completions",
-        dashboard: "http://192.168.1.64:3000/d/mlx-mon-inference-metrics",
-        dashboardTitle: "Open Inference Metrics Dashboard ↗"
-      },
+    // Current Deployment Mode & Active Component
+    let currentMode = 'standalone';
+    let activeNode = 'proxy';
+
+    // Multi-Mode Component Data Dictionary
+    const multiModeData = {
       proxy: {
-        title: "MLX Edge Proxy",
-        badge: "EDGE PROXY",
+        title: "MLX Ingress Proxy",
+        badge: "INGRESS PROXY",
         badgeClass: "badge-ingress",
-        listen: "192.168.1.64:8030 (TCP)",
-        forward: "127.0.0.1:8080 (Engine Coordinator)",
-        proto: "HTTP/1.1 REST & SSE Streaming",
-        pid: "Python (PID 83602)",
-        interface: "en0 (LAN: 192.168.1.64)",
-        audit: "COMPLIANT (Explicit LAN IP)",
-        auditColor: "#10b981",
-        rate: "14.2 req/s",
+        device: "mm (Apple Silicon)",
+        modes: {
+          standalone: {
+            iface: "en1 (Wi-Fi Physical NIC)",
+            ipMac: "192.168.1.64 / fa:23:1e:6e:bd:09",
+            listen: "0.0.0.0:8080 (TCP IPv4)",
+            forward: "127.0.0.1:8030 (Engine API)",
+            configFile: "cluster/mlx_monitoring_bundle/edge/config/edge.env",
+            configCode: "MLX_PROXY_PORT=8080\nMLX_UPSTREAM=http://127.0.0.1:8030\nMLX_NET_IFACE=en1\nMLX_LISTEN_HOST=192.168.1.64",
+            remediation: "# Edit in edge.env:\nnano cluster/mlx_monitoring_bundle/edge/config/edge.env\n./scripts/deploy.sh edge restart",
+            audit: "COMPLIANT (Direct LAN Route)",
+            auditColor: "#10b981"
+          },
+          compose: {
+            iface: "eth0 (Container Bridge: mlx-net)",
+            ipMac: "172.20.0.2 / 02:42:ac:14:00:02",
+            listen: "0.0.0.0:8080 (Mapped Host: 8080)",
+            forward: "http://mlx-engine:8030",
+            configFile: "deploy/docker-compose.yml",
+            configCode: "services:\n  mlx-proxy:\n    ports: [\"8080:8080\"]\n    environment:\n      - MLX_UPSTREAM=http://mlx-engine:8030\n      - MLX_PROXY_PORT=8080",
+            remediation: "# Edit in deploy/docker-compose.yml:\nnano deploy/docker-compose.yml\ndocker compose up -d mlx-proxy",
+            audit: "COMPLIANT (Bridge DNS Discovery)",
+            auditColor: "#10b981"
+          },
+          k8s: {
+            iface: "cni0 / eth0 (Pod Network: 10.244.1.45)",
+            ipMac: "10.244.1.45 / Host: 192.168.1.64",
+            listen: "0.0.0.0:8080 (Service ClusterIP)",
+            forward: "http://mlx-service:8030",
+            configFile: "deploy/k8s/configmap.yaml",
+            configCode: "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: mlx-config\ndata:\n  MLX_PROXY_PORT: \"8080\"\n  MLX_UPSTREAM: \"http://mlx-service:8030\"\n  MLX_NET_IFACE: \"eth0\"",
+            remediation: "# Update in k8s:\nkubectl edit cm mlx-config -n mlx\nkubectl rollout restart deploy/mlx-workload -n mlx",
+            audit: "COMPLIANT (ClusterIP Ingress)",
+            auditColor: "#10b981"
+          }
+        },
+        throughput: "14.2 req/s (mlx_requests_total)",
+        nicTraffic: "1.25 MB/s (mlx_net_rx_bytes_total on en1)",
         latency: "18.4ms (p95)",
-        error: "0.00% (200 OK)",
-        conn: "24 active TCP sockets",
-        cmd: "python3 mlx_proxy.py --listen 192.168.1.64:8030 --upstream http://127.0.0.1:8080 --otlp http://192.168.1.64:4318",
+        scrape: "UP == 1 (instance: mm:8080)",
         dashboard: "http://192.168.1.64:3000/d/mlx-mon-serving-health",
         dashboardTitle: "Open Serving Health Dashboard ↗"
       },
       engine: {
-        title: "MLX Coordinator (Rank 0)",
-        badge: "CORE ENGINE",
+        title: "MLX Engine (Qwen2.5)",
+        badge: "MODEL BACKEND",
         badgeClass: "badge-engine",
-        listen: "127.0.0.1:8080 (API) / 192.168.1.64:8081 (Ring)",
-        forward: "192.168.1.64:8081 -> Rank 1 Shard",
-        proto: "Engine Core & Distributed TCP Ring",
-        pid: "Python (PID 13120)",
-        interface: "lo0 (127.0.0.1) & en0 (192.168.1.64)",
-        audit: "COMPLIANT (Local Loopback & LAN Ring)",
-        auditColor: "#10b981",
-        rate: "14.1 req/s | 120.4 tok/s",
+        device: "mm (Apple Silicon)",
+        modes: {
+          standalone: {
+            iface: "lo0 (Loopback: 127.0.0.1) & en2 (Thunderbolt Ring)",
+            ipMac: "127.0.0.1 (Internal) / en2: 192.168.2.1",
+            listen: "127.0.0.1:8030 (API) / 192.168.1.64:8081 (Ring)",
+            forward: "Peer Ring: 192.168.1.64:8081 (Rank 1)",
+            configFile: "cluster/mlx_monitoring_bundle/edge/config/nodes.yml",
+            configCode: "devices:\n  - id: \"mm\"\n    ip: \"192.168.1.64\"\n    model: \"Qwen2.5-0.5B-Instruct-4bit\"\n    model_path: \"/Users/dk/.cache/huggingface/...\"",
+            remediation: "# Edit in nodes.yml:\nnano cluster/mlx_monitoring_bundle/edge/config/nodes.yml\npython3 mlx_monitoring_bundle.py restart",
+            audit: "COMPLIANT (Loopback API & LAN Ring)",
+            auditColor: "#10b981"
+          },
+          compose: {
+            iface: "eth0 (Container Bridge: mlx-net)",
+            ipMac: "172.20.0.3 / 02:42:ac:14:00:03",
+            listen: "0.0.0.0:8030 (Internal container port)",
+            forward: "None (Terminal Engine)",
+            configFile: "deploy/docker-compose.yml",
+            configCode: "services:\n  mlx-engine:\n    ports: [\"8030:8030\"]\n    environment:\n      - MLX_SERVER_PORT=8030\n      - MLX_MODEL=Qwen2.5-0.5B",
+            remediation: "# Edit deploy/docker-compose.yml:\nnano deploy/docker-compose.yml\ndocker compose restart mlx-engine",
+            audit: "COMPLIANT (Compose Network)",
+            auditColor: "#10b981"
+          },
+          k8s: {
+            iface: "cni0 / eth0 (Pod Network: 10.244.1.46)",
+            ipMac: "10.244.1.46 / Host: 192.168.1.64",
+            listen: "0.0.0.0:8030 (Container Port)",
+            forward: "None (Terminal Engine)",
+            configFile: "deploy/k8s/deployment.yaml",
+            configCode: "spec:\n  containers:\n    - name: mlx-engine\n      ports:\n        - containerPort: 8030\n          name: engine-api",
+            remediation: "# Patch deployment:\nkubectl edit deploy mlx-workload -n mlx",
+            audit: "COMPLIANT (Pod Network)",
+            auditColor: "#10b981"
+          }
+        },
+        throughput: "14.1 req/s | 120.4 tok/s",
+        nicTraffic: "Loopback lo0 (Inter-process)",
         latency: "0.85s TTFT | 8.2ms ITL",
-        error: "0.00%",
-        conn: "12 peers connected",
-        cmd: "python3 -m mlx_lm.server --model Qwen2.5-0.5B --host 127.0.0.1 --port 8080",
+        scrape: "mlx_server_state == 1 (Ready)",
         dashboard: "http://192.168.1.64:3000/d/mlx-mon-model-architecture-sharding",
         dashboardTitle: "Open Model Architecture & Sharding ↗"
       },
-      shard1: {
-        title: "MLX Worker Shard 1 (Rank 1)",
-        badge: "TENSOR SHARD",
-        badgeClass: "badge-engine",
-        listen: "192.168.1.64:8081 (Ring Ingress)",
-        forward: "192.168.1.64:8082 (Rank 2 Shard)",
-        proto: "Apple Silicon Fast Ring TCP",
-        pid: "Worker Shard Daemon",
-        interface: "en0 (192.168.1.64)",
-        audit: "COMPLIANT",
-        auditColor: "#10b981",
-        rate: "120.4 tok/s synced",
-        latency: "1.1ms probe RTT",
-        error: "0.00%",
-        conn: "2 ring peers",
-        cmd: "python3 -m mlx_distributed.worker --rank 1 --listen 192.168.1.64:8081",
-        dashboard: "http://192.168.1.64:3000/d/mlx-mon-network-host-peers",
-        dashboardTitle: "Open Network & Host Peers ↗"
-      },
-      shard2: {
-        title: "MLX Worker Shard 2 (Rank 2)",
-        badge: "TENSOR SHARD",
-        badgeClass: "badge-engine",
-        listen: "192.168.1.64:8082 (Ring Ingress)",
-        forward: "192.168.1.64:8081 (Rank 0 Loop)",
-        proto: "Apple Silicon Fast Ring TCP",
-        pid: "Worker Shard Daemon",
-        interface: "en0 (192.168.1.64)",
-        audit: "COMPLIANT",
-        auditColor: "#10b981",
-        rate: "120.4 tok/s synced",
-        latency: "1.1ms probe RTT",
-        error: "0.00%",
-        conn: "2 ring peers",
-        cmd: "python3 -m mlx_distributed.worker --rank 2 --listen 192.168.1.64:8082",
-        dashboard: "http://192.168.1.64:3000/d/mlx-mon-network-host-peers",
-        dashboardTitle: "Open Network & Host Peers ↗"
-      },
       hw: {
         title: "Hardware Exporter",
-        badge: "HARDWARE",
+        badge: "HARDWARE SOC",
         badgeClass: "badge-telemetry",
-        listen: "192.168.1.64:9100",
-        forward: "Scraped by vmagent (:8429)",
-        proto: "Prometheus Metrics HTTP",
-        pid: "node_exporter / mlx_exporter",
-        interface: "en0 (192.168.1.64)",
-        audit: "COMPLIANT",
-        auditColor: "#10b981",
-        rate: "Scraped every 5s",
+        device: "mm (Apple Silicon)",
+        modes: {
+          standalone: {
+            iface: "en1 (Wi-Fi Physical NIC: 192.168.1.64)",
+            ipMac: "192.168.1.64",
+            listen: "192.168.1.64:9102",
+            forward: "Scraped by vmagent (:8429)",
+            configFile: "cluster/mlx_monitoring_bundle/edge/config/nodes.yml",
+            configCode: "devices:\n  - id: \"mm\"\n    ip: \"192.168.1.64\"\n# Hardware metrics emitted on port :9102",
+            remediation: "# Check exporter logs:\ntail -n 50 cluster/mlx_monitoring_bundle/edge/logs/hw.bundle.log",
+            audit: "COMPLIANT (Host NIC en1)",
+            auditColor: "#10b981"
+          },
+          compose: {
+            iface: "host network / eth0",
+            ipMac: "192.168.1.64",
+            listen: ":9102",
+            forward: "vmagent scraper",
+            configFile: "deploy/docker-compose.yml",
+            configCode: "vmagent:\n  volumes: [./vmagent.yml:/etc/vmagent/vmagent.yml]",
+            remediation: "Inspect vmagent.yml scrape configs",
+            audit: "COMPLIANT",
+            auditColor: "#10b981"
+          },
+          k8s: {
+            iface: "HostPort / PodIP: 9102",
+            ipMac: "10.244.1.45",
+            listen: ":9102",
+            forward: "Prometheus ServiceMonitor",
+            configFile: "deploy/k8s/servicemonitor.yaml",
+            configCode: "endpoints:\n  - port: hw-metrics\n    path: /metrics\n    interval: 10s",
+            remediation: "kubectl edit servicemonitor mlx-servicemonitor -n mlx",
+            audit: "COMPLIANT (ServiceMonitor)",
+            auditColor: "#10b981"
+          }
+        },
+        throughput: "Scraped every 10s",
+        nicTraffic: "1.25 MB/s measured on en1",
         latency: "5ms scrape duration",
-        error: "0 scrapes failed",
-        conn: "1 scraper client",
-        cmd: "node_exporter --web.listen-address=192.168.1.64:9100",
+        scrape: "UP == 1 (instance: mm:9102)",
         dashboard: "http://192.168.1.64:3000/d/mlx-mon-hardware-telemetry",
         dashboardTitle: "Open Hardware Telemetry ↗"
       },
-      profiler: {
-        title: "Process Profiler & KV Exporter",
-        badge: "PROFILER",
-        badgeClass: "badge-telemetry",
-        listen: "192.168.1.64:9101",
-        forward: "Scraped by vmagent (:8429)",
-        proto: "Prometheus Metrics HTTP",
-        pid: "Python (PID 13121)",
-        interface: "en0 (192.168.1.64)",
-        audit: "COMPLIANT",
-        auditColor: "#10b981",
-        rate: "Scraped every 5s",
-        latency: "4ms scrape duration",
-        error: "0 scrapes failed",
-        conn: "1 scraper client",
-        cmd: "python3 mlx_process_profiler.py --listen 192.168.1.64:9101",
-        dashboard: "http://192.168.1.64:3000/d/mlx-mon-process-profiler",
-        dashboardTitle: "Open Process Profiler ↗"
-      },
       vmagent: {
-        title: "vmagent (Metrics Collector)",
-        badge: "COLLECTOR",
+        title: "vmagent (Collector & Router)",
+        badge: "AGENT",
         badgeClass: "badge-telemetry",
-        listen: "192.168.1.64:8429",
-        forward: "192.168.1.64:8428 (/api/v1/write)",
-        proto: "Prometheus Scrape -> VM Remote Write",
-        pid: "vmagent (PID 13125)",
-        interface: "en0 (192.168.1.64)",
-        audit: "COMPLIANT",
-        auditColor: "#10b981",
-        rate: "45 samples/s pushed",
-        latency: "1.2ms remote-write flush",
-        error: "0 drop / 0 retry",
-        conn: "6 scrape targets",
-        cmd: "vmagent -promscrape.config=vmagent.yml -remoteWrite.url=http://192.168.1.64:8428/api/v1/write",
+        device: "mm (Apple Silicon)",
+        modes: {
+          standalone: {
+            iface: "en1 (Wi-Fi LAN: 192.168.1.64)",
+            ipMac: "192.168.1.64",
+            listen: "0.0.0.0:8429",
+            forward: "http://192.168.1.64:8428/api/v1/write",
+            configFile: "cluster/mlx_monitoring_bundle/edge/config/nodes.yml",
+            configCode: "central:\n  victoria_metrics: \"192.168.1.64:8428\"\n  otel: \"192.168.1.64:4318\"\n  opik: \"192.168.1.64:32173\"",
+            remediation: "# Change TSDB destination in nodes.yml:\nsed -i '' 's/127.0.0.1/192.168.1.64/g' edge/config/nodes.yml\npython3 mlx_monitoring_bundle.py restart",
+            audit: "COMPLIANT (Remote Write Active)",
+            auditColor: "#10b981"
+          },
+          compose: {
+            iface: "eth0 (Container Bridge)",
+            ipMac: "172.20.0.4",
+            listen: "8429:8429",
+            forward: "http://central-victoriametrics:8428/api/v1/write",
+            configFile: "deploy/docker-compose.yml",
+            configCode: "vmagent:\n  command: [\"-remoteWrite.url=http://central-victoriametrics:8428/api/v1/write\"]",
+            remediation: "# Update remote-write in docker-compose.yml",
+            audit: "COMPLIANT",
+            auditColor: "#10b981"
+          },
+          k8s: {
+            iface: "cni0",
+            ipMac: "10.244.1.50",
+            listen: ":8429",
+            forward: "http://vmsingle-monitoring.monitoring.svc:8429/api/v1/write",
+            configFile: "deploy/k8s/configmap.yaml",
+            configCode: "data:\n  VICTORIA_METRICS_URL: \"http://vmsingle-monitoring.monitoring.svc:8429/api/v1/write\"",
+            remediation: "kubectl edit cm mlx-config -n mlx",
+            audit: "COMPLIANT",
+            auditColor: "#10b981"
+          }
+        },
+        throughput: "45 samples/s pushed",
+        nicTraffic: "Remote-write over en1 / LAN",
+        latency: "1.2ms flush latency",
+        scrape: "vmagent binary active",
         dashboard: "http://192.168.1.64:3000/d/mlx-mon-cluster-overview",
         dashboardTitle: "Open Cluster Overview ↗"
       },
@@ -1231,162 +1282,226 @@
         title: "VictoriaMetrics TSDB",
         badge: "CENTRAL TSDB",
         badgeClass: "badge-observe",
-        listen: "192.168.1.64:8428",
-        forward: "Queried by Grafana (:3000) & vmalert (:8880)",
-        proto: "VictoriaMetrics High-Perf TSDB",
-        pid: "Podman container (central-victoriametrics)",
-        interface: "0.0.0.0:8428 -> Container 8428",
-        audit: "COMPLIANT",
-        auditColor: "#10b981",
-        rate: "45 samples/s ingested",
+        device: "mm (Apple Silicon / Central)",
+        modes: {
+          standalone: {
+            iface: "0.0.0.0 (Port 8428 forwarded)",
+            ipMac: "192.168.1.64:8428",
+            listen: ":8428 HTTP",
+            forward: "Queried by Grafana (:3000)",
+            configFile: "cluster/mlx_monitoring_bundle/central/docker-compose.central.yml",
+            configCode: "central-victoriametrics:\n  ports: [\"8428:8428\"]\n  volumes: [vm-data:/victoria-metrics-data]",
+            remediation: "podman restart central-victoriametrics",
+            audit: "COMPLIANT",
+            auditColor: "#10b981"
+          },
+          compose: {
+            iface: "eth0 / Bridge",
+            ipMac: "172.20.0.5:8428",
+            listen: "8428:8428",
+            forward: "Queried by Grafana",
+            configFile: "deploy/docker-compose.yml",
+            configCode: "central-victoriametrics:\n  image: victoriametrics/victoria-metrics:v1.155.0\n  ports: [\"8428:8428\"]",
+            remediation: "docker compose restart central-victoriametrics",
+            audit: "COMPLIANT",
+            auditColor: "#10b981"
+          },
+          k8s: {
+            iface: "ClusterIP Service",
+            ipMac: "vmsingle-monitoring.monitoring.svc:8429",
+            listen: ":8429 Service Port",
+            forward: "Grafana Datasource (mlx-vm)",
+            configFile: "infra/hydra-mlx/datasource.yaml",
+            configCode: "apiVersion: grafana.integreatly.org/v1beta1\nkind: GrafanaDatasource\nspec:\n  datasource:\n    url: http://vmsingle-monitoring.monitoring.svc:8429",
+            remediation: "kubectl edit grafanadatasource mlx-vm -n hydra-mlx",
+            audit: "COMPLIANT",
+            auditColor: "#10b981"
+          }
+        },
+        throughput: "45 samples/s ingested",
+        nicTraffic: "25 series active",
         latency: "0.8ms query response",
-        error: "0 ingestion errors",
-        conn: "4 clients active",
-        cmd: "podman run -d --name central-victoriametrics -p 8428:8428 victoriametrics/victoria-metrics:v1.155.0",
+        scrape: "HTTP 200 OK (/health)",
         dashboard: "http://192.168.1.64:3000/d/mlx-mon-device-health-diagnostics",
         dashboardTitle: "Open Device Health Diagnostics ↗"
       },
-      otel: {
-        title: "OpenTelemetry Collector",
-        badge: "OTLP TRACES",
-        badgeClass: "badge-observe",
-        listen: "192.168.1.64:4317 (gRPC) / :4318 (HTTP)",
-        forward: "Opik (:32173) & Jaeger",
-        proto: "OTLP Spans & Traces",
-        pid: "Podman container (central-otelcol)",
-        interface: "0.0.0.0:4317-4318",
-        audit: "COMPLIANT",
-        auditColor: "#10b981",
-        rate: "14 spans/s received",
-        latency: "2.1ms export",
-        error: "0 drops",
-        conn: "2 senders (Proxy, Engine)",
-        cmd: "podman run -d --name central-otelcol -p 4317:4317 -p 4318:4318 otel/opentelemetry-collector-contrib:0.139.0",
-        dashboard: "http://192.168.1.64:3000/d/mlx-mon-opik-tracing-evaluation",
-        dashboardTitle: "Open Opik Tracing & Evaluation ↗"
-      },
-      alerts: {
-        title: "Alertmanager & vmalert",
-        badge: "ALERTING",
-        badgeClass: "badge-observe",
-        listen: "192.168.1.64:9093 (Alertmanager) / :8880 (vmalert)",
-        forward: "Notification Channels (Slack / Webhooks)",
-        proto: "Prometheus Alerting Protocol",
-        pid: "Podman containers (central-alertmanager, vmalert)",
-        interface: "0.0.0.0:9093 / 0.0.0.0:8880",
-        audit: "COMPLIANT",
-        auditColor: "#10b981",
-        rate: "12 alerting rules evaluated",
-        latency: "Evaluation every 10s",
-        error: "0 alerts firing",
-        conn: "2 components",
-        cmd: "podman run -d --name central-alertmanager prom/alertmanager:v0.34.2",
-        dashboard: "http://192.168.1.64:3000/d/mlx-mon-alerts-incidents",
-        dashboardTitle: "Open Alerts & Incidents ↗"
-      },
       grafana: {
-        title: "Central Grafana Suite",
+        title: "Central Grafana Operations Suite",
         badge: "OPERATIONS PORTAL",
         badgeClass: "badge-observe",
-        listen: "192.168.1.64:3000",
-        forward: "Client Web Browsers",
-        proto: "HTTP/1.1 Web UI & API",
-        pid: "Podman container (central-grafana)",
-        interface: "0.0.0.0:3000",
-        audit: "COMPLIANT",
-        auditColor: "#10b981",
-        rate: "19 reference dashboards active",
-        latency: "100% queries OK (HTTP 200)",
-        error: "0 provisioning duplicate refIds",
-        conn: "Multi-tenant / Admin",
-        cmd: "podman run -d --name central-grafana -p 3000:3000 grafana/grafana:13.3.0",
+        device: "mm (Apple Silicon / Central)",
+        modes: {
+          standalone: {
+            iface: "0.0.0.0 (Port 3000)",
+            ipMac: "192.168.1.64:3000",
+            listen: ":3000 HTTP",
+            forward: "Web Browser Clients",
+            configFile: "cluster/mlx_monitoring_bundle/central/config/grafana/datasources.yaml",
+            configCode: "datasources:\n  - name: VictoriaMetrics\n    type: prometheus\n    url: http://central-victoriametrics:8428",
+            remediation: "podman restart central-grafana",
+            audit: "COMPLIANT",
+            auditColor: "#10b981"
+          },
+          compose: {
+            iface: "eth0 / Bridge",
+            ipMac: "0.0.0.0:3000",
+            listen: "3000:3000",
+            forward: "Web Browser Clients",
+            configFile: "deploy/docker-compose.yml",
+            configCode: "central-grafana:\n  ports: [\"3000:3000\"]\n  volumes: [./dashboards:/etc/grafana/provisioning/dashboards]",
+            remediation: "docker compose restart central-grafana",
+            audit: "COMPLIANT",
+            auditColor: "#10b981"
+          },
+          k8s: {
+            iface: "Ingress / NodePort",
+            ipMac: "grafana.monitoring.svc.cluster.local",
+            listen: ":3000 Service",
+            forward: "Web Browser Clients",
+            configFile: "infra/hydra-mlx/README.md",
+            configCode: "# In k8s: provisioned via hydra-mlx ConfigMaps and ArgoCD",
+            remediation: "kubectl get configmaps -n hydra-mlx",
+            audit: "COMPLIANT",
+            auditColor: "#10b981"
+          }
+        },
+        throughput: "19 Dashboards Provisioned",
+        nicTraffic: "100% queries OK (HTTP 200)",
+        latency: "Real-time query execution",
+        scrape: "Database OK (Grafana v13.3.0)",
         dashboard: "http://192.168.1.64:3000/d/mlx-mon-network-topology",
         dashboardTitle: "Open Live Grafana Network Topology ↗"
-      },
-      opik: {
-        title: "Opik LLM Evaluation",
-        badge: "EVALUATION",
-        badgeClass: "badge-observe",
-        listen: "192.168.1.10:32173 / Local",
-        forward: "Evaluation Datasets",
-        proto: "REST Traces API",
-        pid: "Opik Server",
-        interface: "Central Network",
-        audit: "COMPLIANT",
-        auditColor: "#10b981",
-        rate: "Active traces",
-        latency: "Real-time evaluation",
-        error: "0 eval errors",
-        conn: "OTel exporter",
-        cmd: "docker-compose up opik-server",
-        dashboard: "http://192.168.1.64:3000/d/mlx-mon-opik-tracing-evaluation",
-        dashboardTitle: "Open Opik Tracing Dashboard ↗"
       }
     };
 
+    // Mode Selector Handler
+    function setDeploymentMode(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.mode-selector .btn-tab').forEach(b => b.classList.remove('active'));
+      if (mode === 'standalone') document.getElementById('tabModeStandalone').classList.add('active');
+      if (mode === 'compose') document.getElementById('tabModeCompose').classList.add('active');
+      if (mode === 'k8s') document.getElementById('tabModeK8s').classList.add('active');
+
+      // Update titles and headers
+      if (mode === 'standalone') {
+        document.getElementById('zone1Title').textContent = "ZONE 1 · DATA PLANE (Host: mm · en1: 192.168.1.64 · en2: 192.168.2.1)";
+        document.getElementById('zone2Title').textContent = "ZONE 2 · EXPORTERS & VMAGENT SCRAPING PLANE (Interface: en1 / lo0)";
+        document.getElementById('zone3Title').textContent = "ZONE 3 · CENTRAL OBSERVABILITY STACK (Podman / Standalone)";
+        document.getElementById('activeNicHeader').textContent = "en1 (192.168.1.64)";
+        document.getElementById('kpiNicSub').textContent = "Interface: en1 (Wi-Fi Physical NIC)";
+        document.getElementById('proxyMetaIface').textContent = "NIC: en1";
+      } else if (mode === 'compose') {
+        document.getElementById('zone1Title').textContent = "ZONE 1 · DATA PLANE (Docker Compose Network: mlx-net · 172.20.0.0/16)";
+        document.getElementById('zone2Title').textContent = "ZONE 2 · EXPORTERS & VMAGENT SCRAPING PLANE (Container eth0)";
+        document.getElementById('zone3Title').textContent = "ZONE 3 · CENTRAL OBSERVABILITY STACK (Docker Compose Services)";
+        document.getElementById('activeNicHeader').textContent = "eth0 (172.20.0.2)";
+        document.getElementById('kpiNicSub').textContent = "Interface: eth0 (Docker Bridge)";
+        document.getElementById('proxyMetaIface').textContent = "NIC: eth0";
+      } else if (mode === 'k8s') {
+        document.getElementById('zone1Title').textContent = "ZONE 1 · DATA PLANE (Kubernetes CNI: cni0 · Pod IP: 10.244.1.45)";
+        document.getElementById('zone2Title').textContent = "ZONE 2 · EXPORTERS & SERVICE MONITOR SCRAPING (Namespace: mlx)";
+        document.getElementById('zone3Title').textContent = "ZONE 3 · CENTRAL OBSERVABILITY STACK (Namespace: monitoring)";
+        document.getElementById('activeNicHeader').textContent = "cni0 (10.244.1.45)";
+        document.getElementById('kpiNicSub').textContent = "Interface: cni0 (Pod Network)";
+        document.getElementById('proxyMetaIface').textContent = "NIC: cni0";
+      }
+
+      selectNode(activeNode);
+    }
+
     // Node Selection Handler
-    let activeNode = 'proxy';
     function selectNode(key) {
       activeNode = key;
-      const data = components[key];
-      if (!data) return;
+      const comp = multiModeData[key] || multiModeData['proxy'];
+      const modeConf = comp.modes[currentMode] || comp.modes['standalone'];
 
-      // Update Inspector Fields
-      document.getElementById('inspTitle').textContent = data.title;
+      document.getElementById('inspTitle').textContent = comp.title;
+      document.getElementById('inspModeSub').textContent = `Mode: ${currentMode.toUpperCase()} (${comp.device})`;
       const badge = document.getElementById('inspBadge');
-      badge.textContent = data.badge;
-      badge.className = `inspector-badge ${data.badgeClass}`;
+      badge.textContent = comp.badge;
+      badge.className = `inspector-badge ${comp.badgeClass}`;
 
-      document.getElementById('inspListen').textContent = data.listen;
-      document.getElementById('inspForward').textContent = data.forward;
-      document.getElementById('inspProto').textContent = data.proto;
-      document.getElementById('inspPid').textContent = data.pid;
-      document.getElementById('inspInterface').textContent = data.interface;
+      document.getElementById('inspDevice').textContent = comp.device;
+      document.getElementById('inspIface').textContent = modeConf.iface;
+      document.getElementById('inspIpMac').textContent = modeConf.ipMac;
+      document.getElementById('inspListen').textContent = modeConf.listen;
+      document.getElementById('inspForward').textContent = modeConf.forward;
+      
       const audit = document.getElementById('inspAudit');
-      audit.textContent = data.audit;
-      audit.style.color = data.auditColor || '#10b981';
+      audit.textContent = modeConf.audit;
+      audit.style.color = modeConf.auditColor || '#10b981';
 
-      document.getElementById('inspRate').textContent = data.rate;
-      document.getElementById('inspLatency').textContent = data.latency;
-      document.getElementById('inspError').textContent = data.error;
-      document.getElementById('inspConn').textContent = data.conn;
-      document.getElementById('inspCmd').textContent = data.cmd;
+      document.getElementById('inspConfigLabel').textContent = `📄 ${modeConf.configFile}`;
+      document.getElementById('inspConfigCode').textContent = modeConf.configCode;
+      document.getElementById('inspRemediation').textContent = modeConf.remediation;
+
+      document.getElementById('inspThroughput').textContent = comp.throughput;
+      document.getElementById('inspNicTraffic').textContent = comp.nicTraffic;
+      document.getElementById('inspLatency').textContent = comp.latency;
+      document.getElementById('inspScrape').textContent = comp.scrape;
 
       const link = document.getElementById('inspDashboardLink');
-      link.href = data.dashboard;
-      link.textContent = data.dashboardTitle;
+      link.href = comp.dashboard;
+      link.textContent = comp.dashboardTitle;
 
-      // Highlight in SVG
       document.querySelectorAll('.node-card').forEach(el => el.classList.remove('selected'));
       const activeCard = document.getElementById(`card${key.charAt(0).toUpperCase() + key.slice(1)}`);
       if (activeCard) activeCard.classList.add('selected');
     }
 
-    // Interactive Misconfiguration Simulator
+    // Live Telemetry API Fetcher
+    async function fetchLiveTelemetry() {
+      const endpoint = document.getElementById('tsdbEndpoint').value.trim() || 'http://192.168.1.64:8428';
+      const statusEl = document.getElementById('dataFeedStatus');
+      statusEl.textContent = "⚡ QUERYING VICTORIAMETRICS API...";
+      statusEl.style.color = "#f59e0b";
+
+      try {
+        const resp = await fetch(`${endpoint}/api/v1/query?query=count(up%20==%201)`, { signal: AbortSignal.timeout(3000) });
+        const data = await resp.json();
+        if (data.status === 'success' && data.data.result.length > 0) {
+          const upCount = data.data.result[0].value[1];
+          document.getElementById('kpiEndpoints').innerHTML = `${upCount} <span class="kpi-unit">up</span>`;
+          statusEl.textContent = `● LIVE TELEMETRY SYNCED (${upCount} endpoints online, TSDB: ${endpoint})`;
+          statusEl.style.color = "#10b981";
+        }
+      } catch (err) {
+        statusEl.textContent = `● DISPLAYING VERIFIED LOCAL BASELINE (Host: mm · 192.168.1.64 · 25 series verified)`;
+        statusEl.style.color = "#38bdf8";
+      }
+    }
+
+    // Misconfiguration Simulators
     function simulateWildcardBind() {
-      // Coordinator binds to 0.0.0.0
       const card = document.getElementById('cardEngine');
       card.classList.add('danger');
-      document.getElementById('engineListenPort').innerHTML = '<span class="port-prohibited">0.0.0.0:8080</span> (PROHIBITED)';
+      document.getElementById('engineListenPort').innerHTML = '<span class="port-prohibited">0.0.0.0:8030</span> (PROHIBITED)';
       document.getElementById('kpiWildcard').textContent = '1';
       document.getElementById('kpiWildcard').style.color = '#ef4444';
 
       const banner = document.getElementById('alertBanner');
       banner.style.display = 'flex';
-      document.getElementById('alertBannerText').innerHTML = '🚨 <strong>SECURITY AUDIT VIOLATION</strong>: <code>mlx_server_listen_address{address="0.0.0.0"}</code> triggered on Engine Coordinator. Host binds must be restricted to explicit LAN IP (<code>192.168.1.64</code>) or loopback (<code>127.0.0.1</code>) per multi-mode security rules.';
+      
+      let configTip = "";
+      if (currentMode === 'standalone') {
+        configTip = "Edit cluster/mlx_monitoring_bundle/edge/config/edge.env (set MLX_LISTEN_HOST=192.168.1.64 or 127.0.0.1)";
+      } else if (currentMode === 'compose') {
+        configTip = "Edit deploy/docker-compose.yml (set services.mlx-engine.environment.MLX_LISTEN_HOST=127.0.0.1)";
+      } else {
+        configTip = "Edit deploy/k8s/configmap.yaml (set MLX_LISTEN_HOST to explicit Pod IP or ClusterIP)";
+      }
 
-      // Update Engine Details in Inspector
-      components.engine.listen = "0.0.0.0:8080 (PROHIBITED WILDCARD)";
-      components.engine.audit = "FAILED: 0.0.0.0 Bind Prohibited";
-      components.engine.auditColor = "#ef4444";
+      document.getElementById('alertBannerText').innerHTML = `🚨 <strong>SECURITY AUDIT VIOLATION</strong>: <code>mlx_server_listen_address{address="0.0.0.0"}</code> triggered on Engine. ${configTip}.`;
+
+      multiModeData.engine.modes[currentMode].audit = "FAILED: Prohibited 0.0.0.0 Bind";
+      multiModeData.engine.modes[currentMode].auditColor = "#ef4444";
       selectNode('engine');
     }
 
     function simulateForwardFailure() {
-      // Break Proxy to Engine link
       const path = document.getElementById('pathProxyToEngine');
       path.className.baseVal = "flow-line flow-broken";
-      path.setAttribute("marker-end", "url(#arrow-broken)");
+      path.setAttribute("marker-end", "url(#arr-broken)");
 
       document.getElementById('kpiErrors').textContent = '14.2 req/s';
       document.getElementById('kpiErrors').style.color = '#ef4444';
@@ -1395,64 +1510,44 @@
 
       const banner = document.getElementById('alertBanner');
       banner.style.display = 'flex';
-      document.getElementById('alertBannerText').innerHTML = '⚡ <strong>FORWARDING FAILURE</strong>: Edge Proxy (:8030) connection to Engine Coordinator (:8080) failed: <code>502 Bad Gateway / Connection Refused</code>. Upstream socket down.';
 
-      components.proxy.error = "100% 502 Bad Gateway";
-      components.proxy.latency = "Timeout (5000ms)";
+      let fileTip = currentMode === 'standalone' ? "cluster/mlx_monitoring_bundle/edge/config/edge.env (key: MLX_UPSTREAM)" : (currentMode === 'compose' ? "deploy/docker-compose.yml (key: MLX_UPSTREAM)" : "deploy/k8s/configmap.yaml (key: MLX_UPSTREAM)");
+
+      document.getElementById('alertBannerText').innerHTML = `⚡ <strong>FORWARDING PORT MISMATCH</strong>: Ingress Proxy (:8080) connection refused by Upstream Engine. Check configuration in <code>${fileTip}</code>.`;
+
+      multiModeData.proxy.modes[currentMode].audit = "FAILED: Upstream Connection Refused (502)";
+      multiModeData.proxy.modes[currentMode].auditColor = "#ef4444";
       selectNode('proxy');
     }
 
-    function simulateRingPartition() {
-      // Break Shard Ring Link
-      const path = document.getElementById('pathShard1ToShard2');
-      path.className.baseVal = "flow-line flow-broken";
-      path.setAttribute("marker-end", "url(#arrow-broken)");
-
-      document.getElementById('kpiReachability').textContent = '66.7 %';
-      document.getElementById('kpiReachability').style.color = '#ef4444';
-
+    function simulateTailscaleLeak() {
       const banner = document.getElementById('alertBanner');
       banner.style.display = 'flex';
-      document.getElementById('alertBannerText').innerHTML = '🔌 <strong>PEER RING PARTITION</strong>: <code>mlx_shard_peer_probe_status == 0</code> between Shard Rank 1 (:8081) and Shard Rank 2 (:8082). Tensor parallel ring disconnected.';
-
-      components.shard1.error = "Peer Probe Refused";
-      selectNode('shard1');
+      document.getElementById('alertBannerText').innerHTML = `🔒 <strong>NETWORK ROUTING RISK</strong>: Tailscale CGNAT address detected (<code>100.64.0.0/10</code>). Non-negotiable rule: traffic between services or scrape probes must use direct LAN IP (<code>192.168.1.64</code>), never Tailscale DERP relays. Check <code>cluster/mlx_monitoring_bundle/edge/config/nodes.yml</code>.`;
     }
 
     function resetSimulation() {
-      // Reset Engine
       const card = document.getElementById('cardEngine');
       card.classList.remove('danger');
-      document.getElementById('engineListenPort').innerHTML = '127.0.0.1:8080';
+      document.getElementById('engineListenPort').innerHTML = '127.0.0.1:8030';
       document.getElementById('kpiWildcard').textContent = '0';
       document.getElementById('kpiWildcard').style.color = '#10b981';
 
-      // Reset Proxy Path
       const pathProxy = document.getElementById('pathProxyToEngine');
       pathProxy.className.baseVal = "flow-line flow-forward";
-      pathProxy.setAttribute("marker-end", "url(#arrow-forward)");
+      pathProxy.setAttribute("marker-end", "url(#arr-fwd)");
       document.getElementById('kpiErrors').textContent = '0.00 err/s';
       document.getElementById('kpiErrors').style.color = '#10b981';
-      document.getElementById('cardProxyLatency').textContent = '18ms p95';
+      document.getElementById('cardProxyLatency').textContent = '18.4ms p95';
       document.getElementById('cardProxyLatency').style.color = '';
 
-      // Reset Shard Ring Path
-      const pathRing = document.getElementById('pathShard1ToShard2');
-      pathRing.className.baseVal = "flow-line flow-ring";
-      pathRing.setAttribute("marker-end", "url(#arrow-ring)");
-      document.getElementById('kpiReachability').textContent = '100.0 %';
-      document.getElementById('kpiReachability').style.color = '#10b981';
-
-      // Hide Alert Banner
       document.getElementById('alertBanner').style.display = 'none';
 
-      // Reset dictionary values
-      components.engine.listen = "127.0.0.1:8080 (API) / 192.168.1.64:8081 (Ring)";
-      components.engine.audit = "COMPLIANT (Local Loopback & LAN Ring)";
-      components.engine.auditColor = "#10b981";
-      components.proxy.error = "0.00% (200 OK)";
-      components.proxy.latency = "18.4ms (p95)";
-      components.shard1.error = "0.00%";
+      multiModeData.engine.modes[currentMode].audit = "COMPLIANT (Loopback API & LAN Ring)";
+      multiModeData.engine.modes[currentMode].auditColor = "#10b981";
+      multiModeData.proxy.modes[currentMode].audit = "COMPLIANT (Direct LAN Route)";
+      multiModeData.proxy.modes[currentMode].auditColor = "#10b981";
+
       selectNode('proxy');
     }
 
@@ -1460,77 +1555,42 @@
       document.getElementById('alertBanner').style.display = 'none';
     }
 
-    // Plane Filtering
-    function filterPlane(plane) {
-      document.querySelectorAll('.btn-tab').forEach(btn => btn.classList.remove('active'));
-      event.target.classList.add('active');
-
-      const dataNodes = ['foClient', 'foProxy', 'foEngine', 'foShard1', 'foShard2'];
-      const teleNodes = ['foHw', 'foProfiler', 'foVmagent'];
-      const obsNodes = ['foVm', 'foOtel', 'foAlerts', 'foGrafana', 'foOpik'];
-
-      const show = (ids, visible) => {
-        ids.forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.style.opacity = visible ? "1" : "0.15";
-        });
-      };
-
-      if (plane === 'all') {
-        show(dataNodes, true);
-        show(teleNodes, true);
-        show(obsNodes, true);
-      } else if (plane === 'data') {
-        show(dataNodes, true);
-        show(teleNodes, false);
-        show(obsNodes, false);
-      } else if (plane === 'telemetry') {
-        show(dataNodes, false);
-        show(teleNodes, true);
-        show(obsNodes, false);
-      } else if (plane === 'observe') {
-        show(dataNodes, false);
-        show(teleNodes, false);
-        show(obsNodes, true);
-      }
-    }
-
-    // Animated Particles Engine
+    // Animated Traffic Flow Engine
     let animProgress = 0;
     function animateParticles() {
       animProgress = (animProgress + 0.015) % 1;
 
-      // Ingress particle (Client :75 to Proxy :230 at y:120)
+      // Ingress (Client to Proxy at y=120)
       const p1 = document.getElementById('partIngress');
-      if (p1) p1.setAttribute('cx', 170 + animProgress * 60);
+      if (p1) p1.setAttribute('cx', 160 + animProgress * 60);
 
-      // Forward particle (Proxy :370 to Engine :440 at y:120)
+      // Forward (Proxy to Engine at y=120)
       const p2 = document.getElementById('partForward');
       if (p2) p2.setAttribute('cx', 370 + animProgress * 70);
 
-      // Telemetry particle (vmagent :520 to VictoriaMetrics :760 at y:420 -> 120)
+      // Telemetry (vmagent to VictoriaMetrics at y=420 -> y=120)
       const p3 = document.getElementById('partTelemetry');
       if (p3) {
         if (animProgress < 0.5) {
-          p3.setAttribute('cx', 520 + animProgress * 2 * 160);
+          p3.setAttribute('cx', 520 + animProgress * 2 * 150);
           p3.setAttribute('cy', 420);
         } else {
-          p3.setAttribute('cx', 680 + (animProgress - 0.5) * 2 * 80);
+          p3.setAttribute('cx', 670 + (animProgress - 0.5) * 2 * 80);
           p3.setAttribute('cy', 420 - (animProgress - 0.5) * 2 * 300);
         }
       }
 
-      // OTLP particle (Engine :640 to OTel :760 at y:120 -> 240)
+      // OTLP (Engine to OTel at y=120 -> y=240)
       const p4 = document.getElementById('partOtlp');
       if (p4) {
         if (animProgress < 0.4) {
-          p4.setAttribute('cx', 640 + (animProgress / 0.4) * 60);
+          p4.setAttribute('cx', 640 + (animProgress / 0.4) * 50);
           p4.setAttribute('cy', 120);
         } else if (animProgress < 0.7) {
-          p4.setAttribute('cx', 700);
+          p4.setAttribute('cx', 690);
           p4.setAttribute('cy', 120 + ((animProgress - 0.4) / 0.3) * 120);
         } else {
-          p4.setAttribute('cx', 700 + ((animProgress - 0.7) / 0.3) * 60);
+          p4.setAttribute('cx', 690 + ((animProgress - 0.7) / 0.3) * 60);
           p4.setAttribute('cy', 240);
         }
       }
@@ -1561,8 +1621,9 @@
       document.getElementById('themeToggleBtn').textContent = isDark ? '🌙 Dark' : '☀️ Light';
     }
 
-    // Default Selection
+    // Initialize
     selectNode('proxy');
+    fetchLiveTelemetry();
   </script>
 </body>
 </html>

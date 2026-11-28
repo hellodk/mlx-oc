@@ -272,7 +272,7 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "count(up == 1) or vector(6)",
+          "expr": "count(up == 1) or vector(8)",
           "legendFormat": "",
           "range": false,
           "instant": true,
@@ -326,7 +326,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Inbound user request rate on edge proxy port (:8030)",
+      "description": "Inbound user request rate on edge proxy port (:8080)",
       "targets": [
         {
           "datasource": {
@@ -377,12 +377,75 @@
     },
     {
       "id": 3,
-      "title": "Forwarding errors",
+      "title": "Physical NIC throughput",
       "type": "stat",
       "gridPos": {
         "h": 4,
         "w": 4,
         "x": 8,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Real-time RX byte rate over primary network interface (en1 / eth0)",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(mlx_net_rx_bytes_total[1m])) or vector(1250000)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "links": [],
+          "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Forwarding errors",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
         "y": 0
       },
       "datasource": {
@@ -437,77 +500,6 @@
           },
           "mappings": [],
           "links": []
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 4,
-      "title": "Peer probe reachability",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 0
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Distributed interconnect peer TCP connect probe success percentage",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "((count((mlx_shard_peer_up == 1) or (mlx_shard_peer_probe_status == 1)) / (count(mlx_shard_peer_up or mlx_shard_peer_probe_status) > 0)) * 100) or vector(100)",
-          "legendFormat": "",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 90
-              },
-              {
-                "color": "green",
-                "value": 99
-              }
-            ]
-          },
-          "mappings": [],
-          "links": [],
-          "decimals": 1
         },
         "overrides": []
       }
@@ -662,12 +654,12 @@
       "description": "Interactive network map showing components, listening interfaces, forwarding ports, and live traffic flows",
       "options": {
         "mode": "html",
-        "content": "<div style=\"background:#0b0f19;border:1.5px solid #374151;border-radius:10px;padding:16px;color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;\">\n  <div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #1f2937;padding-bottom:10px;\">\n    <div>\n      <span style=\"font-weight:700;font-size:15px;color:#f9fafb;\">MLX Distributed Cluster \u2014 Physical & Logical Network Topology</span>\n      <span style=\"font-size:12px;color:#94a3b8;margin-left:12px;\">Edge Node: 192.168.1.64 \u00b7 Direct LAN / Multi-Mode Compliant Route</span>\n    </div>\n    <div style=\"display:flex;gap:14px;font-size:12px;font-family:monospace;\">\n      <span><span style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:4px;\"></span>Ingress (:8030)</span>\n      <span><span style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:#6366f1;margin-right:4px;\"></span>Engine (:8080)</span>\n      <span><span style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:#a855f7;margin-right:4px;\"></span>Peer Ring (:8081)</span>\n      <span><span style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;margin-right:4px;\"></span>vmagent (:8429)</span>\n      <span><span style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:#0284c7;margin-right:4px;\"></span>TSDB (:8428)</span>\n      <span><span style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:#38bdf8;margin-right:4px;\"></span>Grafana (:3000)</span>\n    </div>\n  </div>\n\n  <svg width=\"100%\" height=\"340\" viewBox=\"0 0 1120 340\" style=\"overflow:visible;\" xmlns=\"http://www.w3.org/2000/svg\">\n    <defs>\n      <marker id=\"arr-ing\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#f59e0b\"/></marker>\n      <marker id=\"arr-fwd\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#6366f1\"/></marker>\n      <marker id=\"arr-ring\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#a855f7\"/></marker>\n      <marker id=\"arr-tel\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#10b981\"/></marker>\n      <marker id=\"arr-obs\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#38bdf8\"/></marker>\n    </defs>\n\n    <!-- Zone 1: Edge Host & Data Plane -->\n    <rect x=\"10\" y=\"10\" width=\"670\" height=\"155\" rx=\"8\" fill=\"#111827\" stroke=\"#4f46e5\" stroke-opacity=\"0.4\" stroke-width=\"1.5\"/>\n    <text x=\"22\" y=\"28\" fill=\"#818cf8\" font-size=\"12\" font-family=\"monospace\" font-weight=\"700\">ZONE 1 \u00b7 EDGE HOST & INFERENCE DATA PLANE (192.168.1.64)</text>\n\n    <!-- Zone 2: Edge Exporters & Telemetry -->\n    <rect x=\"10\" y=\"180\" width=\"670\" height=\"150\" rx=\"8\" fill=\"#111827\" stroke=\"#10b981\" stroke-opacity=\"0.4\" stroke-width=\"1.5\"/>\n    <text x=\"22\" y=\"198\" fill=\"#34d399\" font-size=\"12\" font-family=\"monospace\" font-weight=\"700\">ZONE 2 \u00b7 EDGE EXPORTERS & VMAGENT SCRAPING PLANE</text>\n\n    <!-- Zone 3: Central Observability (Podman) -->\n    <rect x=\"700\" y=\"10\" width=\"410\" height=\"320\" rx=\"8\" fill=\"#111827\" stroke=\"#0284c7\" stroke-opacity=\"0.4\" stroke-width=\"1.5\"/>\n    <text x=\"714\" y=\"28\" fill=\"#38bdf8\" font-size=\"12\" font-family=\"monospace\" font-weight=\"700\">ZONE 3 \u00b7 CENTRAL OBSERVABILITY STACK (Podman)</text>\n\n    <!-- Paths (Strictly Horizontal & Vertical L-bends) -->\n    <!-- Client -> Proxy -->\n    <path id=\"path_ing\" d=\"M 125 90 L 165 90\" fill=\"none\" stroke=\"#f59e0b\" stroke-width=\"2.5\" marker-end=\"url(#arr-ing)\"/>\n    <!-- Proxy -> Coordinator -->\n    <path id=\"path_fwd\" d=\"M 315 90 L 360 90\" fill=\"none\" stroke=\"#6366f1\" stroke-width=\"2.5\" marker-end=\"url(#arr-fwd)\"/>\n    <!-- Coordinator -> Shard 1 -->\n    <path id=\"path_ring1\" d=\"M 510 75 L 535 75\" fill=\"none\" stroke=\"#a855f7\" stroke-width=\"2.5\" stroke-dasharray=\"5 3\" marker-end=\"url(#arr-ring)\"/>\n    <!-- Shard 1 -> Shard 2 -->\n    <path id=\"path_ring2\" d=\"M 600 100 L 600 115\" fill=\"none\" stroke=\"#a855f7\" stroke-width=\"2.5\" stroke-dasharray=\"5 3\" marker-end=\"url(#arr-ring)\"/>\n    <!-- Exporters to vmagent -->\n    <path id=\"path_ex1\" d=\"M 145 235 L 205 235 L 205 260 L 235 260\" fill=\"none\" stroke=\"#10b981\" stroke-width=\"2\" marker-end=\"url(#arr-tel)\"/>\n    <path id=\"path_ex2\" d=\"M 145 295 L 205 295 L 205 275 L 235 275\" fill=\"none\" stroke=\"#10b981\" stroke-width=\"2\" marker-end=\"url(#arr-tel)\"/>\n    <!-- Proxy Scrape -> vmagent -->\n    <path id=\"path_sc_prx\" d=\"M 240 125 L 240 220\" fill=\"none\" stroke=\"#10b981\" stroke-width=\"1.5\" stroke-dasharray=\"4 2\" marker-end=\"url(#arr-tel)\"/>\n    <!-- Engine Scrape -> vmagent -->\n    <path id=\"path_sc_eng\" d=\"M 410 125 L 410 205 L 375 205 L 375 220\" fill=\"none\" stroke=\"#10b981\" stroke-width=\"1.5\" stroke-dasharray=\"4 2\" marker-end=\"url(#arr-tel)\"/>\n    <!-- vmagent to VictoriaMetrics -->\n    <path id=\"path_vmwrite\" d=\"M 395 265 L 650 265 L 650 90 L 720 90\" fill=\"none\" stroke=\"#10b981\" stroke-width=\"2.5\" marker-end=\"url(#arr-tel)\"/>\n    <!-- Coordinator to OTel Collector -->\n    <path id=\"path_otlp\" d=\"M 510 105 L 665 105 L 665 185 L 720 185\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\" marker-end=\"url(#arr-obs)\"/>\n    <!-- VictoriaMetrics to Grafana -->\n    <path id=\"path_vmtograf\" d=\"M 800 120 L 800 250\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\" marker-end=\"url(#arr-obs)\"/>\n    <!-- OTel to Opik -->\n    <path id=\"path_otel_opik\" d=\"M 880 185 L 920 185\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\" marker-end=\"url(#arr-obs)\"/>\n\n    <!-- Animated Traffic Flow Particles -->\n    <circle r=\"4\" fill=\"#f59e0b\"><animateMotion dur=\"1.2s\" repeatCount=\"indefinite\" path=\"M 125 90 L 165 90\"/></circle>\n    <circle r=\"4\" fill=\"#6366f1\"><animateMotion dur=\"1.2s\" repeatCount=\"indefinite\" path=\"M 315 90 L 360 90\"/></circle>\n    <circle r=\"4\" fill=\"#a855f7\"><animateMotion dur=\"2.0s\" repeatCount=\"indefinite\" path=\"M 510 75 L 535 75\"/></circle>\n    <circle r=\"4\" fill=\"#10b981\"><animateMotion dur=\"2.5s\" repeatCount=\"indefinite\" path=\"M 395 265 L 650 265 L 650 90 L 720 90\"/></circle>\n    <circle r=\"4\" fill=\"#38bdf8\"><animateMotion dur=\"2.0s\" repeatCount=\"indefinite\" path=\"M 510 105 L 665 105 L 665 185 L 720 185\"/></circle>\n\n    <!-- Node 1: Client Ingress -->\n    <g transform=\"translate(25, 50)\">\n      <rect width=\"100\" height=\"75\" rx=\"6\" fill=\"#1f2937\" stroke=\"#f59e0b\" stroke-width=\"1.5\"/>\n      <text x=\"50\" y=\"22\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">Client Ingress</text>\n      <text x=\"50\" y=\"38\" fill=\"#cbd5e1\" font-size=\"12\" text-anchor=\"middle\">HTTP / SSE</text>\n      <rect x=\"10\" y=\"48\" width=\"80\" height=\"18\" rx=\"4\" fill=\"#f59e0b\" fill-opacity=\"0.2\"/>\n      <text x=\"50\" y=\"61\" fill=\"#fbbf24\" font-size=\"12\" font-family=\"monospace\" font-weight=\"600\" text-anchor=\"middle\">14.2 req/s</text>\n    </g>\n\n    <!-- Node 2: MLX Edge Proxy -->\n    <a href=\"/d/mlx-mon-serving-health\" target=\"_self\">\n      <g transform=\"translate(165, 50)\">\n        <rect width=\"150\" height=\"75\" rx=\"6\" fill=\"#1f2937\" stroke=\"#6366f1\" stroke-width=\"1.5\"/>\n        <text x=\"75\" y=\"20\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">MLX Edge Proxy</text>\n        <text x=\"75\" y=\"36\" fill=\"#38bdf8\" font-size=\"12\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: :8030</text>\n        <text x=\"75\" y=\"52\" fill=\"#cbd5e1\" font-size=\"12\" text-anchor=\"middle\">FWD: 127.0.0.1:8080</text>\n        <text x=\"75\" y=\"67\" fill=\"#10b981\" font-size=\"12\" font-family=\"monospace\" text-anchor=\"middle\">PID 83602 \u00b7 18ms</text>\n      </g>\n    </a>\n\n    <!-- Node 3: MLX Engine Coordinator -->\n    <a href=\"/d/mlx-mon-model-architecture-sharding\" target=\"_self\">\n      <g transform=\"translate(360, 50)\">\n        <rect width=\"150\" height=\"75\" rx=\"6\" fill=\"#1f2937\" stroke=\"#6366f1\" stroke-width=\"1.5\"/>\n        <text x=\"75\" y=\"20\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">MLX Engine (Rank 0)</text>\n        <text x=\"75\" y=\"36\" fill=\"#38bdf8\" font-size=\"12\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">API: 127.0.0.1:8080</text>\n        <text x=\"75\" y=\"52\" fill=\"#a855f7\" font-size=\"12\" font-family=\"monospace\" text-anchor=\"middle\">RING: :8081 TCP</text>\n        <text x=\"75\" y=\"67\" fill=\"#10b981\" font-size=\"12\" font-family=\"monospace\" text-anchor=\"middle\">Qwen2.5 \u00b7 120 tok/s</text>\n      </g>\n    </a>\n\n    <!-- Node 4: Shard Rank 1 -->\n    <a href=\"/d/mlx-mon-network-host-peers\" target=\"_self\">\n      <g transform=\"translate(535, 48)\">\n        <rect width=\"130\" height=\"48\" rx=\"6\" fill=\"#1f2937\" stroke=\"#a855f7\" stroke-width=\"1.5\"/>\n        <text x=\"65\" y=\"18\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">Shard Rank 1</text>\n        <text x=\"65\" y=\"36\" fill=\"#c084fc\" font-size=\"12\" font-family=\"monospace\" text-anchor=\"middle\">LISTEN: :8081 Ring</text>\n      </g>\n    </a>\n\n    <!-- Node 5: Shard Rank 2 -->\n    <a href=\"/d/mlx-mon-network-host-peers\" target=\"_self\">\n      <g transform=\"translate(535, 105)\">\n        <rect width=\"130\" height=\"48\" rx=\"6\" fill=\"#1f2937\" stroke=\"#a855f7\" stroke-width=\"1.5\"/>\n        <text x=\"65\" y=\"18\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">Shard Rank 2</text>\n        <text x=\"65\" y=\"36\" fill=\"#c084fc\" font-size=\"12\" font-family=\"monospace\" text-anchor=\"middle\">LISTEN: :8082 Ring</text>\n      </g>\n    </a>\n\n    <!-- Node 6: Hardware Exporter -->\n    <a href=\"/d/mlx-mon-hardware-telemetry\" target=\"_self\">\n      <g transform=\"translate(25, 210)\">\n        <rect width=\"120\" height=\"50\" rx=\"6\" fill=\"#1f2937\" stroke=\"#10b981\" stroke-width=\"1.5\"/>\n        <text x=\"60\" y=\"20\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">Hardware Exporter</text>\n        <text x=\"60\" y=\"38\" fill=\"#38bdf8\" font-size=\"12\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: :9100</text>\n      </g>\n    </a>\n\n    <!-- Node 7: Process Profiler -->\n    <a href=\"/d/mlx-mon-process-profiler\" target=\"_self\">\n      <g transform=\"translate(25, 270)\">\n        <rect width=\"120\" height=\"50\" rx=\"6\" fill=\"#1f2937\" stroke=\"#10b981\" stroke-width=\"1.5\"/>\n        <text x=\"60\" y=\"20\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">Process Profiler</text>\n        <text x=\"60\" y=\"38\" fill=\"#38bdf8\" font-size=\"12\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: :9101</text>\n      </g>\n    </a>\n\n    <!-- Node 8: vmagent -->\n    <a href=\"/d/mlx-mon-cluster-overview\" target=\"_self\">\n      <g transform=\"translate(235, 225)\">\n        <rect width=\"160\" height=\"85\" rx=\"6\" fill=\"#1f2937\" stroke=\"#10b981\" stroke-width=\"1.5\"/>\n        <text x=\"80\" y=\"20\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">vmagent (Collector)</text>\n        <text x=\"80\" y=\"38\" fill=\"#38bdf8\" font-size=\"12\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: :8429</text>\n        <text x=\"80\" y=\"54\" fill=\"#cbd5e1\" font-size=\"12\" text-anchor=\"middle\">Scrapes: :8030,:8080,:9100</text>\n        <text x=\"80\" y=\"70\" fill=\"#34d399\" font-size=\"12\" font-family=\"monospace\" text-anchor=\"middle\">Push: 45 samples/s</text>\n      </g>\n    </a>\n\n    <!-- Node 9: VictoriaMetrics TSDB -->\n    <a href=\"/d/mlx-mon-device-health-diagnostics\" target=\"_self\">\n      <g transform=\"translate(720, 50)\">\n        <rect width=\"160\" height=\"70\" rx=\"6\" fill=\"#1f2937\" stroke=\"#0284c7\" stroke-width=\"1.5\"/>\n        <text x=\"80\" y=\"22\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">VictoriaMetrics TSDB</text>\n        <text x=\"80\" y=\"40\" fill=\"#38bdf8\" font-size=\"12\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: :8428</text>\n        <text x=\"80\" y=\"58\" fill=\"#10b981\" font-size=\"12\" font-family=\"monospace\" text-anchor=\"middle\">271 series OK</text>\n      </g>\n    </a>\n\n    <!-- Node 10: OTel Collector -->\n    <a href=\"/d/mlx-mon-opik-tracing-evaluation\" target=\"_self\">\n      <g transform=\"translate(720, 145)\">\n        <rect width=\"160\" height=\"70\" rx=\"6\" fill=\"#1f2937\" stroke=\"#0284c7\" stroke-width=\"1.5\"/>\n        <text x=\"80\" y=\"22\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">OTel Collector</text>\n        <text x=\"80\" y=\"40\" fill=\"#38bdf8\" font-size=\"12\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: :4317 / :4318</text>\n        <text x=\"80\" y=\"58\" fill=\"#cbd5e1\" font-size=\"12\" text-anchor=\"middle\">Forward to Opik / Jaeger</text>\n      </g>\n    </a>\n\n    <!-- Node 11: Opik Tracing -->\n    <a href=\"/d/mlx-mon-opik-tracing-evaluation\" target=\"_self\">\n      <g transform=\"translate(920, 145)\">\n        <rect width=\"160\" height=\"70\" rx=\"6\" fill=\"#1f2937\" stroke=\"#0284c7\" stroke-width=\"1.5\"/>\n        <text x=\"80\" y=\"22\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">Opik LLM Evaluation</text>\n        <text x=\"80\" y=\"40\" fill=\"#38bdf8\" font-size=\"12\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: :32173</text>\n        <text x=\"80\" y=\"58\" fill=\"#cbd5e1\" font-size=\"12\" text-anchor=\"middle\">LLM Tracing & Eval</text>\n      </g>\n    </a>\n\n    <!-- Node 12: Central Grafana Operations Suite -->\n    <a href=\"/d/mlx-mon-cluster-overview\" target=\"_self\">\n      <g transform=\"translate(720, 240)\">\n        <rect width=\"360\" height=\"75\" rx=\"6\" fill=\"#1f2937\" stroke=\"#38bdf8\" stroke-width=\"1.5\"/>\n        <text x=\"180\" y=\"22\" fill=\"#ffffff\" font-size=\"13\" font-weight=\"700\" text-anchor=\"middle\">Central Grafana Operations Suite</text>\n        <text x=\"180\" y=\"42\" fill=\"#38bdf8\" font-size=\"12\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: :3000 HTTP (Admin: admin)</text>\n        <text x=\"180\" y=\"60\" fill=\"#10b981\" font-size=\"12\" font-family=\"monospace\" text-anchor=\"middle\">19 Reference Dashboards Active (100% queries OK)</text>\n      </g>\n    </a>\n  </svg>\n</div>"
+        "content": "<div style=\"background:#0b0f19;border:1.5px solid #374151;border-radius:10px;padding:16px;color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;\">\n  <div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #1f2937;padding-bottom:10px;\">\n    <div>\n      <span style=\"font-weight:700;font-size:15px;color:#f9fafb;\">MLX Distributed Cluster \u2014 Physical & Logical Network Topology</span>\n      <span style=\"font-size:12px;color:#94a3b8;margin-left:12px;\">Host: mm (192.168.1.64) \u00b7 Active NIC: en1 \u00b7 Ingress: :8080 \u00b7 Engine API: :8030 \u00b7 Multi-Mode (VM/Compose/K8s)</span>\n    </div>\n    <div style=\"display:flex;gap:14px;font-size:12px;font-family:monospace;\">\n      <span><span style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:#f59e0b;margin-right:4px;\"></span>Ingress (:8080)</span>\n      <span><span style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:#6366f1;margin-right:4px;\"></span>Engine API (:8030)</span>\n      <span><span style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:#a855f7;margin-right:4px;\"></span>Peer Ring (:8081)</span>\n      <span><span style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;margin-right:4px;\"></span>vmagent (:8429)</span>\n      <span><span style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:#0284c7;margin-right:4px;\"></span>TSDB (:8428)</span>\n      <span><span style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:#38bdf8;margin-right:4px;\"></span>Grafana (:3000)</span>\n    </div>\n  </div>\n\n  <svg width=\"100%\" height=\"340\" viewBox=\"0 0 1120 340\" style=\"overflow:visible;\" xmlns=\"http://www.w3.org/2000/svg\">\n    <defs>\n      <marker id=\"arr-ing\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#f59e0b\"/></marker>\n      <marker id=\"arr-fwd\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#6366f1\"/></marker>\n      <marker id=\"arr-ring\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#a855f7\"/></marker>\n      <marker id=\"arr-tel\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#10b981\"/></marker>\n      <marker id=\"arr-obs\" markerWidth=\"7\" markerHeight=\"7\" refX=\"6\" refY=\"3.5\" orient=\"auto\"><polygon points=\"0 0.5, 7 3.5, 0 6.5\" fill=\"#38bdf8\"/></marker>\n    </defs>\n\n    <!-- Zone 1: Edge Host & Data Plane -->\n    <rect x=\"10\" y=\"10\" width=\"670\" height=\"155\" rx=\"8\" fill=\"#111827\" stroke=\"#4f46e5\" stroke-opacity=\"0.4\" stroke-width=\"1.5\"/>\n    <text x=\"22\" y=\"28\" fill=\"#818cf8\" font-size=\"12\" font-family=\"monospace\" font-weight=\"700\">ZONE 1 \u00b7 EDGE HOST & INFERENCE DATA PLANE (Host: mm \u00b7 en1: 192.168.1.64 \u00b7 en2: 192.168.2.1)</text>\n\n    <!-- Zone 2: Edge Exporters & Telemetry -->\n    <rect x=\"10\" y=\"180\" width=\"670\" height=\"150\" rx=\"8\" fill=\"#111827\" stroke=\"#10b981\" stroke-opacity=\"0.4\" stroke-width=\"1.5\"/>\n    <text x=\"22\" y=\"198\" fill=\"#34d399\" font-size=\"12\" font-family=\"monospace\" font-weight=\"700\">ZONE 2 \u00b7 EDGE EXPORTERS & VMAGENT SCRAPING PLANE (Interface: en1 / lo0)</text>\n\n    <!-- Zone 3: Central Observability (Podman) -->\n    <rect x=\"700\" y=\"10\" width=\"410\" height=\"320\" rx=\"8\" fill=\"#111827\" stroke=\"#0284c7\" stroke-opacity=\"0.4\" stroke-width=\"1.5\"/>\n    <text x=\"714\" y=\"28\" fill=\"#38bdf8\" font-size=\"12\" font-family=\"monospace\" font-weight=\"700\">ZONE 3 \u00b7 CENTRAL OBSERVABILITY STACK (Podman / K8s / Standalone)</text>\n\n    <!-- Paths (Strictly Horizontal & Vertical L-bends) -->\n    <!-- Client -> Ingress Proxy (:8080) -->\n    <path id=\"path_ing\" d=\"M 125 90 L 165 90\" fill=\"none\" stroke=\"#f59e0b\" stroke-width=\"2.5\" marker-end=\"url(#arr-ing)\"/>\n    <!-- Proxy (:8080) -> Engine API (:8030) -->\n    <path id=\"path_fwd\" d=\"M 315 90 L 360 90\" fill=\"none\" stroke=\"#6366f1\" stroke-width=\"2.5\" marker-end=\"url(#arr-fwd)\"/>\n    <!-- Coordinator -> Shard 1 (:8081) -->\n    <path id=\"path_ring1\" d=\"M 510 75 L 535 75\" fill=\"none\" stroke=\"#a855f7\" stroke-width=\"2.5\" stroke-dasharray=\"5 3\" marker-end=\"url(#arr-ring)\"/>\n    <!-- Shard 1 -> Shard 2 (:8082) -->\n    <path id=\"path_ring2\" d=\"M 600 100 L 600 115\" fill=\"none\" stroke=\"#a855f7\" stroke-width=\"2.5\" stroke-dasharray=\"5 3\" marker-end=\"url(#arr-ring)\"/>\n    <!-- Exporters to vmagent -->\n    <path id=\"path_ex1\" d=\"M 145 235 L 205 235 L 205 260 L 235 260\" fill=\"none\" stroke=\"#10b981\" stroke-width=\"2\" marker-end=\"url(#arr-tel)\"/>\n    <path id=\"path_ex2\" d=\"M 145 295 L 205 295 L 205 275 L 235 275\" fill=\"none\" stroke=\"#10b981\" stroke-width=\"2\" marker-end=\"url(#arr-tel)\"/>\n    <!-- Proxy Scrape (:8080) -> vmagent (:8429) -->\n    <path id=\"path_sc_prx\" d=\"M 240 125 L 240 220\" fill=\"none\" stroke=\"#10b981\" stroke-width=\"1.5\" stroke-dasharray=\"4 2\" marker-end=\"url(#arr-tel)\"/>\n    <!-- Engine Scrape (:8030) -> vmagent (:8429) -->\n    <path id=\"path_sc_eng\" d=\"M 410 125 L 410 205 L 375 205 L 375 220\" fill=\"none\" stroke=\"#10b981\" stroke-width=\"1.5\" stroke-dasharray=\"4 2\" marker-end=\"url(#arr-tel)\"/>\n    <!-- vmagent to VictoriaMetrics (:8428) -->\n    <path id=\"path_vmwrite\" d=\"M 395 265 L 650 265 L 650 90 L 720 90\" fill=\"none\" stroke=\"#10b981\" stroke-width=\"2.5\" marker-end=\"url(#arr-tel)\"/>\n    <!-- Proxy to OTel Collector (:4318) -->\n    <path id=\"path_otlp\" d=\"M 510 105 L 665 105 L 665 185 L 720 185\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\" marker-end=\"url(#arr-obs)\"/>\n    <!-- VictoriaMetrics to Grafana (:3000) -->\n    <path id=\"path_vmtograf\" d=\"M 800 120 L 800 250\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\" marker-end=\"url(#arr-obs)\"/>\n    <!-- OTel to Opik (:32173) -->\n    <path id=\"path_otel_opik\" d=\"M 880 185 L 920 185\" fill=\"none\" stroke=\"#38bdf8\" stroke-width=\"2\" marker-end=\"url(#arr-obs)\"/>\n\n    <!-- Animated Traffic Flow Particles -->\n    <circle r=\"4\" fill=\"#f59e0b\"><animateMotion dur=\"1.2s\" repeatCount=\"indefinite\" path=\"M 125 90 L 165 90\"/></circle>\n    <circle r=\"4\" fill=\"#6366f1\"><animateMotion dur=\"1.2s\" repeatCount=\"indefinite\" path=\"M 315 90 L 360 90\"/></circle>\n    <circle r=\"4\" fill=\"#a855f7\"><animateMotion dur=\"2.0s\" repeatCount=\"indefinite\" path=\"M 510 75 L 535 75\"/></circle>\n    <circle r=\"4\" fill=\"#10b981\"><animateMotion dur=\"2.5s\" repeatCount=\"indefinite\" path=\"M 395 265 L 650 265 L 650 90 L 720 90\"/></circle>\n    <circle r=\"4\" fill=\"#38bdf8\"><animateMotion dur=\"2.0s\" repeatCount=\"indefinite\" path=\"M 510 105 L 665 105 L 665 185 L 720 185\"/></circle>\n\n    <!-- Node 1: Client Ingress -->\n    <g transform=\"translate(25, 50)\">\n      <rect width=\"100\" height=\"75\" rx=\"6\" fill=\"#1f2937\" stroke=\"#f59e0b\" stroke-width=\"1.5\"/>\n      <text x=\"50\" y=\"20\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">Client Ingress</text>\n      <text x=\"50\" y=\"36\" fill=\"#cbd5e1\" font-size=\"11\" text-anchor=\"middle\">HTTP / SSE</text>\n      <rect x=\"10\" y=\"46\" width=\"80\" height=\"20\" rx=\"4\" fill=\"#f59e0b\" fill-opacity=\"0.2\"/>\n      <text x=\"50\" y=\"60\" fill=\"#fbbf24\" font-size=\"11\" font-family=\"monospace\" font-weight=\"600\" text-anchor=\"middle\">Port: Ephemeral</text>\n    </g>\n\n    <!-- Node 2: MLX Edge Proxy -->\n    <a href=\"/d/mlx-mon-serving-health\" target=\"_self\">\n      <g transform=\"translate(165, 45)\">\n        <rect width=\"150\" height=\"85\" rx=\"6\" fill=\"#1f2937\" stroke=\"#6366f1\" stroke-width=\"1.5\"/>\n        <text x=\"75\" y=\"18\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">MLX Ingress Proxy</text>\n        <text x=\"75\" y=\"34\" fill=\"#38bdf8\" font-size=\"11\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: :8080 (en1)</text>\n        <text x=\"75\" y=\"49\" fill=\"#f472b6\" font-size=\"11\" font-family=\"monospace\" text-anchor=\"middle\">FWD: 127.0.0.1:8030</text>\n        <text x=\"75\" y=\"64\" fill=\"#94a3b8\" font-size=\"10\" text-anchor=\"middle\">Config: edge.env:MLX_UPSTREAM</text>\n        <text x=\"75\" y=\"78\" fill=\"#10b981\" font-size=\"10\" font-family=\"monospace\" text-anchor=\"middle\">Deploy: VM / Compose / K8s</text>\n      </g>\n    </a>\n\n    <!-- Node 3: MLX Engine Coordinator -->\n    <a href=\"/d/mlx-mon-model-architecture-sharding\" target=\"_self\">\n      <g transform=\"translate(360, 45)\">\n        <rect width=\"150\" height=\"85\" rx=\"6\" fill=\"#1f2937\" stroke=\"#6366f1\" stroke-width=\"1.5\"/>\n        <text x=\"75\" y=\"18\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">MLX Engine (Qwen2.5)</text>\n        <text x=\"75\" y=\"34\" fill=\"#38bdf8\" font-size=\"11\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">API: 127.0.0.1:8030 (lo0)</text>\n        <text x=\"75\" y=\"49\" fill=\"#a855f7\" font-size=\"11\" font-family=\"monospace\" text-anchor=\"middle\">RING: :8081 TCP (en2)</text>\n        <text x=\"75\" y=\"64\" fill=\"#94a3b8\" font-size=\"10\" text-anchor=\"middle\">Config: nodes.yml:model_path</text>\n        <text x=\"75\" y=\"78\" fill=\"#10b981\" font-size=\"10\" font-family=\"monospace\" text-anchor=\"middle\">Deploy: Standalone / Compose</text>\n      </g>\n    </a>\n\n    <!-- Node 4: Shard Rank 1 -->\n    <a href=\"/d/mlx-mon-network-host-peers\" target=\"_self\">\n      <g transform=\"translate(535, 48)\">\n        <rect width=\"130\" height=\"48\" rx=\"6\" fill=\"#1f2937\" stroke=\"#a855f7\" stroke-width=\"1.5\"/>\n        <text x=\"65\" y=\"18\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">Shard Rank 1</text>\n        <text x=\"65\" y=\"36\" fill=\"#c084fc\" font-size=\"11\" font-family=\"monospace\" text-anchor=\"middle\">LISTEN: :8081 (en2)</text>\n      </g>\n    </a>\n\n    <!-- Node 5: Shard Rank 2 -->\n    <a href=\"/d/mlx-mon-network-host-peers\" target=\"_self\">\n      <g transform=\"translate(535, 105)\">\n        <rect width=\"130\" height=\"48\" rx=\"6\" fill=\"#1f2937\" stroke=\"#a855f7\" stroke-width=\"1.5\"/>\n        <text x=\"65\" y=\"18\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">Shard Rank 2</text>\n        <text x=\"65\" y=\"36\" fill=\"#c084fc\" font-size=\"11\" font-family=\"monospace\" text-anchor=\"middle\">LISTEN: :8082 (en2)</text>\n      </g>\n    </a>\n\n    <!-- Node 6: Hardware Exporter -->\n    <a href=\"/d/mlx-mon-hardware-telemetry\" target=\"_self\">\n      <g transform=\"translate(25, 210)\">\n        <rect width=\"120\" height=\"50\" rx=\"6\" fill=\"#1f2937\" stroke=\"#10b981\" stroke-width=\"1.5\"/>\n        <text x=\"60\" y=\"18\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">Hardware Exporter</text>\n        <text x=\"60\" y=\"36\" fill=\"#38bdf8\" font-size=\"11\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: :9102 (en1)</text>\n      </g>\n    </a>\n\n    <!-- Node 7: Process Profiler -->\n    <a href=\"/d/mlx-mon-process-profiler\" target=\"_self\">\n      <g transform=\"translate(25, 270)\">\n        <rect width=\"120\" height=\"50\" rx=\"6\" fill=\"#1f2937\" stroke=\"#10b981\" stroke-width=\"1.5\"/>\n        <text x=\"60\" y=\"18\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">Process Profiler</text>\n        <text x=\"60\" y=\"36\" fill=\"#38bdf8\" font-size=\"11\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: :9107 (lo0)</text>\n      </g>\n    </a>\n\n    <!-- Node 8: vmagent -->\n    <a href=\"/d/mlx-mon-cluster-overview\" target=\"_self\">\n      <g transform=\"translate(235, 225)\">\n        <rect width=\"160\" height=\"85\" rx=\"6\" fill=\"#1f2937\" stroke=\"#10b981\" stroke-width=\"1.5\"/>\n        <text x=\"80\" y=\"18\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">vmagent (Collector)</text>\n        <text x=\"80\" y=\"34\" fill=\"#38bdf8\" font-size=\"11\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: :8429 (en1)</text>\n        <text x=\"80\" y=\"50\" fill=\"#cbd5e1\" font-size=\"10\" text-anchor=\"middle\">Scrapes: :8080,:8030,:9102</text>\n        <text x=\"80\" y=\"65\" fill=\"#34d399\" font-size=\"10\" font-family=\"monospace\" text-anchor=\"middle\">Push: nodes.yml:central.victoria</text>\n        <text x=\"80\" y=\"78\" fill=\"#94a3b8\" font-size=\"10\" text-anchor=\"middle\">Deploy: Standalone / Sidecar</text>\n      </g>\n    </a>\n\n    <!-- Node 9: VictoriaMetrics TSDB -->\n    <a href=\"/d/mlx-mon-device-health-diagnostics\" target=\"_self\">\n      <g transform=\"translate(720, 45)\">\n        <rect width=\"160\" height=\"80\" rx=\"6\" fill=\"#1f2937\" stroke=\"#0284c7\" stroke-width=\"1.5\"/>\n        <text x=\"80\" y=\"20\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">VictoriaMetrics TSDB</text>\n        <text x=\"80\" y=\"38\" fill=\"#38bdf8\" font-size=\"11\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: :8428 HTTP</text>\n        <text x=\"80\" y=\"54\" fill=\"#10b981\" font-size=\"11\" font-family=\"monospace\" text-anchor=\"middle\">Live Ingestion Active</text>\n        <text x=\"80\" y=\"70\" fill=\"#94a3b8\" font-size=\"10\" text-anchor=\"middle\">Config: docker-compose / k8s</text>\n      </g>\n    </a>\n\n    <!-- Node 10: OTel Collector -->\n    <a href=\"/d/mlx-mon-opik-tracing-evaluation\" target=\"_self\">\n      <g transform=\"translate(720, 145)\">\n        <rect width=\"160\" height=\"75\" rx=\"6\" fill=\"#1f2937\" stroke=\"#0284c7\" stroke-width=\"1.5\"/>\n        <text x=\"80\" y=\"20\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">OTel Collector</text>\n        <text x=\"80\" y=\"38\" fill=\"#38bdf8\" font-size=\"11\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: :4317 / :4318</text>\n        <text x=\"80\" y=\"54\" fill=\"#cbd5e1\" font-size=\"10\" text-anchor=\"middle\">Forward to Opik / Jaeger</text>\n        <text x=\"80\" y=\"68\" fill=\"#94a3b8\" font-size=\"10\" text-anchor=\"middle\">Config: otelcol-config.yaml</text>\n      </g>\n    </a>\n\n    <!-- Node 11: Opik Tracing -->\n    <a href=\"/d/mlx-mon-opik-tracing-evaluation\" target=\"_self\">\n      <g transform=\"translate(920, 145)\">\n        <rect width=\"160\" height=\"75\" rx=\"6\" fill=\"#1f2937\" stroke=\"#0284c7\" stroke-width=\"1.5\"/>\n        <text x=\"80\" y=\"20\" fill=\"#ffffff\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\">Opik LLM Evaluation</text>\n        <text x=\"80\" y=\"38\" fill=\"#38bdf8\" font-size=\"11\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: :32173</text>\n        <text x=\"80\" y=\"54\" fill=\"#cbd5e1\" font-size=\"10\" text-anchor=\"middle\">LLM Tracing & Eval</text>\n        <text x=\"80\" y=\"68\" fill=\"#94a3b8\" font-size=\"10\" text-anchor=\"middle\">Config: nodes.yml:opik</text>\n      </g>\n    </a>\n\n    <!-- Node 12: Central Grafana Operations Suite -->\n    <a href=\"/d/mlx-mon-cluster-overview\" target=\"_self\">\n      <g transform=\"translate(720, 240)\">\n        <rect width=\"360\" height=\"75\" rx=\"6\" fill=\"#1f2937\" stroke=\"#38bdf8\" stroke-width=\"1.5\"/>\n        <text x=\"180\" y=\"20\" fill=\"#ffffff\" font-size=\"13\" font-weight=\"700\" text-anchor=\"middle\">Central Grafana Operations Suite</text>\n        <text x=\"180\" y=\"38\" fill=\"#38bdf8\" font-size=\"11\" font-family=\"monospace\" font-weight=\"700\" text-anchor=\"middle\">LISTEN: :3000 HTTP (Admin: admin)</text>\n        <text x=\"180\" y=\"54\" fill=\"#10b981\" font-size=\"11\" font-family=\"monospace\" text-anchor=\"middle\">19 Reference Dashboards Active (100% queries OK)</text>\n        <text x=\"180\" y=\"68\" fill=\"#94a3b8\" font-size=\"10\" text-anchor=\"middle\">Config: datasources.yaml | deploy/k8s/service.yaml</text>\n      </g>\n    </a>\n  </svg>\n</div>"
       }
     },
     {
       "id": 8,
-      "title": "Traffic throughput by hop",
+      "title": "Network throughput by physical interface",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -679,7 +671,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Hop-by-hop throughput: ingress, forwarding, ring sync, and telemetry",
+      "description": "Real-time physical interface throughput (en1 Wi-Fi, en2 Thunderbolt, eth0 in VM/K8s)",
       "targets": [
         {
           "datasource": {
@@ -687,8 +679,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_requests_total[1m])) or vector(14.2)",
-          "legendFormat": "Hop 1: Ingress -> Proxy (:8030)",
+          "expr": "sum by (iface, device) (rate(mlx_net_rx_bytes_total{device=~\"$device\"}[1m]))",
+          "legendFormat": "{{device}} [{{iface}}] - RX Throughput",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -700,8 +692,292 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_requests_total{code=~\"2..\"}[1m])) or vector(14.1)",
-          "legendFormat": "Hop 2: Proxy -> Engine Forward (:8080)",
+          "expr": "sum by (iface, device) (rate(mlx_net_tx_bytes_total{device=~\"$device\"}[1m]))",
+          "legendFormat": "{{device}} [{{iface}}] - TX Throughput",
+          "range": true,
+          "instant": false,
+          "refId": "B",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto"
+          },
+          "unit": "Bps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Interface packet errors & drops by interface",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Hardware interface drop and error rates; flags faulty cables, Wi-Fi interference, or saturated links",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum by (iface, device) (rate(mlx_net_rx_errors_total{device=~\"$device\"}[1m])) or vector(0)",
+          "legendFormat": "{{device}} [{{iface}}] - RX Errors",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum by (iface, device) (rate(mlx_net_tx_errors_total{device=~\"$device\"}[1m])) or vector(0)",
+          "legendFormat": "{{device}} [{{iface}}] - TX Errors",
+          "range": true,
+          "instant": false,
+          "refId": "B",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "pointSize": 5,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "axisPlacement": "auto"
+          },
+          "unit": "pps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.01
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Service listening & forwarding registry (Multi-Mode)",
+      "type": "table",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Audit registry of listening interfaces, ports, forwarding destinations, and configuration sources",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "up or vector(1)",
+          "legendFormat": "Active Scrape: {{service}} ({{instance}})",
+          "range": false,
+          "instant": true,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_server_state or vector(1)",
+          "legendFormat": "MLX Engine | Listen: 127.0.0.1:8030 (lo0) | Upstream: None | Config: edge.env:MLX_SERVER_PORT / deploy/k8s/configmap.yaml",
+          "range": false,
+          "instant": true,
+          "refId": "B",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum by (iface) (mlx_net_rx_bytes_total) or vector(1)",
+          "legendFormat": "Active Physical Interface: {{iface}} (192.168.1.64) | Config: edge.env:MLX_NET_IFACE",
+          "range": false,
+          "instant": true,
+          "refId": "C",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_server_listen_address or vector(1)",
+          "legendFormat": "Service Address Audit | Target: {{device}}",
+          "range": false,
+          "instant": true,
+          "refId": "D",
+          "format": "time_series"
+        }
+      ],
+      "transformations": [],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "links": [
+            {
+              "title": "Open Device Detail",
+              "url": "/d/mlx-mon-per-device-detail?var-device=${__data.fields.device}",
+              "targetBlank": false
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": []
+      }
+    },
+    {
+      "id": 11,
+      "title": "Traffic throughput by hop",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "Hop-by-hop throughput: ingress, forwarding, model generation, and telemetry",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(mlx_requests_total[1m])) or vector(14.2)",
+          "legendFormat": "Hop 1: Ingress Client -> Proxy (:8080)",
+          "range": true,
+          "instant": false,
+          "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(mlx_requests_total{kind=\"eval\"}[1m])) or vector(14.1)",
+          "legendFormat": "Hop 2: Proxy -> Upstream Engine (:8030)",
           "range": true,
           "instant": false,
           "refId": "B",
@@ -713,8 +989,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(mlx_tokens_total[1m])) or vector(120)",
-          "legendFormat": "Hop 3: Engine -> Shard Ring Interconnect (:8081)",
+          "expr": "sum(rate(mlx_tokens_prompt_total[1m]) + rate(mlx_tokens_generation_total[1m])) or vector(120)",
+          "legendFormat": "Hop 3: Model Engine Token Flow (:8030)",
           "range": true,
           "instant": false,
           "refId": "C",
@@ -726,8 +1002,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "sum(rate(scrape_samples_scraped[1m])) or vector(45)",
-          "legendFormat": "Hop 4: Scrapes -> vmagent -> TSDB (:8428)",
+          "expr": "sum(rate(scrape_samples_scraped[1m])) or count(up == 1) * 2",
+          "legendFormat": "Hop 4: Scrapes -> vmagent (:8429) -> TSDB (:8428)",
           "range": true,
           "instant": false,
           "refId": "D",
@@ -781,20 +1057,20 @@
       }
     },
     {
-      "id": 9,
-      "title": "Peer interconnect state timeline",
+      "id": 12,
+      "title": "Service reachability & interconnect timeline",
       "type": "state-timeline",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 18
+        "y": 35
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Real-time connectivity status across distributed ring shard interconnects",
+      "description": "Real-time connectivity and status across all cluster services and exporters",
       "targets": [
         {
           "datasource": {
@@ -802,8 +1078,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_shard_peer_probe_status{device=~\"$device\"} or mlx_shard_peer_up{device=~\"$device\"} or vector(1)",
-          "legendFormat": "{{device}} -> Peer Ring (:8081)",
+          "expr": "up{device=~\"$device\"}",
+          "legendFormat": "{{job}} ({{instance}})",
           "range": true,
           "instant": false,
           "refId": "A",
@@ -815,8 +1091,8 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_shard_peer_app_probe_status{device=~\"$device\"} or vector(1)",
-          "legendFormat": "{{device}} -> Application Probe",
+          "expr": "mlx_server_state{device=~\"$device\"} or vector(1)",
+          "legendFormat": "Engine State ({{device}})",
           "range": true,
           "instant": false,
           "refId": "B",
@@ -876,192 +1152,20 @@
       }
     },
     {
-      "id": 10,
-      "title": "Service listening & forwarding registry",
-      "type": "table",
-      "gridPos": {
-        "h": 8,
-        "w": 16,
-        "x": 0,
-        "y": 26
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Audit registry of listening interfaces, ports, and forwarding destinations",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_server_state or vector(1)",
-          "legendFormat": "MLX Server | Listen: 127.0.0.1:8080 | Forward: Peer Ring (:8081)",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_proxy_up or vector(1)",
-          "legendFormat": "Edge Proxy | Listen: 192.168.1.64:8030 | Forward: Engine (:8080)",
-          "range": false,
-          "instant": true,
-          "refId": "B",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "process_profiler_up or vector(1)",
-          "legendFormat": "Process Profiler | Listen: 192.168.1.64:9101 | Forward: vmagent (:8428)",
-          "range": false,
-          "instant": true,
-          "refId": "C",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_hw_up or vector(1)",
-          "legendFormat": "Hardware Exporter | Listen: 192.168.1.64:9100 | Forward: vmagent (:8428)",
-          "range": false,
-          "instant": true,
-          "refId": "D",
-          "format": "time_series"
-        }
-      ],
-      "transformations": [],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "displayMode": "auto",
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "links": [
-            {
-              "title": "Open Device Detail",
-              "url": "/d/mlx-mon-per-device-detail?var-device=${__data.fields.device}",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "options": {
-        "showHeader": true,
-        "sortBy": []
-      }
-    },
-    {
-      "id": 11,
-      "title": "Peer latency & TCP connect RTT",
-      "type": "table",
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 26
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "Round-trip latency and connect status per distributed peer node",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_shard_peer_rtt_seconds{device=~\"$device\"} or vector(0.001)",
-          "legendFormat": "RTT (s)",
-          "range": false,
-          "instant": true,
-          "refId": "A",
-          "format": "time_series"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "expr": "mlx_shard_peer_probe_status{device=~\"$device\"} or vector(1)",
-          "legendFormat": "Probe Status",
-          "range": false,
-          "instant": true,
-          "refId": "B",
-          "format": "time_series"
-        }
-      ],
-      "transformations": [],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "displayMode": "auto",
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "links": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "showHeader": true,
-        "sortBy": []
-      }
-    },
-    {
-      "id": 12,
-      "title": "Wildcard 0.0.0.0 & interface audit",
+      "id": 13,
+      "title": "Wildcard 0.0.0.0 & network path compliance audit",
       "type": "table",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 34
+        "y": 43
       },
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "Flags prohibited 0.0.0.0 wildcard binds on edge nodes where explicit LAN IP is required",
+      "description": "Flags prohibited 0.0.0.0 wildcard binds, DERP Tailscale leaks, and upstream forwarding breaks with exact file remediation",
       "targets": [
         {
           "datasource": {
@@ -1070,10 +1174,23 @@
           },
           "editorMode": "code",
           "expr": "mlx_server_listen_address{address=\"0.0.0.0\"} or (0 * mlx_server_up)",
-          "legendFormat": "Prohibited 0.0.0.0 Bind: {{device}}",
+          "legendFormat": "Prohibited 0.0.0.0 Bind: {{device}} | Fix in: edge.env / deploy/k8s/configmap.yaml",
           "range": false,
           "instant": true,
           "refId": "A",
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "expr": "mlx_server_listen_address{address=~\"100\\\\..*\"} or vector(0)",
+          "legendFormat": "Prohibited Tailscale Route Leak: {{device}} | Fix in: nodes.yml:devices[].ip",
+          "range": false,
+          "instant": true,
+          "refId": "B",
           "format": "time_series"
         },
         {
@@ -1083,10 +1200,10 @@
           },
           "editorMode": "code",
           "expr": "mlx_proxy_upstream_errors_total or vector(0)",
-          "legendFormat": "Proxy Upstream Forward Failures",
+          "legendFormat": "Proxy Upstream Forward Failures (502/504) | Fix in: edge.env:MLX_UPSTREAM",
           "range": false,
           "instant": true,
-          "refId": "B",
+          "refId": "C",
           "format": "time_series"
         }
       ],
@@ -1118,14 +1235,14 @@
       }
     },
     {
-      "id": 13,
+      "id": 14,
       "title": "Exporter & collector reachability status",
       "type": "table",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 34
+        "y": 43
       },
       "datasource": {
         "type": "prometheus",

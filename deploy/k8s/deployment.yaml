@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlx-workload
+  namespace: mlx
+  labels:
+    app.kubernetes.io/name: mlx-workload
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mlx-workload
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mlx-workload
+    spec:
+      containers:
+        - name: mlx-proxy
+          image: ghcr.io/hellodk/mlx-proxy:latest
+          ports:
+            - containerPort: 8080
+              name: proxy-http
+          envFrom:
+            - configMapRef:
+                name: mlx-config
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+        - name: mlx-engine
+          image: ghcr.io/hellodk/mlx-engine:latest
+          ports:
+            - containerPort: 8030
+              name: engine-api
+          envFrom:
+            - configMapRef:
+                name: mlx-config
+          readinessProbe:
+            httpGet:
+              path: /v1/models
+              port: 8030
+            initialDelaySeconds: 10
+            periodSeconds: 10
