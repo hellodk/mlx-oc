@@ -82,6 +82,7 @@ class EdgeTopologyAgentDaemon:
     def __init__(
         self,
         device_id: str,
+        device_ip: Optional[str] = None,
         central_url: str = "http://127.0.0.1:8089",
         vmagent_url: str = "http://127.0.0.1:8429",
         interval: float = 30.0,
@@ -89,6 +90,7 @@ class EdgeTopologyAgentDaemon:
         inventory_path: Optional[str | Path] = None,
     ):
         self.device_id = device_id
+        self.device_ip = device_ip
         self.central_url = central_url.rstrip("/")
         self.vmagent_url = vmagent_url.rstrip("/")
         self.interval = max(2.0, interval)
@@ -97,6 +99,7 @@ class EdgeTopologyAgentDaemon:
 
         self.discovery = EdgeTopologyDiscovery(
             device_id=self.device_id,
+            device_ip=self.device_ip,
             components_inventory_path=self.inventory_path,
             vmagent_url=self.vmagent_url,
             central_url=self.central_url,
@@ -161,6 +164,7 @@ class EdgeTopologyAgentDaemon:
 def main() -> None:
     parser = argparse.ArgumentParser(description="MLX Edge Topology Discovery Agent")
     parser.add_argument("--device-id", default=os.environ.get("MLX_DEVICE_ID", os.environ.get("MLX_MACBOOK_ID", "node-01")))
+    parser.add_argument("--device-ip", default=os.environ.get("MLX_DEVICE_IP", ""))
     parser.add_argument("--central-url", default=os.environ.get("CENTRAL_TOPOLOGY_URL", "http://127.0.0.1:8089"))
     parser.add_argument("--vmagent-url", default=os.environ.get("VMAGENT_URL", "http://127.0.0.1:8429"))
     parser.add_argument("--interval", type=float, default=float(os.environ.get("TOPOLOGY_INTERVAL", "30.0")))
@@ -172,6 +176,7 @@ def main() -> None:
 
     daemon = EdgeTopologyAgentDaemon(
         device_id=args.device_id,
+        device_ip=args.device_ip or None,
         central_url=args.central_url,
         vmagent_url=args.vmagent_url,
         interval=args.interval,

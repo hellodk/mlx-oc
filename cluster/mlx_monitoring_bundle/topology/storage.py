@@ -9,6 +9,7 @@ from __future__ import annotations
 import abc
 import datetime
 import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -63,8 +64,9 @@ class TopologyStorage(abc.ABC):
 class SQLiteTopologyStorage(TopologyStorage):
     """SQLite WAL-mode implementation of the central topology registry."""
 
-    def __init__(self, db_path: str | Path = "topology.db"):
+    def __init__(self, db_path: str | Path = "topology.db", central_ip: Optional[str] = None):
         self.db_path = str(db_path)
+        self.central_ip = central_ip or os.environ.get("CENTRAL_IP", "192.168.1.64")
         if self.db_path != ":memory:":
             Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
@@ -159,10 +161,14 @@ class SQLiteTopologyStorage(TopologyStorage):
                 CREATE INDEX IF NOT EXISTS idx_edges_device ON edges (device_id);
                 CREATE INDEX IF NOT EXISTS idx_discrepancies_device ON discrepancies (device_id, resolved);
                 CREATE INDEX IF NOT EXISTS idx_snapshots_device_ts ON snapshots (device_id, timestamp);
-
-                INSERT OR IGNORE INTO devices (device_id, name, ip, deployment_type, status, last_heartbeat)
-                VALUES ('central', 'Central Observability Stack', '127.0.0.1', 'container', 'HEALTHY', '2026-01-01T00:00:00Z');
             """)
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO devices (device_id, name, ip, deployment_type, status, last_heartbeat)
+                VALUES ('central', 'Central Observability Stack', ?, 'container', 'HEALTHY', '2026-01-01T00:00:00Z');
+                """,
+                (self.central_ip,),
+            )
 
     def save_snapshot(self, snapshot: TopologySnapshot) -> None:
         """Persist snapshot, update device heartbeat, and upsert nodes/edges atomically."""

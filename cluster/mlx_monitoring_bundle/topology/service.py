@@ -331,12 +331,13 @@ class TopologyAPIService:
         host: str = "0.0.0.0",
         port: int = 8089,
         db_path: str = "topology.db",
-        vm_url: str = "http://127.0.0.1:8428",
+        vm_url: str = "http://192.168.1.64:8428",
         reconcile_interval: float = 15.0,
+        central_ip: Optional[str] = None,
     ):
         self.host = host
         self.port = port
-        self.storage = SQLiteTopologyStorage(db_path=db_path)
+        self.storage = SQLiteTopologyStorage(db_path=db_path, central_ip=central_ip)
         self.reconciler = CentralTopologyReconciler(storage=self.storage, vm_query_url=vm_url)
         self.reconcile_interval = max(2.0, reconcile_interval)
         self.server: Optional[ThreadingHTTPServer] = None
@@ -405,7 +406,8 @@ def main() -> None:
     parser.add_argument("--host", default="0.0.0.0", help="HTTP listen host")
     parser.add_argument("--port", type=int, default=8089, help="HTTP listen port")
     parser.add_argument("--db-path", default="topology.db", help="Path to SQLite topology database")
-    parser.add_argument("--vm-url", default="http://127.0.0.1:8428", help="VictoriaMetrics TSDB base URL")
+    parser.add_argument("--vm-url", default=os.environ.get("VM_URL", "http://192.168.1.64:8428"), help="VictoriaMetrics TSDB base URL")
+    parser.add_argument("--central-ip", default=os.environ.get("CENTRAL_IP", "192.168.1.64"), help="Central node IP address")
     parser.add_argument("--reconcile-interval", type=float, default=15.0, help="Reconciliation & TSDB export interval in seconds")
     args = parser.parse_args()
 
@@ -415,6 +417,7 @@ def main() -> None:
         db_path=args.db_path,
         vm_url=args.vm_url,
         reconcile_interval=args.reconcile_interval,
+        central_ip=args.central_ip,
     )
     try:
         svc.start()

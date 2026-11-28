@@ -40,11 +40,13 @@ class EdgeTopologyDiscovery:
     def __init__(
         self,
         device_id: str = "node-01",
+        device_ip: Optional[str] = None,
         components_inventory_path: Optional[str | Path] = None,
         vmagent_url: str = "http://127.0.0.1:8429",
         central_url: str = "http://127.0.0.1:8089",
     ):
         self.device_id = device_id
+        self.device_ip = device_ip or self._detect_local_ip()
         self.vmagent_url = vmagent_url
         self.central_url = central_url.rstrip("/")
 
@@ -61,6 +63,20 @@ class EdgeTopologyDiscovery:
             self.inventory_path = next((p for p in candidates if p.exists()), candidates[0])
 
         self.inspector = VMAgentInspector(vmagent_url=self.vmagent_url)
+
+    @staticmethod
+    def _detect_local_ip() -> str:
+        """Best-effort detection of local host IP."""
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            if ip and not ip.startswith("127."):
+                return ip
+        except Exception:
+            pass
+        return "127.0.0.1"
 
     def load_desired_inventory(self) -> Dict[str, Any]:
         """Load desired component inventory if available."""
@@ -99,6 +115,7 @@ class EdgeTopologyDiscovery:
         # Snapshot metadata
         meta = {
             "device_id": self.device_id,
+            "ip_address": self.device_ip,
             "hostname": socket.gethostname(),
             "platform": platform.platform(),
             "python_version": platform.python_version(),
@@ -474,7 +491,8 @@ class EdgeTopologyDiscovery:
         nodes.append(vma_node)
 
         # Central VictoriaMetrics Node & Edge
-        vm_target_url = vma_report.configured_remote_writes[0] if vma_report.configured_remote_writes else "http://127.0.0.1:8428/api/v1/write"
+        default_vm_host = self.central_url.split("://")[-1].split(":")[0] if "://" in self.central_url else "127.0.0.1"
+        vm_target_url = vma_report.configured_remote_writes[0] if vma_report.configured_remote_writes else f"http://{default_vm_host}:8428/api/v1/write"
         rw_stat = vma_report.remote_write_status.get(vm_target_url)
 
         rw_status = HealthStatus.HEALTHY

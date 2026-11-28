@@ -12,6 +12,7 @@ central:
   victoria_metrics: "<CENTRAL_HOST>:8428"
   otel: "<CENTRAL_HOST>:4318"
   opik: "<CENTRAL_HOST>:32173"
+  topology: "<CENTRAL_HOST>:8089"
 
 macbooks:
   - id: "<NODE_ID>"              # e.g. hostname; used as the macbook label

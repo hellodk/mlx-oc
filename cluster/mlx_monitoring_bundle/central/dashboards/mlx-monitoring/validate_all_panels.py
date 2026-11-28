@@ -218,8 +218,8 @@ def main():
     parser = argparse.ArgumentParser(description="Validate all panels across MLX reference monitoring dashboards.")
     parser.add_argument(
         "--url",
-        default=os.environ.get("VICTORIAMETRICS_URL", os.environ.get("VM_URL", "http://127.0.0.1:8428")),
-        help="VictoriaMetrics / TSDB base URL (default: http://127.0.0.1:8428 or $VICTORIAMETRICS_URL)",
+        default=os.environ.get("VICTORIAMETRICS_URL", os.environ.get("VM_URL", "http://192.168.1.64:8428")),
+        help="VictoriaMetrics / TSDB base URL (default: http://192.168.1.64:8428 or $VICTORIAMETRICS_URL)",
     )
     parser.add_argument(
         "--device",

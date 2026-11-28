@@ -280,10 +280,19 @@ class Bundle:
             f"{self.otlp_scheme}://{self.central_opik}" if self.central_opik else ""
         )
         self.opik_otlp_endpoint = config.get("OPIK_OTLP_ENDPOINT", "")
+
+        # Dynamic central topology resolution:
+        # Priority: CENTRAL_TOPOLOGY_URL -> central_topology -> host of central_vm -> node IP -> loopback
+        default_central_host = "127.0.0.1"
+        if self.central_vm:
+            default_central_host = self.central_vm.split(":")[0]
+        elif self.node_config.get("ip"):
+            default_central_host = self.node_config.get("ip")
+
         self.topology_endpoint = (
             config.get("CENTRAL_TOPOLOGY_URL")
             or (f"{self.otlp_scheme}://{self.central_topology}" if self.central_topology else "")
-            or "http://127.0.0.1:8089"
+            or f"http://{default_central_host}:8089"
         )
 
         model_path = (
@@ -566,6 +575,7 @@ class Bundle:
         cmd = [
             self.venv_python, "mlx_topology_agent.py",
             "--device-id", self.device,
+            "--device-ip", self.node_config.get("ip", ""),
             "--central-url", self.topology_endpoint,
             "--vmagent-url", f"{self.otlp_scheme}://127.0.0.1:8429",
             "--interval", str(self.topology_interval),
