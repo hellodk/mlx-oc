@@ -663,9 +663,9 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_topology_node_info{device=~\"$device\"} or (1 * mlx_server_state{device=~\"$device\"})",
+          "expr": "mlx_topology_node_info{device=~\"$device|central|external\"} or (1 * mlx_server_state{device=~\"$device\"})",
           "legendFormat": "Node: {{name}} ({{device}})",
-          "range": true,
+          "range": false,
           "instant": true,
           "refId": "nodes",
           "format": "table"
@@ -676,9 +676,9 @@
             "uid": "VictoriaMetrics"
           },
           "editorMode": "code",
-          "expr": "mlx_topology_edge_info or (1 * mlx_shard_peer_up)",
+          "expr": "mlx_topology_edge_info{device=~\"$device|central|external\"} or (1 * mlx_shard_peer_up)",
           "legendFormat": "Edge: {{source}} -> {{target}}",
-          "range": true,
+          "range": false,
           "instant": true,
           "refId": "edges",
           "format": "table"

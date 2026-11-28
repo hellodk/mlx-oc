@@ -60,6 +60,7 @@ class SignalType(str, Enum):
 
 class NodeRole(str, Enum):
     """Architectural layer of the topology component."""
+    CLIENT = "client"
     DATA_PLANE = "data_plane"
     EXPORTER = "exporter"
     COLLECTOR = "collector"
@@ -158,6 +159,7 @@ class TopologyEdge(BaseModel):
     id: str  # e.g. "node-01:mlx_metrics_proxy->central:victoria_metrics:metrics"
     source_id: str
     target_id: str
+    device_id: str = ""
     signal_type: SignalType
     protocol: str = "http"  # http_prom_scrape | prom_remote_write | otlp_http | opik_sdk | http_app
     expected_endpoint: str = ""
@@ -183,6 +185,7 @@ class TopologyEdge(BaseModel):
             "id": self.id,
             "source": self.source_id,
             "target": self.target_id,
+            "device": self.device_id,
             "mainStat": main_stat,
             "secondaryStat": sec_stat,
             "color": edge_color,

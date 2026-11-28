@@ -301,11 +301,13 @@ def make_nodegraph_panel(
     n_t["refId"] = "nodes"
     n_t["format"] = "table"
     n_t["instant"] = True
+    n_t["range"] = False
 
     e_t = dict(edges_target)
     e_t["refId"] = "edges"
     e_t["format"] = "table"
     e_t["instant"] = True
+    e_t["range"] = False
 
     return {
         "id": panel_id,
@@ -2194,8 +2196,8 @@ def build_network_topology() -> Dict[str, Any]:
         # Row 2: Live Dynamic Node Graph Visualization (Hero Panel, y=4, h=14, w=24)
         make_nodegraph_panel(
             7, "Dynamic telemetry & component topology (Native Node Graph)", 0, 4, 24, 14,
-            make_target("mlx_topology_node_info{device=~\"$device\"} or (1 * mlx_server_state{device=~\"$device\"})", legend="Node: {{name}} ({{device}})"),
-            make_target("mlx_topology_edge_info or (1 * mlx_shard_peer_up)", legend="Edge: {{source}} -> {{target}}"),
+            make_target("mlx_topology_node_info{device=~\"$device|central|external\"} or (1 * mlx_server_state{device=~\"$device\"})", legend="Node: {{name}} ({{device}})"),
+            make_target("mlx_topology_edge_info{device=~\"$device|central|external\"} or (1 * mlx_shard_peer_up)", legend="Edge: {{source}} -> {{target}}"),
             description="Native Grafana Node Graph rendering real-time nodes, listening sockets, forwarding hops, and telemetry pipelines with click-to-inspect drawers",
         ),
 

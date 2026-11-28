@@ -310,15 +310,33 @@ def render_prometheus_metrics(storage: TopologyStorage) -> str:
         "# HELP mlx_topology_node_info Node graph info metric for Grafana",
         "# TYPE mlx_topology_node_info gauge",
     ])
+    node_ids = {n.id for n in nodes}
+    # Ensure client_applications is always present if any edge references it
+    has_client = any(e.source_id == "client_applications" or e.target_id == "client_applications" for e in edges)
+    if "client_applications" not in node_ids and has_client:
+        lines.append('mlx_topology_node_info{id="client_applications",name="Client Applications",device="external",role="client",health="HEALTHY",color="#3b82f6"} 1')
+        node_ids.add("client_applications")
+
     for n in nodes:
         lines.append(f'mlx_topology_node_info{{id="{n.id}",name="{n.name}",device="{n.device_id}",role="{n.role.value}",health="{n.health.value}",color="{n.health.color}"}} 1')
+
+    # Safety: synthesize stub nodes for any edge source or target absent from node_ids
+    # This strictly guarantees Grafana Node Graph never fails with "edge references missing nodes"
+    for e in edges:
+        if e.source_id not in node_ids:
+            lines.append(f'mlx_topology_node_info{{id="{e.source_id}",name="{e.source_id}",device="external",role="data_plane",health="UNKNOWN",color="#6b7280"}} 1')
+            node_ids.add(e.source_id)
+        if e.target_id not in node_ids:
+            lines.append(f'mlx_topology_node_info{{id="{e.target_id}",name="{e.target_id}",device="external",role="data_plane",health="UNKNOWN",color="#6b7280"}} 1')
+            node_ids.add(e.target_id)
 
     lines.extend([
         "# HELP mlx_topology_edge_info Edge graph info metric for Grafana",
         "# TYPE mlx_topology_edge_info gauge",
     ])
     for e in edges:
-        lines.append(f'mlx_topology_edge_info{{id="{e.id}",source="{e.source_id}",target="{e.target_id}",signal="{e.signal_type.value}",status="{e.status.value}"}} 1')
+        edev = getattr(e, "device_id", "") or (e.source_id.split(":")[0] if ":" in e.source_id else "all")
+        lines.append(f'mlx_topology_edge_info{{id="{e.id}",source="{e.source_id}",target="{e.target_id}",device="{edev}",signal="{e.signal_type.value}",status="{e.status.value}"}} 1')
 
     lines.append("")
     return "\n".join(lines)

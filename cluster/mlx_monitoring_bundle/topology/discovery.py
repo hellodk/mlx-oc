@@ -220,6 +220,19 @@ class EdgeTopologyDiscovery:
         now_ts: str,
     ) -> None:
         """Inspect Ingress Proxy and Upstream Inference Engine."""
+        # 0. Client Applications (ingress traffic source)
+        client_node = TopologyNode(
+            id="client_applications",
+            name="Client Applications",
+            device_id="external",
+            role=NodeRole.CLIENT,
+            deployment_type="external",
+            health=HealthStatus.HEALTHY,
+            last_seen_ts=now_ts,
+            metadata={"description": "External client applications and API traffic"},
+        )
+        nodes.append(client_node)
+
         # 1. Ingress Proxy (:8080)
         proxy_pid, proxy_eps = self._find_pid_by_port_or_pattern(8080, "mlx_metrics_proxy", listeners, process_map)
         proxy_health = HealthStatus.HEALTHY if proxy_pid is not None else HealthStatus.CRITICAL
@@ -299,6 +312,7 @@ class EdgeTopologyDiscovery:
             id=f"client->{self.device_id}:mlx_metrics_proxy:application",
             source_id="client_applications",
             target_id=proxy_node.id,
+            device_id=self.device_id,
             signal_type=SignalType.APPLICATION,
             protocol="http_rest_sse",
             expected_endpoint=":8080",
@@ -313,6 +327,7 @@ class EdgeTopologyDiscovery:
             id=f"{proxy_node.id}->{engine_node.id}:application",
             source_id=proxy_node.id,
             target_id=engine_node.id,
+            device_id=self.device_id,
             signal_type=SignalType.APPLICATION,
             protocol="http_loopback",
             expected_endpoint="127.0.0.1:8030",
@@ -428,6 +443,7 @@ class EdgeTopologyDiscovery:
                 id=f"{node_id}->{vma_node_id}:metrics",
                 source_id=node_id,
                 target_id=vma_node_id,
+                device_id=self.device_id,
                 signal_type=SignalType.METRICS,
                 protocol="http_prom_scrape",
                 expected_endpoint=f"127.0.0.1:{port}/metrics",
@@ -522,6 +538,7 @@ class EdgeTopologyDiscovery:
             id=f"{vma_node_id}->{central_vm_id}:metrics",
             source_id=vma_node_id,
             target_id=central_vm_id,
+            device_id=self.device_id,
             signal_type=SignalType.METRICS,
             protocol="prom_remote_write",
             expected_endpoint=vm_target_url,
